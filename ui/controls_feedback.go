@@ -1,0 +1,213 @@
+package ui
+
+import (
+	"math"
+	"time"
+
+	"anyui/platform"
+	"anyui/render"
+)
+
+// ToastKind задаёт тип всплывающего уведомления.
+type ToastKind uint8
+
+const (
+	ToastInfo ToastKind = iota
+	ToastSuccess
+	ToastWarning
+	ToastError
+)
+
+// ToastMessage описывает активное всплывающее уведомление.
+type ToastMessage struct {
+	ID        int
+	Title     string
+	Text      string
+	Kind      ToastKind
+	Duration  time.Duration
+	CreatedAt time.Time
+}
+
+// ShowToast добавляет всплывающее уведомление в очередь отображения.
+// Если duration не задано, используется длительность по умолчанию (3.5 секунды).
+func (c *Context) ShowToast(title, text string, kind ToastKind, duration ...time.Duration) {
+	dur := 3500 * time.Millisecond
+	if len(duration) > 0 && duration[0] > 0 {
+		dur = duration[0]
+	}
+	c.nextToastID++
+	c.toasts = append(c.toasts, &ToastMessage{
+		ID:        c.nextToastID,
+		Title:     title,
+		Text:      text,
+		Kind:      kind,
+		Duration:  dur,
+		CreatedAt: time.Now(),
+	})
+	// Ограничим максимум 5 одновременных тостов
+	if len(c.toasts) > 5 {
+		c.toasts = c.toasts[len(c.toasts)-5:]
+	}
+	if c.Animator != nil {
+		c.Animator.MarkActive()
+	}
+	c.RequestRedraw()
+}
+
+// ToastsCount возвращает количество активных уведомлений (удобно для тестов).
+func (c *Context) ToastsCount() int {
+	return len(c.toasts)
+}
+
+// drawToasts удаляет просроченные уведомления и рисует активные в правом нижнем углу поверх UI.
+func (c *Context) drawToasts() {
+	if len(c.toasts) == 0 {
+		return
+	}
+
+	now := time.Now()
+	alive := c.toasts[:0]
+	for _, t := range c.toasts {
+		if now.Sub(t.CreatedAt) < t.Duration {
+			alive = append(alive, t)
+		}
+	}
+	c.toasts = alive
+	if len(c.toasts) == 0 {
+		return
+	}
+
+	if c.Animator != nil {
+		c.Animator.MarkActive()
+	}
+
+	toastW := c.S(300)
+	toastH := c.S(64)
+	gap := c.S(10)
+	margin := c.S(16)
+
+	for i := len(c.toasts) - 1; i >= 0; i-- {
+		t := c.toasts[i]
+		idxFromBottom := len(c.toasts) - 1 - i
+		rx := c.Canvas.Width - toastW - margin
+		ry := c.Canvas.Height - margin - (idxFromBottom+1)*toastH - idxFromBottom*gap
+		if rx < margin {
+			rx = margin
+		}
+		if ry < margin {
+			continue
+		}
+		tr := render.Rect{X: rx, Y: ry, W: toastW, H: toastH}
+
+		accent := c.Theme.Accent
+		switch t.Kind {
+		case ToastSuccess:
+			accent = c.Theme.Success
+		case ToastWarning:
+			accent = c.Theme.Warning
+		case ToastError:
+			accent = c.Theme.Danger
+		}
+
+		elapsed := now.Sub(t.CreatedAt)
+		remainRatio := 1.0 - float32(elapsed)/float32(t.Duration)
+		if remainRatio < 0 {
+			remainRatio = 0
+		}
+
+		toastRef := t
+		c.PushOverlay(tr, func() {
+			c.Canvas.DrawBoxShadow(tr, render.BoxShadow{
+				OffsetY: c.Sf(4),
+				Blur:    c.Sf(12),
+				Color:   render.RGBA(0, 0, 0, 120),
+				Radii:   render.UniformRadii(c.Sf(10)),
+			})
+			c.Canvas.DrawRoundedBox(tr, c.Sf(10), c.Theme.Card, 1.0, c.Theme.Border)
+
+			// Левая цветная полоса типа уведомления
+			barR := render.Rect{X: tr.X + c.S(4), Y: tr.Y + c.S(8), W: c.S(4), H: tr.H - c.S(16)}
+			c.Canvas.FillRoundedRect(barR, c.Sf(2), accent)
+
+			// Кнопка закрытия '×'
+			closeR := render.Rect{X: tr.X + tr.W - c.S(26), Y: tr.Y + c.S(8), W: c.S(18), H: c.S(18)}
+			if closeR.Contains(c.MouseX, c.MouseY) {
+				c.nextCursor = platform.CursorHand
+				c.Canvas.FillRoundedRect(closeR, c.Sf(4), c.Theme.Surface)
+				if c.MousePressed {
+					toastRef.Duration = 0
+					c.RequestRedraw()
+				}
+			}
+			p := c.Sf(4)
+			c.Canvas.DrawLine(float32(closeR.X)+p, float32(closeR.Y)+p, float32(closeR.X+closeR.W)-p, float32(closeR.Y+closeR.H)-p, c.Sf(1.4), c.Theme.TextMuted)
+			c.Canvas.DrawLine(float32(closeR.X+closeR.W)-p, float32(closeR.Y)+p, float32(closeR.X)+p, float32(closeR.Y+closeR.H)-p, c.Sf(1.4), c.Theme.TextMuted)
+
+			if c.Font != nil {
+				textX := tr.X + c.S(16)
+				textW := tr.W - c.S(46)
+				c.Canvas.PushClip(render.Rect{X: textX, Y: tr.Y, W: textW, H: tr.H})
+				if toastRef.Title != "" {
+					c.Font.DrawTextStyled(c.Canvas, textX, tr.Y+c.S(10), toastRef.Title, c.S(13), c.Theme.TextPrimary, render.FontBold)
+				}
+				if toastRef.Text != "" {
+					c.Font.DrawText(c.Canvas, textX, tr.Y+c.S(32), toastRef.Text, c.S(12), c.Theme.TextMuted)
+				}
+				c.Canvas.PopClip()
+			}
+
+			// Индикатор оставшегося времени внизу
+			progW := int(float32(tr.W-c.S(16)) * remainRatio)
+			if progW > 0 {
+				c.Canvas.FillRoundedRect(render.Rect{X: tr.X + c.S(8), Y: tr.Y + tr.H - c.S(4), W: progW, H: c.S(2)}, c.Sf(1), accent.WithAlpha(180))
+			}
+		})
+	}
+}
+
+// Spinner рисует анимированный индикатор загрузки.
+func (c *Context) Spinner(id string, sizeDp int, opts ...Option) {
+	if sizeDp <= 0 {
+		sizeDp = 24
+	}
+	if c.spinnerAngle == nil {
+		c.spinnerAngle = make(map[string]float32)
+	}
+	st := ApplyOptions(opts)
+	sz := c.S(sizeDp)
+	rect := c.allocRect(sz, sz)
+
+	dt := float32(1.0 / 60.0)
+	if c.Animator != nil {
+		if d := c.Animator.Delta(); d > 0 {
+			dt = d
+		}
+		c.Animator.MarkActive()
+	}
+
+	angle := c.spinnerAngle[id] + dt*4.5 // ~0.72 оборота в секунду
+	if angle > float32(2*math.Pi) {
+		angle -= float32(2 * math.Pi)
+	}
+	c.spinnerAngle[id] = angle
+
+	cx := float32(rect.X) + float32(rect.W)*0.5
+	cy := float32(rect.Y) + float32(rect.H)*0.5
+	rad := float32(sz)*0.5 - c.Sf(3)
+	if rad < 2 {
+		rad = 2
+	}
+	thick := c.Sf(2.8)
+	if sz >= c.S(36) {
+		thick = c.Sf(3.5)
+	}
+
+	col := c.Theme.Accent
+	if st.Color != nil {
+		col = *st.Color
+	}
+
+	// Фоновое кольцо + вращающаяся дуга
+	c.Canvas.DrawArc(cx, cy, rad, 0, float32(2*math.Pi), thick, c.Theme.Border.WithAlpha(90))
+	c.Canvas.DrawArc(cx, cy, rad, angle, angle+float32(math.Pi*1.15), thick, col)
+}
