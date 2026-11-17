@@ -79,6 +79,13 @@ type demoState struct {
 	formHost  string
 	formPort  string
 	formToken string
+
+	// Раздел Фазы 6.2 (работа с текстом)
+	emailVal     string
+	phoneMaskVal string
+	dateMaskVal  string
+	ipMaskVal    string
+	linkClicks   int
 }
 
 func newDemoState() *demoState {
@@ -106,7 +113,11 @@ func newDemoState() *demoState {
 		textVal:     "Привет, AnyUI!",
 		digitsVal:   "12345",
 		readOnlyVal: "Только чтение (можно выделить и скопировать)",
-		notesVal:    "Многострочный редактор TextArea.\nПоддерживает перенос строк, скролл колесом мыши,\nCtrl+A / Ctrl+C / Ctrl+V.",
+		notesVal:    "Многострочный редактор TextArea с нумерацией строк.\nПоддерживает перенос строк, скролл колесом мыши,\nнавигацию Up/Down, Undo/Redo (Ctrl+Z/Ctrl+Y),\nвыделение по словам (Ctrl+Left/Right) и ПКМ-меню.",
+		emailVal:     "bad-email",
+		phoneMaskVal: "+7 (999) 123-45-67",
+		dateMaskVal:  "17.11.2026",
+		ipMaskVal:    "192.168.001.010",
 		selectIdx:   0,
 		comboIdx:    2,
 		listItems:   listItems,

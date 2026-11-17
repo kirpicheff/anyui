@@ -18,6 +18,8 @@ const (
 	EventKeyUp
 	EventChar
 	EventDropFiles
+	EventCaptureLost
+	EventFocusLost
 )
 
 // MouseButton определяет кнопку мыши.
@@ -72,6 +74,7 @@ type Event struct {
 	X        int         // Координата мыши X (в физических пикселях)
 	Y        int         // Координата мыши Y (в физических пикселях)
 	Button   MouseButton // Для EventMouseDown / EventMouseUp
+	WheelX   float32     // Для EventMouseWheel (положительное — вправо)
 	WheelY   float32     // Для EventMouseWheel (положительное — вверх)
 	KeyCode  uint32      // Виртуальный код клавиши (VK_* на Windows)
 	ScanCode uint16      // Аппаратный скан-код клавиши
@@ -175,6 +178,15 @@ type Window interface {
 
 	// NativeHandle возвращает нативный дескриптор окна (HWND на Windows).
 	NativeHandle() uintptr
+
+	// SetCapture захватывает ввод мыши окном, чтобы события приходили даже за его пределами.
+	SetCapture()
+
+	// ReleaseCapture освобождает захват ввода мыши.
+	ReleaseCapture()
+
+	// DoubleClickTimeMs возвращает системное время двойного клика в миллисекундах.
+	DoubleClickTimeMs() int
 }
 
 // TrayMenuItem описывает пункт контекстного меню системного трея.

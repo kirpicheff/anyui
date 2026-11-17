@@ -46,6 +46,7 @@ var (
 	procReleaseDC                 = modUser32.NewProc("ReleaseDC")
 	procSetCapture                = modUser32.NewProc("SetCapture")
 	procReleaseCapture            = modUser32.NewProc("ReleaseCapture")
+	procGetDoubleClickTime        = modUser32.NewProc("GetDoubleClickTime")
 	procOpenClipboard             = modUser32.NewProc("OpenClipboard")
 	procCloseClipboard            = modUser32.NewProc("CloseClipboard")
 	procEmptyClipboard            = modUser32.NewProc("EmptyClipboard")
@@ -79,9 +80,11 @@ const (
 
 	wmDestroy       = 0x0002
 	wmSize          = 0x0005
+	wmKillFocus     = 0x0008
 	wmPaint         = 0x000F
 	wmClose         = 0x0010
 	wmEraseBkgnd    = 0x0014
+	wmCancelMode    = 0x001F
 	wmGetMinMaxInfo = 0x0024
 	wmSetCursor     = 0x0020
 	wmKeyDown       = 0x0100
@@ -96,8 +99,10 @@ const (
 	wmRButtonUp     = 0x0205
 	wmMButtonDown   = 0x0207
 	wmMButtonUp     = 0x0208
-	wmMouseWheel    = 0x020A
-	wmDropFiles     = 0x0233
+	wmMouseWheel     = 0x020A
+	wmMouseHWheel    = 0x020E
+	wmCaptureChanged = 0x0215
+	wmDropFiles      = 0x0233
 	wmDPIChanged    = 0x02E0
 	wmAppWakeUp     = 0x8001
 
@@ -191,11 +196,12 @@ type win32Window struct {
 	pixels     []byte
 	bufW       int
 	bufH       int
-	closing    bool
-	onClose    func() bool
-	fullscreen bool
-	savedStyle uintptr
-	savedRect  rect
+	closing          bool
+	onClose          func() bool
+	fullscreen       bool
+	savedStyle       uintptr
+	savedRect        rect
+	releasingCapture bool
 }
 
 // NewWindow создаёт нативное окно для текущей операционной системы.
@@ -486,6 +492,29 @@ func (w *win32Window) SetCursor(cursor CursorType) {
 	w.applyCursor()
 }
 
+// SetCapture захватывает ввод мыши окном.
+func (w *win32Window) SetCapture() {
+	if w.hwnd != 0 {
+		procSetCapture.Call(uintptr(w.hwnd))
+	}
+}
+
+// ReleaseCapture освобождает захват ввода мыши.
+func (w *win32Window) ReleaseCapture() {
+	w.releasingCapture = true
+	procReleaseCapture.Call()
+	w.releasingCapture = false
+}
+
+// DoubleClickTimeMs возвращает системное время двойного клика ОС в миллисекундах.
+func (w *win32Window) DoubleClickTimeMs() int {
+	ms, _, _ := procGetDoubleClickTime.Call()
+	if ms == 0 {
+		return 500
+	}
+	return int(ms)
+}
+
 func (w *win32Window) applyCursor() {
 	var id uintptr = idcArrow
 	switch w.cursor {
@@ -734,7 +763,6 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 		return 0
 
 	case wmLButtonUp, wmRButtonUp, wmMButtonUp:
-		procReleaseCapture.Call()
 		btn := MouseLeft
 		if msg == wmRButtonUp {
 			btn = MouseRight
@@ -748,6 +776,7 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 			Y:      signExtend16(lParam >> 16),
 			Mods:   getModifiers(),
 		})
+		w.ReleaseCapture()
 		return 0
 
 	case wmMouseWheel:
@@ -757,6 +786,32 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 			WheelY: delta,
 			Mods:   getModifiers(),
 		})
+		return 0
+
+	case wmMouseHWheel:
+		delta := float32(int16(uint16((wParam >> 16) & 0xFFFF))) / 120.0
+		w.emit(Event{
+			Type:   EventMouseWheel,
+			WheelX: delta,
+			Mods:   getModifiers(),
+		})
+		return 0
+
+	case wmCaptureChanged:
+		if !w.releasingCapture && lParam != uintptr(hwnd) {
+			w.emit(Event{Type: EventCaptureLost})
+		}
+		return 0
+
+	case wmKillFocus:
+		// При потере фокуса (Alt+Tab) отпускаем захват мыши и сбрасываем фокус виджетов
+		w.ReleaseCapture()
+		w.emit(Event{Type: EventFocusLost})
+		return 0
+
+	case wmCancelMode:
+		w.ReleaseCapture()
+		w.emit(Event{Type: EventCaptureLost})
 		return 0
 
 	case wmKeyDown, wmSysKeyDown:

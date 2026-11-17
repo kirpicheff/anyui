@@ -6,10 +6,14 @@ import (
 )
 
 type scrollInfo struct {
-	y        int
-	contentH int
-	dragging bool
-	dragOffY int
+	x         int
+	y         int
+	contentW  int
+	contentH  int
+	dragging  bool
+	dragOffY  int
+	draggingH bool
+	dragOffX  int
 }
 
 // DrawerSide задаёт сторону окна, с которой выезжает Drawer.
@@ -89,21 +93,36 @@ func (c *Context) ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)
 	if maxSc < 0 {
 		maxSc = 0
 	}
+	maxScX := si.contentW - r.W
+	if maxScX < 0 {
+		maxScX = 0
+	}
 
 	hovered := !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)
 	if hovered && c.WheelY != 0 && maxSc > 0 {
 		si.y -= int(c.WheelY * float32(c.S(36)))
 		c.RequestRedraw()
 	}
+	if hovered && c.WheelX != 0 && maxScX > 0 {
+		si.x += int(c.WheelX * float32(c.S(36)))
+		c.RequestRedraw()
+	}
 
-	// Обработка перетаскивания скроллбара
+	// Обработка перетаскивания вертикального и горизонтального скроллбаров
 	barW := c.S(8)
-	if maxSc > 0 && si.contentH > 0 {
-		thumbH := (r.H * r.H) / si.contentH
+	vTrackLen := r.H
+	if maxScX > 0 {
+		vTrackLen -= barW + c.S(2)
+	}
+	if maxSc > 0 && si.contentH > 0 && vTrackLen > 0 {
+		thumbH := (vTrackLen * r.H) / si.contentH
 		if thumbH < c.S(24) {
 			thumbH = c.S(24)
 		}
-		trackH := r.H - thumbH
+		if thumbH > vTrackLen {
+			thumbH = vTrackLen
+		}
+		trackH := vTrackLen - thumbH
 		thumbY := r.Y
 		if trackH > 0 {
 			thumbY += (trackH * si.y) / maxSc
@@ -112,6 +131,7 @@ func (c *Context) ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)
 		if hovered && c.MousePressed && thumbRect.Contains(c.MouseX, c.MouseY) {
 			si.dragging = true
 			si.dragOffY = c.MouseY - thumbY
+			c.ActiveID = "sv_v:" + id
 		}
 		if si.dragging {
 			if c.MouseDown && trackH > 0 {
@@ -131,11 +151,58 @@ func (c *Context) ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)
 		}
 	}
 
+	hTrackLen := r.W
+	if maxSc > 0 {
+		hTrackLen -= barW + c.S(2)
+	}
+	if maxScX > 0 && si.contentW > 0 && hTrackLen > 0 {
+		thumbW := (hTrackLen * r.W) / si.contentW
+		if thumbW < c.S(24) {
+			thumbW = c.S(24)
+		}
+		if thumbW > hTrackLen {
+			thumbW = hTrackLen
+		}
+		trackW := hTrackLen - thumbW
+		thumbX := r.X
+		if trackW > 0 {
+			thumbX += (trackW * si.x) / maxScX
+		}
+		thumbRectH := render.Rect{X: thumbX, Y: r.Y + r.H - barW - c.S(2), W: thumbW, H: barW}
+		if hovered && c.MousePressed && thumbRectH.Contains(c.MouseX, c.MouseY) {
+			si.draggingH = true
+			si.dragOffX = c.MouseX - thumbX
+			c.ActiveID = "sv_h:" + id
+		}
+		if si.draggingH {
+			if c.MouseDown && trackW > 0 {
+				newThumbX := c.MouseX - si.dragOffX
+				rel := newThumbX - r.X
+				if rel < 0 {
+					rel = 0
+				}
+				if rel > trackW {
+					rel = trackW
+				}
+				si.x = (rel * maxScX) / trackW
+				c.RequestRedraw()
+			} else {
+				si.draggingH = false
+			}
+		}
+	}
+
 	if si.y < 0 {
 		si.y = 0
 	}
 	if si.y > maxSc {
 		si.y = maxSc
+	}
+	if si.x < 0 {
+		si.x = 0
+	}
+	if si.x > maxScX {
+		si.x = maxScX
 	}
 
 	pad := c.S(4)
@@ -148,24 +215,40 @@ func (c *Context) ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)
 	}
 
 	c.Canvas.PushClip(r)
+	boxX := r.X + pad - si.x
 	c.pushBox(render.Rect{
-		X: r.X + pad,
+		X: boxX,
 		Y: r.Y + pad - si.y,
 		W: innerW,
 		H: 1000000,
 	}, dirColumn, AlignStart, c.S(8))
 	startY := c.topLayout().cursorY
 	fn()
-	si.contentH = (c.topLayout().cursorY - startY) + pad*2
+	top := c.topLayout()
+	si.contentH = (top.cursorY - startY) + pad*2
+	if maxScX > 0 {
+		si.contentH += barW + c.S(4)
+	}
+	if top.maxUsedX > boxX {
+		si.contentW = (top.maxUsedX - boxX) + pad*2
+		if maxSc > 0 {
+			si.contentW += barW + c.S(4)
+		}
+	} else {
+		si.contentW = innerW + pad*2
+	}
 	c.popBox()
 	c.Canvas.PopClip()
 
-	if maxSc > 0 && si.contentH > 0 {
-		thumbH := (r.H * r.H) / si.contentH
+	if maxSc > 0 && si.contentH > 0 && vTrackLen > 0 {
+		thumbH := (vTrackLen * r.H) / si.contentH
 		if thumbH < c.S(24) {
 			thumbH = c.S(24)
 		}
-		thumbY := r.Y + ((r.H - thumbH) * si.y / maxSc)
+		if thumbH > vTrackLen {
+			thumbH = vTrackLen
+		}
+		thumbY := r.Y + ((vTrackLen - thumbH) * si.y / maxSc)
 		col := c.Theme.TextMuted.WithAlpha(110)
 		if si.dragging {
 			col = c.Theme.Accent
@@ -175,6 +258,26 @@ func (c *Context) ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)
 			Y: thumbY,
 			W: barW,
 			H: thumbH,
+		}, c.Sf(4), col)
+	}
+	if maxScX > 0 && si.contentW > 0 && hTrackLen > 0 {
+		thumbW := (hTrackLen * r.W) / si.contentW
+		if thumbW < c.S(24) {
+			thumbW = c.S(24)
+		}
+		if thumbW > hTrackLen {
+			thumbW = hTrackLen
+		}
+		thumbX := r.X + ((hTrackLen - thumbW) * si.x / maxScX)
+		col := c.Theme.TextMuted.WithAlpha(110)
+		if si.draggingH {
+			col = c.Theme.Accent
+		}
+		c.Canvas.FillRoundedRect(render.Rect{
+			X: thumbX,
+			Y: r.Y + r.H - barW - c.S(2),
+			W: thumbW,
+			H: barW,
 		}, c.Sf(4), col)
 	}
 }

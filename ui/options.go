@@ -42,6 +42,10 @@ type WidgetStyle struct {
 	Indeterminate bool
 	Searchable    bool
 	InputFilter   func(rune) bool
+	WordWrap      bool
+	Ellipsis      bool
+	LineNumbers   bool
+	ErrorText     string
 }
 
 // Option настраивает стиль или поведение отдельного виджета.
@@ -272,6 +276,34 @@ func AutoHeight() Option {
 func Flex(weight float32) Option {
 	return func(s *WidgetStyle) {
 		s.FlexWeight = weight
+	}
+}
+
+// WordWrap включает перенос текста по ширине (для Label и SelectableLabel).
+func WordWrap(v bool) Option {
+	return func(s *WidgetStyle) {
+		s.WordWrap = v
+	}
+}
+
+// Ellipsis включает обрезку текста с многоточием при нехватке ширины (для Label).
+func Ellipsis(v bool) Option {
+	return func(s *WidgetStyle) {
+		s.Ellipsis = v
+	}
+}
+
+// LineNumbers включает отображение номеров строк в TextArea.
+func LineNumbers(v bool) Option {
+	return func(s *WidgetStyle) {
+		s.LineNumbers = v
+	}
+}
+
+// Error задаёт текст ошибки валидации и подсвечивает рамку поля ввода.
+func Error(text string) Option {
+	return func(s *WidgetStyle) {
+		s.ErrorText = text
 	}
 }
 

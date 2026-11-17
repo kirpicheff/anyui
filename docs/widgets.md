@@ -51,8 +51,8 @@ ui.Toggle("autostart", "Запускать при старте ОС", &autoStart
 
 ### `TextInput`
 - **Сигнатура:** `ui.TextInput(id string, value *string, placeholder string, opts ...Option) bool`
-- **Возможности:** точный клик курсора, выделение мышью и `Shift + Стрелки`, `Ctrl+A / C / V / X`.
-- **Опции:** `Password()`, `ReadOnly(bool)`, `Clearable(bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `Disabled(bool)`, `Width(dp)`.
+- **Возможности:** точный клик курсора, выделение мышью, `Shift + Стрелки`, навигация/удаление по словам (`Ctrl + Left/Right`, `Ctrl + Shift + Left/Right`, `Ctrl + Backspace/Delete`), двойной клик (слово) и тройной клик (весь текст), `Ctrl+A / C / V / X`, история правок `Undo` / `Redo` (`Ctrl+Z` / `Ctrl+Y` / `Ctrl+Shift+Z`), встроенное контекстное меню по ПКМ.
+- **Опции:** `Password()`, `ReadOnly(bool)`, `Clearable(bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `Error(string)`, `Disabled(bool)`, `Width(dp)`.
 - **Пример:**
 ```go
 ui.TextInput("pass", &password, "Введите пароль",
@@ -60,14 +60,46 @@ ui.TextInput("pass", &password, "Введите пароль",
 	anyui.Clearable(true),
 	anyui.Width(280),
 )
+ui.TextInput("email", &email, "Email...",
+	anyui.Width(260),
+	anyui.Error(emailErr),
+)
+```
+
+### `MaskedInput`
+- **Сигнатура:** `ui.MaskedInput(id string, value *string, mask string, opts ...Option) bool`
+- **Назначение:** однострочный ввод по шаблону маски (`0`/`9` — цифра, `A` — буква, `*` — буква или цифра, остальные символы — фиксированные разделители). Поддерживает `Undo`/`Redo`, контекстное меню по ПКМ и `Error(string)`.
+- **Пример:**
+```go
+ui.MaskedInput("phone", &phone, "+7 (000) 000-00-00", anyui.Width(200), anyui.Mono())
+ui.MaskedInput("date", &dateStr, "00.00.0000", anyui.Width(140), anyui.Mono())
+ui.MaskedInput("ip", &ipStr, "000.000.000.000", anyui.Width(170), anyui.Mono())
 ```
 
 ### `TextArea`
 - **Сигнатура:** `ui.TextArea(id string, value *string, placeholder string, opts ...Option) bool`
-- **Возможности:** многострочный ввод с переносами строк и вертикальной прокруткой колесом мыши.
+- **Возможности:** многострочный ввод с переносами строк, вертикальной прокруткой и автоскроллом за кареткой, навигацией `Up`/`Down`/`Home`/`End`/`Ctrl+Home`/`Ctrl+End`, навигацией по словам (`Ctrl + Стрелки`), выделением мышью по нескольким строкам, двойным/тройным кликом, `Undo`/`Redo`, опциональной нумерацией строк (`LineNumbers(true)`), контекстным меню по ПКМ и `Error(string)`.
 - **Пример:**
 ```go
-ui.TextArea("notes", &notes, "Комментарий...", anyui.Height(140))
+ui.TextArea("notes", &notes, "Комментарий...",
+	anyui.Height(140),
+	anyui.LineNumbers(true),
+)
+```
+
+### `Label`, `SelectableLabel` и `Hyperlink`
+- **Сигнатуры:**
+  - `ui.Label(text string, opts ...Option)` — вывод текста с опциями `WordWrap(true)` и `Ellipsis(true)`.
+  - `ui.SelectableLabel(id, text string, opts ...Option)` — статический текст с выделением мышью (включая двойной/тройной клик), `Ctrl+C`/`Ctrl+A` и контекстным меню по ПКМ.
+  - `ui.Hyperlink(id, text string, opts ...Option) bool` — кликабельная ссылка с подчёркиванием при наведении и курсором руки.
+- **Пример:**
+```go
+ui.Label("Длинный текст с автопереносом...", anyui.WordWrap(true))
+ui.Label("Заголовок, обрезаемый по ширине", anyui.Width(220), anyui.Ellipsis(true))
+ui.SelectableLabel("session_id", "ID: 8f4c-2a19-b70e | IP: 10.24.18.5", anyui.Mono())
+if ui.Hyperlink("docs_link", "Открыть документацию") {
+	// обработка клика
+}
 ```
 
 ---
@@ -197,3 +229,93 @@ ui.DatePicker("dp", &dateVal, anyui.Width(170))
 ui.Spinner("loader", 28)
 ui.ShowToast("Готово", "Данные сохранены", anyui.ToastSuccess)
 ```
+
+---
+
+## Продвинутая система раскладки (Фаза 6.1)
+
+### `RowFlex`, `ColumnFlex` и `Expand`
+Пропорциональное деление доступного пространства по весам `FlexItem{Weight, FixedDp, Fn}`:
+```go
+ui.RowFlex(10, 38,
+	anyui.FlexItem{FixedDp: 100, Fn: func() { ui.Button("b1", "Фикс") }},
+	anyui.FlexItem{Weight: 1, Fn: func() { ui.TextInput("in1", &s1, "1x") }},
+	anyui.FlexItem{Weight: 2, Fn: func() { ui.TextInput("in2", &s2, "2x") }},
+)
+ui.ColumnFlex(10,
+	anyui.FlexItem{Weight: 1, Fn: func() { /* верхняя часть */ }},
+	anyui.FlexItem{Weight: 2, Fn: func() { /* нижняя часть */ }},
+)
+ui.Expand(func() {
+	// занимает всё оставшееся пространство в текущем контейнере
+})
+```
+
+### `RowWith` и `ColumnWith`
+Расширенные режимы выравнивания (`AlignStart`, `AlignCenter`, `AlignEnd`, `AlignStretch`) и распределения (`JustifyStart`, `JustifyCenter`, `JustifyEnd`, `JustifySpaceBetween`, `JustifySpaceAround`):
+```go
+ui.RowWith(anyui.AlignCenter, anyui.JustifySpaceBetween, 10, 40,
+	func() { ui.Label("Заголовок", anyui.Bold()) },
+	func() { ui.Button("act", "Действие", anyui.Primary()) },
+)
+```
+
+### `Grid` и `FormLayout` / `FormRow`
+Сетка из `cols` колонок и табличная вёрстка форм «Подпись — Поле» с единой шириной колонки меток:
+```go
+ui.Grid(3, 12, 12, 44, func() {
+	// дочерние элементы автоматически распределяются по 3 колонкам
+})
+
+ui.FormLayout(120, 12, 8, func() {
+	ui.FormRow("Хост:", func() { ui.TextInput("host", &host, "localhost") })
+	ui.FormRow("Порт:", func() { ui.TextInput("port", &port, "8080") })
+})
+```
+
+### `Flow` и авто-высота `Card`
+Контейнер `Flow` автоматически переносит элементы на следующую строку при нехватке ширины, а `Card` с опцией `anyui.AutoHeight()` подбирает высоту по содержимому:
+```go
+ui.Card(func() {
+	ui.Flow(8, 8, func() {
+		ui.Badge("Go 1.24", anyui.Primary())
+		ui.Badge("Win32")
+		ui.Badge("Software Renderer")
+	})
+}, anyui.AutoHeight(), anyui.Padding(12))
+```
+
+## Расширенные события мыши, клавиатуры и фокуса (Фаза 6.3)
+
+### Двойной клик (`DoubleClick`) и средняя кнопка мыши (`MiddleClick`)
+- В `UI` и `ui.Context` доступны методы `DoubleClicked() bool` и `MiddleClicked() bool` (в `ui.Context` — `MiddleMousePressed` / `MiddleMouseDown` / `MiddleMouseReleased`).
+- В `Table` структура `TableEvent` возвращает поля `RowDoubleClicked` и `RowMiddleClicked` (`-1`, если события не было):
+```go
+ev := ui.Table("tbl", cols, len(rows), &sel, &sort, drawCell)
+if ev.RowDoubleClicked >= 0 {
+	// Открытие элемента по двойному клику
+}
+if ev.RowMiddleClicked >= 0 {
+	// Действие по средней кнопке мыши
+}
+```
+- В `TabBar` клик средней кнопкой мыши по вкладке с `Closable: true` закрывает её (`ev.Closed`).
+- В `TreeView` двойной клик по узлу с дочерними элементами переключает его состояние `Expanded`.
+
+### Горизонтальная прокрутка (`WheelX` и `Shift + WheelY`)
+- Поддерживаются горизонтальное колесо мыши (`WM_MOUSEHWHEEL` -> `WheelX`) и вертикальное колесо с зажатым `Shift` (`Shift + WheelY`).
+- `ScrollView` автоматически отображает горизонтальный скроллбар при переполнении ширины содержимого и прокручивается по горизонтали.
+- `Table` поддерживает горизонтальный скролл колонок (колесом `WheelX` / `Shift + WheelY`, перетаскиванием горизонтального скроллбара и клавишами `Left`/`Right`).
+- `TabBar` прокручивает вкладки как по `WheelX`, так и по `WheelY`.
+
+### Захват мыши за пределами окна (`SetCapture` / `ReleaseCapture`)
+- При нажатии кнопки мыши окно захватывает ввод (`SetCapture`) и освобождает его при отпускании (`ReleaseCapture`). При потере фокуса окна (`Alt+Tab`, `WM_KILLFOCUS`) генерируется `EventFocusLost` (сбрасывает `FocusID` в текстовых полях, `MouseDown` и `ActiveID`), а при отмене захвата (`WM_CAPTURECHANGED`, `WM_CANCELMODE`) — `EventCaptureLost` (сбрасывает `MouseDown` и `ActiveID`).
+- Интервал двойного клика берётся из системной настройки Windows (`GetDoubleClickTime`).
+- Перетаскивание `Slider`, `RangeSlider`, `SplitPane`, скроллбаров (`ScrollView`, `Table`, `TreeView`), ресайз колонок `Table`, перетаскивание вкладок `TabBar` и выделение текста не обрываются при выходе курсора за границы окна.
+
+### Клавиатурная навигация в списках, таблицах, деревьях и селектах
+Для `ListView`, `Table` и `TreeView` используется единый интерфейс `ui.Navigable` (`Count`, `SelectedIndex`, `PageSize`, `OnSelect`) и общий обработчик навигации. При наличии фокуса (`Tab` / `Shift+Tab` или клик по виджету) работают следующие клавиши:
+- **`ListView`**: `Up`, `Down`, `PageUp`, `PageDown`, `Home`, `End`, `Space` (с автопрокруткой к выбранному элементу).
+- **`Table`**: `Up`, `Down`, `PageUp`, `PageDown`, `Home`, `End`, `Left`, `Right` (горизонтальный скролл), `Space` / `Enter`.
+- **`TreeView`**: `Up`, `Down`, `PageUp`, `PageDown`, `Home`, `End`, `Right` (раскрыть узел или перейти к дочернему), `Left` (свернуть узел или перейти к родителю), `Space` / `Enter` (переключить `Expanded`).
+- **`Select` / `ComboBox`**: `Space` / `Enter` (открыть/закрыть список), `Up`, `Down`, `PageUp`, `PageDown`, `Home`, `End` (выбор элемента как в закрытом, так и в открытом состоянии).

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 
 	"anyui/platform"
@@ -82,12 +83,12 @@ func (c *Context) TextInput(id string, value *string, placeholder string, widthD
 }
 
 // TextInputOpts рисует однострочное поле ввода текста с поддержкой выделения, курсора мышью,
-// буфера обмена, режима пароля, иконок и кнопки очистки.
+// буфера обмена, режима пароля, иконок, истории правок, контекстного меню и ошибки валидации.
 func (c *Context) TextInputOpts(id string, value *string, placeholder string, opts ...Option) bool {
 	if value == nil {
 		return false
 	}
-	c.ensureTextMaps()
+	c.ensureTextEditingMaps()
 	st := ApplyOptions(opts)
 
 	w := c.RemainingWidth()
@@ -98,7 +99,9 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 	if st.HeightDp != nil && *st.HeightDp > 0 {
 		h = c.S(*st.HeightDp)
 	}
-	r := c.allocRect(w, h)
+	errH := c.inputErrorExtraH(st.ErrorText)
+	r := c.allocRect(w, h+errH)
+	r.H = h
 	if !st.Disabled {
 		c.registerFocusable(id)
 	}
@@ -142,6 +145,10 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 	}
 
 	changed := false
+	if c.textMenuChanged[id] {
+		changed = true
+		delete(c.textMenuChanged, id)
+	}
 	clearClicked := false
 	if showClear {
 		clearRect := render.Rect{
@@ -153,6 +160,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 		if !c.IsInputBlocked() && clearRect.Contains(c.MouseX, c.MouseY) {
 			c.nextCursor = platform.CursorHand
 			if c.MousePressed {
+				c.pushTextUndo(id, *value, c.caretPos[id], c.textSelStart[id])
 				*value = ""
 				c.caretPos[id] = 0
 				c.textSelStart[id] = 0
@@ -175,13 +183,28 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 			c.ActiveID = id
 			c.FocusID = id
 			idx := c.CaretIndexAtX(displayRunes, c.MouseX-textArea.X+c.textScroll[id], pxSize, st.FontStyle)
-			c.caretPos[id] = idx
-			c.textSelStart[id] = idx
+			cc := c.ClickCount()
+			if cc == 2 {
+				if st.Password || len(runes) == 0 {
+					c.textSelStart[id] = 0
+					c.caretPos[id] = len(runes)
+				} else {
+					a, b := wordBoundsAt(runes, idx)
+					c.textSelStart[id] = a
+					c.caretPos[id] = b
+				}
+			} else if cc == 3 {
+				c.textSelStart[id] = 0
+				c.caretPos[id] = len(runes)
+			} else {
+				c.caretPos[id] = idx
+				c.textSelStart[id] = idx
+			}
 		}
 	}
 
 	// Выделение текста протяжкой мыши
-	if !st.Disabled && c.ActiveID == id && c.MouseDown && !clearClicked {
+	if !st.Disabled && c.ActiveID == id && c.MouseDown && !c.MousePressed && !clearClicked {
 		idx := c.CaretIndexAtX(displayRunes, c.MouseX-textArea.X+c.textScroll[id], pxSize, st.FontStyle)
 		c.caretPos[id] = idx
 	}
@@ -207,6 +230,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 				case KeyX:
 					if !st.ReadOnly {
 						if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
+							c.pushTextUndo(id, string(runes), caret, selStart)
 							if !st.Password {
 								_ = c.Win.SetClipboardText(string(runes[a:b]))
 							}
@@ -226,15 +250,94 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 									ins = append(ins, ch)
 								}
 							}
-							if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
-								runes, caret = deleteRuneRange(runes, a, b)
+							if len(ins) > 0 {
+								c.pushTextUndo(id, string(runes), caret, selStart)
+								if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
+									runes, caret = deleteRuneRange(runes, a, b)
+								}
+								next := make([]rune, 0, len(runes)+len(ins))
+								next = append(next, runes[:caret]...)
+								next = append(next, ins...)
+								next = append(next, runes[caret:]...)
+								runes = next
+								caret += len(ins)
+								selStart = caret
+								changed = true
 							}
-							next := make([]rune, 0, len(runes)+len(ins))
-							next = append(next, runes[:caret]...)
-							next = append(next, ins...)
-							next = append(next, runes[caret:]...)
-							runes = next
-							caret += len(ins)
+						}
+					}
+				case KeyZ:
+					if !st.ReadOnly {
+						var nextText string
+						var ok bool
+						if kp.Mods.Shift {
+							nextText, caret, selStart, ok = c.redoText(id, string(runes), caret, selStart)
+						} else {
+							nextText, caret, selStart, ok = c.undoText(id, string(runes), caret, selStart)
+						}
+						if ok {
+							runes = []rune(nextText)
+							changed = true
+						}
+					}
+				case KeyY:
+					if !st.ReadOnly {
+						if nextText, nc, ns, ok := c.redoText(id, string(runes), caret, selStart); ok {
+							runes = []rune(nextText)
+							caret, selStart = nc, ns
+							changed = true
+						}
+					}
+				case KeyLeft:
+					if st.Password {
+						caret = 0
+					} else {
+						caret = prevWordStart(runes, caret)
+					}
+					if !kp.Mods.Shift {
+						selStart = caret
+					}
+				case KeyRight:
+					if st.Password {
+						caret = len(runes)
+					} else {
+						caret = nextWordEnd(runes, caret)
+					}
+					if !kp.Mods.Shift {
+						selStart = caret
+					}
+				case KeyBackspace:
+					if !st.ReadOnly {
+						if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
+							c.pushTextUndo(id, string(runes), caret, selStart)
+							runes, caret = deleteRuneRange(runes, a, b)
+							selStart = caret
+							changed = true
+						} else if caret > 0 {
+							c.pushTextUndo(id, string(runes), caret, selStart)
+							start := 0
+							if !st.Password {
+								start = prevWordStart(runes, caret)
+							}
+							runes, caret = deleteRuneRange(runes, start, caret)
+							selStart = caret
+							changed = true
+						}
+					}
+				case KeyDelete:
+					if !st.ReadOnly {
+						if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
+							c.pushTextUndo(id, string(runes), caret, selStart)
+							runes, caret = deleteRuneRange(runes, a, b)
+							selStart = caret
+							changed = true
+						} else if caret < len(runes) {
+							c.pushTextUndo(id, string(runes), caret, selStart)
+							end := len(runes)
+							if !st.Password {
+								end = nextWordEnd(runes, caret)
+							}
+							runes, caret = deleteRuneRange(runes, caret, end)
 							selStart = caret
 							changed = true
 						}
@@ -247,10 +350,12 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 			case KeyBackspace:
 				if !st.ReadOnly {
 					if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
+						c.pushTextUndo(id, string(runes), caret, selStart)
 						runes, caret = deleteRuneRange(runes, a, b)
 						selStart = caret
 						changed = true
 					} else if caret > 0 && len(runes) > 0 {
+						c.pushTextUndo(id, string(runes), caret, selStart)
 						runes = append(runes[:caret-1], runes[caret:]...)
 						caret--
 						selStart = caret
@@ -260,10 +365,12 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 			case KeyDelete:
 				if !st.ReadOnly {
 					if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
+						c.pushTextUndo(id, string(runes), caret, selStart)
 						runes, caret = deleteRuneRange(runes, a, b)
 						selStart = caret
 						changed = true
 					} else if caret < len(runes) {
+						c.pushTextUndo(id, string(runes), caret, selStart)
 						runes = append(runes[:caret], runes[caret+1:]...)
 						selStart = caret
 						changed = true
@@ -307,6 +414,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 				if st.InputFilter != nil && !st.InputFilter(ch) {
 					continue
 				}
+				c.pushTextUndo(id, string(runes), caret, selStart)
 				if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
 					runes, caret = deleteRuneRange(runes, a, b)
 				}
@@ -344,6 +452,9 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 		baseBorder = *st.BorderColor
 	}
 	borderCol := render.LerpColor(baseBorder, c.Theme.BorderFocus, focusAnim)
+	if st.ErrorText != "" {
+		borderCol = c.Theme.Danger
+	}
 
 	bg := c.Theme.SurfaceDark
 	if st.Bg != nil {
@@ -370,6 +481,8 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 	}
 
 	if textArea.W <= 0 || c.Font == nil {
+		c.drawInputError(r, st.ErrorText)
+		c.textFieldContextMenu(id, r, value, st, false)
 		return changed
 	}
 
@@ -428,6 +541,8 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 	}
 
 	c.Canvas.PopClip()
+	c.drawInputError(r, st.ErrorText)
+	c.textFieldContextMenu(id, r, value, st, false)
 	return changed
 }
 
@@ -477,12 +592,29 @@ type textLineSpan struct {
 	end   int
 }
 
-// TextArea рисует многострочное поле ввода текста с переносами и вертикальным скроллом.
+// findVisualLine возвращает индекс визуальной строки, содержащей позицию caret.
+func findVisualLine(lines []textLineSpan, runes []rune, caret int) int {
+	for i, sp := range lines {
+		if caret >= sp.start && caret <= sp.end {
+			if caret == sp.end && i+1 < len(lines) && lines[i+1].start == caret && (caret == 0 || runes[caret-1] != '\n') {
+				return i + 1
+			}
+			return i
+		}
+	}
+	if len(lines) > 0 {
+		return len(lines) - 1
+	}
+	return 0
+}
+
+// TextArea рисует многострочное поле ввода текста с переносами, вертикальным скроллом,
+// выделением, навигацией по строкам и словам, историей правок, нумерацией строк и контекстным меню.
 func (c *Context) TextArea(id string, value *string, placeholder string, opts ...Option) bool {
 	if value == nil {
 		return false
 	}
-	c.ensureTextMaps()
+	c.ensureTextEditingMaps()
 	st := ApplyOptions(opts)
 
 	w := c.RemainingWidth()
@@ -493,7 +625,9 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 	if st.HeightDp != nil && *st.HeightDp > 0 {
 		h = c.S(*st.HeightDp)
 	}
-	r := c.allocRect(w, h)
+	errH := c.inputErrorExtraH(st.ErrorText)
+	r := c.allocRect(w, h+errH)
+	r.H = h
 	if !st.Disabled {
 		c.registerFocusable(id)
 	}
@@ -501,12 +635,6 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 	pad := c.S(10)
 	if st.PadDp != nil && *st.PadDp >= 0 {
 		pad = c.S(*st.PadDp)
-	}
-	textArea := render.Rect{
-		X: r.X + pad,
-		Y: r.Y + pad,
-		W: r.W - pad*2,
-		H: r.H - pad*2,
 	}
 
 	fontSizeDp := 14
@@ -524,7 +652,47 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 	lineStep := lineH + c.S(4)
 
 	runes := []rune(*value)
+	gutterW := 0
+	if st.LineNumbers {
+		logicalCount := 1
+		for _, ch := range runes {
+			if ch == '\n' {
+				logicalCount++
+			}
+		}
+		sample := "99"
+		if logicalCount >= 100 {
+			sample = fmt.Sprintf("%d", logicalCount)
+		}
+		numW := c.S(24)
+		if c.Font != nil {
+			mw, _ := c.Font.MeasureTextStyled(sample, c.S(fontSizeDp-1), st.FontStyle)
+			numW = mw
+		}
+		gutterW = numW + c.S(16)
+	}
+
+	textArea := render.Rect{
+		X: r.X + pad + gutterW,
+		Y: r.Y + pad,
+		W: r.W - pad*2 - gutterW,
+		H: r.H - pad*2,
+	}
+
 	lines := c.WrapTextLines(runes, textArea.W-c.S(6), pxSize, st.FontStyle)
+
+	caretFromPoint := func(mx, my int) int {
+		lineIdx := (my - textArea.Y + c.textScroll[id]) / lineStep
+		if lineIdx < 0 {
+			lineIdx = 0
+		}
+		if lineIdx >= len(lines) {
+			lineIdx = len(lines) - 1
+		}
+		sp := lines[lineIdx]
+		col := c.CaretIndexAtX(runes[sp.start:sp.end], mx-textArea.X, pxSize, st.FontStyle)
+		return sp.start + col
+	}
 
 	hovered := !st.Disabled && !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)
 	if hovered {
@@ -547,25 +715,40 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 		if c.MousePressed {
 			c.ActiveID = id
 			c.FocusID = id
-			lineIdx := (c.MouseY - textArea.Y + c.textScroll[id]) / lineStep
-			if lineIdx < 0 {
-				lineIdx = 0
+			idx := caretFromPoint(c.MouseX, c.MouseY)
+			cc := c.ClickCount()
+			if cc == 2 {
+				a, b := wordBoundsAt(runes, idx)
+				c.textSelStart[id] = a
+				c.caretPos[id] = b
+			} else if cc == 3 {
+				a, b := lineBoundsAt(runes, idx)
+				c.textSelStart[id] = a
+				c.caretPos[id] = b
+			} else {
+				c.caretPos[id] = idx
+				c.textSelStart[id] = idx
 			}
-			if lineIdx >= len(lines) {
-				lineIdx = len(lines) - 1
-			}
-			sp := lines[lineIdx]
-			col := c.CaretIndexAtX(runes[sp.start:sp.end], c.MouseX-textArea.X, pxSize, st.FontStyle)
-			c.caretPos[id] = sp.start + col
-			c.textSelStart[id] = c.caretPos[id]
+			c.textPrefX[id] = -1
 		}
 	}
 
+	// Выделение текста протяжкой мыши по нескольким строкам
+	if !st.Disabled && c.ActiveID == id && c.MouseDown && !c.MousePressed {
+		c.caretPos[id] = caretFromPoint(c.MouseX, c.MouseY)
+		c.textPrefX[id] = -1
+	}
+
 	changed := false
+	if c.textMenuChanged[id] {
+		changed = true
+		delete(c.textMenuChanged, id)
+	}
 	focused := !st.Disabled && c.FocusID == id
 	if focused {
 		caret := clampRuneIdx(c.caretPos[id], len(runes))
 		selStart := clampRuneIdx(c.textSelStart[id], len(runes))
+		hadKeyOrRune := len(c.KeyEvents) > 0 || len(c.TypedRunes) > 0
 
 		for _, kp := range c.KeyEvents {
 			if kp.Mods.Ctrl {
@@ -573,31 +756,132 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 				case KeyA:
 					selStart = 0
 					caret = len(runes)
+					c.textPrefX[id] = -1
 				case KeyC:
 					if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
 						_ = c.Win.SetClipboardText(string(runes[a:b]))
 					} else {
 						_ = c.Win.SetClipboardText(string(runes))
 					}
+				case KeyX:
+					if !st.ReadOnly {
+						if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
+							c.pushTextUndo(id, string(runes), caret, selStart)
+							_ = c.Win.SetClipboardText(string(runes[a:b]))
+							runes, caret = deleteRuneRange(runes, a, b)
+							selStart = caret
+							c.textPrefX[id] = -1
+							changed = true
+						}
+					}
 				case KeyV:
 					if !st.ReadOnly {
 						if clip, err := c.Win.ClipboardText(); err == nil && clip != "" {
 							clip = strings.ReplaceAll(clip, "\r\n", "\n")
 							clip = strings.ReplaceAll(clip, "\r", "\n")
-							ins := []rune(clip)
-							if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
-								runes, caret = deleteRuneRange(runes, a, b)
+							var ins []rune
+							for _, ch := range clip {
+								if st.InputFilter == nil || st.InputFilter(ch) {
+									ins = append(ins, ch)
+								}
 							}
-							next := make([]rune, 0, len(runes)+len(ins))
-							next = append(next, runes[:caret]...)
-							next = append(next, ins...)
-							next = append(next, runes[caret:]...)
-							runes = next
-							caret += len(ins)
-							selStart = caret
+							if len(ins) > 0 {
+								c.pushTextUndo(id, string(runes), caret, selStart)
+								if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
+									runes, caret = deleteRuneRange(runes, a, b)
+								}
+								next := make([]rune, 0, len(runes)+len(ins))
+								next = append(next, runes[:caret]...)
+								next = append(next, ins...)
+								next = append(next, runes[caret:]...)
+								runes = next
+								caret += len(ins)
+								selStart = caret
+								c.textPrefX[id] = -1
+								changed = true
+							}
+						}
+					}
+				case KeyZ:
+					if !st.ReadOnly {
+						var nextText string
+						var ok bool
+						if kp.Mods.Shift {
+							nextText, caret, selStart, ok = c.redoText(id, string(runes), caret, selStart)
+						} else {
+							nextText, caret, selStart, ok = c.undoText(id, string(runes), caret, selStart)
+						}
+						if ok {
+							runes = []rune(nextText)
+							c.textPrefX[id] = -1
 							changed = true
 						}
 					}
+				case KeyY:
+					if !st.ReadOnly {
+						if nextText, nc, ns, ok := c.redoText(id, string(runes), caret, selStart); ok {
+							runes = []rune(nextText)
+							caret, selStart = nc, ns
+							c.textPrefX[id] = -1
+							changed = true
+						}
+					}
+				case KeyLeft:
+					caret = prevWordStart(runes, caret)
+					if !kp.Mods.Shift {
+						selStart = caret
+					}
+					c.textPrefX[id] = -1
+				case KeyRight:
+					caret = nextWordEnd(runes, caret)
+					if !kp.Mods.Shift {
+						selStart = caret
+					}
+					c.textPrefX[id] = -1
+				case KeyBackspace:
+					if !st.ReadOnly {
+						if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
+							c.pushTextUndo(id, string(runes), caret, selStart)
+							runes, caret = deleteRuneRange(runes, a, b)
+							selStart = caret
+							changed = true
+						} else if caret > 0 {
+							c.pushTextUndo(id, string(runes), caret, selStart)
+							start := prevWordStart(runes, caret)
+							runes, caret = deleteRuneRange(runes, start, caret)
+							selStart = caret
+							changed = true
+						}
+						c.textPrefX[id] = -1
+					}
+				case KeyDelete:
+					if !st.ReadOnly {
+						if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
+							c.pushTextUndo(id, string(runes), caret, selStart)
+							runes, caret = deleteRuneRange(runes, a, b)
+							selStart = caret
+							changed = true
+						} else if caret < len(runes) {
+							c.pushTextUndo(id, string(runes), caret, selStart)
+							end := nextWordEnd(runes, caret)
+							runes, caret = deleteRuneRange(runes, caret, end)
+							selStart = caret
+							changed = true
+						}
+						c.textPrefX[id] = -1
+					}
+				case KeyHome:
+					caret = 0
+					if !kp.Mods.Shift {
+						selStart = caret
+					}
+					c.textPrefX[id] = -1
+				case KeyEnd:
+					caret = len(runes)
+					if !kp.Mods.Shift {
+						selStart = caret
+					}
+					c.textPrefX[id] = -1
 				}
 				continue
 			}
@@ -605,6 +889,7 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 			switch kp.Code {
 			case KeyEnter:
 				if !st.ReadOnly {
+					c.pushTextUndo(id, string(runes), caret, selStart)
 					if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
 						runes, caret = deleteRuneRange(runes, a, b)
 					}
@@ -615,32 +900,39 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 					runes = next
 					caret++
 					selStart = caret
+					c.textPrefX[id] = -1
 					changed = true
 				}
 			case KeyBackspace:
 				if !st.ReadOnly {
 					if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
+						c.pushTextUndo(id, string(runes), caret, selStart)
 						runes, caret = deleteRuneRange(runes, a, b)
 						selStart = caret
 						changed = true
 					} else if caret > 0 {
+						c.pushTextUndo(id, string(runes), caret, selStart)
 						runes = append(runes[:caret-1], runes[caret:]...)
 						caret--
 						selStart = caret
 						changed = true
 					}
+					c.textPrefX[id] = -1
 				}
 			case KeyDelete:
 				if !st.ReadOnly {
 					if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
+						c.pushTextUndo(id, string(runes), caret, selStart)
 						runes, caret = deleteRuneRange(runes, a, b)
 						selStart = caret
 						changed = true
 					} else if caret < len(runes) {
+						c.pushTextUndo(id, string(runes), caret, selStart)
 						runes = append(runes[:caret], runes[caret+1:]...)
 						selStart = caret
 						changed = true
 					}
+					c.textPrefX[id] = -1
 				}
 			case KeyLeft:
 				if caret > 0 {
@@ -649,6 +941,7 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 				if !kp.Mods.Shift {
 					selStart = caret
 				}
+				c.textPrefX[id] = -1
 			case KeyRight:
 				if caret < len(runes) {
 					caret++
@@ -656,6 +949,53 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 				if !kp.Mods.Shift {
 					selStart = caret
 				}
+				c.textPrefX[id] = -1
+			case KeyUp, KeyDown:
+				curLines := lines
+				if changed {
+					curLines = c.WrapTextLines(runes, textArea.W-c.S(6), pxSize, st.FontStyle)
+				}
+				li := findVisualLine(curLines, runes, caret)
+				prefX := c.textPrefX[id]
+				if prefX < 0 && c.Font != nil {
+					sp := curLines[li]
+					prefX, _ = c.Font.MeasureTextStyled(string(runes[sp.start:caret]), pxSize, st.FontStyle)
+					c.textPrefX[id] = prefX
+				}
+				if kp.Code == KeyUp && li > 0 {
+					target := curLines[li-1]
+					col := c.CaretIndexAtX(runes[target.start:target.end], prefX, pxSize, st.FontStyle)
+					caret = target.start + col
+				} else if kp.Code == KeyDown && li+1 < len(curLines) {
+					target := curLines[li+1]
+					col := c.CaretIndexAtX(runes[target.start:target.end], prefX, pxSize, st.FontStyle)
+					caret = target.start + col
+				}
+				if !kp.Mods.Shift {
+					selStart = caret
+				}
+			case KeyHome:
+				curLines := lines
+				if changed {
+					curLines = c.WrapTextLines(runes, textArea.W-c.S(6), pxSize, st.FontStyle)
+				}
+				li := findVisualLine(curLines, runes, caret)
+				caret = curLines[li].start
+				if !kp.Mods.Shift {
+					selStart = caret
+				}
+				c.textPrefX[id] = -1
+			case KeyEnd:
+				curLines := lines
+				if changed {
+					curLines = c.WrapTextLines(runes, textArea.W-c.S(6), pxSize, st.FontStyle)
+				}
+				li := findVisualLine(curLines, runes, caret)
+				caret = curLines[li].end
+				if !kp.Mods.Shift {
+					selStart = caret
+				}
+				c.textPrefX[id] = -1
 			case KeyEscape:
 				c.FocusID = ""
 				focused = false
@@ -670,6 +1010,7 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 				if st.InputFilter != nil && !st.InputFilter(ch) {
 					continue
 				}
+				c.pushTextUndo(id, string(runes), caret, selStart)
 				if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
 					runes, caret = deleteRuneRange(runes, a, b)
 				}
@@ -680,6 +1021,7 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 				runes = next
 				caret++
 				selStart = caret
+				c.textPrefX[id] = -1
 				changed = true
 			}
 		}
@@ -691,6 +1033,29 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 			lines = c.WrapTextLines(runes, textArea.W-c.S(6), pxSize, st.FontStyle)
 			c.RequestRedraw()
 		}
+
+		if hadKeyOrRune || changed {
+			li := findVisualLine(lines, runes, caret)
+			caretY := li * lineStep
+			sc := c.textScroll[id]
+			if caretY < sc {
+				sc = caretY
+			}
+			if textArea.H > 0 && caretY+lineStep > sc+textArea.H {
+				sc = caretY + lineStep - textArea.H
+			}
+			maxSc := len(lines)*lineStep - textArea.H
+			if maxSc < 0 {
+				maxSc = 0
+			}
+			if sc < 0 {
+				sc = 0
+			}
+			if sc > maxSc {
+				sc = maxSc
+			}
+			c.textScroll[id] = sc
+		}
 	}
 
 	bg := c.Theme.SurfaceDark
@@ -698,8 +1063,14 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 		bg = *st.Bg
 	}
 	borderCol := c.Theme.Border
+	if st.BorderColor != nil {
+		borderCol = *st.BorderColor
+	}
 	if focused {
 		borderCol = c.Theme.BorderFocus
+	}
+	if st.ErrorText != "" {
+		borderCol = c.Theme.Danger
 	}
 	rad := c.Theme.RadiusSm
 	if st.Radius != nil {
@@ -708,11 +1079,39 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 	c.Canvas.DrawRoundedBox(r, c.Sf(rad), bg, 1.0, borderCol)
 
 	if textArea.W <= 0 || textArea.H <= 0 || c.Font == nil {
+		c.drawInputError(r, st.ErrorText)
+		c.textFieldContextMenu(id, r, value, st, true)
 		return changed
 	}
 
-	c.Canvas.PushClip(textArea)
 	scroll := c.textScroll[id]
+	if st.LineNumbers && gutterW > 0 {
+		gutterRect := render.Rect{X: r.X + 1, Y: r.Y + 1, W: gutterW + pad - c.S(4), H: r.H - 2}
+		c.Canvas.PushClip(gutterRect)
+		c.Canvas.FillRect(gutterRect, c.Theme.Surface.WithAlpha(120))
+		c.Canvas.FillRect(render.Rect{X: gutterRect.X + gutterRect.W - 1, Y: gutterRect.Y, W: 1, H: gutterRect.H}, c.Theme.Border)
+		numPx := c.S(fontSizeDp - 1)
+		if numPx < c.S(10) {
+			numPx = c.S(10)
+		}
+		logicalNum := 0
+		for li, sp := range lines {
+			isLogicalStart := li == 0 || (sp.start > 0 && runes[sp.start-1] == '\n')
+			if isLogicalStart {
+				logicalNum++
+			}
+			y := textArea.Y + li*lineStep - scroll
+			if !isLogicalStart || y+lineStep < textArea.Y || y > textArea.Y+textArea.H {
+				continue
+			}
+			numStr := fmt.Sprintf("%d", logicalNum)
+			nw, _ := c.Font.MeasureTextStyled(numStr, numPx, st.FontStyle)
+			c.Font.DrawTextStyled(c.Canvas, gutterRect.X+gutterRect.W-nw-c.S(6), y+c.S(1), numStr, numPx, c.Theme.TextMuted, st.FontStyle)
+		}
+		c.Canvas.PopClip()
+	}
+
+	c.Canvas.PushClip(textArea)
 	if len(runes) == 0 && !focused && placeholder != "" {
 		c.Font.DrawTextStyled(c.Canvas, textArea.X, textArea.Y, placeholder, pxSize, c.Theme.TextMuted, st.FontStyle)
 	} else {
@@ -725,15 +1124,48 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 		}
 
 		caret := clampRuneIdx(c.caretPos[id], len(runes))
+		selStart := clampRuneIdx(c.textSelStart[id], len(runes))
+		selA, selB, hasSel := selectionBounds(caret, selStart, len(runes))
+		caretLine := findVisualLine(lines, runes, caret)
+
 		for li, sp := range lines {
 			y := textArea.Y + li*lineStep - scroll
 			if y+lineStep < textArea.Y || y > textArea.Y+textArea.H {
 				continue
 			}
+
+			if focused && hasSel && selB > sp.start && selA < sp.end {
+				a := selA
+				if a < sp.start {
+					a = sp.start
+				}
+				b := selB
+				if b > sp.end {
+					b = sp.end
+				}
+				if b > a {
+					x1, _ := c.Font.MeasureTextStyled(string(runes[sp.start:a]), pxSize, st.FontStyle)
+					x2, _ := c.Font.MeasureTextStyled(string(runes[sp.start:b]), pxSize, st.FontStyle)
+					c.Canvas.FillRect(render.Rect{
+						X: textArea.X + x1,
+						Y: y,
+						W: x2 - x1,
+						H: lineH,
+					}, c.Theme.Accent.WithAlpha(90))
+				}
+			} else if focused && hasSel && sp.start == sp.end && selA <= sp.start && selB > sp.start {
+				c.Canvas.FillRect(render.Rect{
+					X: textArea.X,
+					Y: y,
+					W: c.S(6),
+					H: lineH,
+				}, c.Theme.Accent.WithAlpha(90))
+			}
+
 			lineStr := string(runes[sp.start:sp.end])
 			c.Font.DrawTextStyled(c.Canvas, textArea.X, y, lineStr, pxSize, textCol, st.FontStyle)
 
-			if focused && caret >= sp.start && caret <= sp.end {
+			if focused && li == caretLine {
 				cxOff, _ := c.Font.MeasureTextStyled(string(runes[sp.start:caret]), pxSize, st.FontStyle)
 				c.Canvas.FillRect(render.Rect{
 					X: textArea.X + cxOff,
@@ -746,6 +1178,8 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 	}
 	c.Canvas.PopClip()
 
+	c.drawInputError(r, st.ErrorText)
+	c.textFieldContextMenu(id, r, value, st, true)
 	return changed
 }
 

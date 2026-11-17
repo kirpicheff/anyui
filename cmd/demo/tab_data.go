@@ -95,12 +95,13 @@ func (st *demoState) sortDemoTable() {
 func (st *demoState) drawTabData(ui *anyui.UI) {
 	th := ui.Theme()
 	ui.ScrollView("sv_data", 0, 0, func() {
-		ui.Label("Table (сортировка, ресайз колонок, 200 строк)", anyui.FontSize(16), anyui.Bold())
+		ui.Label("Table (сортировка, ресайз, горизонтальный скролл, DoubleClick/MiddleClick, навигация клавишами)", anyui.FontSize(15), anyui.Bold())
 		cols := []anyui.TableColumn{
 			{Title: "ID", WidthDp: 64, MinWidthDp: 48, Sortable: true},
 			{Title: "Сервер", WidthDp: 220, MinWidthDp: 100, Sortable: true},
 			{Title: "Статус", WidthDp: 120, MinWidthDp: 70, Sortable: true},
 			{Title: "Пинг (мс)", WidthDp: 110, MinWidthDp: 70, Sortable: true},
+			{Title: "Зона / Примечание", WidthDp: 240, MinWidthDp: 100, Sortable: false},
 		}
 		tev := ui.Table("tbl_servers", cols, len(st.tableRows), &st.tableSelected, &st.tableSort, func(row, col int, area anyui.Rect, sel bool) {
 			r := st.tableRows[row]
@@ -123,6 +124,9 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 				}
 			case 3:
 				txt = fmt.Sprintf("%d ms", r.Latency)
+			case 4:
+				txt = "msk-dc1 / основной кластер"
+				txtCol = th.TextMuted
 			}
 			ui.DrawText(area.X+ui.S(8), area.Y+ui.S(7), txt, 12, txtCol)
 		}, anyui.Height(210))
@@ -133,11 +137,21 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 		if tev.RowClicked >= 0 {
 			st.statusMsg = fmt.Sprintf("Выбрана строка: %s", st.tableRows[tev.RowClicked].Name)
 		}
+		if tev.RowDoubleClicked >= 0 {
+			row := st.tableRows[tev.RowDoubleClicked]
+			st.statusMsg = fmt.Sprintf("DoubleClick по строке: %s (%d ms)", row.Name, row.Latency)
+			ui.ShowToast("Двойной клик", st.statusMsg, anyui.ToastInfo)
+		}
+		if tev.RowMiddleClicked >= 0 {
+			row := st.tableRows[tev.RowMiddleClicked]
+			st.statusMsg = fmt.Sprintf("MiddleClick по строке: %s", row.Name)
+			ui.ShowToast("Средняя кнопка", st.statusMsg, anyui.ToastSuccess)
+		}
 
 		ui.Spacer(12)
 		ui.Label("SplitPane + TreeView + Collapsible & Accordion", anyui.FontSize(16), anyui.Bold())
 		ui.SplitPane("split_main", anyui.SplitHorizontal, &st.splitRatio, func() {
-			ui.Label("TreeView (каталог проекта)", anyui.FontSize(13), anyui.Bold())
+			ui.Label("TreeView (двойной клик и стрелки ←/→/↑/↓/Space)", anyui.FontSize(13), anyui.Bold())
 			if ui.TreeView("tree_proj", st.treeRoots, &st.treeSelected, anyui.Height(220)) {
 				st.statusMsg = fmt.Sprintf("TreeView: %s", st.treeSelected)
 			}

@@ -14,6 +14,9 @@ const (
 	KeyBackspace uint32 = 0x08
 	KeyEnter     uint32 = 0x0D
 	KeyEscape    uint32 = 0x1B
+	KeySpace     uint32 = 0x20
+	KeyPageUp    uint32 = 0x21
+	KeyPageDown  uint32 = 0x22
 	KeyEnd       uint32 = 0x23
 	KeyHome      uint32 = 0x24
 	KeyLeft      uint32 = 0x25
@@ -25,6 +28,8 @@ const (
 	KeyC         uint32 = 0x43
 	KeyV         uint32 = 0x56
 	KeyX         uint32 = 0x58
+	KeyY         uint32 = 0x59
+	KeyZ         uint32 = 0x5A
 )
 
 // KeyPress описывает одно нажатие клавиши за кадр.
@@ -47,12 +52,18 @@ type Context struct {
 	MouseX            int
 	MouseY            int
 	MouseDown         bool
-	MousePressed      bool
-	MouseReleased     bool
-	WheelY            float32
-	RightMousePressed bool
-	RightMouseX       int
-	RightMouseY       int
+	MousePressed        bool
+	MouseReleased       bool
+	WheelX              float32
+	WheelY              float32
+	RightMousePressed   bool
+	RightMouseX         int
+	RightMouseY         int
+	MiddleMouseDown     bool
+	MiddleMousePressed  bool
+	MiddleMouseReleased bool
+	MiddleMouseX        int
+	MiddleMouseY        int
 
 	// Ввод с клавиатуры за текущий кадр
 	TypedRunes []rune
@@ -64,10 +75,13 @@ type Context struct {
 	FocusID  string
 
 	// Внутреннее состояние для текстовых полей и контролов
-	caretPos       map[string]int
-	textSelStart   map[string]int
-	textScroll     map[string]int
-	scrollState    map[string]*scrollInfo
+	caretPos        map[string]int
+	textSelStart    map[string]int
+	textScroll      map[string]int
+	textPrefX       map[string]int
+	textHistory     map[string]*textUndoState
+	textMenuChanged map[string]bool
+	scrollState     map[string]*scrollInfo
 	openState      map[string]bool
 	floatPos       map[string][2]int
 	floatCollapsed map[string]bool
@@ -104,6 +118,11 @@ type Context struct {
 	needsRedraw bool
 	inRender    bool
 	wakePending atomic.Bool
+
+	lastClickTime time.Time
+	lastClickX    int
+	lastClickY    int
+	clickCount    int
 
 	animMu          sync.Mutex
 	animTimerActive bool
@@ -178,6 +197,22 @@ func (c *Context) IsInputBlocked() bool {
 	return c.Overlays.IsBlocked(c.MouseX, c.MouseY)
 }
 
+// ClickCount возвращает количество последовательных кликов ЛКМ (1, 2 или 3) в текущем кадре.
+func (c *Context) ClickCount() int {
+	if !c.MousePressed {
+		return 0
+	}
+	if c.clickCount <= 0 {
+		return 1
+	}
+	return c.clickCount
+}
+
+// DoubleClicked возвращает true, если в текущем кадре произошёл двойной клик ЛКМ.
+func (c *Context) DoubleClicked() bool {
+	return c.ClickCount() == 2
+}
+
 // Run запускает главный цикл событий окна и вызывает drawFn при необходимости перерисовки.
 func (c *Context) Run(drawFn func(ctx *Context)) error {
 	return c.Win.Run(func(ev platform.Event) {
@@ -213,6 +248,38 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 		redraw = true
 	case platform.EventMouseDown:
 		if ev.Button == platform.MouseLeft {
+			now := time.Now()
+			dist := c.S(5)
+			if dist < 5 {
+				dist = 5
+			}
+			dx := ev.X - c.lastClickX
+			dy := ev.Y - c.lastClickY
+			if dx < 0 {
+				dx = -dx
+			}
+			if dy < 0 {
+				dy = -dy
+			}
+			dblTime := 500 * time.Millisecond
+			if c.Win != nil {
+				if ms := c.Win.DoubleClickTimeMs(); ms > 0 {
+					dblTime = time.Duration(ms) * time.Millisecond
+				}
+			}
+			if !c.lastClickTime.IsZero() && now.Sub(c.lastClickTime) <= dblTime && dx <= dist && dy <= dist {
+				if c.clickCount < 3 {
+					c.clickCount++
+				} else {
+					c.clickCount = 1
+				}
+			} else {
+				c.clickCount = 1
+			}
+			c.lastClickTime = now
+			c.lastClickX = ev.X
+			c.lastClickY = ev.Y
+
 			c.MouseX = ev.X
 			c.MouseY = ev.Y
 			c.MouseDown = true
@@ -227,9 +294,22 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 			c.RightMouseX = ev.X
 			c.RightMouseY = ev.Y
 			redraw = true
+		} else if ev.Button == platform.MouseMiddle {
+			c.MouseX = ev.X
+			c.MouseY = ev.Y
+			c.MiddleMouseDown = true
+			c.MiddleMousePressed = true
+			c.MiddleMouseX = ev.X
+			c.MiddleMouseY = ev.Y
+			redraw = true
 		}
 	case platform.EventMouseWheel:
-		c.WheelY += ev.WheelY
+		c.WheelX += ev.WheelX
+		if ev.Mods.Shift && ev.WheelY != 0 && ev.WheelX == 0 {
+			c.WheelX -= ev.WheelY
+		} else {
+			c.WheelY += ev.WheelY
+		}
 		redraw = true
 	case platform.EventMouseUp:
 		if ev.Button == platform.MouseLeft {
@@ -238,7 +318,24 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 			c.MouseDown = false
 			c.MouseReleased = true
 			redraw = true
+		} else if ev.Button == platform.MouseMiddle {
+			c.MouseX = ev.X
+			c.MouseY = ev.Y
+			c.MiddleMouseDown = false
+			c.MiddleMouseReleased = true
+			redraw = true
 		}
+	case platform.EventCaptureLost:
+		c.MouseDown = false
+		c.MiddleMouseDown = false
+		c.ActiveID = ""
+		redraw = true
+	case platform.EventFocusLost:
+		c.FocusID = ""
+		c.MouseDown = false
+		c.MiddleMouseDown = false
+		c.ActiveID = ""
+		redraw = true
 	case platform.EventKeyDown:
 		c.KeyEvents = append(c.KeyEvents, KeyPress{Code: ev.KeyCode, Mods: ev.Mods})
 		redraw = true
@@ -362,8 +459,11 @@ func (c *Context) endFrame() {
 	}
 	c.MousePressed = false
 	c.MouseReleased = false
+	c.WheelX = 0
 	c.WheelY = 0
 	c.RightMousePressed = false
+	c.MiddleMousePressed = false
+	c.MiddleMouseReleased = false
 	c.TypedRunes = c.TypedRunes[:0]
 	c.KeyEvents = c.KeyEvents[:0]
 }

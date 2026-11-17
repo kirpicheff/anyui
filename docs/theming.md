@@ -40,4 +40,16 @@ custom.RadiusSm = 6
 | `anyui.Padding(dp)` | Внутренний отступ в `dp` | `anyui.Padding(12)` |
 | `anyui.Icon(svg)` | SVG-иконка (рендеринг с Фазы 2) | `anyui.Icon(saveSVG)` |
 | `anyui.Disabled(v)` | Блокировка ввода и приглушённый вид | `anyui.Disabled(isBusy)` |
+| `anyui.MinWidth(dp)` | Минимальная ширина виджета в `dp` | `anyui.MinWidth(120)` |
+| `anyui.MaxWidth(dp)` | Максимальная ширина виджета в `dp` | `anyui.MaxWidth(400)` |
+| `anyui.MinHeight(dp)` | Минимальная высота виджета в `dp` | `anyui.MinHeight(80)` |
+| `anyui.MaxHeight(dp)` | Максимальная высота виджета в `dp` | `anyui.MaxHeight(300)` |
+| `anyui.FillWidth()` | Растянуть виджет на всю доступную ширину | `anyui.FillWidth()` |
+| `anyui.FillHeight()` | Растянуть виджет на всю доступную высоту | `anyui.FillHeight()` |
+| `anyui.AutoHeight()` | Автоматическая высота контейнера (`Card`) по содержимому | `anyui.AutoHeight()` |
+| `anyui.Flex(weight)` | Пропорциональный вес виджета | `anyui.Flex(2)` |
+| `anyui.WordWrap(v)` | Перенос текста по ширине (`Label`, `SelectableLabel`) | `anyui.WordWrap(true)` |
+| `anyui.Ellipsis(v)` | Обрезка текста с `...` при нехватке ширины (`Label`) | `anyui.Ellipsis(true)` |
+| `anyui.LineNumbers(v)` | Нумерация строк в `TextArea` | `anyui.LineNumbers(true)` |
+| `anyui.Error(text)` | Состояние ошибки валидации и подпись под полем ввода | `anyui.Error("Неверный формат")` |
 

@@ -39,6 +39,9 @@ func (m *mockWindow) SetPosition(int, int)                    {}
 func (m *mockWindow) SetSize(int, int)                        {}
 func (m *mockWindow) SetOnClose(func() bool)                  {}
 func (m *mockWindow) NativeHandle() uintptr                   { return 0 }
+func (m *mockWindow) SetCapture()                             {}
+func (m *mockWindow) ReleaseCapture()                         {}
+func (m *mockWindow) DoubleClickTimeMs() int                  { return 500 }
 
 func newTestContext(w, h int) *Context {
 	win := &mockWindow{w: w, h: h, scale: 1.0}

@@ -21,9 +21,11 @@ type TableSort struct {
 
 // TableEvent сообщает о действиях пользователя в таблице за текущий кадр.
 type TableEvent struct {
-	RowClicked    int
-	SortChanged   bool
-	ColumnResized bool
+	RowClicked       int
+	RowDoubleClicked int
+	RowMiddleClicked int
+	SortChanged      bool
+	ColumnResized    bool
 }
 
 // Table рисует таблицу с заголовками, ресайзом ширины колонок, сортировкой и виртуализацией строк.
@@ -36,7 +38,7 @@ func (c *Context) Table(
 	drawCell func(row, col int, area render.Rect, isSelected bool),
 	opts ...Option,
 ) TableEvent {
-	ev := TableEvent{RowClicked: -1}
+	ev := TableEvent{RowClicked: -1, RowDoubleClicked: -1, RowMiddleClicked: -1}
 	if len(cols) == 0 {
 		return ev
 	}
@@ -55,11 +57,22 @@ func (c *Context) Table(
 	}
 
 	rect := c.allocRect(w, h)
+	if !st.Disabled {
+		c.registerFocusable(id)
+	}
+	if !c.IsInputBlocked() && rect.Contains(c.MouseX, c.MouseY) && (c.MousePressed || c.MiddleMousePressed) {
+		c.FocusID = id
+		c.RequestRedraw()
+	}
 	radius := c.Sf(c.Theme.RadiusSm)
 	if st.Radius != nil {
 		radius = c.Sf(*st.Radius)
 	}
-	c.Canvas.DrawRoundedBox(rect, radius, c.Theme.SurfaceDark, 1.0, c.Theme.Border)
+	borderCol := c.Theme.Border
+	if c.FocusID == id {
+		borderCol = c.Theme.BorderFocus
+	}
+	c.Canvas.DrawRoundedBox(rect, radius, c.Theme.SurfaceDark, 1.0, borderCol)
 
 	// Инициализируем ширины колонок в dp
 	if c.tableColWidths == nil {
@@ -124,13 +137,19 @@ func (c *Context) Table(
 		c.tableResizeCol[id] = -1
 	}
 
+	si := c.getScrollInfo("tbl:" + id)
+	totalW := 0
+	for i := range cols {
+		totalW += c.S(widthsDp[i])
+	}
+
 	// Отрисовка заголовка таблицы
 	c.Canvas.PushClip(headerRect)
 	c.Canvas.FillRect(headerRect, c.Theme.Surface)
 	c.Canvas.DrawLine(float32(headerRect.X), float32(headerRect.Y+headerRect.H-1), float32(headerRect.X+headerRect.W), float32(headerRect.Y+headerRect.H-1), 1.0, c.Theme.Border)
 
 	pxSize := c.S(12)
-	curX := headerRect.X
+	curX := headerRect.X - si.x
 	blocked := c.IsInputBlocked()
 	for i, col := range cols {
 		cw := c.S(widthsDp[i])
@@ -196,14 +215,83 @@ func (c *Context) Table(
 		return ev
 	}
 	rowH := c.S(30)
-	si := c.getScrollInfo("tbl:" + id)
 	totalH := rowCount * rowH
 
-	if !blocked && bodyRect.Contains(c.MouseX, c.MouseY) && c.WheelY != 0 {
-		si.y -= int(c.WheelY * float32(rowH*2))
-		c.RequestRedraw()
+	sbW := c.S(8)
+	sbH := c.S(8)
+	hasHSB := totalW > bodyRect.W
+	viewH := bodyRect.H
+	if hasHSB {
+		viewH -= sbH + c.S(2)
+		if viewH < 0 {
+			viewH = 0
+		}
 	}
-	maxSc := totalH - bodyRect.H
+	hasSB := totalH > viewH
+	contentW := bodyRect.W
+	if hasSB {
+		contentW -= sbW + c.S(2)
+	}
+	// Пересчитываем hasHSB с учётом возможного вертикального скроллбара
+	hasHSB = totalW > contentW
+	if hasHSB {
+		viewH = bodyRect.H - sbH - c.S(2)
+		if viewH < 0 {
+			viewH = 0
+		}
+	}
+
+	if !blocked && bodyRect.Contains(c.MouseX, c.MouseY) {
+		if c.WheelY != 0 {
+			si.y -= int(c.WheelY * float32(rowH*2))
+			c.RequestRedraw()
+		}
+		if c.WheelX != 0 && totalW > contentW {
+			si.x += int(c.WheelX * float32(c.S(36)))
+			c.RequestRedraw()
+		}
+	}
+
+	// Клавиатурная навигация в фокусе через общий Navigable
+	if !st.Disabled && selected != nil && rowCount > 0 {
+		nav := funcNavigable{
+			count:    rowCount,
+			selected: *selected,
+			pageSize: viewH / rowH,
+			onSelect: func(newRow int) {
+				*selected = newRow
+				ev.RowClicked = newRow
+				if newRow*rowH < si.y {
+					si.y = newRow * rowH
+				} else if (newRow+1)*rowH > si.y+viewH && viewH > 0 {
+					si.y = (newRow+1)*rowH - viewH
+				}
+			},
+		}
+		c.handleNavigable(id, nav, func(idx int) {
+			ev.RowClicked = idx
+		}, func(kp KeyPress) {
+			switch kp.Code {
+			case KeyLeft:
+				if hasHSB {
+					si.x -= c.S(40)
+					c.RequestRedraw()
+				}
+			case KeyRight:
+				if hasHSB {
+					si.x += c.S(40)
+					c.RequestRedraw()
+				}
+			case KeyEnter:
+				if *selected >= 0 && *selected < rowCount {
+					ev.RowClicked = *selected
+					c.RequestRedraw()
+				}
+			}
+		})
+	}
+
+	maxSc := totalH - viewH
 	if maxSc < 0 {
 		maxSc = 0
 	}
@@ -213,22 +301,25 @@ func (c *Context) Table(
 	if si.y > maxSc {
 		si.y = maxSc
 	}
-
-	sbW := c.S(8)
-	hasSB := maxSc > 0
-	contentW := bodyRect.W
-	if hasSB {
-		contentW -= sbW + c.S(2)
+	maxScX := totalW - contentW
+	if maxScX < 0 {
+		maxScX = 0
+	}
+	if si.x < 0 {
+		si.x = 0
+	}
+	if si.x > maxScX {
+		si.x = maxScX
 	}
 
-	startRow, endRow := ComputeVisibleRange(si.y, bodyRect.H, rowH, rowCount)
+	startRow, endRow := ComputeVisibleRange(si.y, viewH, rowH, rowCount)
 
-	c.Canvas.PushClip(render.Rect{X: bodyRect.X, Y: bodyRect.Y, W: contentW, H: bodyRect.H})
+	c.Canvas.PushClip(render.Rect{X: bodyRect.X, Y: bodyRect.Y, W: contentW, H: viewH})
 	for r := startRow; r < endRow; r++ {
 		ry := bodyRect.Y + r*rowH - si.y
 		rowRect := render.Rect{X: bodyRect.X, Y: ry, W: contentW, H: rowH}
 		isSel := selected != nil && *selected == r
-		rowHover := !blocked && bodyRect.Contains(c.MouseX, c.MouseY) && rowRect.Contains(c.MouseX, c.MouseY) && c.MouseX < bodyRect.X+contentW
+		rowHover := !blocked && bodyRect.Contains(c.MouseX, c.MouseY) && c.MouseY < bodyRect.Y+viewH && rowRect.Contains(c.MouseX, c.MouseY) && c.MouseX < bodyRect.X+contentW
 
 		if isSel {
 			c.Canvas.FillRect(rowRect, c.Theme.Accent.WithAlpha(45))
@@ -245,16 +336,25 @@ func (c *Context) Table(
 					*selected = r
 				}
 				ev.RowClicked = r
+				if c.DoubleClicked() {
+					ev.RowDoubleClicked = r
+				}
+				c.RequestRedraw()
+			} else if c.MiddleMousePressed {
+				if selected != nil {
+					*selected = r
+				}
+				ev.RowMiddleClicked = r
 				c.RequestRedraw()
 			}
 		}
 
-		// Отрисовка ячеек
-		cellX := bodyRect.X
+		// Отрисовка ячеек с учётом горизонтальной прокрутки
+		cellX := bodyRect.X - si.x
 		for ci := range cols {
 			cw := c.S(widthsDp[ci])
 			cellRect := render.Rect{X: cellX, Y: ry, W: cw, H: rowH}
-			if drawCell != nil {
+			if drawCell != nil && cellRect.X+cellRect.W > bodyRect.X && cellRect.X < bodyRect.X+contentW {
 				c.Canvas.PushClip(cellRect)
 				drawCell(r, ci, cellRect, isSel)
 				c.Canvas.PopClip()
@@ -272,8 +372,17 @@ func (c *Context) Table(
 			X: bodyRect.X + contentW + c.S(1),
 			Y: bodyRect.Y + c.S(2),
 			W: sbW - c.S(2),
-			H: bodyRect.H - c.S(4),
-		}, si, totalH, bodyRect.H)
+			H: viewH - c.S(4),
+		}, si, totalH, viewH)
+	}
+	// Горизонтальный скроллбар
+	if hasHSB {
+		c.drawHorizontalScrollbar("tbl_hsb:"+id, render.Rect{
+			X: bodyRect.X + c.S(2),
+			Y: bodyRect.Y + viewH + c.S(1),
+			W: contentW - c.S(4),
+			H: sbH - c.S(2),
+		}, si, totalW, contentW)
 	}
 
 	return ev
@@ -329,11 +438,22 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 	}
 
 	rect := c.allocRect(w, h)
+	if !st.Disabled {
+		c.registerFocusable(id)
+	}
+	if !c.IsInputBlocked() && rect.Contains(c.MouseX, c.MouseY) && (c.MousePressed || c.MiddleMousePressed) {
+		c.FocusID = id
+		c.RequestRedraw()
+	}
 	radius := c.Sf(c.Theme.RadiusSm)
 	if st.Radius != nil {
 		radius = c.Sf(*st.Radius)
 	}
-	c.Canvas.DrawRoundedBox(rect, radius, c.Theme.SurfaceDark, 1.0, c.Theme.Border)
+	borderCol := c.Theme.Border
+	if c.FocusID == id {
+		borderCol = c.Theme.BorderFocus
+	}
+	c.Canvas.DrawRoundedBox(rect, radius, c.Theme.SurfaceDark, 1.0, borderCol)
 
 	flat := FlattenTree(roots)
 	itemH := c.S(28)
@@ -346,6 +466,88 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 		si.y -= int(c.WheelY * float32(itemH*2))
 		c.RequestRedraw()
 	}
+
+	changed := false
+	if !st.Disabled && selectedID != nil && len(flat) > 0 {
+		curIdx := -1
+		for i, it := range flat {
+			if it.Node.ID == *selectedID {
+				curIdx = i
+				break
+			}
+		}
+		selectIdx := func(idx int) {
+			*selectedID = flat[idx].Node.ID
+			curIdx = idx
+			if idx*itemH < si.y {
+				si.y = idx * itemH
+			} else if (idx+1)*itemH > si.y+inner.H {
+				si.y = (idx+1)*itemH - inner.H
+			}
+		}
+		toggleExpand := func(idx int) {
+			if idx >= 0 && idx < len(flat) && len(flat[idx].Node.Children) > 0 {
+				flat[idx].Node.Expanded = !flat[idx].Node.Expanded
+				flat = FlattenTree(roots)
+				totalH = len(flat) * itemH
+				changed = true
+				c.RequestRedraw()
+			}
+		}
+		nav := funcNavigable{
+			count:    len(flat),
+			selected: curIdx,
+			pageSize: inner.H / itemH,
+			onSelect: selectIdx,
+		}
+		if c.handleNavigable(id, nav, toggleExpand, func(kp KeyPress) {
+			switch kp.Code {
+			case KeyRight:
+				if curIdx >= 0 && curIdx < len(flat) {
+					nd := flat[curIdx].Node
+					if len(nd.Children) > 0 {
+						if !nd.Expanded {
+							nd.Expanded = true
+							flat = FlattenTree(roots)
+							totalH = len(flat) * itemH
+							changed = true
+							c.RequestRedraw()
+						} else if curIdx+1 < len(flat) {
+							selectIdx(curIdx + 1)
+							changed = true
+							c.RequestRedraw()
+						}
+					}
+				}
+			case KeyLeft:
+				if curIdx >= 0 && curIdx < len(flat) {
+					nd := flat[curIdx].Node
+					if len(nd.Children) > 0 && nd.Expanded {
+						nd.Expanded = false
+						flat = FlattenTree(roots)
+						totalH = len(flat) * itemH
+						changed = true
+						c.RequestRedraw()
+					} else if flat[curIdx].Depth > 0 {
+						targetDepth := flat[curIdx].Depth - 1
+						for p := curIdx - 1; p >= 0; p-- {
+							if flat[p].Depth == targetDepth {
+								selectIdx(p)
+								changed = true
+								c.RequestRedraw()
+								break
+							}
+						}
+					}
+				}
+			case KeyEnter:
+				toggleExpand(curIdx)
+			}
+		}) {
+			changed = true
+		}
+	}
+
 	maxSc := totalH - inner.H
 	if maxSc < 0 {
 		maxSc = 0
@@ -364,7 +566,6 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 		contentW -= sbW + c.S(2)
 	}
 
-	changed := false
 	startIdx, endIdx := ComputeVisibleRange(si.y, inner.H, itemH, len(flat))
 	pxSize := c.S(13)
 
@@ -395,10 +596,17 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 					node.Expanded = !node.Expanded
 					changed = true
 					c.RequestRedraw()
-				} else if selectedID != nil {
-					*selectedID = node.ID
-					changed = true
-					c.RequestRedraw()
+				} else {
+					if selectedID != nil {
+						*selectedID = node.ID
+						changed = true
+						c.RequestRedraw()
+					}
+					if hasChildren && c.DoubleClicked() {
+						node.Expanded = !node.Expanded
+						changed = true
+						c.RequestRedraw()
+					}
 				}
 			}
 		}
@@ -489,4 +697,48 @@ func (c *Context) drawVerticalScrollbar(sbID string, track render.Rect, si *scro
 		thumbCol = c.Theme.TextMuted
 	}
 	c.Canvas.FillRoundedRect(thumbR, float32(track.W)/2, thumbCol)
+}
+
+// drawHorizontalScrollbar рисует и обрабатывает перетаскиваемый горизонтальный скроллбар.
+func (c *Context) drawHorizontalScrollbar(sbID string, track render.Rect, si *scrollInfo, totalW, viewW int) {
+	if totalW <= viewW || track.W <= 0 {
+		return
+	}
+	c.Canvas.FillRoundedRect(track, float32(track.H)/2, c.Theme.Surface)
+	thumbW := (track.W * viewW) / totalW
+	if thumbW < c.S(24) {
+		thumbW = c.S(24)
+	}
+	if thumbW > track.W {
+		thumbW = track.W
+	}
+	maxSc := totalW - viewW
+	thumbRange := track.W - thumbW
+	thumbX := track.X
+	if maxSc > 0 && thumbRange > 0 {
+		thumbX += (si.x * thumbRange) / maxSc
+	}
+	thumbR := render.Rect{X: thumbX, Y: track.Y, W: thumbW, H: track.H}
+
+	hover := !c.IsInputBlocked() && track.Contains(c.MouseX, c.MouseY)
+	if hover && c.MousePressed {
+		c.ActiveID = sbID
+	}
+	if c.ActiveID == sbID && c.MouseDown && thumbRange > 0 {
+		relX := c.MouseX - track.X - thumbW/2
+		if relX < 0 {
+			relX = 0
+		}
+		if relX > thumbRange {
+			relX = thumbRange
+		}
+		si.x = (relX * maxSc) / thumbRange
+		c.RequestRedraw()
+	}
+
+	thumbCol := c.Theme.Border
+	if hover || c.ActiveID == sbID {
+		thumbCol = c.Theme.TextMuted
+	}
+	c.Canvas.FillRoundedRect(thumbR, float32(track.H)/2, thumbCol)
 }

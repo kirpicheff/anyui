@@ -125,6 +125,65 @@ func (c *Context) Select(id string, items []string, selected *int, opts ...Optio
 	c.Canvas.DrawLine(ax, ay+aw*0.5, ax+aw, ay-aw*0.5, c.Sf(1.6), c.Theme.TextMuted)
 
 	changed := false
+	if c.FocusID == id && !st.Disabled && len(items) > 0 && !isOpen {
+		for _, kp := range c.KeyEvents {
+			switch kp.Code {
+			case KeySpace, KeyEnter:
+				isOpen = true
+				c.openState[id] = true
+				c.RequestRedraw()
+			case KeyDown:
+				if *selected < len(items)-1 {
+					*selected++
+					changed = true
+					c.RequestRedraw()
+				}
+			case KeyUp:
+				if *selected > 0 {
+					*selected--
+					changed = true
+					c.RequestRedraw()
+				} else if *selected < 0 {
+					*selected = 0
+					changed = true
+					c.RequestRedraw()
+				}
+			case KeyHome:
+				if *selected != 0 {
+					*selected = 0
+					changed = true
+					c.RequestRedraw()
+				}
+			case KeyEnd:
+				if *selected != len(items)-1 {
+					*selected = len(items) - 1
+					changed = true
+					c.RequestRedraw()
+				}
+			case KeyPageUp:
+				nxt := *selected - 6
+				if nxt < 0 {
+					nxt = 0
+				}
+				if nxt != *selected {
+					*selected = nxt
+					changed = true
+					c.RequestRedraw()
+				}
+			case KeyPageDown:
+				nxt := *selected + 6
+				if nxt >= len(items) {
+					nxt = len(items) - 1
+				}
+				if nxt != *selected {
+					*selected = nxt
+					changed = true
+					c.RequestRedraw()
+				}
+			}
+		}
+	}
+
 	if isOpen {
 		itemH := c.S(32)
 		searchH := 0
@@ -203,6 +262,63 @@ func (c *Context) Select(id string, items []string, selected *int, opts ...Optio
 			if listRect.Contains(c.MouseX, c.MouseY) && c.WheelY != 0 {
 				si.y -= int(c.WheelY * float32(itemH))
 			}
+
+			// Клавиатурная навигация внутри открытого списка
+			if c.FocusID == id && len(filtered) > 0 {
+				curPos := -1
+				for p, origIdx := range filtered {
+					if origIdx == *selected {
+						curPos = p
+						break
+					}
+				}
+				movePos := func(np int) {
+					if np < 0 {
+						np = 0
+					}
+					if np >= len(filtered) {
+						np = len(filtered) - 1
+					}
+					if *selected != filtered[np] {
+						*selected = filtered[np]
+						changed = true
+					}
+					if np*itemH < si.y {
+						si.y = np * itemH
+					} else if (np+1)*itemH > si.y+listRect.H {
+						si.y = (np+1)*itemH - listRect.H
+					}
+					c.RequestRedraw()
+				}
+				for _, kp := range c.KeyEvents {
+					switch kp.Code {
+					case KeyDown:
+						movePos(curPos + 1)
+					case KeyUp:
+						if curPos <= 0 {
+							movePos(0)
+						} else {
+							movePos(curPos - 1)
+						}
+					case KeyPageDown:
+						movePos(curPos + maxVisible)
+					case KeyPageUp:
+						movePos(curPos - maxVisible)
+					case KeyHome:
+						movePos(0)
+					case KeyEnd:
+						movePos(len(filtered) - 1)
+					case KeyEnter:
+						c.openState[id] = false
+						c.RequestRedraw()
+					case KeySpace:
+						if !st.Searchable {
+							c.openState[id] = false
+							c.RequestRedraw()
+						}
+					}
+				}
+			}
 			maxSc := totalH - listRect.H
 			if maxSc < 0 {
 				maxSc = 0
@@ -272,6 +388,16 @@ func (c *Context) ListView(id string, count int, itemHeightDp int, selected *int
 	}
 
 	r := c.allocRect(w, h)
+	if !st.Disabled {
+		c.registerFocusable(id)
+	}
+
+	hovered := !st.Disabled && !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)
+	if hovered && (c.MousePressed || c.MiddleMousePressed) {
+		c.FocusID = id
+		c.RequestRedraw()
+	}
+
 	bg := c.Theme.SurfaceDark
 	if st.Bg != nil {
 		bg = *st.Bg
@@ -280,7 +406,11 @@ func (c *Context) ListView(id string, count int, itemHeightDp int, selected *int
 	if st.Radius != nil {
 		rad = *st.Radius
 	}
-	c.Canvas.DrawRoundedBox(r, c.Sf(rad), bg, 1.0, c.Theme.Border)
+	borderCol := c.Theme.Border
+	if c.FocusID == id {
+		borderCol = c.Theme.BorderFocus
+	}
+	c.Canvas.DrawRoundedBox(r, c.Sf(rad), bg, 1.0, borderCol)
 
 	itemH := c.S(itemHeightDp)
 	si := c.getScrollInfo("lv:" + id)
@@ -290,19 +420,37 @@ func (c *Context) ListView(id string, count int, itemHeightDp int, selected *int
 		maxSc = 0
 	}
 
-	hovered := !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)
 	if hovered && c.WheelY != 0 {
 		si.y -= int(c.WheelY * float32(itemH) * 2)
 		c.RequestRedraw()
 	}
+
+	changed := false
+	if !st.Disabled && selected != nil && count > 0 {
+		nav := funcNavigable{
+			count:    count,
+			selected: *selected,
+			pageSize: r.H / itemH,
+			onSelect: func(newIdx int) {
+				*selected = newIdx
+				if newIdx*itemH < si.y {
+					si.y = newIdx * itemH
+				} else if (newIdx+1)*itemH > si.y+r.H {
+					si.y = (newIdx+1)*itemH - r.H
+				}
+			},
+		}
+		if c.handleNavigable(id, nav, nil, nil) {
+			changed = true
+		}
+	}
+
 	if si.y < 0 {
 		si.y = 0
 	}
 	if si.y > maxSc {
 		si.y = maxSc
 	}
-
-	changed := false
 	c.Canvas.PushClip(r)
 	start, end := ComputeVisibleRange(si.y, r.H, itemH, count)
 	for i := start; i < end; i++ {
@@ -465,8 +613,8 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 	if maxSc < 0 {
 		maxSc = 0
 	}
-	if tabsArea.Contains(c.MouseX, c.MouseY) && c.WheelY != 0 {
-		c.tabScroll[id] -= int(c.WheelY * float32(c.S(40)))
+	if tabsArea.Contains(c.MouseX, c.MouseY) && (c.WheelY != 0 || c.WheelX != 0) {
+		c.tabScroll[id] += int(c.WheelX*float32(c.S(40))) - int(c.WheelY*float32(c.S(40)))
 		c.RequestRedraw()
 	}
 	if c.tabScroll[id] < 0 {
@@ -494,7 +642,10 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 
 		if hovered {
 			c.nextCursor = platform.CursorHand
-			if c.MousePressed {
+			if c.MiddleMousePressed && tab.Closable {
+				ev.Closed = i
+				c.RequestRedraw()
+			} else if c.MousePressed {
 				if closeHover {
 					ev.Closed = i
 					c.RequestRedraw()

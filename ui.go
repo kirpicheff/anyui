@@ -44,6 +44,16 @@ func (u *UI) Canvas() *render.Canvas {
 	return u.ctx.Canvas
 }
 
+// DoubleClicked возвращает true, если в текущем кадре произошёл двойной клик ЛКМ.
+func (u *UI) DoubleClicked() bool {
+	return u.ctx.DoubleClicked()
+}
+
+// MiddleClicked возвращает true, если в текущем кадре нажата средняя кнопка мыши.
+func (u *UI) MiddleClicked() bool {
+	return u.ctx.MiddleMousePressed
+}
+
 // S переводит логические пиксели (dp) в физические с учётом DPI-масштаба.
 func (u *UI) S(dp int) int {
 	return u.ctx.S(dp)

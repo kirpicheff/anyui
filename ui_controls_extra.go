@@ -100,3 +100,18 @@ func (u *UI) Spinner(id string, sizeDp int, opts ...Option) {
 	u.ctx.Spinner(id, sizeDp, opts...)
 }
 
+// SelectableLabel отображает статический текст с возможностью выделения мышью и копирования.
+func (u *UI) SelectableLabel(id, text string, opts ...Option) {
+	u.ctx.SelectableLabel(id, text, opts...)
+}
+
+// Hyperlink отображает кликабельную текстовую ссылку и возвращает true при нажатии.
+func (u *UI) Hyperlink(id, text string, opts ...Option) bool {
+	return u.ctx.Hyperlink(id, text, opts...)
+}
+
+// MaskedInput рисует однострочное поле ввода с шаблоном маски.
+func (u *UI) MaskedInput(id string, value *string, mask string, opts ...Option) bool {
+	return u.ctx.MaskedInput(id, value, mask, opts...)
+}
+

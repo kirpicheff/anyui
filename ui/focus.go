@@ -108,3 +108,103 @@ func (c *Context) stepFocus(reverse bool) {
 	c.FocusID = c.focusOrder[idx]
 }
 
+// Navigable задаёт единый интерфейс для виджетов с постраничной клавиатурной навигацией по индексу.
+type Navigable interface {
+	Count() int
+	SelectedIndex() int
+	PageSize() int
+	OnSelect(index int)
+}
+
+type funcNavigable struct {
+	count    int
+	selected int
+	pageSize int
+	onSelect func(index int)
+}
+
+func (n funcNavigable) Count() int         { return n.count }
+func (n funcNavigable) SelectedIndex() int { return n.selected }
+func (n funcNavigable) PageSize() int {
+	if n.pageSize < 1 {
+		return 1
+	}
+	return n.pageSize
+}
+func (n funcNavigable) OnSelect(index int) {
+	if n.onSelect != nil {
+		n.onSelect(index)
+	}
+}
+
+// handleNavigable обрабатывает стандартную клавиатурную навигацию для виджета, реализующего Navigable.
+func (c *Context) handleNavigable(id string, nav Navigable, onActivate func(index int), onExtra func(KeyPress)) bool {
+	if c.FocusID != id || nav == nil || len(c.KeyEvents) == 0 {
+		return false
+	}
+	count := nav.Count()
+	if count <= 0 {
+		return false
+	}
+
+	page := nav.PageSize()
+	if page < 1 {
+		page = 1
+	}
+	changed := false
+
+	for _, kp := range c.KeyEvents {
+		cur := nav.SelectedIndex()
+		moveTo := func(idx int) {
+			if idx < 0 {
+				idx = 0
+			}
+			if idx >= count {
+				idx = count - 1
+			}
+			if cur != idx {
+				nav.OnSelect(idx)
+				changed = true
+			}
+			c.RequestRedraw()
+		}
+
+		switch kp.Code {
+		case KeyUp:
+			if cur < 0 {
+				moveTo(0)
+			} else {
+				moveTo(cur - 1)
+			}
+		case KeyDown:
+			moveTo(cur + 1)
+		case KeyPageUp:
+			moveTo(cur - page)
+		case KeyPageDown:
+			moveTo(cur + page)
+		case KeyHome:
+			moveTo(0)
+		case KeyEnd:
+			moveTo(count - 1)
+		case KeySpace:
+			if cur < 0 {
+				moveTo(0)
+			} else {
+				if onActivate != nil {
+					onActivate(cur)
+				} else {
+					nav.OnSelect(cur)
+				}
+				changed = true
+				c.RequestRedraw()
+			}
+		default:
+			if onExtra != nil {
+				onExtra(kp)
+			}
+		}
+	}
+
+	return changed
+}
+

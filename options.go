@@ -98,3 +98,15 @@ func AutoHeight() Option { return ui.AutoHeight() }
 // Flex задаёт пропорциональный вес виджета при делении пространства.
 func Flex(weight float32) Option { return ui.Flex(weight) }
 
+// WordWrap включает перенос текста по ширине (для Label и SelectableLabel).
+func WordWrap(v bool) Option { return ui.WordWrap(v) }
+
+// Ellipsis включает обрезку текста с многоточием при нехватке ширины (для Label).
+func Ellipsis(v bool) Option { return ui.Ellipsis(v) }
+
+// LineNumbers включает отображение номеров строк в TextArea.
+func LineNumbers(v bool) Option { return ui.LineNumbers(v) }
+
+// Error задаёт текст ошибки валидации и подсвечивает рамку поля ввода.
+func Error(text string) Option { return ui.Error(text) }
+

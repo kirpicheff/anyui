@@ -30,7 +30,7 @@ func (c *Context) Label(text string, sizeDp int, col render.Color) {
 	c.LabelOpts(text, FontSize(sizeDp), TextColor(col))
 }
 
-// LabelOpts выводит строку текста с опциями стилизации.
+// LabelOpts выводит строку текста с опциями стилизации, переносом строк (WordWrap) и обрезкой (Ellipsis).
 func (c *Context) LabelOpts(text string, opts ...Option) {
 	if c.Font == nil {
 		return
@@ -49,9 +49,77 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 	}
 
 	pxSize := c.S(sizeDp)
-	w, h := c.Font.MeasureTextStyled(text, pxSize, st.FontStyle)
+	if st.WordWrap {
+		maxW := c.RemainingWidth()
+		if st.WidthDp != nil && *st.WidthDp > 0 {
+			maxW = c.S(*st.WidthDp)
+		}
+		if st.MaxWidthDp != nil && *st.MaxWidthDp > 0 && c.S(*st.MaxWidthDp) < maxW {
+			maxW = c.S(*st.MaxWidthDp)
+		}
+		if maxW <= 0 {
+			maxW = c.S(200)
+		}
+		runes := []rune(text)
+		lines := c.WrapTextLines(runes, maxW, pxSize, st.FontStyle)
+		_, lineH := c.Font.MeasureTextStyled("Аy", pxSize, st.FontStyle)
+		if lineH <= 0 {
+			_, lineH = c.Font.MeasureTextStyled(text, pxSize, st.FontStyle)
+		}
+		gap := c.S(3)
+		lineStep := lineH + gap
+		totalH := lineH
+		if len(lines) > 1 {
+			totalH = len(lines)*lineStep - gap
+		}
+		totalW := 0
+		for _, sp := range lines {
+			lw, _ := c.Font.MeasureTextStyled(string(runes[sp.start:sp.end]), pxSize, st.FontStyle)
+			if lw > totalW {
+				totalW = lw
+			}
+		}
+		if st.WidthDp != nil && *st.WidthDp > 0 {
+			totalW = c.S(*st.WidthDp)
+		}
+		r := c.allocRectStyled(totalW, totalH, st)
+		for i, sp := range lines {
+			c.Font.DrawTextStyled(c.Canvas, r.X, r.Y+i*lineStep, string(runes[sp.start:sp.end]), pxSize, col, st.FontStyle)
+		}
+		return
+	}
+
+	drawText := text
+	w, h := c.Font.MeasureTextStyled(drawText, pxSize, st.FontStyle)
+	if st.Ellipsis {
+		maxW := c.RemainingWidth()
+		if st.WidthDp != nil && *st.WidthDp > 0 {
+			maxW = c.S(*st.WidthDp)
+		}
+		if st.MaxWidthDp != nil && *st.MaxWidthDp > 0 && c.S(*st.MaxWidthDp) < maxW {
+			maxW = c.S(*st.MaxWidthDp)
+		}
+		if maxW > 0 && w > maxW {
+			runes := []rune(drawText)
+			cut := len(runes)
+			for cut > 0 {
+				cand := string(runes[:cut]) + "..."
+				cw, _ := c.Font.MeasureTextStyled(cand, pxSize, st.FontStyle)
+				if cw <= maxW {
+					drawText = cand
+					w = cw
+					break
+				}
+				cut--
+			}
+			if cut == 0 {
+				drawText = "..."
+				w, _ = c.Font.MeasureTextStyled(drawText, pxSize, st.FontStyle)
+			}
+		}
+	}
 	r := c.allocRectStyled(w, h, st)
-	c.Font.DrawTextStyled(c.Canvas, r.X, r.Y, text, pxSize, col, st.FontStyle)
+	c.Font.DrawTextStyled(c.Canvas, r.X, r.Y, drawText, pxSize, col, st.FontStyle)
 }
 
 // StatusDot рисует цветной кружок-индикатор и подпись справа от него.
