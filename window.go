@@ -4,8 +4,8 @@ import (
 	"errors"
 	"image"
 
-	"git.gtw.su/kirpich/anyui/platform"
-	"git.gtw.su/kirpich/anyui/ui"
+	"github.com/kirpicheff/anyui/platform"
+	"github.com/kirpicheff/anyui/ui"
 )
 
 // Window представляет независимое нативное окно с собственным холстом, фокусом и анимациями.

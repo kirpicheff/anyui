@@ -1,6 +1,6 @@
 package ui
 
-import "git.gtw.su/kirpich/anyui/platform"
+import "github.com/kirpicheff/anyui/platform"
 
 // KeyTab — виртуальный код клавиши Tab на Windows.
 const KeyTab uint32 = 0x09

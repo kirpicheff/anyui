@@ -1,6 +1,6 @@
 package anyui
 
-import "git.gtw.su/kirpich/anyui/ui"
+import "github.com/kirpicheff/anyui/ui"
 
 // TabItem описывает вкладку в динамическом TabBar.
 type TabItem = ui.TabItem

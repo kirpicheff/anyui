@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const modulePath = "git.gtw.su/kirpich/anyui"
+const modulePath = "github.com/kirpicheff/anyui"
 
 func main() {
 	version := detectVersion()
@@ -81,9 +81,9 @@ func writeHeader(out *bytes.Buffer, version string) {
 	fmt.Fprintf(out, "# AnyUI (%s)\n\n", version)
 	out.WriteString("Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).\n\n")
 	out.WriteString("## Инструкция для ИИ-агента\n\n")
-	out.WriteString("- Импорт: `import \"git.gtw.su/kirpich/anyui\"` (`go get git.gtw.su/kirpich/anyui`).\n")
+	out.WriteString("- Импорт: `import \"github.com/kirpicheff/anyui\"` (`go get github.com/kirpicheff/anyui`).\n")
 	out.WriteString("- Подпакеты `ui/`, `platform/`, `render/` — внутренние; прикладной код использует только корневой пакет `anyui`.\n")
-	out.WriteString("- Для уточнения сигнатур любого типа или метода используй `go doc git.gtw.su/kirpich/anyui.<Symbol>` вместо чтения исходников.\n")
+	out.WriteString("- Для уточнения сигнатур любого типа или метода используй `go doc github.com/kirpicheff/anyui.<Symbol>` вместо чтения исходников.\n")
 	out.WriteString("- Модель Immediate Mode: состояние хранится в переменных/структурах приложения, `drawFn(ui *anyui.UI)` перерисовывает UI на каждом кадре.\n")
 	out.WriteString("- Идентификаторы виджетов: передавайте уникальный `id`, либо `\"\"` для автогенерации по счётчику в скоупе; в циклах и компонентах используйте `ui.IDScope(key, fn)` (или `PushID`/`PopID`).\n")
 	out.WriteString("- Все размеры, координаты и отступы задаются в `dp` и масштабируются под DPI автоматически.\n")
@@ -101,7 +101,7 @@ func writeQuickStart(out *bytes.Buffer) {
 import (
 	"log"
 
-	"git.gtw.su/kirpich/anyui"
+	"github.com/kirpicheff/anyui"
 )
 
 func main() {

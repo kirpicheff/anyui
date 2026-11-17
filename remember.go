@@ -1,6 +1,6 @@
 package anyui
 
-import "git.gtw.su/kirpich/anyui/ui"
+import "github.com/kirpicheff/anyui/ui"
 
 // Remember кеширует результат фоновой функции loader по ключу key для использования внутри drawFn.
 // При первом вызове или после InvalidateRemember запускает loader в отдельной горутине

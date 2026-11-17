@@ -1,8 +1,8 @@
 package ui
 
 import (
-	"git.gtw.su/kirpich/anyui/platform"
-	"git.gtw.su/kirpich/anyui/render"
+	"github.com/kirpicheff/anyui/platform"
+	"github.com/kirpicheff/anyui/render"
 )
 
 // TitleBarConfig задаёт настройки кастомной шапки окна (для режима Frameless и тем на любых ОС).

@@ -3,7 +3,7 @@ package ui
 import (
 	"testing"
 
-	"git.gtw.su/kirpich/anyui/render"
+	"github.com/kirpicheff/anyui/render"
 )
 
 func TestResolveIDAndScope(t *testing.T) {

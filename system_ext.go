@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"git.gtw.su/kirpich/anyui/platform"
-	"git.gtw.su/kirpich/anyui/ui"
+	"github.com/kirpicheff/anyui/platform"
+	"github.com/kirpicheff/anyui/ui"
 )
 
 // ErrAlreadyRunning возвращается из App.Run, если включён режим SingleInstance

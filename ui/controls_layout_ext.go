@@ -1,8 +1,8 @@
 package ui
 
 import (
-	"git.gtw.su/kirpich/anyui/platform"
-	"git.gtw.su/kirpich/anyui/render"
+	"github.com/kirpicheff/anyui/platform"
+	"github.com/kirpicheff/anyui/render"
 )
 
 // SplitOrientation задаёт направление разделения в SplitPane.

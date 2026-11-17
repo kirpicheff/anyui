@@ -53,7 +53,7 @@ Minimal `480x320` window (label, text input, click counter button) measured on *
 ## Quick Start
 
 ```bash
-go get git.gtw.su/kirpich/anyui
+go get github.com/kirpicheff/anyui
 ```
 
 ```go
@@ -62,7 +62,7 @@ package main
 import (
 	"log"
 
-	"git.gtw.su/kirpich/anyui"
+	"github.com/kirpicheff/anyui"
 )
 
 func main() {

@@ -4,9 +4,9 @@
 
 ## Инструкция для ИИ-агента
 
-- Импорт: `import "git.gtw.su/kirpich/anyui"` (`go get git.gtw.su/kirpich/anyui`).
+- Импорт: `import "github.com/kirpicheff/anyui"` (`go get github.com/kirpicheff/anyui`).
 - Подпакеты `ui/`, `platform/`, `render/` — внутренние; прикладной код использует только корневой пакет `anyui`.
-- Для уточнения сигнатур любого типа или метода используй `go doc git.gtw.su/kirpich/anyui.<Symbol>` вместо чтения исходников.
+- Для уточнения сигнатур любого типа или метода используй `go doc github.com/kirpicheff/anyui.<Symbol>` вместо чтения исходников.
 - Модель Immediate Mode: состояние хранится в переменных/структурах приложения, `drawFn(ui *anyui.UI)` перерисовывает UI на каждом кадре.
 - Идентификаторы виджетов: передавайте уникальный `id`, либо `""` для автогенерации по счётчику в скоупе; в циклах и компонентах используйте `ui.IDScope(key, fn)` (или `PushID`/`PopID`).
 - Все размеры, координаты и отступы задаются в `dp` и масштабируются под DPI автоматически.
@@ -24,7 +24,7 @@ package main
 import (
 	"log"
 
-	"git.gtw.su/kirpich/anyui"
+	"github.com/kirpicheff/anyui"
 )
 
 func main() {
@@ -56,7 +56,7 @@ func main() {
 ## Корневой пакет (константы, функции, типы, опции)
 
 ```go
-package anyui // import "git.gtw.su/kirpich/anyui"
+package anyui // import "github.com/kirpicheff/anyui"
 
 Package anyui предоставляет лёгкий кроссплатформенный UI-фреймворк на Go с
 программным 2D-рендерингом (без WebView2 и без зависимости от OpenGL/GPU).
@@ -83,11 +83,11 @@ pixels) и автоматически масштабируются под тек
 
 # Архитектура подпакетов
 
-  - git.gtw.su/kirpich/anyui/ui — внутренний движок раскладки, фокуса, анимаций
+  - github.com/kirpicheff/anyui/ui — внутренний движок раскладки, фокуса, анимаций
     и виджетов.
-  - git.gtw.su/kirpich/anyui/render — программный 2D-рендерер (BGRA),
+  - github.com/kirpicheff/anyui/render — программный 2D-рендерер (BGRA),
     SDF-примитивы и кеш шрифтов.
-  - git.gtw.su/kirpich/anyui/platform — абстракция окна ОС, диалоги, трей и цикл
+  - github.com/kirpicheff/anyui/platform — абстракция окна ОС, диалоги, трей и цикл
     событий.
 
 const HitClient = platform.HitClient ...
@@ -228,7 +228,7 @@ type WindowState = platform.WindowState
 ## Config
 
 ```go
-package anyui // import "git.gtw.su/kirpich/anyui"
+package anyui // import "github.com/kirpicheff/anyui"
 
 type Config struct {
 	Title               string
@@ -265,7 +265,7 @@ type Config struct {
 ## PageConfig
 
 ```go
-package anyui // import "git.gtw.su/kirpich/anyui"
+package anyui // import "github.com/kirpicheff/anyui"
 
 type PageConfig = ui.PageConfig
     PageConfig задаёт параметры типовой разметки страницы с шапкой,
@@ -275,7 +275,7 @@ type PageConfig = ui.PageConfig
 ## TrayConfig
 
 ```go
-package anyui // import "git.gtw.su/kirpich/anyui"
+package anyui // import "github.com/kirpicheff/anyui"
 
 type TrayConfig struct {
 	Tooltip             string
@@ -294,7 +294,7 @@ type TrayConfig struct {
 ## FlexItem
 
 ```go
-package anyui // import "git.gtw.su/kirpich/anyui"
+package anyui // import "github.com/kirpicheff/anyui"
 
 type FlexItem = ui.FlexItem
     FlexItem описывает элемент для пропорционального деления пространства в
@@ -304,7 +304,7 @@ type FlexItem = ui.FlexItem
 ## TableColumn
 
 ```go
-package anyui // import "git.gtw.su/kirpich/anyui"
+package anyui // import "github.com/kirpicheff/anyui"
 
 type TableColumn = ui.TableColumn
     TableColumn описывает колонку таблицы.
@@ -313,7 +313,7 @@ type TableColumn = ui.TableColumn
 ## TabItem
 
 ```go
-package anyui // import "git.gtw.su/kirpich/anyui"
+package anyui // import "github.com/kirpicheff/anyui"
 
 type TabItem = ui.TabItem
     TabItem описывает вкладку в динамическом TabBar.
@@ -322,7 +322,7 @@ type TabItem = ui.TabItem
 ## StatusBarSection
 
 ```go
-package anyui // import "git.gtw.su/kirpich/anyui"
+package anyui // import "github.com/kirpicheff/anyui"
 
 type StatusBarSection = ui.StatusBarSection
     StatusBarSection описывает секцию нижней строки состояния StatusBar.
@@ -331,7 +331,7 @@ type StatusBarSection = ui.StatusBarSection
 ## App
 
 ```go
-package anyui // import "git.gtw.su/kirpich/anyui"
+package anyui // import "github.com/kirpicheff/anyui"
 
 type App struct {
 	// Has unexported fields.
@@ -356,7 +356,7 @@ func (a *App) ShowNotification(n Notification) error
 ## Window
 
 ```go
-package anyui // import "git.gtw.su/kirpich/anyui"
+package anyui // import "github.com/kirpicheff/anyui"
 
 type Window struct {
 	// Has unexported fields.
@@ -397,7 +397,7 @@ func (w *Window) State() WindowState
 ## UI (Immediate Mode API)
 
 ```go
-package anyui // import "git.gtw.su/kirpich/anyui"
+package anyui // import "github.com/kirpicheff/anyui"
 
 type UI struct {
 	// Has unexported fields.

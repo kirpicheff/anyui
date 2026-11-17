@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"git.gtw.su/kirpich/anyui"
+	"github.com/kirpicheff/anyui"
 )
 
 const (

@@ -1,6 +1,6 @@
 package ui
 
-import "git.gtw.su/kirpich/anyui/render"
+import "github.com/kirpicheff/anyui/render"
 
 // Theme хранит цвета и базовые параметры оформления интерфейса.
 type Theme struct {

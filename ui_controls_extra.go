@@ -3,8 +3,8 @@ package anyui
 import (
 	"time"
 
-	"git.gtw.su/kirpich/anyui/render"
-	"git.gtw.su/kirpich/anyui/ui"
+	"github.com/kirpicheff/anyui/render"
+	"github.com/kirpicheff/anyui/ui"
 )
 
 // TableColumn описывает колонку таблицы.

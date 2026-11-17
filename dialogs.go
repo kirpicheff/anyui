@@ -1,6 +1,6 @@
 package anyui
 
-import "git.gtw.su/kirpich/anyui/platform"
+import "github.com/kirpicheff/anyui/platform"
 
 // FileFilter задаёт фильтр расширений для системных файловых диалогов.
 type FileFilter = platform.FileFilter

@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"git.gtw.su/kirpich/anyui"
+	"github.com/kirpicheff/anyui"
 )
 
 func (st *demoState) drawTabControls(ui *anyui.UI) {

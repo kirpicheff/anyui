@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"git.gtw.su/kirpich/anyui"
-	"git.gtw.su/kirpich/anyui/render"
+	"github.com/kirpicheff/anyui"
+	"github.com/kirpicheff/anyui/render"
 )
 
 func (st *demoState) drawTabOverlays(ui *anyui.UI) {

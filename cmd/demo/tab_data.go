@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"git.gtw.su/kirpich/anyui"
+	"github.com/kirpicheff/anyui"
 )
 
 type demoTableRow struct {

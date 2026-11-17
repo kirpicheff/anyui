@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	"git.gtw.su/kirpich/anyui/platform"
-	"git.gtw.su/kirpich/anyui/render"
+	"github.com/kirpicheff/anyui/platform"
+	"github.com/kirpicheff/anyui/render"
 )
 
 // TabItem описывает вкладку в динамическом TabBar.

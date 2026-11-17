@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode"
 
-	"git.gtw.su/kirpich/anyui/render"
+	"github.com/kirpicheff/anyui/render"
 )
 
 const maxTextUndoEntries = 100

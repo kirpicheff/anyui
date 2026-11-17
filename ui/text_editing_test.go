@@ -3,7 +3,7 @@ package ui
 import (
 	"testing"
 
-	"git.gtw.su/kirpich/anyui/platform"
+	"github.com/kirpicheff/anyui/platform"
 )
 
 func TestTextInputUndoRedoAndWordNav(t *testing.T) {

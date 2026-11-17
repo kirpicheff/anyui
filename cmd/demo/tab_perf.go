@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 
-	"git.gtw.su/kirpich/anyui"
-	"git.gtw.su/kirpich/anyui/render"
+	"github.com/kirpicheff/anyui"
+	"github.com/kirpicheff/anyui/render"
 )
 
 type perfTabState struct {
