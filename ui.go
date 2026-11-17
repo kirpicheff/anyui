@@ -144,6 +144,75 @@ func (u *UI) FlexSpacer(reserveDp int) {
 	u.ctx.FlexSpacer(reserveDp)
 }
 
+// Align задаёт выравнивание элементов по поперечной оси.
+type Align = ui.Align
+
+const (
+	AlignStart   = ui.AlignStart
+	AlignCenter  = ui.AlignCenter
+	AlignEnd     = ui.AlignEnd
+	AlignStretch = ui.AlignStretch
+)
+
+// Justify задаёт распределение элементов по главной оси контейнера.
+type Justify = ui.Justify
+
+const (
+	JustifyStart        = ui.JustifyStart
+	JustifyCenter       = ui.JustifyCenter
+	JustifyEnd          = ui.JustifyEnd
+	JustifySpaceBetween = ui.JustifySpaceBetween
+	JustifySpaceAround  = ui.JustifySpaceAround
+)
+
+// FlexItem описывает элемент для пропорционального деления пространства в RowFlex / ColumnFlex.
+type FlexItem = ui.FlexItem
+
+// Expand выделяет дочернему блоку всё оставшееся пространство в текущем контейнере.
+func (u *UI) Expand(fn func()) {
+	u.ctx.Expand(fn)
+}
+
+// RowFlex располагает элементы горизонтально, деля ширину пропорционально весам FlexItem.
+func (u *UI) RowFlex(gapDp, heightDp int, items ...FlexItem) {
+	u.ctx.RowFlex(gapDp, heightDp, items...)
+}
+
+// ColumnFlex располагает элементы вертикально, деля высоту пропорционально весам FlexItem.
+func (u *UI) ColumnFlex(gapDp int, items ...FlexItem) {
+	u.ctx.ColumnFlex(gapDp, items...)
+}
+
+// RowWith располагает элементы горизонтально с заданным выравниванием Align и распределением Justify.
+func (u *UI) RowWith(align Align, justify Justify, gapDp, heightDp int, items ...func()) {
+	u.ctx.RowWith(align, justify, gapDp, heightDp, items...)
+}
+
+// ColumnWith располагает элементы вертикально с заданным выравниванием Align и распределением Justify.
+func (u *UI) ColumnWith(align Align, justify Justify, gapDp int, items ...func()) {
+	u.ctx.ColumnWith(align, justify, gapDp, items...)
+}
+
+// Grid располагает дочерние элементы в виде сетки из cols колонок.
+func (u *UI) Grid(cols, gapXDp, gapYDp, rowHeightDp int, fn func()) {
+	u.ctx.Grid(cols, gapXDp, gapYDp, rowHeightDp, fn)
+}
+
+// FormLayout создаёт табличную вёрстку формы «Подпись — Поле» с единой шириной колонки меток.
+func (u *UI) FormLayout(labelWidthDp, gapXDp, gapYDp int, fn func()) {
+	u.ctx.FormLayout(labelWidthDp, gapXDp, gapYDp, fn)
+}
+
+// FormRow рисует строку формы с подписью слева и полем справа.
+func (u *UI) FormRow(label string, fn func()) {
+	u.ctx.FormRow(label, fn)
+}
+
+// Flow располагает дочерние элементы слева направо с автоматическим переносом на новую строку.
+func (u *UI) Flow(gapXDp, gapYDp int, fn func()) {
+	u.ctx.Flow(gapXDp, gapYDp, fn)
+}
+
 // PushOverlay регистрирует отложенную отрисовку элемента поверх основного интерфейса.
 // Прямоугольник bounds блокирует клики по виджетам под оверлеем.
 func (u *UI) PushOverlay(bounds Rect, drawFn func()) {

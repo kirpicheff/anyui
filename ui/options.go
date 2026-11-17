@@ -15,14 +15,22 @@ const (
 
 // WidgetStyle хранит переопределения оформления и размеров конкретного виджета.
 type WidgetStyle struct {
-	Bg          *render.Color
-	Color       *render.Color
-	BorderColor *render.Color
-	Radius      *float32
-	WidthDp     *int
-	HeightDp    *int
-	FontSizeDp  *int
-	PadDp       *int
+	Bg            *render.Color
+	Color         *render.Color
+	BorderColor   *render.Color
+	Radius        *float32
+	WidthDp       *int
+	HeightDp      *int
+	MinWidthDp    *int
+	MaxWidthDp    *int
+	MinHeightDp   *int
+	MaxHeightDp   *int
+	FillWidth     bool
+	FillHeight    bool
+	AutoHeight    bool
+	FlexWeight    float32
+	FontSizeDp    *int
+	PadDp         *int
 	IconSVG       string
 	IconRightSVG  string
 	FontStyle     render.FontStyle
@@ -208,6 +216,62 @@ func Searchable(v bool) Option {
 func InputFilter(fn func(rune) bool) Option {
 	return func(s *WidgetStyle) {
 		s.InputFilter = fn
+	}
+}
+
+// MinWidth задаёт минимальную ширину виджета в логических пикселях.
+func MinWidth(dp int) Option {
+	return func(s *WidgetStyle) {
+		s.MinWidthDp = &dp
+	}
+}
+
+// MaxWidth задаёт максимальную ширину виджета в логических пикселях.
+func MaxWidth(dp int) Option {
+	return func(s *WidgetStyle) {
+		s.MaxWidthDp = &dp
+	}
+}
+
+// MinHeight задаёт минимальную высоту виджета в логических пикселях.
+func MinHeight(dp int) Option {
+	return func(s *WidgetStyle) {
+		s.MinHeightDp = &dp
+	}
+}
+
+// MaxHeight задаёт максимальную высоту виджета в логических пикселях.
+func MaxHeight(dp int) Option {
+	return func(s *WidgetStyle) {
+		s.MaxHeightDp = &dp
+	}
+}
+
+// FillWidth растягивает виджет на всю доступную ширину контейнера.
+func FillWidth() Option {
+	return func(s *WidgetStyle) {
+		s.FillWidth = true
+	}
+}
+
+// FillHeight растягивает виджет на всю доступную высоту контейнера.
+func FillHeight() Option {
+	return func(s *WidgetStyle) {
+		s.FillHeight = true
+	}
+}
+
+// AutoHeight включает автоматический подбор высоты контейнера (например, Card) по содержимому.
+func AutoHeight() Option {
+	return func(s *WidgetStyle) {
+		s.AutoHeight = true
+	}
+}
+
+// Flex задаёт пропорциональный вес виджета при делении пространства.
+func Flex(weight float32) Option {
+	return func(s *WidgetStyle) {
+		s.FlexWeight = weight
 	}
 }
 

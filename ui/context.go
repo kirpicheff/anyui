@@ -95,8 +95,11 @@ type Context struct {
 	nextFocusOrder []string
 	shortcuts      []Shortcut
 
-	layoutStack []layoutBox
-	nextCursor  platform.CursorType
+	layoutStack  []layoutBox
+	autoHeights  map[string]int
+	justifySizes map[string][]int
+	layoutSeq    int
+	nextCursor   platform.CursorType
 	lastCursor  platform.CursorType
 	needsRedraw bool
 	inRender    bool
@@ -326,6 +329,7 @@ func (c *Context) beginFrame() {
 	c.HotID = ""
 	c.nextCursor = platform.CursorArrow
 	c.needsRedraw = false
+	c.layoutSeq = 0
 	c.nextFocusOrder = c.nextFocusOrder[:0]
 
 	if c.Animator != nil {

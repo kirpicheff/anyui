@@ -74,6 +74,11 @@ type demoState struct {
 	pickedColor     anyui.Color
 	pickedDate      time.Time
 	shortcutsInit   bool
+
+	// Раздел Фазы 6.1 (продвинутая раскладка)
+	formHost  string
+	formPort  string
+	formToken string
 }
 
 func newDemoState() *demoState {
@@ -118,6 +123,9 @@ func newDemoState() *demoState {
 		accordionIdx:    0,
 		numVal:          15.0,
 		sliderVal:       62,
+		formHost:        "api.example.com",
+		formPort:        "8443",
+		formToken:       "secret-token",
 		rangeLow:        20,
 		rangeHigh:       75,
 		pickedColor:     anyui.DeepNavyTheme().Accent,
@@ -177,6 +185,7 @@ func main() {
 		"4. Графика и система",
 		"5. Данные и структура",
 		"6. Расширенный ввод и Toast",
+		"7. Продвинутая раскладка",
 	}
 
 	err := app.Run(func(ui *anyui.UI) {
@@ -300,6 +309,8 @@ func main() {
 						st.drawTabData(ui)
 					case 5:
 						st.drawTabAdvanced(ui)
+					case 6:
+						st.drawTabLayout(ui)
 					}
 				}, anyui.Padding(16))
 			})

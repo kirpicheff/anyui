@@ -74,3 +74,27 @@ func Searchable(v bool) Option { return ui.Searchable(v) }
 // InputFilter задаёт фильтр допустимых символов для ввода.
 func InputFilter(fn func(rune) bool) Option { return ui.InputFilter(fn) }
 
+// MinWidth задаёт минимальную ширину виджета в логических пикселях.
+func MinWidth(dp int) Option { return ui.MinWidth(dp) }
+
+// MaxWidth задаёт максимальную ширину виджета в логических пикселях.
+func MaxWidth(dp int) Option { return ui.MaxWidth(dp) }
+
+// MinHeight задаёт минимальную высоту виджета в логических пикселях.
+func MinHeight(dp int) Option { return ui.MinHeight(dp) }
+
+// MaxHeight задаёт максимальную высоту виджета в логических пикселях.
+func MaxHeight(dp int) Option { return ui.MaxHeight(dp) }
+
+// FillWidth растягивает виджет на всю доступную ширину контейнера.
+func FillWidth() Option { return ui.FillWidth() }
+
+// FillHeight растягивает виджет на всю доступную высоту контейнера.
+func FillHeight() Option { return ui.FillHeight() }
+
+// AutoHeight включает автоматический подбор высоты контейнера по содержимому.
+func AutoHeight() Option { return ui.AutoHeight() }
+
+// Flex задаёт пропорциональный вес виджета при делении пространства.
+func Flex(weight float32) Option { return ui.Flex(weight) }
+

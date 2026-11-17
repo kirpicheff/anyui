@@ -50,7 +50,7 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 
 	pxSize := c.S(sizeDp)
 	w, h := c.Font.MeasureTextStyled(text, pxSize, st.FontStyle)
-	r := c.allocRect(w, h)
+	r := c.allocRectStyled(w, h, st)
 	c.Font.DrawTextStyled(c.Canvas, r.X, r.Y, text, pxSize, col, st.FontStyle)
 }
 
@@ -100,7 +100,18 @@ func (c *Context) CardOpts(fn func(), opts ...Option) {
 		w = c.RemainingWidth()
 	}
 	h := c.S(hDp)
-	if hDp <= 0 {
+	autoKey := ""
+	if st.AutoHeight {
+		autoKey = c.nextJustifyKey("card_")
+		if c.autoHeights != nil {
+			if cachedH, ok := c.autoHeights[autoKey]; ok && cachedH > 0 {
+				h = cachedH
+			}
+		}
+		if h <= 0 {
+			h = c.RemainingHeight()
+		}
+	} else if hDp <= 0 {
 		h = c.RemainingHeight()
 	}
 
@@ -117,7 +128,7 @@ func (c *Context) CardOpts(fn func(), opts ...Option) {
 		rad = *st.Radius
 	}
 
-	r := c.allocRect(w, h)
+	r := c.allocRectStyled(w, h, st)
 	c.Canvas.DrawRoundedBox(r, c.Sf(rad), bg, 1.0, border)
 
 	pad := c.S(padDp)
@@ -139,8 +150,24 @@ func (c *Context) CardOpts(fn func(), opts ...Option) {
 	if fn != nil {
 		fn()
 	}
+	box := c.topLayout()
+	usedH := box.maxUsedY - inner.Y + pad*2
 	c.popBox()
 	c.Canvas.PopClip()
+
+	if st.AutoHeight && autoKey != "" {
+		if usedH < pad*2 {
+			usedH = pad * 2
+		}
+		_, constrainedH := c.applySizeConstraints(r.W, usedH, st)
+		if c.autoHeights == nil {
+			c.autoHeights = make(map[string]int)
+		}
+		if prev, ok := c.autoHeights[autoKey]; !ok || prev != constrainedH {
+			c.autoHeights[autoKey] = constrainedH
+			c.RequestRedraw()
+		}
+	}
 }
 
 // Button рисует кнопку и возвращает true в кадре нажатия.
@@ -197,7 +224,7 @@ func (c *Context) ButtonOpts(id, label string, opts ...Option) bool {
 		h = c.S(*st.HeightDp)
 	}
 
-	r := c.allocRect(w, h)
+	r := c.allocRectStyled(w, h, st)
 	if !st.Disabled {
 		c.registerFocusable(id)
 	}
