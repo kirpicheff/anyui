@@ -36,7 +36,7 @@ Designed for desktop tools, system utilities, background services with a tray ic
 
 | Platform | Backend | CGO | Status |
 | --- | --- | --- | --- |
-| **Windows** (7 / 10 / 11 / Server) | Win32 + GDI + DWM | `CGO_ENABLED=0` | Supported |
+| **Windows** (10 / 11 / Server) | Win32 + GDI + DWM | `CGO_ENABLED=0` | Supported |
 | **Linux (X11)** | `xgb` + MIT-SHM / PutImage | `CGO_ENABLED=0` | Supported |
 | **Linux (Wayland)** | Native Wayland (`wl_shm`, `xdg_shell`) | `CGO_ENABLED=0` | Supported |
 | **macOS** | Cocoa / AppKit | Planned (`CGO`) | Planned |

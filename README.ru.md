@@ -36,7 +36,7 @@
 
 | Платформа | Бэкенд | CGO | Статус |
 | --- | --- | --- | --- |
-| **Windows** (7 / 10 / 11 / Server) | Win32 + GDI + DWM | `CGO_ENABLED=0` | Поддерживается |
+| **Windows** (10 / 11 / Server) | Win32 + GDI + DWM | `CGO_ENABLED=0` | Поддерживается |
 | **Linux (X11)** | `xgb` + MIT-SHM / PutImage | `CGO_ENABLED=0` | Поддерживается |
 | **Linux (Wayland)** | Нативный Wayland (`wl_shm`, `xdg_shell`) | `CGO_ENABLED=0` | Поддерживается |
 | **macOS** | Cocoa / AppKit | Планируется (`CGO`) | В планах |
