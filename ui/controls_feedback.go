@@ -4,8 +4,8 @@ import (
 	"math"
 	"time"
 
-	"anyui/platform"
-	"anyui/render"
+	"git.gtw.su/kirpich/anyui/platform"
+	"git.gtw.su/kirpich/anyui/render"
 )
 
 // ToastKind задаёт тип всплывающего уведомления.

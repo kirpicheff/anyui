@@ -3,7 +3,7 @@ package ui
 import (
 	"strconv"
 
-	"anyui/render"
+	"git.gtw.su/kirpich/anyui/render"
 )
 
 type layoutDir uint8

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"anyui/platform"
-	"anyui/render"
+	"git.gtw.su/kirpich/anyui/platform"
+	"git.gtw.su/kirpich/anyui/render"
 )
 
 // NumberInput рисует числовое поле с кнопками '−' и '+' (Stepper) и возможностью прямого ввода.

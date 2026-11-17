@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"anyui/platform"
-	"anyui/ui"
+	"git.gtw.su/kirpich/anyui/platform"
+	"git.gtw.su/kirpich/anyui/ui"
 )
 
 type stylerMockWindow struct {

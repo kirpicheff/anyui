@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"anyui"
+	"git.gtw.su/kirpich/anyui"
 )
 
 func (st *demoState) drawTabInputs(ui *anyui.UI) {

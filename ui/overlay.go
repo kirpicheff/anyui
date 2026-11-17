@@ -1,6 +1,6 @@
 package ui
 
-import "anyui/render"
+import "git.gtw.su/kirpich/anyui/render"
 
 type overlayItem struct {
 	bounds render.Rect

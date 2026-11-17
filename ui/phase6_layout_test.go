@@ -3,7 +3,7 @@ package ui
 import (
 	"testing"
 
-	"anyui/render"
+	"git.gtw.su/kirpich/anyui/render"
 )
 
 func TestRowFlexAndColumnFlex(t *testing.T) {

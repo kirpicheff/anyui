@@ -4,8 +4,8 @@ import (
 	"strings"
 	"unicode"
 
-	"anyui/platform"
-	"anyui/render"
+	"git.gtw.su/kirpich/anyui/platform"
+	"git.gtw.su/kirpich/anyui/render"
 )
 
 // SelectableLabel отображает статический текст, который можно выделить мышью и скопировать

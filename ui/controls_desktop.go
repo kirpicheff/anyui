@@ -3,8 +3,8 @@ package ui
 import (
 	"strconv"
 
-	"anyui/platform"
-	"anyui/render"
+	"git.gtw.su/kirpich/anyui/platform"
+	"git.gtw.su/kirpich/anyui/render"
 )
 
 // BarMenuItem описывает пункт выпадающего меню в MenuBar (поддерживает вложенные подменю).

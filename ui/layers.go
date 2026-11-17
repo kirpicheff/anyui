@@ -3,8 +3,8 @@ package ui
 import (
 	"bytes"
 
-	"anyui/platform"
-	"anyui/render"
+	"git.gtw.su/kirpich/anyui/platform"
+	"git.gtw.su/kirpich/anyui/render"
 )
 
 // LayerKind определяет логический слой отрисовки интерфейса.

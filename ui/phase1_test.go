@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"anyui/platform"
-	"anyui/render"
+	"git.gtw.su/kirpich/anyui/platform"
+	"git.gtw.su/kirpich/anyui/render"
 )
 
 func TestAnimatorConvergence(t *testing.T) {

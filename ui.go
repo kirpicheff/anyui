@@ -3,9 +3,9 @@ package anyui
 import (
 	"image"
 
-	"anyui/platform"
-	"anyui/render"
-	"anyui/ui"
+	"git.gtw.su/kirpich/anyui/platform"
+	"git.gtw.su/kirpich/anyui/render"
+	"git.gtw.su/kirpich/anyui/ui"
 )
 
 // Modifiers хранит состояние модификаторов клавиатуры для горячих клавиш.

@@ -1,8 +1,8 @@
 package anyui
 
 import (
-	"anyui/render"
-	"anyui/ui"
+	"git.gtw.su/kirpich/anyui/render"
+	"git.gtw.su/kirpich/anyui/ui"
 )
 
 // Color описывает цвет в формате RGBA.

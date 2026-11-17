@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"anyui/platform"
+	"git.gtw.su/kirpich/anyui/platform"
 )
 
 func TestTableSortAndSelect(t *testing.T) {

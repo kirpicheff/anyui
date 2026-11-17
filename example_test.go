@@ -3,7 +3,7 @@ package anyui_test
 import (
 	"log"
 
-	"anyui"
+	"git.gtw.su/kirpich/anyui"
 )
 
 func ExampleNewApp() {

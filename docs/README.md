@@ -18,7 +18,7 @@ package main
 import (
 	"log"
 
-	"anyui"
+	"git.gtw.su/kirpich/anyui"
 )
 
 func main() {

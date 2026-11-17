@@ -3,7 +3,7 @@ package anyui
 import (
 	"time"
 
-	"anyui/ui"
+	"git.gtw.su/kirpich/anyui/ui"
 )
 
 // BarMenuItem описывает пункт выпадающего меню в MenuBar.

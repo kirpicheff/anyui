@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 
-	"anyui/platform"
-	"anyui/render"
+	"git.gtw.su/kirpich/anyui/platform"
+	"git.gtw.su/kirpich/anyui/render"
 )
 
 // ChartSeries описывает одну серию данных для LineChart и BarChart.

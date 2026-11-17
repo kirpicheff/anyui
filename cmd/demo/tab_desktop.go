@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"anyui"
+	"git.gtw.su/kirpich/anyui"
 )
 
 type desktopTabState struct {

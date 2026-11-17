@@ -1,4 +1,4 @@
-module anyui
+module git.gtw.su/kirpich/anyui
 
 go 1.26.2
 

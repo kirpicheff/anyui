@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"anyui/platform"
-	"anyui/render"
+	"git.gtw.su/kirpich/anyui/platform"
+	"git.gtw.su/kirpich/anyui/render"
 )
 
 // LogLevel задаёт уровень важности записи лога для цветовой подсветки.

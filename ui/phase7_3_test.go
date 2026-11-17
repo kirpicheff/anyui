@@ -3,7 +3,7 @@ package ui
 import (
 	"testing"
 
-	"anyui/platform"
+	"git.gtw.su/kirpich/anyui/platform"
 )
 
 type titleBarSpyWindow struct {

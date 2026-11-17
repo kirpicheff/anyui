@@ -1,6 +1,6 @@
 package ui
 
-import "anyui/render"
+import "git.gtw.su/kirpich/anyui/render"
 
 // Variant задаёт стилевой вариант контрола (например, кнопки).
 type Variant uint8

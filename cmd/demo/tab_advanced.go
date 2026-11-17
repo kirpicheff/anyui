@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"anyui"
+	"git.gtw.su/kirpich/anyui"
 )
 
 func (st *demoState) drawTabAdvanced(ui *anyui.UI) {

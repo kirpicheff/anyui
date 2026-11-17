@@ -3,8 +3,8 @@ package ui
 import (
 	"testing"
 
-	"anyui/platform"
-	"anyui/render"
+	"git.gtw.su/kirpich/anyui/platform"
+	"git.gtw.su/kirpich/anyui/render"
 )
 
 func TestContextDoubleAndMiddleClickAndCaptureLost(t *testing.T) {

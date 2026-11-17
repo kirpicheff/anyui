@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 
-	"anyui"
-	"anyui/render"
+	"git.gtw.su/kirpich/anyui"
+	"git.gtw.su/kirpich/anyui/render"
 )
 
 func (st *demoState) drawTabGraphicsSystem(ui *anyui.UI) {

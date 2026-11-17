@@ -5,9 +5,9 @@ import (
 	"os"
 	"sync"
 
-	"anyui/platform"
-	"anyui/render"
-	"anyui/ui"
+	"git.gtw.su/kirpich/anyui/platform"
+	"git.gtw.su/kirpich/anyui/render"
+	"git.gtw.su/kirpich/anyui/ui"
 )
 
 // HitTestResult определяет роль точки клиентской области в режиме Frameless.

@@ -3,8 +3,8 @@ package ui
 import (
 	"image"
 
-	"anyui/platform"
-	"anyui/render"
+	"git.gtw.su/kirpich/anyui/platform"
+	"git.gtw.su/kirpich/anyui/render"
 )
 
 // animFloat безопасно запрашивает анимированное значение даже если Animator не задан.

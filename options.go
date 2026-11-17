@@ -1,6 +1,6 @@
 package anyui
 
-import "anyui/ui"
+import "git.gtw.su/kirpich/anyui/ui"
 
 // Option настраивает стиль, размеры или поведение отдельного виджета.
 type Option = ui.Option
