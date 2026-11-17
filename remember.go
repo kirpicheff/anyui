@@ -53,3 +53,4 @@ func (u *UI) ClearRemember() {
 	}
 	u.ctx.ClearRemember()
 }
+
