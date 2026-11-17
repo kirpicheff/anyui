@@ -197,6 +197,7 @@ func main() {
 		"5. Данные и структура",
 		"6. Расширенный ввод и Toast",
 		"7. Продвинутая раскладка",
+		"8. Десктоп и графики (7.1)",
 	}
 
 	err := app.Run(func(ui *anyui.UI) {
@@ -322,6 +323,8 @@ func main() {
 						st.drawTabAdvanced(ui)
 					case 6:
 						st.drawTabLayout(ui)
+					case 7:
+						st.drawTabDesktop(ui)
 					}
 				}, anyui.Padding(16))
 			})

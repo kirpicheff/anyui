@@ -390,11 +390,13 @@ func (c *Context) Table(
 
 // TreeNode описывает узел дерева для TreeView.
 type TreeNode struct {
-	ID       string
-	Label    string
-	IconSVG  string
-	Expanded bool
-	Children []*TreeNode
+	ID            string
+	Label         string
+	IconSVG       string
+	Expanded      bool
+	Checked       bool
+	Indeterminate bool
+	Children      []*TreeNode
 }
 
 // FlatTreeItem представляет видимый узел дерева с глубиной вложенности.

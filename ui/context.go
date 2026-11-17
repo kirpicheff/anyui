@@ -64,6 +64,7 @@ type Context struct {
 	MiddleMouseReleased bool
 	MiddleMouseX        int
 	MiddleMouseY        int
+	MouseMods           platform.Modifiers
 
 	// Ввод с клавиатуры за текущий кадр
 	TypedRunes []rune
@@ -284,6 +285,7 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 			c.MouseY = ev.Y
 			c.MouseDown = true
 			c.MousePressed = true
+			c.MouseMods = ev.Mods
 			// Клик мимо сфокусированного поля сбросит фокус, если виджет не перехватит его обратно
 			c.FocusID = ""
 			redraw = true

@@ -644,21 +644,79 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 	radius := c.Sf(c.Theme.RadiusSm)
 
 	isOpen := c.openState[id]
-	hover := !c.IsInputBlocked() && !st.Disabled && rect.Contains(c.MouseX, c.MouseY)
-	if hover {
-		c.nextCursor = platform.CursorHand
-		if c.MousePressed {
+	changed := false
+
+	// Клик по полю открывает/закрывает выпадающий календарь; двойной клик по текстовой части включает ручной ввод
+	calZone := render.Rect{X: rect.X + rect.W - c.S(30), Y: rect.Y, W: c.S(30), H: rect.H}
+	textZone := render.Rect{X: rect.X, Y: rect.Y, W: rect.W - c.S(30), H: rect.H}
+
+	if !c.IsInputBlocked() && !st.Disabled {
+		if textZone.Contains(c.MouseX, c.MouseY) && c.DoubleClicked() {
+			dpEditActive[id] = true
+			dpEditText[id] = date.Format("2006-01-02")
+			c.openState[id] = false
+			isOpen = false
+			c.FocusID = id + ":edit"
+			c.RequestRedraw()
+		} else if (calZone.Contains(c.MouseX, c.MouseY) || (textZone.Contains(c.MouseX, c.MouseY) && !dpEditActive[id])) && c.MousePressed {
+			c.nextCursor = platform.CursorHand
 			isOpen = !isOpen
 			c.openState[id] = isOpen
+			dpEditActive[id] = false
 			if isOpen {
+				dpModeStore[id] = dpModeDays
 				c.dateViewMonth[id] = time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, date.Location())
 			}
 			c.RequestRedraw()
+		} else if c.MousePressed && dpEditActive[id] && !textZone.Contains(c.MouseX, c.MouseY) {
+			if parsed, ok := parseDateInput(dpEditText[id], date.Location()); ok {
+				*date = parsed
+				changed = true
+			}
+			dpEditActive[id] = false
+			if c.FocusID == id+":edit" {
+				c.FocusID = ""
+			}
+			c.RequestRedraw()
+		} else if rect.Contains(c.MouseX, c.MouseY) {
+			c.nextCursor = platform.CursorHand
+		}
+	}
+
+	if dpEditActive[id] && c.FocusID == id+":edit" && !c.IsInputBlocked() {
+		buf := []rune(dpEditText[id])
+		for _, kp := range c.KeyEvents {
+			if kp.Code == KeyBackspace && len(buf) > 0 {
+				buf = buf[:len(buf)-1]
+				dpEditText[id] = string(buf)
+				c.RequestRedraw()
+			} else if kp.Code == KeyEnter {
+				if parsed, ok := parseDateInput(dpEditText[id], date.Location()); ok {
+					*date = parsed
+					changed = true
+				}
+				dpEditActive[id] = false
+				c.FocusID = ""
+				c.RequestRedraw()
+			} else if kp.Code == KeyEscape {
+				dpEditActive[id] = false
+				c.FocusID = ""
+				c.RequestRedraw()
+			}
+		}
+		for _, ch := range c.TypedRunes {
+			if (ch >= '0' && ch <= '9') || ch == '-' {
+				if len(buf) < 10 {
+					buf = append(buf, ch)
+					dpEditText[id] = string(buf)
+					c.RequestRedraw()
+				}
+			}
 		}
 	}
 
 	borderCol := c.Theme.Border
-	if isOpen {
+	if isOpen || dpEditActive[id] {
 		borderCol = c.Theme.BorderFocus
 	}
 	c.Canvas.DrawRoundedBox(rect, radius, c.Theme.SurfaceDark, 1.0, borderCol)
@@ -666,8 +724,17 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 	if c.Font != nil {
 		pxSize := c.S(13)
 		label := date.Format("2006-01-02")
+		if dpEditActive[id] {
+			label = dpEditText[id]
+		}
 		_, th := c.Font.MeasureText(label, pxSize)
-		c.Font.DrawText(c.Canvas, rect.X+c.S(10), rect.Y+(rect.H-th)/2, label, pxSize, c.Theme.TextPrimary)
+		tx := rect.X + c.S(10)
+		ty := rect.Y + (rect.H-th)/2
+		c.Font.DrawText(c.Canvas, tx, ty, label, pxSize, c.Theme.TextPrimary)
+		if dpEditActive[id] && c.FocusID == id+":edit" {
+			tw, _ := c.Font.MeasureText(label, pxSize)
+			c.Canvas.FillRect(render.Rect{X: tx + tw + 1, Y: rect.Y + c.S(7), W: 1, H: rect.H - c.S(14)}, c.Theme.Accent)
+		}
 	}
 
 	// Иконка календаря справа
@@ -677,10 +744,9 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 	c.Canvas.DrawRoundedBox(calR, c.Sf(2), render.RGBA(0, 0, 0, 0), 1.2, c.Theme.TextMuted)
 	c.Canvas.DrawLine(float32(calR.X), float32(calR.Y+c.S(4)), float32(calR.X+calR.W), float32(calR.Y+c.S(4)), 1.2, c.Theme.TextMuted)
 
-	changed := false
 	if isOpen {
 		popW := c.S(246)
-		popH := c.S(252)
+		popH := c.S(284)
 		popX := rect.X
 		popY := rect.Y + rect.H + c.S(4)
 		if popX+popW > c.Canvas.Width-c.S(8) {
@@ -712,7 +778,9 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 				c.dateViewMonth[id] = vm
 			}
 
-			// Шапка месяца с кнопками < и >
+			mode := dpModeStore[id]
+
+			// Шапка месяца/года с кнопками < и >
 			hdrR := render.Rect{X: popR.X + c.S(10), Y: popR.Y + c.S(10), W: popR.W - c.S(20), H: c.S(28)}
 			prevR := render.Rect{X: hdrR.X, Y: hdrR.Y, W: c.S(28), H: hdrR.H}
 			nextR := render.Rect{X: hdrR.X + hdrR.W - c.S(28), Y: hdrR.Y, W: c.S(28), H: hdrR.H}
@@ -721,7 +789,13 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 				c.nextCursor = platform.CursorHand
 				c.Canvas.FillRoundedRect(prevR, c.Sf(6), c.Theme.Surface)
 				if c.MousePressed {
-					c.dateViewMonth[id] = vm.AddDate(0, -1, 0)
+					if mode == dpModeYears {
+						c.dateViewMonth[id] = vm.AddDate(-12, 0, 0)
+					} else if mode == dpModeMonths {
+						c.dateViewMonth[id] = vm.AddDate(-1, 0, 0)
+					} else {
+						c.dateViewMonth[id] = vm.AddDate(0, -1, 0)
+					}
 					c.RequestRedraw()
 				}
 			}
@@ -729,7 +803,13 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 				c.nextCursor = platform.CursorHand
 				c.Canvas.FillRoundedRect(nextR, c.Sf(6), c.Theme.Surface)
 				if c.MousePressed {
-					c.dateViewMonth[id] = vm.AddDate(0, 1, 0)
+					if mode == dpModeYears {
+						c.dateViewMonth[id] = vm.AddDate(12, 0, 0)
+					} else if mode == dpModeMonths {
+						c.dateViewMonth[id] = vm.AddDate(1, 0, 0)
+					} else {
+						c.dateViewMonth[id] = vm.AddDate(0, 1, 0)
+					}
 					c.RequestRedraw()
 				}
 			}
@@ -737,9 +817,48 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 			if c.Font != nil {
 				px := c.S(13)
 				months := []string{"Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"}
-				title := fmt.Sprintf("%s %d", months[int(vm.Month())-1], vm.Year())
-				tw, th := c.Font.MeasureText(title, px)
-				c.Font.DrawText(c.Canvas, hdrR.X+(hdrR.W-tw)/2, hdrR.Y+(hdrR.H-th)/2, title, px, c.Theme.TextPrimary)
+				if mode == dpModeYears {
+					title := formatYearRangeTitle(vm.Year())
+					tw, th := c.Font.MeasureText(title, px)
+					c.Font.DrawText(c.Canvas, hdrR.X+(hdrR.W-tw)/2, hdrR.Y+(hdrR.H-th)/2, title, px, c.Theme.TextPrimary)
+				} else {
+					mName := months[int(vm.Month())-1]
+					yName := strconv.Itoa(vm.Year())
+					mw, mh := c.Font.MeasureText(mName, px)
+					yw, yh := c.Font.MeasureText(yName, px)
+					gap := c.S(6)
+					totalW := mw + gap + yw
+					startX := hdrR.X + (hdrR.W-totalW)/2
+					mRect := render.Rect{X: startX - c.S(4), Y: hdrR.Y, W: mw + c.S(8), H: hdrR.H}
+					yRect := render.Rect{X: startX + mw + gap - c.S(4), Y: hdrR.Y, W: yw + c.S(8), H: hdrR.H}
+
+					mCol := c.Theme.TextPrimary
+					if mRect.Contains(c.MouseX, c.MouseY) {
+						c.nextCursor = platform.CursorHand
+						c.Canvas.FillRoundedRect(mRect, c.Sf(6), c.Theme.Surface)
+						mCol = c.Theme.Accent
+						if c.MousePressed {
+							if mode == dpModeMonths {
+								dpModeStore[id] = dpModeDays
+							} else {
+								dpModeStore[id] = dpModeMonths
+							}
+							c.RequestRedraw()
+						}
+					}
+					yCol := c.Theme.TextPrimary
+					if yRect.Contains(c.MouseX, c.MouseY) {
+						c.nextCursor = platform.CursorHand
+						c.Canvas.FillRoundedRect(yRect, c.Sf(6), c.Theme.Surface)
+						yCol = c.Theme.Accent
+						if c.MousePressed {
+							dpModeStore[id] = dpModeYears
+							c.RequestRedraw()
+						}
+					}
+					c.Font.DrawText(c.Canvas, startX, hdrR.Y+(hdrR.H-mh)/2, mName, px, mCol)
+					c.Font.DrawText(c.Canvas, startX+mw+gap, hdrR.Y+(hdrR.H-yh)/2, yName, px, yCol)
+				}
 
 				pw, ph := c.Font.MeasureText("<", px)
 				c.Font.DrawText(c.Canvas, prevR.X+(prevR.W-pw)/2, prevR.Y+(prevR.H-ph)/2, "<", px, c.Theme.TextPrimary)
@@ -747,70 +866,162 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 				c.Font.DrawText(c.Canvas, nextR.X+(nextR.W-nw)/2, nextR.Y+(nextR.H-nh)/2, ">", px, c.Theme.TextPrimary)
 			}
 
-			// Дни недели (Пн..Вс)
-			cellW := (popR.W - c.S(20)) / 7
-			cellH := c.S(28)
 			gridX := popR.X + c.S(10)
 			gridY := hdrR.Y + hdrR.H + c.S(8)
 
-			wdNames := []string{"Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"}
-			if c.Font != nil {
-				pxSmall := c.S(11)
-				for i, wd := range wdNames {
-					tw, th := c.Font.MeasureText(wd, pxSmall)
-					cx := gridX + i*cellW + (cellW-tw)/2
-					c.Font.DrawText(c.Canvas, cx, gridY+(c.S(20)-th)/2, wd, pxSmall, c.Theme.TextMuted)
-				}
-			}
-
-			// Сетка чисел месяца
-			daysY := gridY + c.S(22)
-			firstWD := int(vm.Weekday())
-			if firstWD == 0 {
-				firstWD = 7 // Воскресенье -> 7
-			}
-			offset := firstWD - 1
-			daysInMonth := time.Date(vm.Year(), vm.Month()+1, 0, 0, 0, 0, 0, vm.Location()).Day()
-			now := time.Now()
-
-			for d := 1; d <= daysInMonth; d++ {
-				slot := offset + d - 1
-				colIdx := slot % 7
-				rowIdx := slot / 7
-				dr := render.Rect{X: gridX + colIdx*cellW + c.S(1), Y: daysY + rowIdx*cellH + c.S(1), W: cellW - c.S(2), H: cellH - c.S(2)}
-
-				isSel := date.Year() == vm.Year() && date.Month() == vm.Month() && date.Day() == d
-				isToday := now.Year() == vm.Year() && now.Month() == vm.Month() && now.Day() == d
-				dHover := dr.Contains(c.MouseX, c.MouseY)
-
-				if isSel {
-					c.Canvas.FillRoundedRect(dr, c.Sf(6), c.Theme.Accent)
-				} else if dHover {
-					c.Canvas.FillRoundedRect(dr, c.Sf(6), c.Theme.Surface)
-				} else if isToday {
-					c.Canvas.DrawRoundedBox(dr, c.Sf(6), render.RGBA(0, 0, 0, 0), 1.0, c.Theme.Accent)
-				}
-
-				if dHover {
-					c.nextCursor = platform.CursorHand
-					if c.MousePressed {
-						*date = time.Date(vm.Year(), vm.Month(), d, 0, 0, 0, 0, date.Location())
-						c.openState[id] = false
-						changed = true
-						c.RequestRedraw()
+			if mode == dpModeMonths {
+				shortMonths := []string{"Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"}
+				mW := (popR.W - c.S(20)) / 3
+				mH := c.S(42)
+				for mi := 0; mi < 12; mi++ {
+					colIdx := mi % 3
+					rowIdx := mi / 3
+					mr := render.Rect{X: gridX + colIdx*mW + c.S(2), Y: gridY + rowIdx*mH + c.S(2), W: mW - c.S(4), H: mH - c.S(4)}
+					isCur := int(vm.Month())-1 == mi
+					hov := mr.Contains(c.MouseX, c.MouseY)
+					if isCur {
+						c.Canvas.FillRoundedRect(mr, c.Sf(6), c.Theme.Accent)
+					} else if hov {
+						c.Canvas.FillRoundedRect(mr, c.Sf(6), c.Theme.Surface)
+					}
+					if hov {
+						c.nextCursor = platform.CursorHand
+						if c.MousePressed {
+							c.dateViewMonth[id] = time.Date(vm.Year(), time.Month(mi+1), 1, 0, 0, 0, 0, vm.Location())
+							dpModeStore[id] = dpModeDays
+							c.RequestRedraw()
+						}
+					}
+					if c.Font != nil {
+						tc := c.Theme.TextPrimary
+						if isCur {
+							tc = render.RGBA(255, 255, 255, 255)
+						}
+						tw, th := c.Font.MeasureText(shortMonths[mi], c.S(12))
+						c.Font.DrawText(c.Canvas, mr.X+(mr.W-tw)/2, mr.Y+(mr.H-th)/2, shortMonths[mi], c.S(12), tc)
 					}
 				}
+			} else if mode == dpModeYears {
+				startYear := (vm.Year() / 12) * 12
+				yW := (popR.W - c.S(20)) / 3
+				yH := c.S(42)
+				for yi := 0; yi < 12; yi++ {
+					yr := startYear + yi
+					colIdx := yi % 3
+					rowIdx := yi / 3
+					yrRect := render.Rect{X: gridX + colIdx*yW + c.S(2), Y: gridY + rowIdx*yH + c.S(2), W: yW - c.S(4), H: yH - c.S(4)}
+					isCur := vm.Year() == yr
+					hov := yrRect.Contains(c.MouseX, c.MouseY)
+					if isCur {
+						c.Canvas.FillRoundedRect(yrRect, c.Sf(6), c.Theme.Accent)
+					} else if hov {
+						c.Canvas.FillRoundedRect(yrRect, c.Sf(6), c.Theme.Surface)
+					}
+					if hov {
+						c.nextCursor = platform.CursorHand
+						if c.MousePressed {
+							c.dateViewMonth[id] = time.Date(yr, vm.Month(), 1, 0, 0, 0, 0, vm.Location())
+							dpModeStore[id] = dpModeMonths
+							c.RequestRedraw()
+						}
+					}
+					if c.Font != nil {
+						tc := c.Theme.TextPrimary
+						if isCur {
+							tc = render.RGBA(255, 255, 255, 255)
+						}
+						ys := strconv.Itoa(yr)
+						tw, th := c.Font.MeasureText(ys, c.S(12))
+						c.Font.DrawText(c.Canvas, yrRect.X+(yrRect.W-tw)/2, yrRect.Y+(yrRect.H-th)/2, ys, c.S(12), tc)
+					}
+				}
+			} else {
+				// Дни недели (Пн..Вс)
+				cellW := (popR.W - c.S(20)) / 7
+				cellH := c.S(28)
 
+				wdNames := []string{"Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"}
 				if c.Font != nil {
-					px := c.S(12)
-					ds := strconv.Itoa(d)
-					tw, th := c.Font.MeasureText(ds, px)
-					tc := c.Theme.TextPrimary
-					if isSel {
-						tc = render.RGBA(255, 255, 255, 255)
+					pxSmall := c.S(11)
+					for i, wd := range wdNames {
+						tw, th := c.Font.MeasureText(wd, pxSmall)
+						cx := gridX + i*cellW + (cellW-tw)/2
+						c.Font.DrawText(c.Canvas, cx, gridY+(c.S(20)-th)/2, wd, pxSmall, c.Theme.TextMuted)
 					}
-					c.Font.DrawText(c.Canvas, dr.X+(dr.W-tw)/2, dr.Y+(dr.H-th)/2, ds, px, tc)
 				}
+
+				// Сетка чисел месяца
+				daysY := gridY + c.S(22)
+				firstWD := int(vm.Weekday())
+				if firstWD == 0 {
+					firstWD = 7 // Воскресенье -> 7
+				}
+				offset := firstWD - 1
+				daysInMonth := time.Date(vm.Year(), vm.Month()+1, 0, 0, 0, 0, 0, vm.Location()).Day()
+				now := time.Now()
+
+				for d := 1; d <= daysInMonth; d++ {
+					slot := offset + d - 1
+					colIdx := slot % 7
+					rowIdx := slot / 7
+					dr := render.Rect{X: gridX + colIdx*cellW + c.S(1), Y: daysY + rowIdx*cellH + c.S(1), W: cellW - c.S(2), H: cellH - c.S(2)}
+
+					isSel := date.Year() == vm.Year() && date.Month() == vm.Month() && date.Day() == d
+					isToday := now.Year() == vm.Year() && now.Month() == vm.Month() && now.Day() == d
+					dHover := dr.Contains(c.MouseX, c.MouseY)
+
+					if isSel {
+						c.Canvas.FillRoundedRect(dr, c.Sf(6), c.Theme.Accent)
+					} else if dHover {
+						c.Canvas.FillRoundedRect(dr, c.Sf(6), c.Theme.Surface)
+					} else if isToday {
+						c.Canvas.DrawRoundedBox(dr, c.Sf(6), render.RGBA(0, 0, 0, 0), 1.0, c.Theme.Accent)
+					}
+
+					if dHover {
+						c.nextCursor = platform.CursorHand
+						if c.MousePressed {
+							*date = time.Date(vm.Year(), vm.Month(), d, 0, 0, 0, 0, date.Location())
+							c.openState[id] = false
+							changed = true
+							c.RequestRedraw()
+						}
+					}
+
+					if c.Font != nil {
+						px := c.S(12)
+						ds := strconv.Itoa(d)
+						tw, th := c.Font.MeasureText(ds, px)
+						tc := c.Theme.TextPrimary
+						if isSel {
+							tc = render.RGBA(255, 255, 255, 255)
+						}
+						c.Font.DrawText(c.Canvas, dr.X+(dr.W-tw)/2, dr.Y+(dr.H-th)/2, ds, px, tc)
+					}
+				}
+			}
+
+			// Кнопка "Сегодня" внизу календаря
+			todayR := render.Rect{X: popR.X + c.S(10), Y: popR.Y + popR.H - c.S(34), W: popR.W - c.S(20), H: c.S(24)}
+			hovToday := todayR.Contains(c.MouseX, c.MouseY)
+			todayBg := c.Theme.Surface
+			if hovToday {
+				c.nextCursor = platform.CursorHand
+				todayBg = c.Theme.Accent.WithAlpha(40)
+				if c.MousePressed {
+					now := time.Now()
+					*date = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, date.Location())
+					c.dateViewMonth[id] = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, date.Location())
+					dpModeStore[id] = dpModeDays
+					c.openState[id] = false
+					changed = true
+					c.RequestRedraw()
+				}
+			}
+			c.Canvas.DrawRoundedBox(todayR, c.Sf(6), todayBg, 1.0, c.Theme.Border)
+			if c.Font != nil {
+				tw, th := c.Font.MeasureText("Сегодня", c.S(11))
+				c.Font.DrawText(c.Canvas, todayR.X+(todayR.W-tw)/2, todayR.Y+(todayR.H-th)/2, "Сегодня", c.S(11), c.Theme.Accent)
 			}
 		})
 	}

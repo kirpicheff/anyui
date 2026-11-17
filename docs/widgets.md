@@ -319,3 +319,45 @@ if ev.RowMiddleClicked >= 0 {
 - **`Table`**: `Up`, `Down`, `PageUp`, `PageDown`, `Home`, `End`, `Left`, `Right` (горизонтальный скролл), `Space` / `Enter`.
 - **`TreeView`**: `Up`, `Down`, `PageUp`, `PageDown`, `Home`, `End`, `Right` (раскрыть узел или перейти к дочернему), `Left` (свернуть узел или перейти к родителю), `Space` / `Enter` (переключить `Expanded`).
 - **`Select` / `ComboBox`**: `Space` / `Enter` (открыть/закрыть список), `Up`, `Down`, `PageUp`, `PageDown`, `Home`, `End` (выбор элемента как в закрытом, так и в открытом состоянии).
+
+---
+
+## Десктоп-контролы, графики и мультивыбор (Фаза 7.1)
+
+### `MenuBar`, `Toolbar`, `StatusBar`, `Breadcrumbs`, `Pagination`
+```go
+ui.MenuBar("mb", []anyui.MenuBarItem{
+    {Label: "Файл", Items: []anyui.BarMenuItem{
+        {Label: "Новый", Shortcut: "Ctrl+N", OnClick: func() {}},
+        {Separator: true},
+        {Label: "Экспорт", SubItems: []anyui.BarMenuItem{{Label: "PNG"}}},
+    }},
+})
+ui.Toolbar("tb", []anyui.ToolbarItem{
+    {ID: "save", Label: "Сохранить", Tooltip: "Сохранить файл", OnClick: func() {}},
+})
+ui.Breadcrumbs("bc", []anyui.BreadcrumbItem{{Label: "Главная"}, {Label: "Раздел"}})
+ui.Pagination("pg", &page, 10)
+ui.StatusBar("sb", []anyui.StatusBarSection{{Text: "Готово", Flex: 1}, {Text: "UTF-8", WidthDp: 70}})
+```
+
+### `LogView` и `VirtualTextView`
+- `ui.LogView(id, entries, &followTail, opts...)`: виртуализированный просмотрщик логов с уровнями (`LogInfo`, `LogWarn`, `LogError`, `LogDebug`), встроенным фильтром, режимом `Follow tail`, выделением (`Клик`, `Shift+Клик`, `Ctrl+A`) и копированием (`Ctrl+C` или кнопка «Копировать»).
+- `ui.VirtualTextView(id, lines, opts...)`: виртуализированное отображение массива строк.
+
+### Графики (`Sparkline`, `LineChart`, `BarChart`)
+- `ui.Sparkline(id, values, opts...)`: мини-график тренда с тултипом при наведении.
+- `ui.LineChart(id, labels, series, opts...)` и `ui.BarChart(id, labels, series, opts...)`: графики с осями, сеткой, легендой и всплывающей подсказкой.
+
+### Расширенный `DatePicker`, `TimePicker`, `DateTimePicker`
+- `DatePicker`: клик по названию месяца или году в шапке открывает сетку 12 месяцев или 12 лет; кнопка «Сегодня» внизу календаря; двойной клик по полю включает ручной ввод даты (`YYYY-MM-DD`).
+- `ui.TimePicker(id, &t, opts...)` и `ui.DateTimePicker(id, &dt, opts...)`: выбор времени `ЧЧ:ММ:СС` с кнопками `+`/`-` и колесом мыши.
+
+### `MultiSelect` / `CheckComboBox` и `TagInput`
+- `ui.MultiSelect(id, items, &selected, opts...)` (алиас `CheckComboBox`): выпадающий список с чекбоксами, поиском, кнопками «Выбрать все / Сбросить» и отображением тегов/сводки.
+- `ui.TagInput(id, &tags, placeholder, opts...)`: ввод тегов (добавление по `Enter` или `,`, удаление по `x` или `Backspace`).
+
+### Расширенный мультивыбор: `ListViewEx`, `TreeViewEx`, `TableEx`
+- `ui.ListViewEx`: мультивыбор (`Ctrl+Клик`, `Shift+Клик`, `Ctrl+A`) и опциональные чекбоксы.
+- `ui.TreeViewEx` + `anyui.SetTreeNodeChecked` / `anyui.SyncTreeCheckState`: мультивыбор узлов и каскадные чекбоксы с автоматическим `Indeterminate` у родителей.
+- `ui.TableEx`: мультивыбор строк (`Ctrl+Клик`, `Shift+Клик`, `Ctrl+A`), колонка чекбоксов с «Выбрать все» в шапке, закреплённые колонки (`FrozenCols`), inline-редактирование ячейки по двойному клику и автоподбор ширины колонки (`AutoFitOnDoubleClick`).
