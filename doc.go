@@ -26,5 +26,7 @@
 //   - [git.gtw.su/kirpich/anyui/ui] — внутренний движок раскладки, фокуса, анимаций и виджетов.
 //   - [git.gtw.su/kirpich/anyui/render] — программный 2D-рендерер (BGRA), SDF-примитивы и кеш шрифтов.
 //   - [git.gtw.su/kirpich/anyui/platform] — абстракция окна ОС, диалоги, трей и цикл событий.
+//
+//go:generate go run ./cmd/genllms
 package anyui
 

@@ -1,0 +1,469 @@
+# AnyUI (v0.7.1)
+
+Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).
+
+## Инструкция для ИИ-агента
+
+- Импорт: `import "git.gtw.su/kirpich/anyui"` (`go get git.gtw.su/kirpich/anyui`).
+- Подпакеты `ui/`, `platform/`, `render/` — внутренние; прикладной код использует только корневой пакет `anyui`.
+- Для уточнения сигнатур любого типа или метода используй `go doc git.gtw.su/kirpich/anyui.<Symbol>` вместо чтения исходников.
+- Модель Immediate Mode: состояние хранится в переменных/структурах приложения, `drawFn(ui *anyui.UI)` перерисовывает UI на каждом кадре.
+- Все интерактивные виджеты требуют уникальный строковый `id`.
+- Все размеры, координаты и отступы задаются в `dp` и масштабируются под DPI автоматически.
+- Обновление UI из фоновых горутин выполняется только через `app.Dispatch(func() { ... })`.
+- Иконка окна подхватывается автоматически из `.syso`-ресурсов или задаётся через `Config.IconRGBA` / `win.SetIcon(...)`.
+
+## Минимальный пример
+
+```go
+package main
+
+import (
+	"log"
+
+	"git.gtw.su/kirpich/anyui"
+)
+
+func main() {
+	app := anyui.NewApp(anyui.Config{
+		Title:  "My App",
+		Width:  800,
+		Height: 500,
+		Theme:  anyui.DeepNavyTheme(),
+	})
+
+	name := ""
+	err := app.Run(func(ui *anyui.UI) {
+		ui.Padding(16, func() {
+			ui.Column(10, func() {
+				ui.Label("Привет, AnyUI", anyui.FontSize(18), anyui.Bold())
+				ui.TextInput("inp_name", &name, "Введите имя", anyui.Width(260))
+				if ui.Button("btn_ok", "Готово", anyui.Primary()) {
+					log.Println("Имя:", name)
+				}
+			})
+		})
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+```
+
+## Корневой пакет (константы, функции, типы, опции)
+
+```go
+package anyui // import "git.gtw.su/kirpich/anyui"
+
+Package anyui предоставляет лёгкий кроссплатформенный UI-фреймворк на Go с
+программным 2D-рендерингом (без WebView2 и без зависимости от OpenGL/GPU).
+
+Корневой пакет anyui является основной точкой входа для прикладного кода и
+объединяет управление жизненным циклом приложения (App, Window), Immediate Mode
+API интерфейса (UI), темы оформления (Theme) и функциональные опции стилизации
+(Option).
+
+# Модель работы
+
+Фреймворк использует подход Immediate Mode UI: функция отрисовки drawFn
+вызывается при событиях ОС, анимациях или вызове App.Dispatch. В простое цикл
+событий ожидает сообщения ОС без нагрузки на CPU.
+
+Все размеры и отступы в виджетах и раскладках задаются в dp (device-independent
+pixels) и автоматически масштабируются под текущий DPI монитора.
+
+# Многопоточность
+
+Вызовы методов UI и чтение/изменение состояния интерфейса должны выполняться в
+главном потоке UI (внутри drawFn). Для обновления состояния из фоновых горутин
+используйте App.Dispatch.
+
+# Архитектура подпакетов
+
+  - git.gtw.su/kirpich/anyui/ui — внутренний движок раскладки, фокуса, анимаций
+    и виджетов.
+  - git.gtw.su/kirpich/anyui/render — программный 2D-рендерер (BGRA),
+    SDF-примитивы и кеш шрифтов.
+  - git.gtw.su/kirpich/anyui/platform — абстракция окна ОС, диалоги, трей и цикл
+    событий.
+
+const HitClient = platform.HitClient ...
+const MsgInfo = platform.MsgInfo ...
+const MsgOK = platform.MsgOK ...
+const ResNone = platform.ResNone ...
+const NotifyNone = platform.NotifyNone ...
+const ScaleFit = render.ScaleFit ...
+const FontRegular = render.FontRegular ...
+const CursorArrow = platform.CursorArrow ...
+const AlignStart = ui.AlignStart ...
+const JustifyStart = ui.JustifyStart ...
+const DrawerLeft = ui.DrawerLeft ...
+const SplitHorizontal = ui.SplitHorizontal ...
+const ToastInfo = ui.ToastInfo ...
+const LogInfo = ui.LogInfo ...
+var ErrAlreadyRunning = errors.New("приложение уже запущено")
+func IsSystemDarkTheme() bool
+func OpenFileDialog(opts FileDialogOptions) (string, bool, error)
+func OpenFilesDialog(opts FileDialogOptions) ([]string, bool, error)
+func OpenURL(rawURL string) error
+func RevealInFileManager(path string) error
+func SaveFileDialog(opts FileDialogOptions) (string, bool, error)
+func SaveWindowState(path string, state WindowState) error
+func SelectFolderDialog(opts FolderDialogOptions) (string, bool, error)
+func SetTreeNodeChecked(node *TreeNode, checked bool)
+func SyncTreeCheckState(roots []*TreeNode)
+type AccordionItem = ui.AccordionItem
+type Align = ui.Align
+type App struct{ ... }
+    func NewApp(cfg Config) *App
+type BarMenuItem = ui.BarMenuItem
+type BoxShadow = render.BoxShadow
+type BreadcrumbItem = ui.BreadcrumbItem
+type ChartSeries = ui.ChartSeries
+type Color = render.Color
+    func Hex(rgb uint32) Color
+    func RGB(r, g, b uint8) Color
+    func RGBA(r, g, b, a uint8) Color
+type Config struct{ ... }
+type ContextMenuItem = ui.ContextMenuItem
+type CornerRadii = render.CornerRadii
+    func UniformRadii(r float32) CornerRadii
+type CursorType = platform.CursorType
+type DrawerSide = ui.DrawerSide
+type FileDialogOptions struct{ ... }
+type FileFilter = platform.FileFilter
+type FlexItem = ui.FlexItem
+type FolderDialogOptions struct{ ... }
+type FontStyle = render.FontStyle
+type GradientStop = render.GradientStop
+type HitTestResult = platform.HitTestResult
+type ImageScaleMode = render.ImageScaleMode
+type Justify = ui.Justify
+type LinearGradient = render.LinearGradient
+type LogEntry = ui.LogEntry
+type LogLevel = ui.LogLevel
+type MenuBarItem = ui.MenuBarItem
+type MenuItem struct{ ... }
+type MessageBoxButtons = platform.MessageBoxButtons
+type MessageBoxResult = platform.MessageBoxResult
+    func MessageBox(owner *Window, title, text string, style MessageBoxStyle, ...) MessageBoxResult
+type MessageBoxStyle = platform.MessageBoxStyle
+type Modifiers = platform.Modifiers
+type Notification = platform.TrayNotification
+type NotificationIcon = platform.NotificationIcon
+type Option = ui.Option
+    func AutoHeight() Option
+    func Bg(c Color) Option
+    func Bold() Option
+    func BorderColor(c Color) Option
+    func Clearable(v bool) Option
+    func Danger() Option
+    func Disabled(v bool) Option
+    func Ellipsis(v bool) Option
+    func Error(text string) Option
+    func FillHeight() Option
+    func FillWidth() Option
+    func Flex(weight float32) Option
+    func FontSize(dp int) Option
+    func Ghost() Option
+    func Height(dp int) Option
+    func Icon(svg string) Option
+    func IconRight(svg string) Option
+    func Indeterminate(v bool) Option
+    func InputFilter(fn func(rune) bool) Option
+    func LineNumbers(v bool) Option
+    func MaxHeight(dp int) Option
+    func MaxWidth(dp int) Option
+    func MinHeight(dp int) Option
+    func MinWidth(dp int) Option
+    func Mono() Option
+    func Padding(dp int) Option
+    func Password() Option
+    func Primary() Option
+    func Radius(dp float32) Option
+    func ReadOnly(v bool) Option
+    func Searchable(v bool) Option
+    func Secondary() Option
+    func TextColor(c Color) Option
+    func Width(dp int) Option
+    func WordWrap(v bool) Option
+type PointF = render.PointF
+type RadialGradient = render.RadialGradient
+type Rect = render.Rect
+type SingleInstanceConfig struct{ ... }
+type SingleInstanceGuard = platform.SingleInstanceGuard
+    func AcquireSingleInstance(appID string, args []string) (*SingleInstanceGuard, bool, error)
+type SplitOrientation = ui.SplitOrientation
+type StatusBarSection = ui.StatusBarSection
+type Strings = ui.Strings
+    func EnglishStrings() Strings
+    func RussianStrings() Strings
+type TabBarEvent = ui.TabBarEvent
+type TabItem = ui.TabItem
+type TableColumn = ui.TableColumn
+type TableEvent = ui.TableEvent
+type TableExConfig = ui.TableExConfig
+type TableSort = ui.TableSort
+type Theme = ui.Theme
+    func DarkTheme() Theme
+    func DeepNavyTheme() Theme
+    func LightTheme() Theme
+    func SystemTheme() Theme
+type TitleBarConfig = ui.TitleBarConfig
+type ToastKind = ui.ToastKind
+type ToolbarItem = ui.ToolbarItem
+type TrayConfig struct{ ... }
+type TreeNode = ui.TreeNode
+type UI struct{ ... }
+type Window struct{ ... }
+type WindowState = platform.WindowState
+    func LoadWindowState(path string) (WindowState, error)
+```
+
+## Config
+
+```go
+package anyui // import "git.gtw.su/kirpich/anyui"
+
+type Config struct {
+	Title               string
+	Width               int
+	Height              int
+	MinWidth            int
+	MinHeight           int
+	DarkTitle           bool
+	TitleBarColor       *Color
+	TitleTextColor      *Color
+	BorderColor         *Color
+	InitialState        *WindowState
+	FollowSystemTheme   bool
+	OnSystemThemeChange func(app *App, dark bool)
+	Theme               Theme
+	Strings             *Strings
+	SingleInstance      *SingleInstanceConfig
+	Tray                *TrayConfig
+	Parent              *Window
+	Frameless           bool
+	TitleBarHeight      int
+	HitTest             func(x, y int) HitTestResult
+	AcceptDropFiles     bool
+	IconRGBA            []byte
+	IconWidth           int
+	IconHeight          int
+	HideOnClose         bool
+	OnClose             func(w *Window) bool
+	OnDropFiles         func(files []string, x, y int)
+}
+    Config задаёт параметры создания приложения или окна.
+```
+
+## TrayConfig
+
+```go
+package anyui // import "git.gtw.su/kirpich/anyui"
+
+type TrayConfig struct {
+	Tooltip             string
+	IconRGBA            []byte
+	IconWidth           int
+	IconHeight          int
+	Menu                []MenuItem
+	OnClick             func(app *App)
+	OnDoubleClick       func(app *App)
+	OnRightClick        func(app *App)
+	OnNotificationClick func(app *App)
+}
+    TrayConfig задаёт настройки иконки в системном трее.
+```
+
+## App
+
+```go
+package anyui // import "git.gtw.su/kirpich/anyui"
+
+type App struct {
+	// Has unexported fields.
+}
+    App управляет единым циклом событий ОС, реестром окон и потокобезопасной
+    очередью Dispatch.
+
+func NewApp(cfg Config) *App
+func (a *App) Dispatch(fn func())
+func (a *App) MainWindow() *Window
+func (a *App) OpenWindow(cfg Config, drawFn func(ui *UI)) (*Window, error)
+func (a *App) Quit()
+func (a *App) Run(drawFn func(ui *UI)) error
+func (a *App) SetStrings(s Strings)
+func (a *App) SetTrayIcon(rgba []byte, width, height int) error
+func (a *App) SetTrayMenu(items []MenuItem)
+func (a *App) SetTrayTooltip(tooltip string) error
+func (a *App) Show()
+func (a *App) ShowNotification(n Notification) error
+```
+
+## Window
+
+```go
+package anyui // import "git.gtw.su/kirpich/anyui"
+
+type Window struct {
+	// Has unexported fields.
+}
+    Window представляет независимое нативное окно с собственным холстом, фокусом
+    и анимациями.
+
+func (w *Window) BringToFront()
+func (w *Window) ClipboardImage() (image.Image, error)
+func (w *Window) Close()
+func (w *Window) Hide()
+func (w *Window) Invalidate()
+func (w *Window) IsFullscreen() bool
+func (w *Window) IsMaximized() bool
+func (w *Window) IsMinimized() bool
+func (w *Window) Maximize()
+func (w *Window) Minimize()
+func (w *Window) Position() (int, int)
+func (w *Window) Restore()
+func (w *Window) RestoreState(state WindowState)
+func (w *Window) SetClipboardImage(img image.Image) error
+func (w *Window) SetDarkTitle(dark bool)
+func (w *Window) SetFullscreen(fullscreen bool)
+func (w *Window) SetHideOnClose(hide bool)
+func (w *Window) SetIcon(rgba []byte, width, height int) error
+func (w *Window) SetOnClose(fn func(*Window) bool)
+func (w *Window) SetOnDropFiles(fn func(files []string, x, y int))
+func (w *Window) SetPosition(x, y int)
+func (w *Window) SetSize(width, height int)
+func (w *Window) SetStrings(s Strings)
+func (w *Window) SetTheme(theme Theme)
+func (w *Window) SetTitle(title string)
+func (w *Window) SetTitleBarColors(caption, text, border *Color)
+func (w *Window) Show()
+func (w *Window) State() WindowState
+```
+
+## UI (Immediate Mode API)
+
+```go
+package anyui // import "git.gtw.su/kirpich/anyui"
+
+type UI struct {
+	// Has unexported fields.
+}
+    UI предоставляет публичный Immediate Mode API для построения интерфейса в
+    окне.
+
+func (u *UI) Accordion(id string, items []AccordionItem, openIndex *int, opts ...Option) bool
+func (u *UI) App() *App
+func (u *UI) Badge(text string, opts ...Option)
+func (u *UI) BarChart(id string, labels []string, series []ChartSeries, opts ...Option)
+func (u *UI) Breadcrumbs(id string, items []BreadcrumbItem, opts ...Option) int
+func (u *UI) Button(id, label string, opts ...Option) bool
+func (u *UI) Canvas() *render.Canvas
+func (u *UI) CanvasView(wDp, hDp int, drawFn func(canvas *render.Canvas, area Rect))
+func (u *UI) Card(fn func(), opts ...Option)
+func (u *UI) CheckComboBox(id string, items []string, selected *[]bool, opts ...Option) bool
+func (u *UI) Checkbox(id, label string, checked *bool, opts ...Option) bool
+func (u *UI) ClearGlyphCache()
+func (u *UI) ClearScaledImageCache()
+func (u *UI) Collapsible(id, title string, expanded *bool, fn func(), opts ...Option) bool
+func (u *UI) ColorPicker(id string, col *render.Color, opts ...Option) bool
+func (u *UI) Column(gapDp int, fn func())
+func (u *UI) ColumnCentered(gapDp int, fn func())
+func (u *UI) ColumnFlex(gapDp int, items ...FlexItem)
+func (u *UI) ColumnWith(align Align, justify Justify, gapDp int, items ...func())
+func (u *UI) ComboBox(id string, items []string, selected *int, opts ...Option) bool
+func (u *UI) ContextMenu(id string, anchor Rect, items []ContextMenuItem)
+func (u *UI) CurrentArea() Rect
+func (u *UI) DatePicker(id string, date *time.Time, opts ...Option) bool
+func (u *UI) DateTimePicker(id string, dt *time.Time, opts ...Option) bool
+func (u *UI) DoubleClicked() bool
+func (u *UI) DrawSVG(svgData string, x, y, sizeDp int, tint Color)
+func (u *UI) DrawText(x, y int, text string, sizeDp int, col Color)
+func (u *UI) Drawer(id string, open *bool, side DrawerSide, fn func(), opts ...Option)
+func (u *UI) Expand(fn func())
+func (u *UI) FlexSpacer(reserveDp int)
+func (u *UI) FloatingPanel(id, title string, open *bool, fn func(), opts ...Option)
+func (u *UI) Flow(gapXDp, gapYDp int, fn func())
+func (u *UI) FocusID() string
+func (u *UI) FormLayout(labelWidthDp, gapXDp, gapYDp int, fn func())
+func (u *UI) FormRow(label string, fn func())
+func (u *UI) GlyphCacheStats() (entries int, bytes int64)
+func (u *UI) Grid(cols, gapXDp, gapYDp, rowHeightDp int, fn func())
+func (u *UI) Hyperlink(id, text string, opts ...Option) bool
+func (u *UI) IconButton(id, svg string, opts ...Option) bool
+func (u *UI) Image(img image.Image, wDp, hDp int, mode ImageScaleMode)
+func (u *UI) InvalidateStatic()
+func (u *UI) Label(text string, opts ...Option)
+func (u *UI) LastDirtyRects() []Rect
+func (u *UI) LastFrameStaticBlitted() bool
+func (u *UI) LineChart(id string, labels []string, series []ChartSeries, opts ...Option)
+func (u *UI) ListView(id string, count int, itemHeightDp int, selected *int, ...) bool
+func (u *UI) ListViewEx(id string, count int, itemHeightDp int, selected map[int]bool, checked []bool, ...) bool
+func (u *UI) LogView(id string, entries []LogEntry, followTail *bool, opts ...Option)
+func (u *UI) MaskedInput(id string, value *string, mask string, opts ...Option) bool
+func (u *UI) MenuBar(id string, menus []MenuBarItem, opts ...Option)
+func (u *UI) MiddleClicked() bool
+func (u *UI) Modal(id string, open *bool, title string, fn func(), opts ...Option)
+func (u *UI) MousePos() (int, int)
+func (u *UI) MultiSelect(id string, items []string, selected *[]bool, opts ...Option) bool
+func (u *UI) NumberInput(id string, value *float64, minVal, maxVal, step float64, decimals int, ...) bool
+func (u *UI) Padding(padDp int, fn func())
+func (u *UI) PaddingXY(pxDp, pyDp int, fn func())
+func (u *UI) Pagination(id string, currentPage *int, totalPages int, opts ...Option) bool
+func (u *UI) Popover(id string, open *bool, anchor Rect, fn func(), opts ...Option)
+func (u *UI) ProgressBar(progress float32, opts ...Option)
+func (u *UI) PushOverlay(bounds Rect, drawFn func())
+func (u *UI) RadioButton(id, label string, selected bool, opts ...Option) bool
+func (u *UI) RadioGroup(id string, options []string, selected *int, opts ...Option) bool
+func (u *UI) RangeSlider(id string, low, high *float32, minVal, maxVal float32, opts ...Option) bool
+func (u *UI) RegisterHoverArea(id string, rect Rect, cursor CursorType, trackMove bool)
+func (u *UI) Row(gapDp, heightDp int, fn func())
+func (u *UI) RowCentered(gapDp, heightDp int, fn func())
+func (u *UI) RowFlex(gapDp, heightDp int, items ...FlexItem)
+func (u *UI) RowWith(align Align, justify Justify, gapDp, heightDp int, items ...func())
+func (u *UI) S(dp int) int
+func (u *UI) ScaledImageCacheStats() (entries int, bytes int64)
+func (u *UI) ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)
+func (u *UI) Select(id string, items []string, selected *int, opts ...Option) bool
+func (u *UI) SelectableLabel(id, text string, opts ...Option)
+func (u *UI) Separator(opts ...Option)
+func (u *UI) SetCursor(cursor CursorType)
+func (u *UI) SetDebugDirtyRect(enabled bool)
+func (u *UI) SetFocus(id string)
+func (u *UI) SetSmartMouseMove(enabled bool)
+func (u *UI) SetStrings(s Strings)
+func (u *UI) SetTheme(theme Theme)
+func (u *UI) Sf(dp float32) float32
+func (u *UI) Shortcut(keyCode uint32, mods Modifiers, fn func())
+func (u *UI) ShowToast(title, text string, kind ToastKind, duration ...time.Duration)
+func (u *UI) SkippedMouseMoves() uint64
+func (u *UI) Slider(id string, value *float32, minVal, maxVal float32, opts ...Option) bool
+func (u *UI) Spacer(dp int)
+func (u *UI) Sparkline(id string, values []float64, opts ...Option)
+func (u *UI) Spinner(id string, sizeDp int, opts ...Option)
+func (u *UI) SplitPane(id string, orient SplitOrientation, ratio *float32, firstFn, secondFn func(), ...)
+func (u *UI) StaticLayer(id string, fn func())
+func (u *UI) StatusBar(id string, sections []StatusBarSection, opts ...Option)
+func (u *UI) StatusDot(dotColor Color, label string)
+func (u *UI) Strings() Strings
+func (u *UI) TabBar(id string, tabs []TabItem, active *int, opts ...Option) TabBarEvent
+func (u *UI) Table(id string, cols []TableColumn, rowCount int, selected *int, sort *TableSort, ...) TableEvent
+func (u *UI) TableEx(id string, cols []TableColumn, rowCount int, cfg *TableExConfig, ...) TableEvent
+func (u *UI) Tabs(id string, items []string, active *int, vertical bool, opts ...Option) bool
+func (u *UI) TagInput(id string, tags *[]string, placeholder string, opts ...Option) bool
+func (u *UI) TextArea(id string, value *string, placeholder string, opts ...Option) bool
+func (u *UI) TextInput(id string, value *string, placeholder string, opts ...Option) bool
+func (u *UI) Theme() Theme
+func (u *UI) TimePicker(id string, t *time.Time, opts ...Option) bool
+func (u *UI) TitleBar(id, title string, cfg TitleBarConfig, opts ...Option)
+func (u *UI) TitleBarHitTest(x, y int) HitTestResult
+func (u *UI) Toggle(id, label string, value *bool, opts ...Option) bool
+func (u *UI) Toolbar(id string, items []ToolbarItem, opts ...Option)
+func (u *UI) Tooltip(text string, anchor Rect)
+func (u *UI) TreeView(id string, roots []*TreeNode, selectedID *string, opts ...Option) bool
+func (u *UI) TreeViewEx(id string, roots []*TreeNode, selectedIDs map[string]bool, showCheckboxes bool, ...) bool
+func (u *UI) VirtualTextView(id string, lines []string, opts ...Option)
+func (u *UI) Window() *Window
+```
+
