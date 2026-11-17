@@ -123,7 +123,8 @@ go doc -all .
 
 AnyUI is developed in my free time. If it saved you hours of work and RAM, you can buy me a coffee:
 
-- [Support on Boosty](https://boosty.to/artemalabin/donate)
+- [Support via Tribute (International: Cards, Apple/Google Pay)](https://web.tribute.tg/d/Ung)
+- [Support via Boosty (RU)](https://boosty.to/artemalabin/donate)
 
 ---
 

@@ -123,7 +123,8 @@ go doc -all .
 
 AnyUI разрабатывается в свободное время. Если фреймворк сэкономил вам часы работы и сотни мегабайт RAM, вы можете угостить автора кофе:
 
-- [Поддержать на Boosty](https://boosty.to/artemalabin/donate)
+- [Поддержать через Boosty (РФ: карты, СБП)](https://boosty.to/artemalabin/donate)
+- [Поддержать через Tribute (зарубежные карты, Apple/Google Pay)](https://web.tribute.tg/d/Ung)
 
 ---
 
