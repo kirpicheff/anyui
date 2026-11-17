@@ -27,6 +27,15 @@ func (w *Window) SetTitle(title string) {
 	}
 }
 
+// SetIcon программно устанавливает иконку окна из RGBA-буфера (width * height * 4).
+// Передача пустого буфера и нулевых размеров сбрасывает программную иконку к иконке класса окна.
+func (w *Window) SetIcon(rgba []byte, width, height int) error {
+	if setter, ok := w.platWin.(platform.WindowIconSetter); ok {
+		return setter.SetIcon(rgba, width, height)
+	}
+	return errors.New("установка иконки окна не поддерживается")
+}
+
 // Show отображает окно, если оно было скрыто.
 func (w *Window) Show() {
 	if w.platWin != nil {

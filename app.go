@@ -71,6 +71,9 @@ type Config struct {
 	TitleBarHeight      int
 	HitTest             func(x, y int) HitTestResult
 	AcceptDropFiles     bool
+	IconRGBA            []byte
+	IconWidth           int
+	IconHeight          int
 	HideOnClose         bool
 	OnClose             func(w *Window) bool
 	OnDropFiles         func(files []string, x, y int)
@@ -204,6 +207,9 @@ func (a *App) createWindow(cfg Config, drawFn func(*UI)) (*Window, error) {
 		TitleBarHeight:  cfg.TitleBarHeight,
 		HitTest:         cfg.HitTest,
 		AcceptDropFiles: cfg.AcceptDropFiles,
+		IconRGBA:        cfg.IconRGBA,
+		IconWidth:       cfg.IconWidth,
+		IconHeight:      cfg.IconHeight,
 	})
 	if err != nil {
 		return nil, err

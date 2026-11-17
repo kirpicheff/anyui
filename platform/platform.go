@@ -122,7 +122,10 @@ type WindowConfig struct {
 	Frameless       bool         // Окно без системной рамки с поддержкой перетаскивания и Aero Snap
 	TitleBarHeight  int          // Логическая высота области перетаскивания (по умолчанию 36, если HitTest не задан)
 	HitTest         func(x, y int) HitTestResult
-	AcceptDropFiles bool // Разрешить перетаскивание файлов из проводника (WM_DROPFILES)
+	AcceptDropFiles bool   // Разрешить перетаскивание файлов из проводника (WM_DROPFILES)
+	IconRGBA        []byte // Пиксели иконки окна в формате RGBA (width * height * 4)
+	IconWidth       int    // Ширина иконки в пикселях
+	IconHeight      int    // Высота иконки в пикселях
 }
 
 // DirtyPresenter — опциональный интерфейс окна для частичного обновления экрана (Dirty Rectangles).
@@ -151,6 +154,11 @@ type ClipboardImager interface {
 // WindowActivator — опциональный интерфейс окна для вывода на передний план.
 type WindowActivator interface {
 	BringToFront()
+}
+
+// WindowIconSetter — опциональный интерфейс окна для программной установки иконки.
+type WindowIconSetter interface {
+	SetIcon(rgba []byte, width, height int) error
 }
 
 // Window — кроссплатформенный интерфейс нативного окна.

@@ -53,11 +53,12 @@ var (
 	procGetClipboardData          = modUser32.NewProc("GetClipboardData")
 	procSetClipboardData          = modUser32.NewProc("SetClipboardData")
 
-	procGetModuleHandleW = modKernel32.NewProc("GetModuleHandleW")
-	procGlobalAlloc      = modKernel32.NewProc("GlobalAlloc")
-	procGlobalLock       = modKernel32.NewProc("GlobalLock")
-	procGlobalUnlock     = modKernel32.NewProc("GlobalUnlock")
-	procGlobalSize       = modKernel32.NewProc("GlobalSize")
+	procGetModuleHandleW   = modKernel32.NewProc("GetModuleHandleW")
+	procGetModuleFileNameW = modKernel32.NewProc("GetModuleFileNameW")
+	procGlobalAlloc        = modKernel32.NewProc("GlobalAlloc")
+	procGlobalLock         = modKernel32.NewProc("GlobalLock")
+	procGlobalUnlock       = modKernel32.NewProc("GlobalUnlock")
+	procGlobalSize         = modKernel32.NewProc("GlobalSize")
 
 	procDwmSetWindowAttribute = modDwmapi.NewProc("DwmSetWindowAttribute")
 
@@ -65,6 +66,7 @@ var (
 	procDragQueryFileW  = modShell32.NewProc("DragQueryFileW")
 	procDragQueryPoint  = modShell32.NewProc("DragQueryPoint")
 	procDragFinish      = modShell32.NewProc("DragFinish")
+	procExtractIconExW  = modShell32.NewProc("ExtractIconExW")
 )
 
 const (
@@ -88,6 +90,10 @@ const (
 	wmCancelMode    = 0x001F
 	wmGetMinMaxInfo = 0x0024
 	wmSetCursor     = 0x0020
+	wmSetIcon       = 0x0080
+
+	iconSmall = 0
+	iconBig   = 1
 	wmKeyDown       = 0x0100
 	wmKeyUp         = 0x0101
 	wmChar          = 0x0102
@@ -191,6 +197,7 @@ var (
 type win32Window struct {
 	cfg     WindowConfig
 	hwnd    windows.Handle
+	hIcon   windows.Handle
 	handler func(Event)
 
 	width  int
@@ -292,17 +299,29 @@ func (w *win32Window) Open(handler func(Event)) error {
 	}
 
 	hCursor, _, _ := procLoadCursorW.Call(0, idcArrow)
+	hIconBig, hIconSmall := loadModuleIcons(windows.Handle(hInstance))
 	wc := wndClassExW{
 		cbSize:        uint32(unsafe.Sizeof(wndClassExW{})),
 		style:         csHRedraw | csVRedraw,
 		lpfnWndProc:   wndProcCallback,
 		hInstance:     windows.Handle(hInstance),
+		hIcon:         hIconBig,
 		hCursor:       windows.Handle(hCursor),
 		lpszClassName: className,
+		hIconSm:       hIconSmall,
 	}
-	procRegisterClassExW.Call(uintptr(unsafe.Pointer(&wc)))
+	atom, _, _ := procRegisterClassExW.Call(uintptr(unsafe.Pointer(&wc)))
 	runtime.KeepAlive(&wc)
 	runtime.KeepAlive(className)
+	if atom == 0 {
+		// Класс окна уже зарегистрирован ранее — освобождаем неиспользованные хэндлы.
+		if hIconBig != 0 {
+			procDestroyIcon.Call(uintptr(hIconBig))
+		}
+		if hIconSmall != 0 && hIconSmall != hIconBig {
+			procDestroyIcon.Call(uintptr(hIconSmall))
+		}
+	}
 
 	// Вычисляем начальный масштаб по системному DPI до создания окна
 	hdcScreen, _, _ := procGetDC.Call(0)
@@ -373,6 +392,9 @@ func (w *win32Window) Open(handler func(Event)) error {
 	}
 	if w.cfg.AcceptDropFiles {
 		procDragAcceptFiles.Call(uintptr(w.hwnd), 1)
+	}
+	if len(w.cfg.IconRGBA) > 0 && w.cfg.IconWidth > 0 && w.cfg.IconHeight > 0 {
+		_ = w.SetIcon(w.cfg.IconRGBA, w.cfg.IconWidth, w.cfg.IconHeight)
 	}
 
 	if w.cfg.InitialState != nil && isValidWindowState(*w.cfg.InitialState) {
@@ -920,6 +942,10 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 		return 0
 
 	case wmDestroy:
+		if w.hIcon != 0 {
+			procDestroyIcon.Call(uintptr(w.hIcon))
+			w.hIcon = 0
+		}
 		windowMapMu.Lock()
 		delete(windowMap, hwnd)
 		remaining := len(windowMap)
@@ -932,5 +958,69 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 
 	ret, _, _ := procDefWindowProcW.Call(uintptr(hwnd), uintptr(msg), wParam, lParam)
 	return ret
+}
+
+// loadModuleIcons извлекает первую пару иконок (большую и малую) из ресурсов исполняемого файла (.syso).
+func loadModuleIcons(hInstance windows.Handle) (big, small windows.Handle) {
+	buf := make([]uint16, 1024)
+	n, _, _ := procGetModuleFileNameW.Call(
+		uintptr(hInstance),
+		uintptr(unsafe.Pointer(&buf[0])),
+		uintptr(len(buf)),
+	)
+	runtime.KeepAlive(buf)
+	if n == 0 || int(n) >= len(buf) {
+		return 0, 0
+	}
+
+	var hBig, hSmall windows.Handle
+	count, _, _ := procExtractIconExW.Call(
+		uintptr(unsafe.Pointer(&buf[0])),
+		0,
+		uintptr(unsafe.Pointer(&hBig)),
+		uintptr(unsafe.Pointer(&hSmall)),
+		1,
+	)
+	runtime.KeepAlive(buf)
+	runtime.KeepAlive(&hBig)
+	runtime.KeepAlive(&hSmall)
+	if count == 0 || count == ^uintptr(0) {
+		return 0, 0
+	}
+	return hBig, hSmall
+}
+
+// SetIcon программно устанавливает иконку окна из RGBA-буфера (width * height * 4).
+// При передаче пустого буфера сбрасывает программную иконку обратно к иконке класса.
+func (w *win32Window) SetIcon(rgba []byte, width, height int) error {
+	if len(rgba) == 0 && width == 0 && height == 0 {
+		if w.hwnd != 0 {
+			procSendMessageW.Call(uintptr(w.hwnd), wmSetIcon, iconBig, 0)
+			procSendMessageW.Call(uintptr(w.hwnd), wmSetIcon, iconSmall, 0)
+		}
+		if w.hIcon != 0 {
+			procDestroyIcon.Call(uintptr(w.hIcon))
+			w.hIcon = 0
+		}
+		return nil
+	}
+
+	hIcon, err := createHIconFromRGBA(rgba, width, height)
+	if err != nil {
+		return err
+	}
+	if w.hwnd == 0 {
+		procDestroyIcon.Call(uintptr(hIcon))
+		return errors.New("окно не создано")
+	}
+
+	procSendMessageW.Call(uintptr(w.hwnd), wmSetIcon, iconBig, uintptr(hIcon))
+	procSendMessageW.Call(uintptr(w.hwnd), wmSetIcon, iconSmall, uintptr(hIcon))
+
+	if w.hIcon != 0 {
+		procDestroyIcon.Call(uintptr(w.hIcon))
+	}
+	w.hIcon = hIcon
+	return nil
 }
 
