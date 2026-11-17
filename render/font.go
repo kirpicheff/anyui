@@ -438,7 +438,7 @@ func (fm *FontManager) MeasureText(text string, sizePx int) (int, int) {
 
 // MeasureTextStyled возвращает ширину и высоту строки в пикселях для указанного начертания.
 func (fm *FontManager) MeasureTextStyled(text string, sizePx int, style FontStyle) (int, int) {
-	if fm == nil || text == "" {
+	if fm == nil {
 		return 0, sizePx
 	}
 	fs := fm.styleSet(style)
@@ -448,6 +448,9 @@ func (fm *FontManager) MeasureTextStyled(text string, sizePx int, style FontStyl
 	fe := fs.getFace(sizePx)
 	if fe == nil {
 		return 0, sizePx
+	}
+	if text == "" {
+		return 0, fe.lineHeight
 	}
 	width := 0
 	for _, r := range text {
