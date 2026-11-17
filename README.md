@@ -34,6 +34,22 @@ Designed for desktop tools, system utilities, background services with a tray ic
 
 ---
 
+## Benchmarks
+
+Minimal `480x320` window (label, text input, click counter button) measured on **Windows 11 Pro (64-bit), AMD Ryzen 5 5600G (12 logical CPUs), 31.4 GB RAM, `go1.26.2 windows/amd64`** after 5s warmup over a 5s idle window (including child processes such as WebView2):
+
+| Framework | CGO | Binary Size | Startup Time | Processes | Working Set (RAM) | Private Memory | Idle CPU |
+| --- | :---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **AnyUI** | `0` | **2.7 MB** | **17.56 ms** | **1** | **38.49 MB** | **28.64 MB** | **0%** |
+| **Gio** | `0` | 6.52 MB | 117.93 ms | 1 | 52.74 MB | 38.75 MB | 0% |
+| **Fyne** | `1` | 23.29 MB | 229.49 ms | 1 | 128.1 MB | 159.79 MB | 0% |
+| **Wails** | `0` | 10.66 MB | 364.00 ms | 7 | 339.62 MB | 188.65 MB | 0% |
+
+- **WebView2 Runtime (required by Wails):** `878.2 MB` (`v157.0.4341.46`) on disk.
+- Reproduce on your own machine: see [benchmarks/](benchmarks/README.md) (`.\run.ps1`).
+
+---
+
 ## Quick Start
 
 ```bash
