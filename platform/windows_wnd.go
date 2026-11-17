@@ -112,11 +112,16 @@ const (
 	vkControl = 0x11
 	vkMenu    = 0x12
 
-	idcArrow  = 32512
-	idcIBeam  = 32513
-	idcSizeWE = 32644
-	idcSizeNS = 32645
-	idcHand   = 32649
+	idcArrow    = 32512
+	idcIBeam    = 32513
+	idcCross    = 32515
+	idcSizeNWSE = 32642
+	idcSizeNESW = 32643
+	idcSizeWE   = 32644
+	idcSizeNS   = 32645
+	idcSizeAll  = 32646
+	idcNo       = 32648
+	idcHand     = 32649
 
 	cfUnicodeText = 13
 	gmemMoveable  = 0x0002
@@ -444,6 +449,56 @@ func (w *win32Window) Present(pixels []byte, width, height int) {
 	}
 }
 
+// PresentRect обновляет только изменённую прямоугольную область окна (Dirty Rectangle).
+func (w *win32Window) PresentRect(pixels []byte, width, height, rx, ry, rw, rh int) {
+	if width <= 0 || height <= 0 || len(pixels) < width*height*4 {
+		return
+	}
+	if rx < 0 {
+		rw += rx
+		rx = 0
+	}
+	if ry < 0 {
+		rh += ry
+		ry = 0
+	}
+	if rx+rw > width {
+		rw = width - rx
+	}
+	if ry+rh > height {
+		rh = height - ry
+	}
+	if rw <= 0 || rh <= 0 {
+		return
+	}
+
+	w.mu.Lock()
+	need := width * height * 4
+	if w.bufW != width || w.bufH != height || len(w.pixels) < need {
+		w.mu.Unlock()
+		w.Present(pixels, width, height)
+		return
+	}
+	rowBytes := rw * 4
+	for y := ry; y < ry+rh; y++ {
+		off := (y*width + rx) * 4
+		copy(w.pixels[off:off+rowBytes], pixels[off:off+rowBytes])
+	}
+	w.mu.Unlock()
+
+	if w.hwnd != 0 {
+		rc := rect{
+			left:   int32(rx),
+			top:    int32(ry),
+			right:  int32(rx + rw),
+			bottom: int32(ry + rh),
+		}
+		procInvalidateRect.Call(uintptr(w.hwnd), uintptr(unsafe.Pointer(&rc)), 0)
+		runtime.KeepAlive(&rc)
+		procUpdateWindow.Call(uintptr(w.hwnd))
+	}
+}
+
 func (w *win32Window) Invalidate() {
 	if w.hwnd != 0 {
 		procInvalidateRect.Call(uintptr(w.hwnd), 0, 0)
@@ -515,18 +570,33 @@ func (w *win32Window) DoubleClickTimeMs() int {
 	return int(ms)
 }
 
-func (w *win32Window) applyCursor() {
-	var id uintptr = idcArrow
-	switch w.cursor {
+func win32CursorResourceID(cursor CursorType) uintptr {
+	switch cursor {
 	case CursorHand:
-		id = idcHand
+		return idcHand
 	case CursorIBeam:
-		id = idcIBeam
+		return idcIBeam
 	case CursorResizeH:
-		id = idcSizeWE
+		return idcSizeWE
 	case CursorResizeV:
-		id = idcSizeNS
+		return idcSizeNS
+	case CursorResizeNWSE:
+		return idcSizeNWSE
+	case CursorResizeNESW:
+		return idcSizeNESW
+	case CursorNotAllowed:
+		return idcNo
+	case CursorCrosshair:
+		return idcCross
+	case CursorMove:
+		return idcSizeAll
+	default:
+		return idcArrow
 	}
+}
+
+func (w *win32Window) applyCursor() {
+	id := win32CursorResourceID(w.cursor)
 	hCursor, _, _ := procLoadCursorW.Call(0, id)
 	if hCursor != 0 {
 		procSetCursor.Call(hCursor)

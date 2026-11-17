@@ -54,11 +54,19 @@ func (o *OverlayLayer) IsBlocked(x, y int) bool {
 
 // Flush отрисовывает все накопленные оверлеи поверх основного интерфейса.
 func (o *OverlayLayer) Flush() {
+	o.FlushWithHook(nil)
+}
+
+// FlushWithHook отрисовывает оверлеи поверх основного интерфейса, вызывая onItem перед каждым элементом.
+func (o *OverlayLayer) FlushWithHook(onItem func(bounds render.Rect)) {
 	if len(o.items) == 0 {
 		return
 	}
 	o.inOverlay = true
 	for _, it := range o.items {
+		if onItem != nil {
+			onItem(it.bounds)
+		}
 		it.draw()
 	}
 	o.inOverlay = false

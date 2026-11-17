@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -128,6 +129,22 @@ type Context struct {
 	animMu          sync.Mutex
 	animTimerActive bool
 	animStopCh      chan struct{}
+
+	// Слои, кеш hit-областей и фильтрация EventMouseMove (Фаза 7.2)
+	layers            LayerManager
+	lastTheme         Theme
+	lastScale         float32
+	hitRegions        []hitRegion
+	nextHitRegions    []hitRegion
+	lastHotID         string
+	lastHitID         string
+	smartMouseMove    bool
+	skippedMouseMove  uint64
+	lastDirtyRects    []render.Rect
+	prevPresentPixels []byte
+	prevPresentW      int
+	prevPresentH      int
+	paintRequested    bool
 }
 
 // NewContext создаёт новый UI-контекст поверх окна и менеджера шрифтов.
@@ -144,14 +161,16 @@ func NewContext(win platform.Window, fm *render.FontManager) *Context {
 		scale = 1.0
 	}
 	return &Context{
-		Win:        win,
-		Canvas:     render.NewCanvas(w, h),
-		Font:       fm,
-		Theme:      DeepNavyTheme(),
-		Scale:      scale,
-		Animator:   NewAnimator(),
-		caretPos:   make(map[string]int),
-		textScroll: make(map[string]int),
+		Win:            win,
+		Canvas:         render.NewCanvas(w, h),
+		Font:           fm,
+		Theme:          DeepNavyTheme(),
+		Scale:          scale,
+		Animator:       NewAnimator(),
+		caretPos:       make(map[string]int),
+		textScroll:     make(map[string]int),
+		layers:         newLayerManager(),
+		smartMouseMove: true,
 	}
 }
 
@@ -186,6 +205,11 @@ func (c *Context) DrawText(x, y int, text string, sizeDp int, col render.Color) 
 // RequestRedraw запрашивает повторную перерисовку после изменения состояния.
 func (c *Context) RequestRedraw() {
 	c.needsRedraw = true
+}
+
+// SetCursor задаёт курсор мыши на текущий кадр (актуально при наведении на кастомные области).
+func (c *Context) SetCursor(cursor platform.CursorType) {
+	c.nextCursor = cursor
 }
 
 // PushOverlay регистрирует отложенную отрисовку всплывающего элемента поверх основного UI.
@@ -233,12 +257,15 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 	case platform.EventDPIChange:
 		if ev.Scale > 0 {
 			c.Scale = ev.Scale
+			c.layers.InvalidateStatic()
 			redraw = true
 		}
 	case platform.EventResize:
 		c.Canvas.Resize(ev.Width, ev.Height)
+		c.layers.InvalidateStatic()
 		redraw = true
 	case platform.EventPaint:
+		c.paintRequested = true
 		redraw = true
 	case platform.EventWakeUp:
 		c.wakePending.Store(false)
@@ -246,7 +273,11 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 	case platform.EventMouseMove:
 		c.MouseX = ev.X
 		c.MouseY = ev.Y
-		redraw = true
+		if c.shouldRedrawOnMouseMove(ev.X, ev.Y) {
+			redraw = true
+		} else {
+			c.skippedMouseMove++
+		}
 	case platform.EventMouseDown:
 		if ev.Button == platform.MouseLeft {
 			now := time.Now()
@@ -368,8 +399,51 @@ func (c *Context) Render(drawFn func(ctx *Context)) {
 		}
 	}
 
-	c.Win.Present(c.Canvas.Pixels, c.Canvas.Width, c.Canvas.Height)
+	c.presentFrame()
 	c.syncAnimTimer()
+}
+
+func (c *Context) presentFrame() {
+	w, h := c.Canvas.Width, c.Canvas.Height
+	need := w * h * 4
+	forceFull := c.paintRequested || c.prevPresentW != w || c.prevPresentH != h || len(c.prevPresentPixels) != need
+	c.paintRequested = false
+
+	if forceFull {
+		if cap(c.prevPresentPixels) < need {
+			c.prevPresentPixels = make([]byte, need)
+		} else {
+			c.prevPresentPixels = c.prevPresentPixels[:need]
+		}
+		copy(c.prevPresentPixels, c.Canvas.Pixels[:need])
+		c.prevPresentW = w
+		c.prevPresentH = h
+		c.lastDirtyRects = append(c.lastDirtyRects[:0], render.Rect{X: 0, Y: 0, W: w, H: h})
+		c.Win.Present(c.Canvas.Pixels, w, h)
+		c.Canvas.ResetDirtyRects()
+		return
+	}
+
+	diff := computeDiffRect(c.prevPresentPixels, c.Canvas.Pixels, w, h)
+	if diff.Empty() {
+		c.lastDirtyRects = c.lastDirtyRects[:0]
+		c.Canvas.ResetDirtyRects()
+		return
+	}
+
+	rowBytes := diff.W * 4
+	for y := diff.Y; y < diff.Y+diff.H; y++ {
+		off := (y*w + diff.X) * 4
+		copy(c.prevPresentPixels[off:off+rowBytes], c.Canvas.Pixels[off:off+rowBytes])
+	}
+
+	c.lastDirtyRects = append(c.lastDirtyRects[:0], diff)
+	if dp, ok := c.Win.(platform.DirtyPresenter); ok && diff.W*diff.H < (w*h*3)/4 {
+		dp.PresentRect(c.Canvas.Pixels, w, h, diff.X, diff.Y, diff.W, diff.H)
+	} else {
+		c.Win.Present(c.Canvas.Pixels, w, h)
+	}
+	c.Canvas.ResetDirtyRects()
 }
 
 func (c *Context) syncAnimTimer() {
@@ -430,6 +504,14 @@ func (c *Context) beginFrame() {
 	c.needsRedraw = false
 	c.layoutSeq = 0
 	c.nextFocusOrder = c.nextFocusOrder[:0]
+	c.nextHitRegions = c.nextHitRegions[:0]
+	c.layers.lastFrameBlitted = false
+	c.layers.activeLayer = LayerDynamic
+	if c.Theme != c.lastTheme || c.Scale != c.lastScale {
+		c.layers.InvalidateStatic()
+		c.lastTheme = c.Theme
+		c.lastScale = c.Scale
+	}
 
 	if c.Animator != nil {
 		c.Animator.BeginFrame(time.Now())
@@ -449,8 +531,20 @@ func (c *Context) beginFrame() {
 
 func (c *Context) endFrame() {
 	c.drawToasts()
-	c.Overlays.Flush()
+	ovIdx := 0
+	c.Overlays.FlushWithHook(func(bounds render.Rect) {
+		if !bounds.Empty() {
+			c.registerHitRegion("__overlay:"+strconv.Itoa(ovIdx), bounds, platform.CursorArrow, false)
+		}
+		ovIdx++
+	})
 	c.focusOrder, c.nextFocusOrder = c.nextFocusOrder, c.focusOrder[:0]
+	c.hitRegions, c.nextHitRegions = c.nextHitRegions, c.hitRegions[:0]
+	c.lastHotID = c.HotID
+	c.lastHitID, _, _, _ = c.hitTest(c.MouseX, c.MouseY)
+	if !c.needsRedraw {
+		c.layers.staticDirty = false
+	}
 
 	if c.MouseReleased {
 		c.ActiveID = ""

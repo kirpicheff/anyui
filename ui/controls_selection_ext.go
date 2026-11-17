@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"strconv"
+
 	"anyui/platform"
 	"anyui/render"
 )
@@ -98,6 +100,7 @@ func (c *Context) ListViewEx(
 	for i := startIdx; i < endIdx; i++ {
 		iy := viewRect.Y + i*rowH - si.y
 		ir := render.Rect{X: contentRect.X, Y: iy, W: contentRect.W, H: rowH}
+		c.RegisterHit(id+":row:"+strconv.Itoa(i), contentRect.Intersect(ir), platform.CursorArrow)
 		isSel := selected != nil && selected[i]
 		hov := !c.IsInputBlocked() && ir.Contains(c.MouseX, c.MouseY)
 
@@ -111,6 +114,7 @@ func (c *Context) ListViewEx(
 		if showCheck {
 			cbSize := c.S(16)
 			cbR := render.Rect{X: ir.X + c.S(8), Y: ir.Y + (ir.H-cbSize)/2, W: cbSize, H: cbSize}
+			c.RegisterHit(id+":cb:"+strconv.Itoa(i), contentRect.Intersect(cbR), platform.CursorHand)
 			c.drawMiniCheckbox(cbR, checked[i], false)
 
 			if hov && cbR.Contains(c.MouseX, c.MouseY) {
@@ -291,6 +295,7 @@ func (c *Context) TreeViewEx(
 		n := item.Node
 		iy := viewRect.Y + i*rowH - si.y
 		ir := render.Rect{X: contentRect.X, Y: iy, W: contentRect.W, H: rowH}
+		c.RegisterHit(id+":node:"+n.ID, contentRect.Intersect(ir), platform.CursorArrow)
 		isSel := selectedIDs != nil && selectedIDs[n.ID]
 		hov := !c.IsInputBlocked() && ir.Contains(c.MouseX, c.MouseY)
 
@@ -305,6 +310,7 @@ func (c *Context) TreeViewEx(
 		// Стрелка раскрытия/сворачивания
 		arrowR := render.Rect{X: curX, Y: ir.Y + (ir.H-c.S(16))/2, W: c.S(16), H: c.S(16)}
 		if len(n.Children) > 0 {
+			c.RegisterHit(id+":arrow:"+n.ID, contentRect.Intersect(arrowR), platform.CursorHand)
 			cx := float32(arrowR.X + arrowR.W/2)
 			cy := float32(arrowR.Y + arrowR.H/2)
 			if n.Expanded {
@@ -330,6 +336,7 @@ func (c *Context) TreeViewEx(
 		if showCheckboxes {
 			cbSize := c.S(15)
 			cbR := render.Rect{X: curX, Y: ir.Y + (ir.H-cbSize)/2, W: cbSize, H: cbSize}
+			c.RegisterHit(id+":tcb:"+n.ID, contentRect.Intersect(cbR), platform.CursorHand)
 			c.drawMiniCheckbox(cbR, n.Checked, n.Indeterminate)
 			if hov && cbR.Contains(c.MouseX, c.MouseY) {
 				c.nextCursor = platform.CursorHand
@@ -645,6 +652,10 @@ func (c *Context) TableEx(
 		cw := colWidths[ci]
 		cr := render.Rect{X: cx, Y: hdrRect.Y, W: cw, H: hdrH}
 		resZone := render.Rect{X: cr.X + cr.W - c.S(4), Y: cr.Y, W: c.S(8), H: cr.H}
+		if cols[ci].Sortable && sort != nil {
+			c.RegisterHit(id+":hdr:"+strconv.Itoa(ci), hdrRect.Intersect(cr), platform.CursorHand)
+		}
+		c.RegisterHit(id+":res:"+strconv.Itoa(ci), hdrRect.Intersect(resZone), platform.CursorResizeH)
 
 		if !c.IsInputBlocked() && resZone.Contains(c.MouseX, c.MouseY) {
 			c.nextCursor = platform.CursorResizeH
@@ -726,6 +737,7 @@ func (c *Context) TableEx(
 			}
 			cbSize := c.S(15)
 			cbR := render.Rect{X: viewRect.X + (checkColW-cbSize)/2, Y: hdrRect.Y + (hdrH-cbSize)/2, W: cbSize, H: cbSize}
+			c.RegisterHit(id+":allcb", cbR, platform.CursorHand)
 			c.drawMiniCheckbox(cbR, allChecked, anyChecked && !allChecked)
 			if !c.IsInputBlocked() && cbR.Contains(c.MouseX, c.MouseY) {
 				c.nextCursor = platform.CursorHand
@@ -757,6 +769,7 @@ func (c *Context) TableEx(
 		for ri := startRow; ri < endRow; ri++ {
 			ry := bodyRect.Y + ri*rowH - si.y
 			rowR := render.Rect{X: clipR.X, Y: ry, W: clipR.W, H: rowH}
+			c.RegisterHit(id+":row:"+strconv.Itoa(ri), clipR.Intersect(rowR), platform.CursorArrow)
 			isSel := cfg.SelectedRows != nil && cfg.SelectedRows[ri]
 			hovRow := !c.IsInputBlocked() && render.Rect{X: bodyRect.X, Y: ry, W: bodyRect.W, H: rowH}.Contains(c.MouseX, c.MouseY)
 
@@ -771,6 +784,7 @@ func (c *Context) TableEx(
 			if colStart == 0 && cfg.ShowCheckboxes && cfg.CheckedRows != nil && len(cfg.CheckedRows) >= rowCount {
 				cbSize := c.S(15)
 				cbR := render.Rect{X: viewRect.X + (checkColW-cbSize)/2, Y: ry + (rowH-cbSize)/2, W: cbSize, H: cbSize}
+				c.RegisterHit(id+":rcb:"+strconv.Itoa(ri), clipR.Intersect(cbR), platform.CursorHand)
 				c.drawMiniCheckbox(cbR, cfg.CheckedRows[ri], false)
 				if !c.IsInputBlocked() && cbR.Contains(c.MouseX, c.MouseY) {
 					c.nextCursor = platform.CursorHand

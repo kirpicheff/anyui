@@ -11,6 +11,22 @@ import (
 // Modifiers хранит состояние модификаторов клавиатуры для горячих клавиш.
 type Modifiers = platform.Modifiers
 
+// CursorType задаёт системный курсор мыши.
+type CursorType = platform.CursorType
+
+const (
+	CursorArrow      = platform.CursorArrow
+	CursorHand       = platform.CursorHand
+	CursorIBeam      = platform.CursorIBeam
+	CursorResizeH    = platform.CursorResizeH
+	CursorResizeV    = platform.CursorResizeV
+	CursorResizeNWSE = platform.CursorResizeNWSE
+	CursorResizeNESW = platform.CursorResizeNESW
+	CursorNotAllowed = platform.CursorNotAllowed
+	CursorCrosshair  = platform.CursorCrosshair
+	CursorMove       = platform.CursorMove
+)
+
 // UI предоставляет публичный Immediate Mode API для построения интерфейса в окне.
 type UI struct {
 	ctx *ui.Context
@@ -248,5 +264,81 @@ func (u *UI) Shortcut(keyCode uint32, mods Modifiers, fn func()) {
 // DrawText рисует строку текста в произвольных физических координатах (для ListView и CanvasView).
 func (u *UI) DrawText(x, y int, text string, sizeDp int, col Color) {
 	u.ctx.DrawText(x, y, text, sizeDp, col)
+}
+
+// StaticLayer кеширует статический блок интерфейса (фон, неизменяемый текст) в отдельный Static Layer.
+func (u *UI) StaticLayer(id string, fn func()) {
+	u.ctx.StaticLayer(id, fn)
+}
+
+// InvalidateStatic помечает кеш статического слоя как устаревший и запрашивает перерисовку.
+func (u *UI) InvalidateStatic() {
+	u.ctx.InvalidateStatic()
+}
+
+// SetCursor задаёт системный курсор для текущего кадра.
+func (u *UI) SetCursor(cursor CursorType) {
+	u.ctx.SetCursor(cursor)
+}
+
+// RegisterHoverArea регистрирует кастомную интерактивную область для умной фильтрации EventMouseMove.
+func (u *UI) RegisterHoverArea(id string, rect Rect, cursor CursorType, trackMove bool) {
+	if trackMove {
+		u.ctx.RegisterHitTrack(id, rect, cursor)
+	} else {
+		u.ctx.RegisterHit(id, rect, cursor)
+	}
+}
+
+// SetSmartMouseMove включает или отключает оптимизацию фильтрации EventMouseMove.
+func (u *UI) SetSmartMouseMove(enabled bool) {
+	u.ctx.SetSmartMouseMove(enabled)
+}
+
+// SkippedMouseMoves возвращает количество отфильтрованных событий EventMouseMove без перерисовки.
+func (u *UI) SkippedMouseMoves() uint64 {
+	return u.ctx.SkippedMouseMoves()
+}
+
+// LastFrameStaticBlitted возвращает true, если на последнем кадре статический слой был взят из кеша.
+func (u *UI) LastFrameStaticBlitted() bool {
+	return u.ctx.LastFrameStaticBlitted()
+}
+
+// LastDirtyRects возвращает список изменённых областей последнего выведенного кадра.
+func (u *UI) LastDirtyRects() []Rect {
+	return u.ctx.LastDirtyRects()
+}
+
+// MousePos возвращает текущие физические координаты курсора мыши в окне.
+func (u *UI) MousePos() (int, int) {
+	return u.ctx.MouseX, u.ctx.MouseY
+}
+
+// GlyphCacheStats возвращает число записей и объём памяти (в байтах) LRU-кеша глифов.
+func (u *UI) GlyphCacheStats() (entries int, bytes int64) {
+	if u.ctx.Font == nil {
+		return 0, 0
+	}
+	return u.ctx.Font.GlyphCacheStats()
+}
+
+// ClearGlyphCache сбрасывает LRU-кеш растеризованных глифов.
+func (u *UI) ClearGlyphCache() {
+	if u.ctx.Font != nil {
+		u.ctx.Font.ClearGlyphCache()
+		u.ctx.RequestRedraw()
+	}
+}
+
+// ScaledImageCacheStats возвращает число записей и объём памяти (в байтах) LRU-кеша изображений.
+func (u *UI) ScaledImageCacheStats() (entries int, bytes int64) {
+	return render.ScaledImageCacheStats()
+}
+
+// ClearScaledImageCache сбрасывает LRU-кеш масштабированных изображений.
+func (u *UI) ClearScaledImageCache() {
+	render.ClearScaledImageCache()
+	u.ctx.RequestRedraw()
 }
 

@@ -98,3 +98,26 @@ func TestCreateHIconFromRGBA(t *testing.T) {
 	procDestroyIcon.Call(uintptr(hIcon))
 }
 
+func TestWin32CursorResourceID(t *testing.T) {
+	cases := []struct {
+		cursor CursorType
+		want   uintptr
+	}{
+		{CursorArrow, idcArrow},
+		{CursorHand, idcHand},
+		{CursorIBeam, idcIBeam},
+		{CursorResizeH, idcSizeWE},
+		{CursorResizeV, idcSizeNS},
+		{CursorResizeNWSE, idcSizeNWSE},
+		{CursorResizeNESW, idcSizeNESW},
+		{CursorNotAllowed, idcNo},
+		{CursorCrosshair, idcCross},
+		{CursorMove, idcSizeAll},
+	}
+	for _, tc := range cases {
+		if got := win32CursorResourceID(tc.cursor); got != tc.want {
+			t.Fatalf("для курсора %v ожидался id %d, получено %d", tc.cursor, tc.want, got)
+		}
+	}
+}
+

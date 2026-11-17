@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"strconv"
+
 	"anyui/platform"
 	"anyui/render"
 )
@@ -155,6 +157,10 @@ func (c *Context) Table(
 		cw := c.S(widthsDp[i])
 		colRect := render.Rect{X: curX, Y: headerRect.Y, W: cw, H: headerRect.H}
 		resizeZone := render.Rect{X: curX + cw - c.S(4), Y: headerRect.Y, W: c.S(8), H: headerRect.H}
+		if col.Sortable && sort != nil {
+			c.RegisterHit(id+":hdr:"+strconv.Itoa(i), headerRect.Intersect(colRect), platform.CursorHand)
+		}
+		c.RegisterHit(id+":res:"+strconv.Itoa(i), headerRect.Intersect(resizeZone), platform.CursorResizeH)
 
 		inResize := !blocked && resizeZone.Contains(c.MouseX, c.MouseY)
 		inHeader := !blocked && colRect.Contains(c.MouseX, c.MouseY) && !inResize
@@ -318,6 +324,7 @@ func (c *Context) Table(
 	for r := startRow; r < endRow; r++ {
 		ry := bodyRect.Y + r*rowH - si.y
 		rowRect := render.Rect{X: bodyRect.X, Y: ry, W: contentW, H: rowH}
+		c.RegisterHit(id+":row:"+strconv.Itoa(r), bodyRect.Intersect(rowRect), platform.CursorHand)
 		isSel := selected != nil && *selected == r
 		rowHover := !blocked && bodyRect.Contains(c.MouseX, c.MouseY) && c.MouseY < bodyRect.Y+viewH && rowRect.Contains(c.MouseX, c.MouseY) && c.MouseX < bodyRect.X+contentW
 
@@ -579,6 +586,7 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 		rowR := render.Rect{X: inner.X, Y: iy, W: contentW, H: itemH}
 
 		isSel := selectedID != nil && *selectedID == node.ID
+		c.RegisterHit(id+":node:"+node.ID, inner.Intersect(rowR), platform.CursorHand)
 		rowHover := !blocked && inner.Contains(c.MouseX, c.MouseY) && rowR.Contains(c.MouseX, c.MouseY) && c.MouseX < inner.X+contentW
 
 		if isSel {

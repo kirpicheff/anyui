@@ -58,6 +58,10 @@ func (c *Context) NumberInput(id string, value *float64, minVal, maxVal, step fl
 	minusR := render.Rect{X: rect.X, Y: rect.Y, W: btnW, H: rect.H}
 	plusR := render.Rect{X: rect.X + rect.W - btnW, Y: rect.Y, W: btnW, H: rect.H}
 	midR := render.Rect{X: rect.X + btnW, Y: rect.Y, W: rect.W - btnW*2, H: rect.H}
+	if !st.Disabled {
+		c.RegisterHit(id+":minus", minusR, platform.CursorHand)
+		c.RegisterHit(id+":plus", plusR, platform.CursorHand)
+	}
 
 	c.Canvas.DrawRoundedBox(rect, radius, c.Theme.SurfaceDark, 1.0, c.Theme.Border)
 
@@ -161,6 +165,9 @@ func (c *Context) Slider(id string, value *float32, minVal, maxVal float32, opts
 	trackR := render.Rect{X: rect.X + pad, Y: trackY, W: trackW, H: trackH}
 
 	blocked := c.IsInputBlocked()
+	if !st.Disabled {
+		c.RegisterHit(id, rect, platform.CursorHand)
+	}
 	hover := !blocked && !st.Disabled && rect.Contains(c.MouseX, c.MouseY)
 	changed := false
 
@@ -257,6 +264,9 @@ func (c *Context) RangeSlider(id string, low, high *float32, minVal, maxVal floa
 	lowID := id + ":low"
 	highID := id + ":high"
 	blocked := c.IsInputBlocked()
+	if !st.Disabled {
+		c.RegisterHit(id, rect, platform.CursorHand)
+	}
 	hover := !blocked && !st.Disabled && rect.Contains(c.MouseX, c.MouseY)
 	changed := false
 
@@ -439,6 +449,9 @@ func (c *Context) ColorPicker(id string, col *render.Color, opts ...Option) bool
 	radius := c.Sf(c.Theme.RadiusSm)
 
 	isOpen := c.openState[id]
+	if !st.Disabled {
+		c.RegisterHit(id, rect, platform.CursorHand)
+	}
 	hover := !c.IsInputBlocked() && !st.Disabled && rect.Contains(c.MouseX, c.MouseY)
 	if hover {
 		c.nextCursor = platform.CursorHand
@@ -585,6 +598,7 @@ func (c *Context) ColorPicker(id string, col *render.Color, opts ...Option) bool
 			swGap := c.S(6)
 			for i, swCol := range swatches {
 				sr := render.Rect{X: svR.X + i*(swSize+swGap), Y: swY, W: swSize, H: swSize}
+				c.RegisterHit(id+":sw:"+strconv.Itoa(i), sr, platform.CursorHand)
 				c.Canvas.DrawRoundedBox(sr, c.Sf(4), swCol, 1.0, c.Theme.Border)
 				if sr.Contains(c.MouseX, c.MouseY) {
 					c.nextCursor = platform.CursorHand
@@ -649,6 +663,9 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 	// Клик по полю открывает/закрывает выпадающий календарь; двойной клик по текстовой части включает ручной ввод
 	calZone := render.Rect{X: rect.X + rect.W - c.S(30), Y: rect.Y, W: c.S(30), H: rect.H}
 	textZone := render.Rect{X: rect.X, Y: rect.Y, W: rect.W - c.S(30), H: rect.H}
+	if !st.Disabled {
+		c.RegisterHit(id, rect, platform.CursorHand)
+	}
 
 	if !c.IsInputBlocked() && !st.Disabled {
 		if textZone.Contains(c.MouseX, c.MouseY) && c.DoubleClicked() {
@@ -784,6 +801,8 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 			hdrR := render.Rect{X: popR.X + c.S(10), Y: popR.Y + c.S(10), W: popR.W - c.S(20), H: c.S(28)}
 			prevR := render.Rect{X: hdrR.X, Y: hdrR.Y, W: c.S(28), H: hdrR.H}
 			nextR := render.Rect{X: hdrR.X + hdrR.W - c.S(28), Y: hdrR.Y, W: c.S(28), H: hdrR.H}
+			c.RegisterHit(id+":prev", prevR, platform.CursorHand)
+			c.RegisterHit(id+":next", nextR, platform.CursorHand)
 
 			if prevR.Contains(c.MouseX, c.MouseY) {
 				c.nextCursor = platform.CursorHand
@@ -831,6 +850,8 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 					startX := hdrR.X + (hdrR.W-totalW)/2
 					mRect := render.Rect{X: startX - c.S(4), Y: hdrR.Y, W: mw + c.S(8), H: hdrR.H}
 					yRect := render.Rect{X: startX + mw + gap - c.S(4), Y: hdrR.Y, W: yw + c.S(8), H: hdrR.H}
+					c.RegisterHit(id+":month", mRect, platform.CursorHand)
+					c.RegisterHit(id+":year", yRect, platform.CursorHand)
 
 					mCol := c.Theme.TextPrimary
 					if mRect.Contains(c.MouseX, c.MouseY) {
@@ -877,6 +898,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 					colIdx := mi % 3
 					rowIdx := mi / 3
 					mr := render.Rect{X: gridX + colIdx*mW + c.S(2), Y: gridY + rowIdx*mH + c.S(2), W: mW - c.S(4), H: mH - c.S(4)}
+					c.RegisterHit(id+":m:"+strconv.Itoa(mi), mr, platform.CursorHand)
 					isCur := int(vm.Month())-1 == mi
 					hov := mr.Contains(c.MouseX, c.MouseY)
 					if isCur {
@@ -910,6 +932,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 					colIdx := yi % 3
 					rowIdx := yi / 3
 					yrRect := render.Rect{X: gridX + colIdx*yW + c.S(2), Y: gridY + rowIdx*yH + c.S(2), W: yW - c.S(4), H: yH - c.S(4)}
+					c.RegisterHit(id+":y:"+strconv.Itoa(yr), yrRect, platform.CursorHand)
 					isCur := vm.Year() == yr
 					hov := yrRect.Contains(c.MouseX, c.MouseY)
 					if isCur {
@@ -965,6 +988,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 					colIdx := slot % 7
 					rowIdx := slot / 7
 					dr := render.Rect{X: gridX + colIdx*cellW + c.S(1), Y: daysY + rowIdx*cellH + c.S(1), W: cellW - c.S(2), H: cellH - c.S(2)}
+					c.RegisterHit(id+":d:"+strconv.Itoa(d), dr, platform.CursorHand)
 
 					isSel := date.Year() == vm.Year() && date.Month() == vm.Month() && date.Day() == d
 					isToday := now.Year() == vm.Year() && now.Month() == vm.Month() && now.Day() == d
@@ -1003,6 +1027,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 
 			// Кнопка "Сегодня" внизу календаря
 			todayR := render.Rect{X: popR.X + c.S(10), Y: popR.Y + popR.H - c.S(34), W: popR.W - c.S(20), H: c.S(24)}
+			c.RegisterHit(id+":today", todayR, platform.CursorHand)
 			hovToday := todayR.Contains(c.MouseX, c.MouseY)
 			todayBg := c.Theme.Surface
 			if hovToday {

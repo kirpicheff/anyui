@@ -80,6 +80,9 @@ func (c *Context) SelectableLabel(id, text string, opts ...Option) {
 		return sp.start + col
 	}
 
+	if !st.Disabled {
+		c.RegisterHit(id, r, platform.CursorIBeam)
+	}
 	hovered := !st.Disabled && !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)
 	if hovered {
 		c.HotID = id
@@ -225,6 +228,7 @@ func (c *Context) Hyperlink(id, text string, opts ...Option) bool {
 	r := c.allocRectStyled(w, h+c.S(2), st)
 	if !st.Disabled {
 		c.registerFocusable(id)
+		c.RegisterHit(id, r, platform.CursorHand)
 	}
 
 	hovered := !st.Disabled && !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)
@@ -424,6 +428,9 @@ func (c *Context) MaskedInput(id string, value *string, mask string, opts ...Opt
 		delete(c.textMenuChanged, id)
 	}
 
+	if !st.Disabled {
+		c.RegisterHit(id, r, platform.CursorIBeam)
+	}
 	hovered := !st.Disabled && !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)
 	if hovered {
 		c.HotID = id

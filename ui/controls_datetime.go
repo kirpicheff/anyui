@@ -46,6 +46,9 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 	radius := c.Sf(c.Theme.RadiusSm)
 
 	isOpen := c.openState[id]
+	if !st.Disabled {
+		c.RegisterHit(id, rect, platform.CursorHand)
+	}
 	hover := !c.IsInputBlocked() && !st.Disabled && rect.Contains(c.MouseX, c.MouseY)
 	if hover {
 		c.nextCursor = platform.CursorHand
@@ -113,6 +116,7 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 				dnR := render.Rect{X: cxR + c.S(6), Y: topY + c.S(66), W: colW - c.S(12), H: c.S(26)}
 
 				drawStepBtn := func(br render.Rect, txt string, delta int) {
+					c.RegisterHit(id+":tp:"+label+":"+txt, br, platform.CursorHand)
 					hov := br.Contains(c.MouseX, c.MouseY)
 					bg := c.Theme.Surface
 					if hov {
@@ -165,6 +169,7 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 
 			// Кнопка "Сейчас" внизу
 			nowR := render.Rect{X: popR.X + c.S(12), Y: popR.Y + popR.H - c.S(34), W: popR.W - c.S(24), H: c.S(24)}
+			c.RegisterHit(id+":now", nowR, platform.CursorHand)
 			hovNow := nowR.Contains(c.MouseX, c.MouseY)
 			nowBg := c.Theme.Surface
 			if hovNow {

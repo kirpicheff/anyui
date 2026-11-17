@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strconv"
 	"strings"
 
 	"anyui/platform"
@@ -70,6 +71,7 @@ func (c *Context) Select(id string, items []string, selected *int, opts ...Optio
 	r := c.allocRect(w, h)
 	if !st.Disabled {
 		c.registerFocusable(id)
+		c.RegisterHit(id, r, platform.CursorHand)
 	}
 
 	isOpen := c.openState[id]
@@ -338,6 +340,7 @@ func (c *Context) Select(id string, items []string, selected *int, opts ...Optio
 					continue
 				}
 				ir := render.Rect{X: listRect.X, Y: iy, W: listRect.W, H: itemH}
+				c.RegisterHit(id+":opt:"+strconv.Itoa(origIdx), ir, platform.CursorHand)
 				itemHover := ir.Contains(c.MouseX, c.MouseY)
 				if itemHover {
 					c.nextCursor = platform.CursorHand
@@ -390,6 +393,7 @@ func (c *Context) ListView(id string, count int, itemHeightDp int, selected *int
 	r := c.allocRect(w, h)
 	if !st.Disabled {
 		c.registerFocusable(id)
+		c.RegisterHit(id, r, platform.CursorArrow)
 	}
 
 	hovered := !st.Disabled && !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)
@@ -456,6 +460,7 @@ func (c *Context) ListView(id string, count int, itemHeightDp int, selected *int
 	for i := start; i < end; i++ {
 		iy := r.Y + i*itemH - si.y
 		ir := render.Rect{X: r.X + c.S(2), Y: iy, W: r.W - c.S(4), H: itemH}
+		c.RegisterHit(id+":row:"+strconv.Itoa(i), ir, platform.CursorHand)
 		isSel := selected != nil && *selected == i
 		itemHover := hovered && ir.Contains(c.MouseX, c.MouseY)
 		if itemHover {
@@ -525,6 +530,9 @@ func (c *Context) Tabs(id string, items []string, active *int, vertical bool, op
 		}
 		h := th + c.S(14)
 		r := c.allocRect(w, h)
+		if !st.Disabled {
+			c.RegisterHit(id+":tab:"+strconv.Itoa(i), r, platform.CursorHand)
+		}
 		hovered := !st.Disabled && !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)
 		if hovered {
 			c.nextCursor = platform.CursorHand
@@ -635,9 +643,14 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 		}
 
 		isAct := *active == i
+		visTab := tabsArea.Intersect(tr)
+		c.RegisterHit(id+":tab:"+strconv.Itoa(i), visTab, platform.CursorHand)
 		hovered := !c.IsInputBlocked() && tabsArea.Contains(c.MouseX, c.MouseY) && tr.Contains(c.MouseX, c.MouseY)
 
 		closeR := render.Rect{X: tr.X + tr.W - c.S(22), Y: tr.Y + (tr.H-c.S(16))/2, W: c.S(16), H: c.S(16)}
+		if tab.Closable {
+			c.RegisterHit(id+":close:"+strconv.Itoa(i), tabsArea.Intersect(closeR), platform.CursorHand)
+		}
 		closeHover := tab.Closable && hovered && closeR.Contains(c.MouseX, c.MouseY)
 
 		if hovered {
@@ -777,6 +790,7 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 
 	// Кнопка '+' добавления вкладки
 	addR := render.Rect{X: barRect.X + barRect.W - addBtnW, Y: barRect.Y + c.S(2), W: addBtnW, H: barRect.H - c.S(4)}
+	c.RegisterHit(id+":add", addR, platform.CursorHand)
 	addHover := !c.IsInputBlocked() && addR.Contains(c.MouseX, c.MouseY)
 	if addHover {
 		c.nextCursor = platform.CursorHand

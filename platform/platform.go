@@ -40,6 +40,11 @@ const (
 	CursorIBeam
 	CursorResizeH
 	CursorResizeV
+	CursorResizeNWSE
+	CursorResizeNESW
+	CursorNotAllowed
+	CursorCrosshair
+	CursorMove
 )
 
 // HitTestResult определяет роль точки клиентской области в режиме Frameless.
@@ -96,6 +101,11 @@ type WindowConfig struct {
 	TitleBarHeight  int    // Логическая высота области перетаскивания (по умолчанию 36, если HitTest не задан)
 	HitTest         func(x, y int) HitTestResult
 	AcceptDropFiles bool // Разрешить перетаскивание файлов из проводника (WM_DROPFILES)
+}
+
+// DirtyPresenter — опциональный интерфейс окна для частичного обновления экрана (Dirty Rectangles).
+type DirtyPresenter interface {
+	PresentRect(pixels []byte, width, height, rx, ry, rw, rh int)
 }
 
 // Window — кроссплатформенный интерфейс нативного окна.

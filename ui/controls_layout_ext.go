@@ -124,6 +124,11 @@ func (c *Context) SplitPane(id string, orient SplitOrientation, ratio *float32, 
 	}
 
 	// Отрисовка разделителя
+	splitCur := platform.CursorResizeV
+	if orient == SplitHorizontal {
+		splitCur = platform.CursorResizeH
+	}
+	c.RegisterHit(id+":split", splitR, splitCur)
 	splitBg := c.Theme.Surface
 	gripCol := c.Theme.Border
 	if c.ActiveID == id || (!blocked && splitR.Contains(c.MouseX, c.MouseY)) {
@@ -168,6 +173,7 @@ func (c *Context) Collapsible(id, title string, expanded *bool, fn func(), opts 
 	}
 	headerH := c.S(34)
 	headerR := c.allocRect(w, headerH)
+	c.RegisterHit(id, headerR, platform.CursorHand)
 
 	hovered := !c.IsInputBlocked() && headerR.Contains(c.MouseX, c.MouseY)
 	changed := false

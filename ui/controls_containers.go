@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"strconv"
+
 	"anyui/platform"
 	"anyui/render"
 )
@@ -326,6 +328,7 @@ func (c *Context) Modal(id string, open *bool, title string, fn func(), opts ...
 		}
 
 		closeR := render.Rect{X: box.X + box.W - c.S(36), Y: box.Y + c.S(9), W: c.S(24), H: c.S(24)}
+		c.RegisterHit(id+":close", closeR, platform.CursorHand)
 		closeHover := closeR.Contains(c.MouseX, c.MouseY)
 		if closeHover {
 			c.nextCursor = platform.CursorHand
@@ -450,6 +453,9 @@ func (c *Context) FloatingPanel(id, title string, open *bool, fn func(), opts ..
 		headerR := render.Rect{X: panelRect.X, Y: panelRect.Y, W: panelRect.W, H: headerH}
 		collapseR := render.Rect{X: panelRect.X + panelRect.W - c.S(50), Y: panelRect.Y + c.S(6), W: c.S(22), H: c.S(22)}
 		closeR := render.Rect{X: panelRect.X + panelRect.W - c.S(26), Y: panelRect.Y + c.S(6), W: c.S(22), H: c.S(22)}
+		c.RegisterHit(id+":hdr", headerR, platform.CursorMove)
+		c.RegisterHit(id+":collapse", collapseR, platform.CursorHand)
+		c.RegisterHit(id+":close", closeR, platform.CursorHand)
 
 		if c.MousePressed && headerR.Contains(c.MouseX, c.MouseY) {
 			if closeR.Contains(c.MouseX, c.MouseY) {
@@ -606,13 +612,16 @@ func (c *Context) ContextMenu(id string, anchor render.Rect, items []ContextMenu
 
 		curY := menuRect.Y + c.S(4)
 		pxSize := c.S(13)
-		for _, it := range items {
+		for idx, it := range items {
 			if it.Separator {
 				c.Canvas.FillRect(render.Rect{X: menuRect.X + c.S(8), Y: curY + sepH/2, W: menuRect.W - c.S(16), H: 1}, c.Theme.Border)
 				curY += sepH
 				continue
 			}
 			ir := render.Rect{X: menuRect.X + c.S(4), Y: curY, W: menuRect.W - c.S(8), H: itemH}
+			if !it.Disabled {
+				c.RegisterHit(id+":cm:"+strconv.Itoa(idx), ir, platform.CursorHand)
+			}
 			hov := !it.Disabled && ir.Contains(c.MouseX, c.MouseY)
 			if hov {
 				c.nextCursor = platform.CursorHand
@@ -647,6 +656,7 @@ func (c *Context) Tooltip(text string, anchor render.Rect) {
 	if text == "" || c.Font == nil || c.IsInputBlocked() || !anchor.Contains(c.MouseX, c.MouseY) {
 		return
 	}
+	c.RegisterHitTrack("tip:"+text, anchor, c.nextCursor)
 	pxSize := c.S(12)
 	tw, th := c.Font.MeasureText(text, pxSize)
 	padX, padY := c.S(10), c.S(6)

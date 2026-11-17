@@ -17,6 +17,7 @@ func (c *Canvas) DrawRoundedBox(r Rect, radius float32, fill Color, borderW floa
 	if area.Empty() {
 		return
 	}
+	c.AddDirtyRect(area)
 
 	hx := float32(r.W) * 0.5
 	hy := float32(r.H) * 0.5
@@ -131,6 +132,7 @@ func (c *Canvas) FillCircle(cx, cy, radius float32, col Color) {
 	if area.Empty() {
 		return
 	}
+	c.AddDirtyRect(area)
 
 	for y := area.Y; y < area.Y+area.H; y++ {
 		dy := float32(y) + 0.5 - cy
@@ -224,6 +226,7 @@ func (c *Canvas) DrawRoundedBoxCorners(r Rect, cr CornerRadii, fill Color, borde
 	if area.Empty() {
 		return
 	}
+	c.AddDirtyRect(area)
 
 	hx := float32(r.W) * 0.5
 	hy := float32(r.H) * 0.5

@@ -131,6 +131,7 @@ func (c *Context) MenuBar(id string, menus []MenuBarItem, opts ...Option) {
 		ir := render.Rect{X: curX, Y: r.Y + c.S(2), W: iw, H: r.H - c.S(4)}
 		itemRects = append(itemRects, ir)
 		curX += iw + c.S(2)
+		c.RegisterHit(id+":m:"+strconv.Itoa(i), ir, platform.CursorHand)
 
 		hov := ir.Contains(c.MouseX, c.MouseY)
 		selected := isOpen && activeIdx == i
@@ -284,6 +285,9 @@ func (c *Context) drawMenuPopup(barID string, menuRect render.Rect, items []BarM
 		}
 
 		ir := render.Rect{X: menuRect.X + c.S(4), Y: curY, W: menuRect.W - c.S(8), H: itemH}
+		if !it.Disabled {
+			c.RegisterHit(barID+":mi:"+strconv.Itoa(idx)+":"+it.Label, ir, platform.CursorHand)
+		}
 		hov := !it.Disabled && ir.Contains(c.MouseX, c.MouseY)
 		if hov {
 			c.nextCursor = platform.CursorHand
@@ -366,7 +370,7 @@ func (c *Context) Toolbar(id string, items []ToolbarItem, opts ...Option) {
 	pxSize := c.S(12)
 	iconSize := c.S(16)
 
-	for _, it := range items {
+	for ti, it := range items {
 		if it.Separator {
 			c.Canvas.FillRect(render.Rect{X: curX + c.S(3), Y: r.Y + c.S(7), W: 1, H: r.H - c.S(14)}, c.Theme.Border)
 			curX += c.S(8)
@@ -395,6 +399,13 @@ func (c *Context) Toolbar(id string, items []ToolbarItem, opts ...Option) {
 		curX += w + c.S(4)
 		if curX > r.X+r.W {
 			break
+		}
+		if !it.Disabled {
+			if it.Tooltip != "" {
+				c.RegisterHitTrack(id+":tb:"+strconv.Itoa(ti), br, platform.CursorHand)
+			} else {
+				c.RegisterHit(id+":tb:"+strconv.Itoa(ti), br, platform.CursorHand)
+			}
 		}
 
 		hov := !it.Disabled && !c.IsInputBlocked() && br.Contains(c.MouseX, c.MouseY)
@@ -508,6 +519,9 @@ func (c *Context) StatusBar(id string, sections []StatusBarSection, opts ...Opti
 			c.Canvas.FillRect(render.Rect{X: sr.X, Y: sr.Y + c.S(4), W: 1, H: sr.H - c.S(8)}, c.Theme.Border)
 		}
 
+		if sec.OnClick != nil {
+			c.RegisterHit(id+":sec:"+strconv.Itoa(i), sr, platform.CursorHand)
+		}
 		hov := sec.OnClick != nil && !c.IsInputBlocked() && sr.Contains(c.MouseX, c.MouseY)
 		if hov {
 			c.nextCursor = platform.CursorHand
@@ -585,6 +599,9 @@ func (c *Context) Breadcrumbs(id string, items []BreadcrumbItem, opts ...Option)
 		curX += segW
 
 		canClick := !isLast && !it.Disabled && !c.IsInputBlocked()
+		if !isLast && !it.Disabled {
+			c.RegisterHit(id+":bc:"+strconv.Itoa(i), sr, platform.CursorHand)
+		}
 		hov := canClick && sr.Contains(c.MouseX, c.MouseY)
 		if hov {
 			c.nextCursor = platform.CursorHand
@@ -669,11 +686,16 @@ func (c *Context) Pagination(id string, currentPage *int, totalPages int, opts .
 	curX := r.X
 	changed := false
 
+	btnIdx := 0
 	drawPageBtn := func(label string, enabled bool, active bool, onClick func()) {
 		br := render.Rect{X: curX, Y: r.Y, W: btnSize, H: btnSize}
 		curX += btnSize + gap
 		if curX-gap > r.X+r.W {
 			return
+		}
+		btnIdx++
+		if enabled {
+			c.RegisterHit(id+":pg:"+strconv.Itoa(btnIdx)+":"+label, br, platform.CursorHand)
 		}
 		hov := enabled && !c.IsInputBlocked() && br.Contains(c.MouseX, c.MouseY)
 		bg := c.Theme.Surface

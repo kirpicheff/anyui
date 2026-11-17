@@ -69,6 +69,7 @@ func (c *Canvas) FillLinearGradient(r Rect, cr CornerRadii, grad LinearGradient)
 	if area.Empty() {
 		return
 	}
+	c.AddDirtyRect(area)
 
 	hx := float32(r.W) * 0.5
 	hy := float32(r.H) * 0.5
@@ -116,6 +117,7 @@ func (c *Canvas) FillRadialGradient(r Rect, cr CornerRadii, grad RadialGradient)
 	if area.Empty() {
 		return
 	}
+	c.AddDirtyRect(area)
 
 	hx := float32(r.W) * 0.5
 	hy := float32(r.H) * 0.5
@@ -177,6 +179,7 @@ func (c *Canvas) DrawBoxShadow(r Rect, sh BoxShadow) {
 	if area.Empty() {
 		return
 	}
+	c.AddDirtyRect(area)
 
 	hx := float32(r.W)*0.5 + sh.Spread
 	hy := float32(r.H)*0.5 + sh.Spread
@@ -235,6 +238,7 @@ func (c *Canvas) BackdropBlur(r Rect, radius int, cr CornerRadii) {
 	if area.Empty() {
 		return
 	}
+	c.AddDirtyRect(area)
 
 	w, h := area.W, area.H
 	bufA := make([]byte, w*h*4)

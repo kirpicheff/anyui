@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"anyui/platform"
@@ -41,6 +42,9 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 	}
 
 	isOpen := c.openState[id]
+	if !st.Disabled {
+		c.RegisterHit(id, rect, platform.CursorHand)
+	}
 	hov := !c.IsInputBlocked() && !st.Disabled && rect.Contains(c.MouseX, c.MouseY)
 	if hov {
 		c.nextCursor = platform.CursorHand
@@ -170,6 +174,7 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 		clrR := render.Rect{X: allR.X + btnW + c.S(6), Y: btnY, W: btnW, H: c.S(22)}
 
 		drawMiniBtn := func(br render.Rect, lbl string, fn func()) {
+			c.RegisterHit(id+":mb:"+lbl, br, platform.CursorHand)
 			bhov := br.Contains(c.MouseX, c.MouseY)
 			bg := c.Theme.Surface
 			if bhov {
@@ -223,6 +228,7 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 			origIdx := filtered[fi]
 			iy := listRect.Y + fi*itemH - si.y
 			ir := render.Rect{X: listRect.X + c.S(2), Y: iy, W: listRect.W - c.S(4), H: itemH}
+			c.RegisterHit(id+":opt:"+strconv.Itoa(origIdx), ir, platform.CursorHand)
 
 			ihov := ir.Contains(c.MouseX, c.MouseY)
 			if ihov {
@@ -286,6 +292,9 @@ func (c *Context) TagInput(id string, tags *[]string, placeholder string, opts .
 	}
 	c.Canvas.DrawRoundedBox(r, c.Sf(c.Theme.RadiusSm), c.Theme.SurfaceDark, 1.0, borderCol)
 
+	if !st.Disabled {
+		c.RegisterHit(id, r, platform.CursorIBeam)
+	}
 	if !c.IsInputBlocked() && !st.Disabled && r.Contains(c.MouseX, c.MouseY) {
 		c.nextCursor = platform.CursorIBeam
 		if c.MousePressed {
@@ -366,6 +375,9 @@ func (c *Context) TagInput(id string, tags *[]string, placeholder string, opts .
 
 		// Кнопка удаления "x"
 		xr := render.Rect{X: cr.X + cr.W - closeW, Y: cr.Y, W: closeW, H: cr.H}
+		if !st.Disabled {
+			c.RegisterHit(id+":tagx:"+strconv.Itoa(i), xr, platform.CursorHand)
+		}
 		if !c.IsInputBlocked() && !st.Disabled && xr.Contains(c.MouseX, c.MouseY) {
 			c.nextCursor = platform.CursorHand
 			if c.MousePressed {

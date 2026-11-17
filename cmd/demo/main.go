@@ -163,9 +163,9 @@ func main() {
 	st := newDemoState()
 
 	app := anyui.NewApp(anyui.Config{
-		Title:           "AnyUI — Витрина возможностей (Фазы 1–5)",
-		Width:           1120,
-		Height:          740,
+		Title:           "AnyUI — Витрина возможностей (Фазы 1–7)",
+		Width:           1160,
+		Height:          780,
 		MinWidth:        820,
 		MinHeight:       560,
 		Theme:           anyui.DeepNavyTheme(),
@@ -198,6 +198,7 @@ func main() {
 		"6. Расширенный ввод и Toast",
 		"7. Продвинутая раскладка",
 		"8. Десктоп и графики (7.1)",
+		"9. Слои, кеш и курсоры (7.2)",
 	}
 
 	err := app.Run(func(ui *anyui.UI) {
@@ -225,8 +226,10 @@ func main() {
 		ui.PaddingXY(16, 10, func() {
 			ui.Column(8, func() {
 				ui.RowCentered(10, 36, func() {
-					ui.Label("AnyUI Showcase", anyui.FontSize(18), anyui.Bold())
-					ui.Badge("v0.5", anyui.Primary())
+					ui.StaticLayer("demo_header_brand", func() {
+						ui.Label("AnyUI Showcase", anyui.FontSize(18), anyui.Bold())
+						ui.Badge("v0.7", anyui.Primary())
+					})
 					ui.FlexSpacer(240)
 					if ui.Button("th_navy", "DeepNavy", anyui.Ghost(), anyui.Padding(10)) {
 						ui.SetTheme(anyui.DeepNavyTheme())
@@ -298,14 +301,16 @@ func main() {
 			ui.Row(16, int(float32(contentH)/ui.Sf(1)), func() {
 				ui.Card(func() {
 					ui.Column(6, func() {
-						ui.Label("Разделы", anyui.FontSize(12), anyui.TextColor(th.TextMuted), anyui.Bold())
-						ui.Tabs("nav_tabs", navItems, &st.activeNav, true, anyui.Width(200))
+						ui.StaticLayer("demo_nav_title", func() {
+							ui.Label("Разделы", anyui.FontSize(12), anyui.TextColor(th.TextMuted), anyui.Bold())
+						})
+						ui.Tabs("nav_tabs", navItems, &st.activeNav, true, anyui.Width(210))
 						ui.Spacer(12)
 						ui.Separator()
 						ui.Spacer(6)
 						ui.Label(st.droppedInfo, anyui.FontSize(11), anyui.TextColor(th.TextMuted))
 					})
-				}, anyui.Width(226), anyui.Padding(12))
+				}, anyui.Width(236), anyui.Padding(12))
 
 				ui.Card(func() {
 					switch st.activeNav {
@@ -325,6 +330,8 @@ func main() {
 						st.drawTabLayout(ui)
 					case 7:
 						st.drawTabDesktop(ui)
+					case 8:
+						st.drawTabPerf(ui)
 					}
 				}, anyui.Padding(16))
 			})
@@ -345,7 +352,7 @@ func main() {
 			ui.RowCentered(20, 32, func() {
 				ui.StatusDot(th.Success, st.statusMsg)
 				ui.FlexSpacer(140)
-				ui.Label("AnyUI Фаза 1–5 • Pure Go", anyui.FontSize(12), anyui.TextColor(th.TextMuted))
+				ui.Label("AnyUI Фаза 1–7 • Pure Go", anyui.FontSize(12), anyui.TextColor(th.TextMuted))
 			})
 		})
 

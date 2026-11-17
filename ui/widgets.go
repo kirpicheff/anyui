@@ -295,6 +295,7 @@ func (c *Context) ButtonOpts(id, label string, opts ...Option) bool {
 	r := c.allocRectStyled(w, h, st)
 	if !st.Disabled {
 		c.registerFocusable(id)
+		c.RegisterHit(id, r, platform.CursorHand)
 	}
 
 	hovered := !st.Disabled && !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)
@@ -441,6 +442,7 @@ func (c *Context) ToggleOpts(id, label string, value *bool, opts ...Option) bool
 	r := c.allocRect(totalW, totalH)
 	if !st.Disabled {
 		c.registerFocusable(id)
+		c.RegisterHit(id, r, platform.CursorHand)
 	}
 
 	hovered := !st.Disabled && !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)

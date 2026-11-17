@@ -131,6 +131,7 @@ func (c *Context) drawToasts() {
 
 			// Кнопка закрытия '×'
 			closeR := render.Rect{X: tr.X + tr.W - c.S(26), Y: tr.Y + c.S(8), W: c.S(18), H: c.S(18)}
+			c.RegisterHit("toast:close:"+toastRef.Title, closeR, platform.CursorHand)
 			if closeR.Contains(c.MouseX, c.MouseY) {
 				c.nextCursor = platform.CursorHand
 				c.Canvas.FillRoundedRect(closeR, c.Sf(4), c.Theme.Surface)

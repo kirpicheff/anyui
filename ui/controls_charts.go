@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"anyui/platform"
 	"anyui/render"
 )
 
@@ -84,6 +85,7 @@ func (c *Context) Sparkline(id string, values []float64, opts ...Option) {
 	if len(values) < 2 {
 		return
 	}
+	c.RegisterHitTrack(id, r, platform.CursorArrow)
 
 	minV, maxV := calcMinMax([]ChartSeries{{Values: values}})
 	padX := c.S(8)
@@ -147,6 +149,7 @@ func (c *Context) LineChart(id string, labels []string, series []ChartSeries, op
 	if len(series) == 0 {
 		return
 	}
+	c.RegisterHitTrack(id, r, platform.CursorArrow)
 
 	legendH := c.drawChartLegend(render.Rect{X: r.X + c.S(12), Y: r.Y + c.S(8), W: r.W - c.S(24), H: c.S(20)}, series)
 	padLeft := c.S(48)
@@ -270,6 +273,7 @@ func (c *Context) BarChart(id string, labels []string, series []ChartSeries, opt
 	if len(series) == 0 {
 		return
 	}
+	c.RegisterHitTrack(id, r, platform.CursorArrow)
 
 	legendH := c.drawChartLegend(render.Rect{X: r.X + c.S(12), Y: r.Y + c.S(8), W: r.W - c.S(24), H: c.S(20)}, series)
 	padLeft := c.S(48)

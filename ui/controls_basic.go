@@ -47,6 +47,7 @@ func (c *Context) Checkbox(id, label string, checked *bool, opts ...Option) bool
 	r := c.allocRect(totalW, h)
 	if !st.Disabled {
 		c.registerFocusable(id)
+		c.RegisterHit(id, r, platform.CursorHand)
 	}
 
 	hovered := !st.Disabled && !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)
@@ -168,6 +169,7 @@ func (c *Context) RadioButton(id, label string, selected bool, opts ...Option) b
 	r := c.allocRect(totalW, h)
 	if !st.Disabled {
 		c.registerFocusable(id)
+		c.RegisterHit(id, r, platform.CursorHand)
 	}
 
 	hovered := !st.Disabled && !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)

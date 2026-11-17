@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"anyui/platform"
@@ -116,6 +117,7 @@ func (c *Context) LogView(id string, entries []LogEntry, followTail *bool, opts 
 	copyRect := render.Rect{X: rightX - copyW, Y: barRect.Y + c.S(4), W: copyW, H: barRect.H - c.S(8)}
 
 	// Отрисовка кнопки Tail
+	c.RegisterHit(id+":tail", tailRect, platform.CursorHand)
 	hovTail := !c.IsInputBlocked() && tailRect.Contains(c.MouseX, c.MouseY)
 	tailBg := c.Theme.Card
 	tailFg := c.Theme.TextMuted
@@ -145,6 +147,7 @@ func (c *Context) LogView(id string, entries []LogEntry, followTail *bool, opts 
 
 	// Кнопка Копировать
 	hasSel := len(lvs.selected) > 0
+	c.RegisterHit(id+":copy", copyRect, platform.CursorHand)
 	hovCopy := !c.IsInputBlocked() && copyRect.Contains(c.MouseX, c.MouseY)
 	if hovCopy {
 		c.nextCursor = platform.CursorHand
@@ -241,6 +244,7 @@ func (c *Context) LogView(id string, entries []LogEntry, followTail *bool, opts 
 		entry := entries[visibleIndices[vi]]
 		rowY := viewRect.Y + vi*rowH - si.y
 		rowRect := render.Rect{X: contentRect.X, Y: rowY, W: contentRect.W, H: rowH}
+		c.RegisterHit(id+":row:"+strconv.Itoa(vi), viewRect.Intersect(rowRect), platform.CursorArrow)
 
 		isSel := lvs.selected[vi]
 		hovRow := !c.IsInputBlocked() && rowRect.Contains(c.MouseX, c.MouseY)
@@ -374,6 +378,7 @@ func (c *Context) drawInlineSearchBox(id string, r render.Rect, value *string, p
 		border = c.Theme.Accent
 	}
 	c.Canvas.DrawRoundedBox(r, c.Sf(4), c.Theme.Bg, 1.0, border)
+	c.RegisterHit(id, r, platform.CursorIBeam)
 	if !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY) {
 		c.nextCursor = platform.CursorIBeam
 		if c.MousePressed {

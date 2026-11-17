@@ -45,6 +45,7 @@ func (c *Canvas) DrawSVG(svgData string, x, y, sizePx int, tint Color) {
 	if rect.Empty() {
 		return
 	}
+	c.AddDirtyRect(rect)
 
 	for py := rect.Y; py < rect.Y+rect.H; py++ {
 		sy := py - y

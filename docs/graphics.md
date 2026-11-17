@@ -83,3 +83,15 @@ ui.Label("Код: 000 000", anyui.Mono(), anyui.FontSize(18))
 ui.Label("Заголовок", anyui.Bold(), anyui.FontSize(20))
 ```
 
+## Оптимизация рендеринга, слои и кеши
+
+- **Слои (`StaticLayer` / `Dynamic` / `Overlay`) и `Dirty Rectangles`:**
+  Тяжёлый статичный контент (фон, описания, заголовки) можно обернуть в `ui.StaticLayer("id", func() { ... })`. Он растеризуется в отдельный буфер и на последующих кадрах (при неизменных координатах, размере, теме и DPI) копируется через `BlitFrom` без повторной отрисовки. Для принудительного сброса вызывайте `ui.InvalidateStatic()`. При выводе кадра в окно вычисляется минимальный `DirtyRect`, и через `platform.DirtyPresenter` (`PresentRect`) обновляется только изменённая область экрана.
+- **Умная фильтрация `EventMouseMove`:**
+  Контекст сравнивает `HotID` и активный курсор по зарегистрированным областям (`RegisterHoverArea` для кастомных зон) и пропускает лишние перерисовки при движении мыши внутри одного виджета или по пустому фону.
+- **LRU-кеш глифов и изображений:**
+  `FontManager` кеширует цветные битмапы глифов по ключу `(style, rune, sizePx, color)` (управляется через `SetGlyphCacheCapacity`, `GlyphCacheStats`, `ClearGlyphCache`), а `render.Canvas` кеширует масштабированные изображения (`ClearScaledImageCache`, `ScaledImageCacheStats`, `SetScaledImageCacheLimits`).
+- **Системные курсоры:**
+  Поддерживаются `CursorArrow`, `CursorHand`, `CursorIBeam`, `CursorResizeH`, `CursorResizeV`, `CursorResizeNWSE`, `CursorResizeNESW`, `CursorNotAllowed`, `CursorCrosshair`, `CursorMove` (`ui.SetCursor(...)`).
+
+

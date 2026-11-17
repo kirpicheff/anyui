@@ -75,12 +75,35 @@ func (r Rect) Empty() bool {
 	return r.W <= 0 || r.H <= 0
 }
 
+// Intersects возвращает true, если два прямоугольника пересекаются.
+func (r Rect) Intersects(other Rect) bool {
+	return !r.Intersect(other).Empty()
+}
+
+// Union возвращает минимальный прямоугольник, охватывающий оба прямоугольника.
+func (r Rect) Union(other Rect) Rect {
+	if r.Empty() {
+		return other
+	}
+	if other.Empty() {
+		return r
+	}
+	x0 := minInt(r.X, other.X)
+	y0 := minInt(r.Y, other.Y)
+	x1 := maxInt(r.X+r.W, other.X+other.W)
+	y1 := maxInt(r.Y+r.H, other.Y+other.H)
+	return Rect{X: x0, Y: y0, W: x1 - x0, H: y1 - y0}
+}
+
+const maxDirtyRects = 16
+
 // Canvas — программный 2D-буфер в формате BGRA.
 type Canvas struct {
-	Pixels []byte
-	Width  int
-	Height int
-	clips  []Rect
+	Pixels     []byte
+	Width      int
+	Height     int
+	clips      []Rect
+	dirtyRects []Rect
 }
 
 // NewCanvas создаёт новый пустой холст.
@@ -108,6 +131,7 @@ func (c *Canvas) Resize(w, h int) {
 	}
 	c.clips = c.clips[:0]
 	c.clips = append(c.clips, Rect{X: 0, Y: 0, W: w, H: h})
+	c.MarkFullDirty()
 }
 
 // Clear заливает весь буфер указанным цветом.
@@ -126,6 +150,155 @@ func (c *Canvas) Clear(col Color) {
 	for filled := stride; filled < len(c.Pixels); filled *= 2 {
 		copy(c.Pixels[filled:], c.Pixels[:filled])
 	}
+	c.MarkFullDirty()
+}
+
+// ClearTransparent быстро очищает буфер полностью прозрачными пикселями (нули).
+func (c *Canvas) ClearTransparent() {
+	if len(c.Pixels) == 0 {
+		return
+	}
+	clear(c.Pixels)
+	c.MarkFullDirty()
+}
+
+// AddDirtyRect регистрирует изменённую область холста для оптимизации перерисовки и блиттинга.
+func (c *Canvas) AddDirtyRect(r Rect) {
+	if c == nil || c.Width <= 0 || c.Height <= 0 {
+		return
+	}
+	bounds := Rect{X: 0, Y: 0, W: c.Width, H: c.Height}
+	clipped := bounds.Intersect(r)
+	if clipped.Empty() {
+		return
+	}
+	for i := range c.dirtyRects {
+		existing := c.dirtyRects[i]
+		if existing.X <= clipped.X && existing.Y <= clipped.Y &&
+			existing.X+existing.W >= clipped.X+clipped.W &&
+			existing.Y+existing.H >= clipped.Y+clipped.H {
+			return
+		}
+		if existing.Intersects(clipped) {
+			c.dirtyRects[i] = existing.Union(clipped)
+			return
+		}
+	}
+	if len(c.dirtyRects) < maxDirtyRects {
+		c.dirtyRects = append(c.dirtyRects, clipped)
+		return
+	}
+	merged := clipped
+	for _, dr := range c.dirtyRects {
+		merged = merged.Union(dr)
+	}
+	c.dirtyRects[0] = merged
+	c.dirtyRects = c.dirtyRects[:1]
+}
+
+// MarkFullDirty помечает весь холст как изменённый.
+func (c *Canvas) MarkFullDirty() {
+	if c == nil || c.Width <= 0 || c.Height <= 0 {
+		c.dirtyRects = c.dirtyRects[:0]
+		return
+	}
+	full := Rect{X: 0, Y: 0, W: c.Width, H: c.Height}
+	if len(c.dirtyRects) == 0 {
+		c.dirtyRects = append(c.dirtyRects, full)
+	} else {
+		c.dirtyRects[0] = full
+		c.dirtyRects = c.dirtyRects[:1]
+	}
+}
+
+// DirtyRects возвращает список накопленных изменённых областей текущего кадра.
+func (c *Canvas) DirtyRects() []Rect {
+	if c == nil {
+		return nil
+	}
+	return c.dirtyRects
+}
+
+// DirtyBounds возвращает единый прямоугольник, охватывающий все изменённые области.
+func (c *Canvas) DirtyBounds() Rect {
+	if c == nil || len(c.dirtyRects) == 0 {
+		return Rect{}
+	}
+	res := c.dirtyRects[0]
+	for _, dr := range c.dirtyRects[1:] {
+		res = res.Union(dr)
+	}
+	return res
+}
+
+// ResetDirtyRects сбрасывает список изменённых областей после вывода кадра.
+func (c *Canvas) ResetDirtyRects() {
+	if c != nil {
+		c.dirtyRects = c.dirtyRects[:0]
+	}
+}
+
+// BlitFrom быстро копирует прямоугольную область area из src в текущий холст (без альфа-смешивания).
+func (c *Canvas) BlitFrom(src *Canvas, area Rect) {
+	if c == nil || src == nil || len(c.Pixels) == 0 || len(src.Pixels) == 0 {
+		return
+	}
+	vis := c.CurrentClip().Intersect(area)
+	vis = vis.Intersect(Rect{X: 0, Y: 0, W: src.Width, H: src.Height})
+	if vis.Empty() {
+		return
+	}
+	// Быстрая ветка: копирование всего буфера целиком при совпадении размеров
+	if vis.X == 0 && vis.Y == 0 && vis.W == c.Width && vis.H == c.Height &&
+		c.Width == src.Width && c.Height == src.Height {
+		copy(c.Pixels, src.Pixels)
+		c.AddDirtyRect(vis)
+		return
+	}
+	rowBytes := vis.W * 4
+	for y := vis.Y; y < vis.Y+vis.H; y++ {
+		dstOff := (y*c.Width + vis.X) * 4
+		srcOff := (y*src.Width + vis.X) * 4
+		copy(c.Pixels[dstOff:dstOff+rowBytes], src.Pixels[srcOff:srcOff+rowBytes])
+	}
+	c.AddDirtyRect(vis)
+}
+
+// CompositeFrom накладывает прямоугольную область area из src поверх текущего холста с учётом альфа-канала.
+func (c *Canvas) CompositeFrom(src *Canvas, area Rect) {
+	if c == nil || src == nil || len(c.Pixels) == 0 || len(src.Pixels) == 0 {
+		return
+	}
+	vis := c.CurrentClip().Intersect(area)
+	vis = vis.Intersect(Rect{X: 0, Y: 0, W: src.Width, H: src.Height})
+	if vis.Empty() {
+		return
+	}
+	for y := vis.Y; y < vis.Y+vis.H; y++ {
+		dstRow := (y*c.Width + vis.X) * 4
+		srcRow := (y*src.Width + vis.X) * 4
+		for x := 0; x < vis.W; x++ {
+			so := srcRow + x*4
+			a := uint32(src.Pixels[so+3])
+			if a == 0 {
+				continue
+			}
+			do := dstRow + x*4
+			if a == 255 {
+				c.Pixels[do+0] = src.Pixels[so+0]
+				c.Pixels[do+1] = src.Pixels[so+1]
+				c.Pixels[do+2] = src.Pixels[so+2]
+				c.Pixels[do+3] = 255
+				continue
+			}
+			invA := 255 - a
+			c.Pixels[do+0] = uint8((uint32(src.Pixels[so+0])*a + uint32(c.Pixels[do+0])*invA + 127) / 255)
+			c.Pixels[do+1] = uint8((uint32(src.Pixels[so+1])*a + uint32(c.Pixels[do+1])*invA + 127) / 255)
+			c.Pixels[do+2] = uint8((uint32(src.Pixels[so+2])*a + uint32(c.Pixels[do+2])*invA + 127) / 255)
+			c.Pixels[do+3] = 255
+		}
+	}
+	c.AddDirtyRect(vis)
 }
 
 // CurrentClip возвращает текущую область отсечения.
@@ -158,6 +331,7 @@ func (c *Canvas) FillRect(r Rect, col Color) {
 	if area.Empty() {
 		return
 	}
+	c.AddDirtyRect(area)
 
 	if col.A == 255 {
 		for y := area.Y; y < area.Y+area.H; y++ {

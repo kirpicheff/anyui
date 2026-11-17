@@ -69,6 +69,7 @@ func (c *Canvas) DrawPolyline(pts []PointF, thickness float32, col Color, closed
 	if area.Empty() {
 		return
 	}
+	c.AddDirtyRect(area)
 
 	segCount := len(pts) - 1
 	if closed && len(pts) > 2 {

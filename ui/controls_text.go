@@ -149,6 +149,9 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 		changed = true
 		delete(c.textMenuChanged, id)
 	}
+	if !st.Disabled {
+		c.RegisterHit(id, r, platform.CursorIBeam)
+	}
 	clearClicked := false
 	if showClear {
 		clearRect := render.Rect{
@@ -156,6 +159,9 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 			Y: r.Y + (r.H-iconSize)/2,
 			W: iconSize,
 			H: iconSize,
+		}
+		if !st.Disabled {
+			c.RegisterHit(id+":clear", clearRect, platform.CursorHand)
 		}
 		if !c.IsInputBlocked() && clearRect.Contains(c.MouseX, c.MouseY) {
 			c.nextCursor = platform.CursorHand
@@ -694,6 +700,9 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 		return sp.start + col
 	}
 
+	if !st.Disabled {
+		c.RegisterHit(id, r, platform.CursorIBeam)
+	}
 	hovered := !st.Disabled && !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)
 	if hovered {
 		c.HotID = id

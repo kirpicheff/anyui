@@ -56,6 +56,7 @@ func (w *Window) Invalidate() {
 func (w *Window) SetTheme(theme Theme) {
 	if w.ctx != nil {
 		w.ctx.Theme = theme
+		w.ctx.InvalidateStatic()
 		w.Invalidate()
 	}
 }

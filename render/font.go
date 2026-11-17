@@ -3,11 +3,18 @@ package render
 import (
 	"image"
 	"os"
+	"sync"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
+)
+
+const (
+	defaultAlphaGlyphCacheCap    = 2048
+	defaultColoredGlyphCacheCap  = 4096
+	defaultColoredGlyphCacheByte = 8 << 20
 )
 
 // FontStyle задаёт начертание шрифта.
@@ -24,12 +31,28 @@ type glyphKey struct {
 	size int
 }
 
+type coloredGlyphKey struct {
+	style FontStyle
+	r     rune
+	size  int
+	color Color
+}
+
 type cachedGlyph struct {
 	w, h     int
 	offX     int
 	offY     int
 	advance  int
 	alpha    []byte
+	notEmpty bool
+}
+
+type coloredGlyph struct {
+	w, h     int
+	offX     int
+	offY     int
+	advance  int
+	bgra     []byte
 	notEmpty bool
 }
 
@@ -40,16 +63,17 @@ type faceEntry struct {
 }
 
 type fontSet struct {
+	mu       sync.Mutex
 	sfntFont *sfnt.Font
 	faces    map[int]*faceEntry
-	glyphs   map[glyphKey]*cachedGlyph
+	glyphs   *lruCache[glyphKey, *cachedGlyph]
 }
 
 func newFontSet(f *sfnt.Font) *fontSet {
 	return &fontSet{
 		sfntFont: f,
 		faces:    make(map[int]*faceEntry),
-		glyphs:   make(map[glyphKey]*cachedGlyph),
+		glyphs:   newLRUCache[glyphKey, *cachedGlyph](defaultAlphaGlyphCacheCap, 0),
 	}
 }
 
@@ -66,6 +90,9 @@ func (fs *fontSet) getFace(sizePx int) *faceEntry {
 	if sizePx < 6 {
 		sizePx = 6
 	}
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
 	if fe, ok := fs.faces[sizePx]; ok {
 		return fe
 	}
@@ -89,7 +116,7 @@ func (fs *fontSet) getFace(sizePx int) *faceEntry {
 
 func (fs *fontSet) getGlyph(r rune, sizePx int) *cachedGlyph {
 	key := glyphKey{r: r, size: sizePx}
-	if g, ok := fs.glyphs[key]; ok {
+	if g, ok := fs.glyphs.Get(key); ok {
 		return g
 	}
 
@@ -98,6 +125,7 @@ func (fs *fontSet) getGlyph(r rune, sizePx int) *cachedGlyph {
 		return nil
 	}
 
+	fs.mu.Lock()
 	dr, mask, maskp, adv, ok := fe.face.Glyph(fixed.P(0, 0), r)
 	g := &cachedGlyph{
 		advance: adv.Round(),
@@ -128,15 +156,17 @@ func (fs *fontSet) getGlyph(r rune, sizePx int) *cachedGlyph {
 		g.alpha = alpha
 		g.notEmpty = true
 	}
+	fs.mu.Unlock()
 
-	fs.glyphs[key] = g
+	fs.glyphs.Put(key, g, int64(len(g.alpha)))
 	return g
 }
 
-// FontManager управляет начертаниями шрифтов (Regular, Bold, Mono), fallback-цепочкой и кешем глифов.
+// FontManager управляет начертаниями шрифтов (Regular, Bold, Mono), fallback-цепочкой и LRU-кешем глифов.
 type FontManager struct {
-	styles    map[FontStyle]*fontSet
-	fallbacks []*fontSet
+	styles        map[FontStyle]*fontSet
+	fallbacks     []*fontSet
+	coloredGlyphs *lruCache[coloredGlyphKey, *coloredGlyph]
 }
 
 // NewFontFromBytes создаёт FontManager с основным шрифтом Regular из байтов TTF/OTF (удобно для //go:embed).
@@ -149,6 +179,7 @@ func NewFontFromBytes(data []byte) (*FontManager, error) {
 		styles: map[FontStyle]*fontSet{
 			FontRegular: newFontSet(f),
 		},
+		coloredGlyphs: newLRUCache[coloredGlyphKey, *coloredGlyph](defaultColoredGlyphCacheCap, defaultColoredGlyphCacheByte),
 	}, nil
 }
 
@@ -260,6 +291,62 @@ func LoadDefaultSystemFont() (*FontManager, error) {
 	return fm, nil
 }
 
+func (fm *FontManager) ensureColoredCache() *lruCache[coloredGlyphKey, *coloredGlyph] {
+	if fm.coloredGlyphs == nil {
+		fm.coloredGlyphs = newLRUCache[coloredGlyphKey, *coloredGlyph](defaultColoredGlyphCacheCap, defaultColoredGlyphCacheByte)
+	}
+	return fm.coloredGlyphs
+}
+
+// SetGlyphCacheCapacity задаёт максимальное число записей в LRU-кеше цветных и базовых глифов.
+func (fm *FontManager) SetGlyphCacheCapacity(maxEntries int) {
+	if fm == nil {
+		return
+	}
+	if maxEntries < 1 {
+		maxEntries = 1
+	}
+	fm.ensureColoredCache().SetLimits(maxEntries, defaultColoredGlyphCacheByte)
+	for _, fs := range fm.styles {
+		if fs != nil && fs.glyphs != nil {
+			fs.glyphs.SetLimits(maxEntries, 0)
+		}
+	}
+	for _, fb := range fm.fallbacks {
+		if fb != nil && fb.glyphs != nil {
+			fb.glyphs.SetLimits(maxEntries, 0)
+		}
+	}
+}
+
+// GlyphCacheStats возвращает число закешированных цветных глифов и занимаемую ими память в байтах.
+func (fm *FontManager) GlyphCacheStats() (entries int, bytes int64) {
+	if fm == nil || fm.coloredGlyphs == nil {
+		return 0, 0
+	}
+	return fm.coloredGlyphs.Stats()
+}
+
+// ClearGlyphCache сбрасывает кеш растеризованных глифов.
+func (fm *FontManager) ClearGlyphCache() {
+	if fm == nil {
+		return
+	}
+	if fm.coloredGlyphs != nil {
+		fm.coloredGlyphs.Clear()
+	}
+	for _, fs := range fm.styles {
+		if fs != nil && fs.glyphs != nil {
+			fs.glyphs.Clear()
+		}
+	}
+	for _, fb := range fm.fallbacks {
+		if fb != nil && fb.glyphs != nil {
+			fb.glyphs.Clear()
+		}
+	}
+}
+
 func (fm *FontManager) styleSet(style FontStyle) *fontSet {
 	if fs, ok := fm.styles[style]; ok && fs != nil {
 		return fs
@@ -268,6 +355,9 @@ func (fm *FontManager) styleSet(style FontStyle) *fontSet {
 }
 
 func (fm *FontManager) resolveGlyph(style FontStyle, r rune, sizePx int) *cachedGlyph {
+	if sizePx < 6 {
+		sizePx = 6
+	}
 	primary := fm.styleSet(style)
 	if primary == nil {
 		return nil
@@ -281,6 +371,64 @@ func (fm *FontManager) resolveGlyph(style FontStyle, r rune, sizePx int) *cached
 		}
 	}
 	return primary.getGlyph(r, sizePx)
+}
+
+func (fm *FontManager) resolveColoredGlyph(style FontStyle, r rune, sizePx int, col Color) *coloredGlyph {
+	if sizePx < 6 {
+		sizePx = 6
+	}
+	cache := fm.ensureColoredCache()
+	key := coloredGlyphKey{
+		style: style,
+		r:     r,
+		size:  sizePx,
+		color: col,
+	}
+	if cg, ok := cache.Get(key); ok {
+		return cg
+	}
+
+	g := fm.resolveGlyph(style, r, sizePx)
+	if g == nil {
+		return nil
+	}
+
+	cg := &coloredGlyph{
+		w:        g.w,
+		h:        g.h,
+		offX:     g.offX,
+		offY:     g.offY,
+		advance:  g.advance,
+		notEmpty: g.notEmpty,
+	}
+	if g.notEmpty && len(g.alpha) == g.w*g.h {
+		bgra := make([]byte, g.w*g.h*4)
+		for i, cov := range g.alpha {
+			if cov == 0 {
+				continue
+			}
+			a := (uint32(col.A)*uint32(cov) + 127) / 255
+			if a == 0 {
+				continue
+			}
+			off := i * 4
+			if a >= 255 {
+				bgra[off+0] = col.B
+				bgra[off+1] = col.G
+				bgra[off+2] = col.R
+				bgra[off+3] = 255
+			} else {
+				bgra[off+0] = uint8((uint32(col.B)*a + 127) / 255)
+				bgra[off+1] = uint8((uint32(col.G)*a + 127) / 255)
+				bgra[off+2] = uint8((uint32(col.R)*a + 127) / 255)
+				bgra[off+3] = uint8(a)
+			}
+		}
+		cg.bgra = bgra
+	}
+
+	cache.Put(key, cg, int64(len(cg.bgra)))
+	return cg
 }
 
 // MeasureText возвращает ширину и высоту строки в пикселях для начертания Regular.
@@ -331,37 +479,79 @@ func (fm *FontManager) DrawTextStyled(c *Canvas, x, y int, text string, sizePx i
 	}
 
 	clip := c.CurrentClip()
+	if clip.Empty() || y >= clip.Y+clip.H || y+fe.lineHeight <= clip.Y {
+		return
+	}
+
 	penX := x
 	baselineY := y + fe.ascent
+	var dirty Rect
 
 	for _, r := range text {
-		g := fm.resolveGlyph(style, r, sizePx)
-		if g == nil {
+		cg := fm.resolveColoredGlyph(style, r, sizePx, col)
+		if cg == nil {
 			continue
 		}
-		if g.notEmpty {
-			gx := penX + g.offX
-			gy := baselineY + g.offY
+		if cg.notEmpty && len(cg.bgra) == cg.w*cg.h*4 {
+			gx := penX + cg.offX
+			gy := baselineY + cg.offY
 
 			// Быстрая проверка видимости глифа относительно клипа
-			if gx+g.w > clip.X && gx < clip.X+clip.W && gy+g.h > clip.Y && gy < clip.Y+clip.H {
+			if gx+cg.w > clip.X && gx < clip.X+clip.W && gy+cg.h > clip.Y && gy < clip.Y+clip.H {
 				startY := maxInt(0, clip.Y-gy)
-				endY := minInt(g.h, clip.Y+clip.H-gy)
+				endY := minInt(cg.h, clip.Y+clip.H-gy)
 				startX := maxInt(0, clip.X-gx)
-				endX := minInt(g.w, clip.X+clip.W-gx)
+				endX := minInt(cg.w, clip.X+clip.W-gx)
+				dirty = dirty.Union(Rect{
+					X: gx + startX,
+					Y: gy + startY,
+					W: endX - startX,
+					H: endY - startY,
+				})
 
 				for py := startY; py < endY; py++ {
-					rowOff := py * g.w
-					dstY := gy + py
-					for px := startX; px < endX; px++ {
-						cov := g.alpha[rowOff+px]
-						if cov > 0 {
-							c.blendPixelUnchecked(gx+px, dstY, col, cov)
+					srcRow := (py*cg.w + startX) * 4
+					dstRow := ((gy+py)*c.Width + (gx + startX)) * 4
+					spanW := endX - startX
+					for px := 0; px < spanW; px++ {
+						so := srcRow + px*4
+						a := cg.bgra[so+3]
+						if a == 0 {
+							continue
 						}
+						do := dstRow + px*4
+						if a == 255 {
+							c.Pixels[do+0] = cg.bgra[so+0]
+							c.Pixels[do+1] = cg.bgra[so+1]
+							c.Pixels[do+2] = cg.bgra[so+2]
+							c.Pixels[do+3] = 255
+							continue
+						}
+						invA := uint32(255 - a)
+						b := uint32(cg.bgra[so+0]) + (uint32(c.Pixels[do+0])*invA+127)/255
+						g := uint32(cg.bgra[so+1]) + (uint32(c.Pixels[do+1])*invA+127)/255
+						r := uint32(cg.bgra[so+2]) + (uint32(c.Pixels[do+2])*invA+127)/255
+						if b > 255 {
+							b = 255
+						}
+						if g > 255 {
+							g = 255
+						}
+						if r > 255 {
+							r = 255
+						}
+						c.Pixels[do+0] = uint8(b)
+						c.Pixels[do+1] = uint8(g)
+						c.Pixels[do+2] = uint8(r)
+						c.Pixels[do+3] = 255
 					}
 				}
 			}
 		}
-		penX += g.advance
+		penX += cg.advance
+	}
+
+	if !dirty.Empty() {
+		c.AddDirtyRect(dirty)
 	}
 }
