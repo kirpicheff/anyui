@@ -243,3 +243,17 @@ child, err := app.OpenWindow(anyui.Config{
   go build -trimpath -ldflags="-s -w -H windowsgui" .
   ```
 
+---
+
+## Linux (X11)
+
+- Бэкенд Linux X11 полностью реализован на чистом Go без CGO (`CGO_ENABLED=0`) поверх `github.com/jezek/xgb` и `golang.org/x/sys/unix`, что позволяет кросс-компилировать бинарник с Windows (`GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build`).
+- **Рендеринг:** используется `MIT-SHM` (`ShmPutImage`) с автоматическим переключением на `PutImage` (например, при работе по SSH / X11-forwarding).
+- **Окна и ввод:** поддерживаются DPI (`Xft.dpi`), системные курсоры, `Frameless` (`_MOTIF_WM_HINTS` + `_NET_WM_MOVERESIZE`), Drag & Drop файлов (`XDND`), захват мыши (`GrabPointer`) и буфер обмена `CLIPBOARD` (текст UTF-8 и изображения `image/png`).
+- **Системная интеграция:**
+  - Диалоги (`OpenFileDialog`, `OpenFilesDialog`, `SaveFileDialog`, `SelectFolderDialog`, `MessageBox`) работают через `zenity`, `yad` или `kdialog` (автоопределение в `PATH`).
+  - Системный трей (`NewTray`) работает через `XEmbed` (`_NET_SYSTEM_TRAY_S0`), уведомления — через `notify-send`.
+  - `SingleInstance` использует `flock` и UNIX domain socket в `$XDG_RUNTIME_DIR`.
+  - `IsSystemDarkTheme` проверяет `gsettings` (`color-scheme` / `gtk-theme`), `GTK_THEME` и `~/.config/kdeglobals`.
+  - `OpenURL` использует `xdg-open`, а `RevealInFileManager` — D-Bus `org.freedesktop.FileManager1.ShowItems` с откатом на `xdg-open`.
+

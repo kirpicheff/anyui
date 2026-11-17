@@ -78,44 +78,6 @@ type margins struct {
 	cyBottomHeight int32
 }
 
-// ComputeFramelessHitTest вычисляет результат hit-test для безрамочного окна.
-// Вынесено в чистую функцию для удобства модульного тестирования.
-func ComputeFramelessHitTest(cx, cy, width, height, borderPx, titleBarPx int, maximized bool, customHit func(x, y int) HitTestResult) HitTestResult {
-	if !maximized && borderPx > 0 {
-		onLeft := cx >= 0 && cx < borderPx
-		onRight := cx >= width-borderPx && cx < width
-		onTop := cy >= 0 && cy < borderPx
-		onBottom := cy >= height-borderPx && cy < height
-
-		switch {
-		case onTop && onLeft:
-			return HitTopLeft
-		case onTop && onRight:
-			return HitTopRight
-		case onBottom && onLeft:
-			return HitBottomLeft
-		case onBottom && onRight:
-			return HitBottomRight
-		case onLeft:
-			return HitLeft
-		case onRight:
-			return HitRight
-		case onTop:
-			return HitTop
-		case onBottom:
-			return HitBottom
-		}
-	}
-
-	if customHit != nil {
-		return customHit(cx, cy)
-	}
-	if titleBarPx > 0 && cy >= 0 && cy < titleBarPx {
-		return HitCaption
-	}
-	return HitClient
-}
-
 func hitTestResultToWin32(r HitTestResult) uintptr {
 	switch r {
 	case HitCaption:

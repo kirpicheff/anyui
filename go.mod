@@ -7,4 +7,7 @@ require (
 	golang.org/x/sys v0.50.0
 )
 
-require golang.org/x/text v0.44.0 // indirect
+require (
+	github.com/jezek/xgb v1.3.1 // indirect
+	golang.org/x/text v0.44.0 // indirect
+)

@@ -117,7 +117,3 @@ func (w *win32Window) clampRectToNearestMonitor(rc rect) rect {
 	}
 }
 
-func isValidWindowState(s WindowState) bool {
-	return s.Width > 0 && s.Height > 0
-}
-

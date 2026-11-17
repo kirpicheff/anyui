@@ -186,13 +186,27 @@ func main() {
   - [x] Гарантия сборки без CGO для Windows (`CGO_ENABLED=0`, все вызовы WinAPI строго через `syscall` / `golang.org/x/sys/windows` для компактного бинарника 3–5 МБ).
 - [x] **Документация:** дополнение `docs/widgets.md`, `docs/graphics.md` и `docs/system.md`.
 
-### Фаза 8. Кроссплатформенность (Linux / macOS) и профилирование — [ ] В планах
-- [ ] Реализация бэкенда `platform_linux.go` (X11 / Wayland) за общим интерфейсом `platform.Window` и `Tray`.
-- [ ] Адаптация системных диалогов и буфера обмена под Linux, чтобы пользовательский код работал без изменений.
-- [ ] Поддержка macOS (`platform_darwin.go`).
-- [ ] **Профилировщик UI:** встроенный `pprof`-эндпоинт и оверлей по горячей клавише (например, `F12`) с отображением FPS, числа аллокаций в секунду и времени отрисовки кадра.
+### Фаза 8. Linux — X11 (`platform_linux_x11.go`) и базовая инфраструктура Linux — [x] Готово
+- [x] Бэкенд окна X11 за общим интерфейсом `platform.Window`: вывод буфера (`PutImage` / `MIT-SHM`), события мыши и клавиатуры, скролл, системные курсоры, DPI, режим `Frameless`, Drag & Drop (XDND).
+- [x] Буфер обмена X11 (текст и изображения) и адаптация системных диалогов (`OpenFile`, `SaveFile`, `BrowseFolder`, `MessageBox`) под Linux.
+- [x] Трей (`Tray`), системные уведомления, `SingleInstance`, `WindowState`, `SystemTheme`, `OpenURL` / `RevealInFileManager` для Linux.
 
-### Фаза 9. Примеры, витрина и DX (`examples/`) — [ ] В планах
+### Фаза 9. Linux — Wayland (`platform_linux_wayland.go`) — [ ] В планах
+- [ ] Нативное окно Wayland (`wl_compositor`, `wl_shm`, `xdg_shell`) и вывод пиксельного буфера за интерфейсом `platform.Window`.
+- [ ] Ввод (`wl_seat`, `wl_pointer`, `wl_keyboard`), курсоры (`wl_cursor`), HiDPI / fractional scaling, буфер обмена и Drag & Drop.
+- [ ] Автовыбор бэкенда в рантайме (`WAYLAND_DISPLAY` -> Wayland, иначе X11).
+
+### Фаза 10. macOS (`platform_darwin.go` + CGO / Objective-C мост `.m`) — [ ] В планах
+- [ ] Допустить CGO только для `darwin`: небольшой Objective-C мост (`.m`) к Cocoa / AppKit вместо сложного FFI без CGO.
+- [ ] **Этап 1 (MVP):** минимальный `NSApplication` (`[NSApp run]` в главном потоке) + `NSWindow` + блит одного кадра через `CALayer.contents = CGImageRef` с `contentsScale = backingScaleFactor` (вместо `drawRect:` — сразу проверка run loop, главного потока и Retina).
+- [ ] **Главный поток и события:** маршалинг `app.Dispatch(fn)` на главный поток через `dispatch_async(dispatch_get_main_queue(), ...)` / `performSelectorOnMainThread:`, единая точка инверсии Y-координаты (AppKit снизу-слева -> GoUI сверху-слева), делегаты `NSEvent`/`NSWindowDelegate`, `Frameless` (`mouseDownCanMoveWindow` / `performWindowDragWithEvent:`), захват мыши (`addLocalMonitorForEventsMatchingMask:`).
+- [ ] **Системная интеграция:** трей (`NSStatusItem` с `isTemplate = YES` и монохромной иконкой), уведомления (`UNUserNotificationCenter`, требует `.app` bundle + подпись/entitlements), диалоги (`NSOpenPanel` / `NSSavePanel` / `NSAlert` с аккуратным `runModal` при отсутствии окна), `NSPasteboard` (включая `NSPasteboardTypePNG`/`TIFF`), `SystemTheme`, `OpenURL` / `RevealInFileManager`.
+- [ ] **Сборка и CI:** упаковка `.app` bundle (`Info.plist`, `AnyUI.app/Contents/MacOS/...`) для корректной работы уведомлений и Dock + сборка universal binary (`arm64` + `amd64`) через `lipo`.
+
+### Фаза 11. Профилировщик UI — [ ] В планах
+- [ ] Встроенный `pprof`-эндпоинт и оверлей по горячей клавише (например, `F12`) с отображением FPS, числа аллокаций в секунду и времени отрисовки кадра.
+
+### Фаза 12. Примеры, витрина и DX (`examples/`) — [ ] В планах
 - [ ] `examples/hello` — минимальное приложение за 15 строк.
 - [ ] `examples/tray_app` — приложение с треем, сворачиванием и уведомлениями.
 - [ ] `examples/settings_form` — форма настроек с табами, инпутами, комбобоксами и тогглами.

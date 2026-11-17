@@ -26,39 +26,6 @@ var (
 
 const swShowNormalExec = 1
 
-// validateOpenURL проверяет, что URL использует безопасную схему (http, https или mailto).
-func validateOpenURL(rawURL string) error {
-	trimmed := strings.TrimSpace(rawURL)
-	if trimmed == "" {
-		return errors.New("пустой URL")
-	}
-	for i := 0; i < len(trimmed); i++ {
-		if trimmed[i] < 0x20 || trimmed[i] == 0x7f {
-			return errors.New("URL содержит недопустимые управляющие символы")
-		}
-	}
-	colon := strings.IndexByte(trimmed, ':')
-	if colon <= 0 {
-		return errors.New("некорректный формат URL")
-	}
-	scheme := strings.ToLower(trimmed[:colon])
-	rest := trimmed[colon+1:]
-	switch scheme {
-	case "http", "https":
-		if !strings.HasPrefix(rest, "//") || len(rest) <= 2 {
-			return errors.New("некорректный HTTP/HTTPS URL")
-		}
-		return nil
-	case "mailto":
-		if rest == "" {
-			return errors.New("пустой адрес mailto")
-		}
-		return nil
-	default:
-		return errors.New("неподдерживаемая схема URL: разрешены только http, https и mailto")
-	}
-}
-
 // OpenURL открывает веб-ссылку или mailto-адрес в приложении по умолчанию.
 func OpenURL(rawURL string) error {
 	if err := validateOpenURL(rawURL); err != nil {
