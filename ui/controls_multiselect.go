@@ -20,6 +20,7 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 	if selected == nil {
 		return false
 	}
+	id = c.ResolveID("msel", id)
 	if len(*selected) != len(items) {
 		resized := make([]bool, len(items))
 		copy(resized, *selected)
@@ -277,6 +278,7 @@ func (c *Context) TagInput(id string, tags *[]string, placeholder string, opts .
 	if tags == nil {
 		return false
 	}
+	id = c.ResolveID("tag", id)
 	st := ApplyOptions(opts)
 	hDp := 36
 	if st.HeightDp != nil && *st.HeightDp > 0 {

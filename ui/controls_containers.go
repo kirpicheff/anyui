@@ -72,6 +72,7 @@ func (c *Context) ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)
 	if fn == nil {
 		return
 	}
+	id = c.ResolveID("sv", id)
 	st := ApplyOptions(opts)
 	w := c.S(wDp)
 	if wDp <= 0 {
@@ -289,6 +290,7 @@ func (c *Context) Modal(id string, open *bool, title string, fn func(), opts ...
 	if open == nil || !*open {
 		return
 	}
+	id = c.ResolveID("mdl", id)
 	st := ApplyOptions(opts)
 	w := c.S(440)
 	if st.WidthDp != nil && *st.WidthDp > 0 {
@@ -367,6 +369,7 @@ func (c *Context) Popover(id string, open *bool, anchor render.Rect, fn func(), 
 	if open == nil || !*open {
 		return
 	}
+	id = c.ResolveID("pop", id)
 	st := ApplyOptions(opts)
 	w := c.S(240)
 	if st.WidthDp != nil && *st.WidthDp > 0 {
@@ -419,6 +422,7 @@ func (c *Context) FloatingPanel(id, title string, open *bool, fn func(), opts ..
 	if open == nil || !*open {
 		return
 	}
+	id = c.ResolveID("flt", id)
 	if c.floatPos == nil {
 		c.floatPos = make(map[string][2]int)
 	}
@@ -513,6 +517,7 @@ func (c *Context) Drawer(id string, open *bool, side DrawerSide, fn func(), opts
 	if open == nil {
 		return
 	}
+	id = c.ResolveID("drw", id)
 	target := float32(0)
 	if *open {
 		target = 1
@@ -561,6 +566,7 @@ func (c *Context) ContextMenu(id string, anchor render.Rect, items []ContextMenu
 	if len(items) == 0 {
 		return
 	}
+	id = c.ResolveID("ctx", id)
 	if c.openState == nil {
 		c.openState = make(map[string]bool)
 	}

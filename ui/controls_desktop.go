@@ -82,6 +82,7 @@ func (c *Context) currentMods() platform.Modifiers {
 
 // MenuBar отрисовывает главное верхнее меню окна с выпадающими подменю и хоткеями.
 func (c *Context) MenuBar(id string, menus []MenuBarItem, opts ...Option) {
+	id = c.ResolveID("mbar", id)
 	st := ApplyOptions(opts)
 	hDp := 30
 	if st.HeightDp != nil && *st.HeightDp > 0 {
@@ -351,6 +352,7 @@ func (c *Context) drawMenuPopup(barID string, menuRect render.Rect, items []BarM
 
 // Toolbar отрисовывает панель инструментов с кнопками, иконками, разделителями и подсказками.
 func (c *Context) Toolbar(id string, items []ToolbarItem, opts ...Option) {
+	id = c.ResolveID("tbar", id)
 	st := ApplyOptions(opts)
 	hDp := 38
 	if st.HeightDp != nil && *st.HeightDp > 0 {
@@ -453,6 +455,7 @@ func (c *Context) Toolbar(id string, items []ToolbarItem, opts ...Option) {
 
 // StatusBar отрисовывает нижнюю строку состояния с секциями и индикаторами.
 func (c *Context) StatusBar(id string, sections []StatusBarSection, opts ...Option) {
+	id = c.ResolveID("sbar", id)
 	st := ApplyOptions(opts)
 	hDp := 26
 	if st.HeightDp != nil && *st.HeightDp > 0 {
@@ -556,6 +559,7 @@ func (c *Context) StatusBar(id string, sections []StatusBarSection, opts ...Opti
 
 // Breadcrumbs отрисовывает навигационную цепочку и возвращает индекс кликнутого сегмента (-1 если клика не было).
 func (c *Context) Breadcrumbs(id string, items []BreadcrumbItem, opts ...Option) int {
+	id = c.ResolveID("bc", id)
 	st := ApplyOptions(opts)
 	hDp := 28
 	if st.HeightDp != nil && *st.HeightDp > 0 {
@@ -637,6 +641,7 @@ func (c *Context) Pagination(id string, currentPage *int, totalPages int, opts .
 	if currentPage == nil || totalPages <= 0 {
 		return false
 	}
+	id = c.ResolveID("page", id)
 	if *currentPage < 1 {
 		*currentPage = 1
 	}

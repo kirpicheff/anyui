@@ -69,6 +69,7 @@ func formatChartVal(v float64) string {
 
 // Sparkline отрисовывает компактный мини-график тренда без осей, с тултипом при наведении.
 func (c *Context) Sparkline(id string, values []float64, opts ...Option) {
+	id = c.ResolveID("spark", id)
 	st := ApplyOptions(opts)
 	hDp := 44
 	if st.HeightDp != nil && *st.HeightDp > 0 {
@@ -133,6 +134,7 @@ func (c *Context) Sparkline(id string, values []float64, opts ...Option) {
 
 // LineChart отрисовывает линейный график с сеткой, осями, легендой и всплывающей подсказкой при наведении.
 func (c *Context) LineChart(id string, labels []string, series []ChartSeries, opts ...Option) {
+	id = c.ResolveID("lchart", id)
 	st := ApplyOptions(opts)
 	hDp := 220
 	if st.HeightDp != nil && *st.HeightDp > 0 {
@@ -257,6 +259,7 @@ func (c *Context) LineChart(id string, labels []string, series []ChartSeries, op
 
 // BarChart отрисовывает столбчатую диаграмма с сеткой, осями, легендой и тултипами.
 func (c *Context) BarChart(id string, labels []string, series []ChartSeries, opts ...Option) {
+	id = c.ResolveID("bchart", id)
 	st := ApplyOptions(opts)
 	hDp := 220
 	if st.HeightDp != nil && *st.HeightDp > 0 {

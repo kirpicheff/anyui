@@ -55,6 +55,7 @@ func getLogViewState(id string) *logViewState {
 // LogView отображает виртуальный список записей лога с автопрокруткой вниз (Follow tail),
 // раскраской уровней, поиском и копированием выделенных строк.
 func (c *Context) LogView(id string, entries []LogEntry, followTail *bool, opts ...Option) {
+	id = c.ResolveID("log", id)
 	st := ApplyOptions(opts)
 	hDp := 260
 	if st.HeightDp != nil && *st.HeightDp > 0 {

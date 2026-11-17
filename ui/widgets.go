@@ -168,8 +168,9 @@ func (c *Context) CardOpts(fn func(), opts ...Option) {
 		w = c.RemainingWidth()
 	}
 	h := c.S(hDp)
+	useAutoHeight := st.AutoHeight || ((st.HeightDp == nil || *st.HeightDp <= 0) && !st.FillHeight)
 	autoKey := ""
-	if st.AutoHeight {
+	if useAutoHeight {
 		autoKey = c.nextJustifyKey("card_")
 		if c.autoHeights != nil {
 			if cachedH, ok := c.autoHeights[autoKey]; ok && cachedH > 0 {
@@ -223,7 +224,7 @@ func (c *Context) CardOpts(fn func(), opts ...Option) {
 	c.popBox()
 	c.Canvas.PopClip()
 
-	if st.AutoHeight && autoKey != "" {
+	if useAutoHeight && autoKey != "" {
 		if usedH < pad*2 {
 			usedH = pad * 2
 		}
@@ -255,6 +256,7 @@ func (c *Context) Button(id, label string, primary bool, widthDp int) bool {
 
 // ButtonOpts рисует кнопку с опциями стилизации и плавными анимациями.
 func (c *Context) ButtonOpts(id, label string, opts ...Option) bool {
+	id = c.ResolveID("btn", id)
 	st := ApplyOptions(opts)
 
 	fontSizeDp := 14
@@ -414,6 +416,7 @@ func (c *Context) ToggleOpts(id, label string, value *bool, opts ...Option) bool
 	if value == nil {
 		return false
 	}
+	id = c.ResolveID("tgl", id)
 	st := ApplyOptions(opts)
 
 	fontSizeDp := 14

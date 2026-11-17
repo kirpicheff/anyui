@@ -25,6 +25,7 @@ func main() {
 	}{
 		{"Корневой пакет (константы, функции, типы, опции)", modulePath},
 		{"Config", modulePath + ".Config"},
+		{"PageConfig", modulePath + ".PageConfig"},
 		{"TrayConfig", modulePath + ".TrayConfig"},
 		{"FlexItem", modulePath + ".FlexItem"},
 		{"TableColumn", modulePath + ".TableColumn"},
@@ -84,12 +85,12 @@ func writeHeader(out *bytes.Buffer, version string) {
 	out.WriteString("- Подпакеты `ui/`, `platform/`, `render/` — внутренние; прикладной код использует только корневой пакет `anyui`.\n")
 	out.WriteString("- Для уточнения сигнатур любого типа или метода используй `go doc git.gtw.su/kirpich/anyui.<Symbol>` вместо чтения исходников.\n")
 	out.WriteString("- Модель Immediate Mode: состояние хранится в переменных/структурах приложения, `drawFn(ui *anyui.UI)` перерисовывает UI на каждом кадре.\n")
-	out.WriteString("- Все интерактивные виджеты требуют уникальный строковый `id`.\n")
+	out.WriteString("- Идентификаторы виджетов: передавайте уникальный `id`, либо `\"\"` для автогенерации по счётчику в скоупе; в циклах и компонентах используйте `ui.IDScope(key, fn)` (или `PushID`/`PopID`).\n")
 	out.WriteString("- Все размеры, координаты и отступы задаются в `dp` и масштабируются под DPI автоматически.\n")
-	out.WriteString("- Обновление UI из фоновых горутин выполняется только через `app.Dispatch(func() { ... })`.\n")
+	out.WriteString("- Обновление UI из фоновых горутин выполняется через `app.Dispatch(func() { ... })`, либо через `anyui.Remember(ui, key, loader)` прямо внутри `drawFn`.\n")
 	out.WriteString("- Иконка окна подхватывается автоматически из `.syso`-ресурсов или задаётся через `Config.IconRGBA` / `win.SetIcon(...)`.\n")
-	out.WriteString("- Раскладка без обрезания: не угадывай `Height(...)` у списков/таблиц/карточек перед нижними кнопками — используй `ui.DockBottom`, `ui.DockTop`, `ui.ColumnFlex` / `ui.RowFlex` и `anyui.FillHeight()`.\n")
-	out.WriteString("- `Card(fn, anyui.AutoHeight())` подбирает высоту по содержимому; без `AutoHeight()` карточка занимает весь остаток высоты.\n")
+	out.WriteString("- Раскладка без обрезания: для экранов с шапкой/телом/футером используйте `ui.Page(cfg, headerFn, bodyFn, footerFn)` или `ui.DockBottom` / `ui.DockTop` / `ui.ColumnFlex` и `anyui.FillHeight()`.\n")
+	out.WriteString("- `Card(fn, ...)` по умолчанию подбирает высоту по содержимому (`AutoHeight`); чтобы растянуть карточку на весь остаток высоты, передайте `anyui.FillHeight()`.\n")
 	out.WriteString("- В `Table` / `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.\n\n")
 }
 

@@ -400,3 +400,38 @@ app.Run(func(ui *anyui.UI) {
 ```go
 ui.SetStrings(anyui.EnglishStrings())
 ```
+
+---
+
+## Упрощение вёрстки и состояния (`IDScope`, `Card`, `Page`, `Remember`)
+
+### Автоматические ID и `IDScope`
+В любом виджете можно передать пустую строку `""` вместо ручного `id` — фреймворк сгенерирует его автоматически по счётчику в текущем скоупе. Для циклов и повторяющихся компонентов используйте `ui.IDScope(key, func() { ... })`:
+
+```go
+for _, item := range items {
+	ui.IDScope(item.ID, func() {
+		ui.Row(8, 36, func() {
+			ui.Label(item.Name)
+			if ui.Button("", "Удалить", anyui.Danger()) {
+				deleteItem(item.ID)
+			}
+		})
+	})
+}
+```
+
+### `Card` и `Page`
+- `ui.Card(fn, opts...)` по умолчанию подбирает высоту по содержимому (`AutoHeight`). Чтобы растянуть карточку на всю доступную высоту контейнера, передайте `anyui.FillHeight()`.
+- `ui.Page(cfg, headerFn, bodyFn, footerFn)` строит типовой экран: фиксированная шапка сверху, прокручиваемое тело (`ScrollView`) в центре и фиксированный футер снизу.
+
+```go
+ui.Page(anyui.PageConfig{HeaderDp: 44, FooterDp: 48},
+	func() { ui.Label("Настройки", anyui.FontSize(18), anyui.Bold()) },
+	func() { /* длинная форма с автопрокруткой */ },
+	func() { ui.Button("", "Сохранить", anyui.Primary()) },
+)
+```
+
+### Кеширование фоновой загрузки (`Remember`)
+`anyui.Remember(ui, key, loader)` запускает `loader` в фоне при первом обращении или смене ключа `key` и автоматически перерисовывает окно через `app.Dispatch`. Для сброса кеша вызовите `ui.InvalidateRemember(key)` или `ui.ClearRemember()`.

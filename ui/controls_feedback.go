@@ -168,6 +168,7 @@ func (c *Context) drawToasts() {
 
 // Spinner рисует анимированный индикатор загрузки.
 func (c *Context) Spinner(id string, sizeDp int, opts ...Option) {
+	id = c.ResolveID("spin", id)
 	if sizeDp <= 0 {
 		sizeDp = 24
 	}

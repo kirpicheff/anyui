@@ -52,6 +52,7 @@ func (c *Context) Select(id string, items []string, selected *int, opts ...Optio
 	if selected == nil {
 		return false
 	}
+	id = c.ResolveID("sel", id)
 	if c.openState == nil {
 		c.openState = make(map[string]bool)
 	}
@@ -374,6 +375,7 @@ func (c *Context) Select(id string, items []string, selected *int, opts ...Optio
 
 // ListView рисует виртуализированный прокручиваемый список элементов.
 func (c *Context) ListView(id string, count int, itemHeightDp int, selected *int, drawItem func(index int, area render.Rect, isSelected bool), opts ...Option) bool {
+	id = c.ResolveID("list", id)
 	if itemHeightDp <= 0 {
 		itemHeightDp = 36
 	}
@@ -508,6 +510,7 @@ func (c *Context) Tabs(id string, items []string, active *int, vertical bool, op
 	if active == nil || len(items) == 0 {
 		return false
 	}
+	id = c.ResolveID("tabs", id)
 	st := ApplyOptions(opts)
 	changed := false
 	pxSize := c.S(14)
@@ -592,6 +595,7 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 	if active == nil {
 		return ev
 	}
+	id = c.ResolveID("tbar", id)
 	if c.tabScroll == nil {
 		c.tabScroll = make(map[string]int)
 	}

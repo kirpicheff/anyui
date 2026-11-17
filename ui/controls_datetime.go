@@ -29,6 +29,7 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 	if t == nil {
 		return false
 	}
+	id = c.ResolveID("tp", id)
 	if t.IsZero() {
 		*t = time.Now()
 	}
@@ -198,6 +199,7 @@ func (c *Context) DateTimePicker(id string, dt *time.Time, opts ...Option) bool 
 	if dt == nil {
 		return false
 	}
+	id = c.nextLocalID("dtp", id)
 	if dt.IsZero() {
 		*dt = time.Now()
 	}

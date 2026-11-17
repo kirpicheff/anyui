@@ -310,7 +310,7 @@ func main() {
 						ui.Spacer(6)
 						ui.Label(st.droppedInfo, anyui.FontSize(11), anyui.TextColor(th.TextMuted))
 					})
-				}, anyui.Width(236), anyui.Padding(12))
+				}, anyui.Width(236), anyui.Padding(12), anyui.FillHeight())
 
 				ui.Card(func() {
 					switch st.activeNav {
@@ -333,7 +333,7 @@ func main() {
 					case 8:
 						st.drawTabPerf(ui)
 					}
-				}, anyui.Padding(16))
+				}, anyui.Padding(16), anyui.FillHeight())
 			})
 		})
 

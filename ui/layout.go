@@ -534,6 +534,55 @@ func (c *Context) DockTop(gapDp, topDp int, topFn, bodyFn func()) {
 	)
 }
 
+// PageConfig задаёт параметры типовой разметки страницы с шапкой, прокручиваемым телом и футером.
+type PageConfig struct {
+	ID       string // Идентификатор ScrollView тела (по умолчанию "page_body")
+	GapDp    int    // Отступ между секциями в dp (по умолчанию 8)
+	HeaderDp int    // Высота шапки в dp (по умолчанию 48, если headerFn != nil)
+	FooterDp int    // Высота футера в dp (по умолчанию 44, если footerFn != nil)
+	NoScroll bool   // Отключает автоматическую обёртку bodyFn в ScrollView
+}
+
+// Page строит типовой экран: опциональная шапка сверху, прокручиваемое тело по центру и опциональный футер снизу.
+func (c *Context) Page(cfg PageConfig, headerFn, bodyFn, footerFn func()) {
+	gap := cfg.GapDp
+	if gap <= 0 {
+		gap = 8
+	}
+	var items []FlexItem
+	if headerFn != nil {
+		hd := cfg.HeaderDp
+		if hd <= 0 {
+			hd = 48
+		}
+		items = append(items, FlexItem{FixedDp: hd, Fn: headerFn})
+	}
+	if bodyFn != nil {
+		items = append(items, FlexItem{Weight: 1, Fn: func() {
+			if cfg.NoScroll {
+				bodyFn()
+				return
+			}
+			svID := cfg.ID
+			if svID == "" {
+				svID = "page_body"
+			}
+			c.ScrollView(svID, 0, 0, bodyFn)
+		}})
+	}
+	if footerFn != nil {
+		ft := cfg.FooterDp
+		if ft <= 0 {
+			ft = 44
+		}
+		items = append(items, FlexItem{FixedDp: ft, Fn: footerFn})
+	}
+	if len(items) == 0 {
+		return
+	}
+	c.ColumnFlex(gap, items...)
+}
+
 // calcJustifyOffsets вычисляет начальное смещение и массив шагов между элементами по главной оси.
 func calcJustifyOffsets(justify Justify, totalSize, gapPx int, sizes []int) (int, []int) {
 	n := len(sizes)

@@ -239,6 +239,29 @@ func (u *UI) DockTop(gapDp, topDp int, topFn, bodyFn func()) {
 	u.ctx.DockTop(gapDp, topDp, topFn, bodyFn)
 }
 
+// PageConfig задаёт параметры типовой разметки страницы с шапкой, прокручиваемым телом и футером.
+type PageConfig = ui.PageConfig
+
+// Page строит типовой экран: опциональная шапка сверху, прокручиваемое тело по центру и опциональный футер снизу.
+func (u *UI) Page(cfg PageConfig, headerFn, bodyFn, footerFn func()) {
+	u.ctx.Page(cfg, headerFn, bodyFn, footerFn)
+}
+
+// PushID добавляет префикс пространства имён в стек ID виджетов.
+func (u *UI) PushID(key any) {
+	u.ctx.PushID(key)
+}
+
+// PopID удаляет верхний префикс из стека ID виджетов.
+func (u *UI) PopID() {
+	u.ctx.PopID()
+}
+
+// IDScope задаёт изолированное пространство имён ID на время выполнения fn.
+func (u *UI) IDScope(key any, fn func()) {
+	u.ctx.IDScope(key, fn)
+}
+
 // RowWith располагает элементы горизонтально с заданным выравниванием Align и распределением Justify.
 func (u *UI) RowWith(align Align, justify Justify, gapDp, heightDp int, items ...func()) {
 	u.ctx.RowWith(align, justify, gapDp, heightDp, items...)

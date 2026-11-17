@@ -18,6 +18,7 @@ func (c *Context) Checkbox(id, label string, checked *bool, opts ...Option) bool
 		var dummy bool
 		checked = &dummy
 	}
+	id = c.ResolveID("chk", id)
 	st := ApplyOptions(opts)
 
 	sizeDp := 18
@@ -145,6 +146,7 @@ func (c *Context) Checkbox(id, label string, checked *bool, opts ...Option) bool
 
 // RadioButton рисует одиночную радиокнопку и возвращает true в кадре выбора.
 func (c *Context) RadioButton(id, label string, selected bool, opts ...Option) bool {
+	id = c.ResolveID("rad", id)
 	st := ApplyOptions(opts)
 	circlePx := c.S(18)
 	gap := c.S(8)
@@ -236,6 +238,7 @@ func (c *Context) RadioGroup(id string, options []string, selected *int, opts ..
 	if selected == nil || len(options) == 0 {
 		return false
 	}
+	id = c.nextLocalID("rgrp", id)
 	changed := false
 	c.Column(8, func() {
 		for i, label := range options {

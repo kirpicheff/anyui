@@ -111,6 +111,7 @@ func (c *Context) StaticLayer(id string, fn func()) {
 	if fn == nil || c.Canvas == nil || len(c.layoutStack) == 0 {
 		return
 	}
+	id = c.ResolveID("static", id)
 	// Защита от вложенных вызовов StaticLayer внутри уже активного статического слоя
 	if c.layers.staticCanvas != nil && c.Canvas == c.layers.staticCanvas {
 		fn()

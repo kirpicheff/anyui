@@ -11,6 +11,7 @@ import (
 // SelectableLabel отображает статический текст, который можно выделить мышью и скопировать
 // (Ctrl+C, Ctrl+A, двойной/тройной клик, встроенное контекстное меню).
 func (c *Context) SelectableLabel(id, text string, opts ...Option) {
+	id = c.ResolveID("slbl", id)
 	c.ensureTextEditingMaps()
 	st := ApplyOptions(opts)
 
@@ -215,6 +216,7 @@ func (c *Context) SelectableLabel(id, text string, opts ...Option) {
 
 // Hyperlink отображает кликабельную текстовую ссылку и возвращает true при нажатии.
 func (c *Context) Hyperlink(id, text string, opts ...Option) bool {
+	id = c.ResolveID("link", id)
 	st := ApplyOptions(opts)
 	sizeDp := 14
 	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
@@ -372,6 +374,7 @@ func (c *Context) MaskedInput(id string, value *string, mask string, opts ...Opt
 	if len(maskRunes) == 0 {
 		return c.TextInputOpts(id, value, "", opts...)
 	}
+	id = c.ResolveID("mask", id)
 
 	c.ensureTextEditingMaps()
 	st := ApplyOptions(opts)

@@ -83,6 +83,7 @@ func (c *Context) Table(
 	if len(cols) == 0 {
 		return ev
 	}
+	id = c.ResolveID("tbl", id)
 
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
@@ -470,6 +471,7 @@ func FlattenTree(roots []*TreeNode) []FlatTreeItem {
 
 // TreeView рисует древовидный список с раскрытием узлов и виртуализацией.
 func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opts ...Option) bool {
+	id = c.ResolveID("tree", id)
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {

@@ -88,6 +88,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 	if value == nil {
 		return false
 	}
+	id = c.ResolveID("inp", id)
 	c.ensureTextEditingMaps()
 	st := ApplyOptions(opts)
 
@@ -620,6 +621,7 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 	if value == nil {
 		return false
 	}
+	id = c.ResolveID("ta", id)
 	c.ensureTextEditingMaps()
 	st := ApplyOptions(opts)
 

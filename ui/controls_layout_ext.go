@@ -21,6 +21,7 @@ func (c *Context) SplitPane(id string, orient SplitOrientation, ratio *float32, 
 	if ratio == nil {
 		return
 	}
+	id = c.ResolveID("split", id)
 	if *ratio <= 0 {
 		*ratio = 0.5
 	}
@@ -166,6 +167,7 @@ func (c *Context) Collapsible(id, title string, expanded *bool, fn func(), opts 
 	if expanded == nil {
 		return false
 	}
+	id = c.ResolveID("coll", id)
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
@@ -239,6 +241,7 @@ func (c *Context) Accordion(id string, items []AccordionItem, openIndex *int, op
 	if openIndex == nil {
 		return false
 	}
+	id = c.nextLocalID("acc", id)
 	changed := false
 	for i, it := range items {
 		exp := *openIndex == i

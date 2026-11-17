@@ -16,6 +16,7 @@ func (c *Context) NumberInput(id string, value *float64, minVal, maxVal, step fl
 	if value == nil {
 		return false
 	}
+	id = c.ResolveID("num", id)
 	if step <= 0 {
 		step = 1
 	}
@@ -143,6 +144,7 @@ func (c *Context) Slider(id string, value *float32, minVal, maxVal float32, opts
 	if value == nil {
 		return false
 	}
+	id = c.ResolveID("sld", id)
 	if maxVal <= minVal {
 		maxVal = minVal + 1
 	}
@@ -221,6 +223,7 @@ func (c *Context) RangeSlider(id string, low, high *float32, minVal, maxVal floa
 	if low == nil || high == nil {
 		return false
 	}
+	id = c.ResolveID("rsld", id)
 	if maxVal <= minVal {
 		maxVal = minVal + 1
 	}
@@ -429,6 +432,7 @@ func (c *Context) ColorPicker(id string, col *render.Color, opts ...Option) bool
 	if col == nil {
 		return false
 	}
+	id = c.ResolveID("col", id)
 	if c.openState == nil {
 		c.openState = make(map[string]bool)
 	}
@@ -638,6 +642,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 	if date == nil {
 		return false
 	}
+	id = c.ResolveID("date", id)
 	if date.IsZero() {
 		*date = time.Now()
 	}

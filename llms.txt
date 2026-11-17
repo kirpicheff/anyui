@@ -1,4 +1,4 @@
-# AnyUI (v0.7.1)
+# AnyUI (v0.7.3)
 
 Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).
 
@@ -8,12 +8,12 @@
 - Подпакеты `ui/`, `platform/`, `render/` — внутренние; прикладной код использует только корневой пакет `anyui`.
 - Для уточнения сигнатур любого типа или метода используй `go doc git.gtw.su/kirpich/anyui.<Symbol>` вместо чтения исходников.
 - Модель Immediate Mode: состояние хранится в переменных/структурах приложения, `drawFn(ui *anyui.UI)` перерисовывает UI на каждом кадре.
-- Все интерактивные виджеты требуют уникальный строковый `id`.
+- Идентификаторы виджетов: передавайте уникальный `id`, либо `""` для автогенерации по счётчику в скоупе; в циклах и компонентах используйте `ui.IDScope(key, fn)` (или `PushID`/`PopID`).
 - Все размеры, координаты и отступы задаются в `dp` и масштабируются под DPI автоматически.
-- Обновление UI из фоновых горутин выполняется только через `app.Dispatch(func() { ... })`.
+- Обновление UI из фоновых горутин выполняется через `app.Dispatch(func() { ... })`, либо через `anyui.Remember(ui, key, loader)` прямо внутри `drawFn`.
 - Иконка окна подхватывается автоматически из `.syso`-ресурсов или задаётся через `Config.IconRGBA` / `win.SetIcon(...)`.
-- Раскладка без обрезания: не угадывай `Height(...)` у списков/таблиц/карточек перед нижними кнопками — используй `ui.DockBottom`, `ui.DockTop`, `ui.ColumnFlex` / `ui.RowFlex` и `anyui.FillHeight()`.
-- `Card(fn, anyui.AutoHeight())` подбирает высоту по содержимому; без `AutoHeight()` карточка занимает весь остаток высоты.
+- Раскладка без обрезания: для экранов с шапкой/телом/футером используйте `ui.Page(cfg, headerFn, bodyFn, footerFn)` или `ui.DockBottom` / `ui.DockTop` / `ui.ColumnFlex` и `anyui.FillHeight()`.
+- `Card(fn, ...)` по умолчанию подбирает высоту по содержимому (`AutoHeight`); чтобы растянуть карточку на весь остаток высоты, передайте `anyui.FillHeight()`.
 - В `Table` / `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.
 
 ## Минимальный пример
@@ -109,6 +109,7 @@ func IsSystemDarkTheme() bool
 func OpenFileDialog(opts FileDialogOptions) (string, bool, error)
 func OpenFilesDialog(opts FileDialogOptions) ([]string, bool, error)
 func OpenURL(rawURL string) error
+func Remember[T any](u *UI, key any, loader func() (T, error)) (val T, loading bool, err error)
 func RevealInFileManager(path string) error
 func SaveFileDialog(opts FileDialogOptions) (string, bool, error)
 func SaveWindowState(path string, state WindowState) error
@@ -190,6 +191,7 @@ type Option = ui.Option
     func TextColor(c Color) Option
     func Width(dp int) Option
     func WordWrap(v bool) Option
+type PageConfig = ui.PageConfig
 type PointF = render.PointF
 type RadialGradient = render.RadialGradient
 type Rect = render.Rect
@@ -258,6 +260,16 @@ type Config struct {
 	OnDropFiles         func(files []string, x, y int)
 }
     Config задаёт параметры создания приложения или окна.
+```
+
+## PageConfig
+
+```go
+package anyui // import "git.gtw.su/kirpich/anyui"
+
+type PageConfig = ui.PageConfig
+    PageConfig задаёт параметры типовой разметки страницы с шапкой,
+    прокручиваемым телом и футером.
 ```
 
 ## TrayConfig
@@ -405,6 +417,7 @@ func (u *UI) Card(fn func(), opts ...Option)
 func (u *UI) CheckComboBox(id string, items []string, selected *[]bool, opts ...Option) bool
 func (u *UI) Checkbox(id, label string, checked *bool, opts ...Option) bool
 func (u *UI) ClearGlyphCache()
+func (u *UI) ClearRemember()
 func (u *UI) ClearScaledImageCache()
 func (u *UI) Collapsible(id, title string, expanded *bool, fn func(), opts ...Option) bool
 func (u *UI) ColorPicker(id string, col *render.Color, opts ...Option) bool
@@ -433,8 +446,10 @@ func (u *UI) FormRow(label string, fn func())
 func (u *UI) GlyphCacheStats() (entries int, bytes int64)
 func (u *UI) Grid(cols, gapXDp, gapYDp, rowHeightDp int, fn func())
 func (u *UI) Hyperlink(id, text string, opts ...Option) bool
+func (u *UI) IDScope(key any, fn func())
 func (u *UI) IconButton(id, svg string, opts ...Option) bool
 func (u *UI) Image(img image.Image, wDp, hDp int, mode ImageScaleMode)
+func (u *UI) InvalidateRemember(key any)
 func (u *UI) InvalidateStatic()
 func (u *UI) Label(text string, opts ...Option)
 func (u *UI) LastDirtyRects() []Rect
@@ -452,9 +467,12 @@ func (u *UI) MultiSelect(id string, items []string, selected *[]bool, opts ...Op
 func (u *UI) NumberInput(id string, value *float64, minVal, maxVal, step float64, decimals int, ...) bool
 func (u *UI) Padding(padDp int, fn func())
 func (u *UI) PaddingXY(pxDp, pyDp int, fn func())
+func (u *UI) Page(cfg PageConfig, headerFn, bodyFn, footerFn func())
 func (u *UI) Pagination(id string, currentPage *int, totalPages int, opts ...Option) bool
+func (u *UI) PopID()
 func (u *UI) Popover(id string, open *bool, anchor Rect, fn func(), opts ...Option)
 func (u *UI) ProgressBar(progress float32, opts ...Option)
+func (u *UI) PushID(key any)
 func (u *UI) PushOverlay(bounds Rect, drawFn func())
 func (u *UI) RadioButton(id, label string, selected bool, opts ...Option) bool
 func (u *UI) RadioGroup(id string, options []string, selected *int, opts ...Option) bool

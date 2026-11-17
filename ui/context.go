@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -111,8 +112,12 @@ type Context struct {
 	nextFocusOrder []string
 	shortcuts      []Shortcut
 
-	layoutStack  []layoutBox
-	autoHeights  map[string]int
+	layoutStack   []layoutBox
+	idScopeStack  []string
+	idSeqStack    []int
+	rememberMu    sync.Mutex
+	rememberStore map[string]*RememberEntry
+	autoHeights   map[string]int
 	justifySizes map[string][]int
 	layoutSeq    int
 	nextCursor   platform.CursorType
@@ -542,6 +547,8 @@ func (c *Context) beginFrame() {
 	c.nextCursor = platform.CursorArrow
 	c.needsRedraw = false
 	c.layoutSeq = 0
+	c.idScopeStack = c.idScopeStack[:0]
+	c.idSeqStack = append(c.idSeqStack[:0], 0)
 	c.nextFocusOrder = c.nextFocusOrder[:0]
 	c.nextHitRegions = c.nextHitRegions[:0]
 	c.layers.lastFrameBlitted = false
@@ -602,4 +609,81 @@ func (c *Context) endFrame() {
 	c.TypedRunes = c.TypedRunes[:0]
 	c.KeyEvents = c.KeyEvents[:0]
 }
+
+func formatIDKey(key any) string {
+	switch v := key.(type) {
+	case string:
+		return v
+	case int:
+		return strconv.Itoa(v)
+	case int64:
+		return strconv.FormatInt(v, 10)
+	case uint:
+		return strconv.FormatUint(uint64(v), 10)
+	case uint64:
+		return strconv.FormatUint(v, 10)
+	default:
+		return fmt.Sprint(v)
+	}
+}
+
+// PushID добавляет префикс пространства имён в стек ID виджетов.
+func (c *Context) PushID(key any) {
+	part := formatIDKey(key)
+	if len(c.idScopeStack) > 0 {
+		part = c.idScopeStack[len(c.idScopeStack)-1] + "/" + part
+	}
+	c.idScopeStack = append(c.idScopeStack, part)
+	c.idSeqStack = append(c.idSeqStack, 0)
+}
+
+// PopID удаляет верхний префикс из стека ID виджетов.
+func (c *Context) PopID() {
+	if len(c.idScopeStack) > 0 {
+		c.idScopeStack = c.idScopeStack[:len(c.idScopeStack)-1]
+	}
+	if len(c.idSeqStack) > 1 {
+		c.idSeqStack = c.idSeqStack[:len(c.idSeqStack)-1]
+	}
+}
+
+// IDScope задаёт изолированное пространство имён ID на время выполнения fn.
+// Удобно использовать в циклах и переиспользуемых компонентах.
+func (c *Context) IDScope(key any, fn func()) {
+	if fn == nil {
+		return
+	}
+	c.PushID(key)
+	defer c.PopID()
+	fn()
+}
+
+// nextLocalID возвращает локальный ID без префикса IDScope.
+// Используется композитными контролами, которые делегируют рендер в дочерние виджеты.
+func (c *Context) nextLocalID(kind, id string) string {
+	if id != "" {
+		return id
+	}
+	if len(c.idSeqStack) == 0 {
+		c.idSeqStack = append(c.idSeqStack, 0)
+	}
+	idx := len(c.idSeqStack) - 1
+	seq := c.idSeqStack[idx]
+	c.idSeqStack[idx] = seq + 1
+	if kind == "" {
+		kind = "w"
+	}
+	return kind + "#" + strconv.Itoa(seq)
+}
+
+// ResolveID возвращает итоговый уникальный ID виджета с учётом активного IDScope.
+// Если передана пустая строка id == "", генерирует детерминированный ID по счётчику в текущем скоупе.
+func (c *Context) ResolveID(kind, id string) string {
+	id = c.nextLocalID(kind, id)
+	if len(c.idScopeStack) > 0 {
+		return c.idScopeStack[len(c.idScopeStack)-1] + "/" + id
+	}
+	return id
+}
+
 
