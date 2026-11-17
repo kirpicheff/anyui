@@ -141,3 +141,23 @@ func TestPickTextMIME(t *testing.T) {
 	}
 }
 
+func TestRGBAToSNIPixmapAndDBusMenu(t *testing.T) {
+	rgba := []byte{0x11, 0x22, 0x33, 0xFF} // R=11, G=22, B=33, A=FF
+	pix := rgbaToSNIPixmap(rgba, 1, 1)
+	if pix.Width != 1 || pix.Height != 1 || len(pix.Data) != 4 {
+		t.Fatalf("unexpected pixmap dimensions: %+v", pix)
+	}
+	// Ожидается ARGB32 big-endian: A, R, G, B
+	if pix.Data[0] != 0xFF || pix.Data[1] != 0x11 || pix.Data[2] != 0x22 || pix.Data[3] != 0x33 {
+		t.Fatalf("unexpected ARGB bytes: % X", pix.Data)
+	}
+
+	props := buildDBusMenuProps(TrayMenuItem{Label: "Открыть", Checked: true})
+	if props["label"].Value() != "Открыть" {
+		t.Fatalf("unexpected label: %v", props["label"].Value())
+	}
+	if props["toggle-state"].Value() != int32(1) {
+		t.Fatalf("unexpected toggle-state: %v", props["toggle-state"].Value())
+	}
+}
+
