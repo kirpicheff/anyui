@@ -39,7 +39,7 @@ func (c *Context) ListViewEx(
 	if st.HeightDp != nil && *st.HeightDp > 0 {
 		h = c.S(*st.HeightDp)
 	}
-	r := c.allocRect(w, h)
+	r := c.allocRectStyled(w, h, st)
 	c.registerFocusable(id)
 
 	c.Canvas.DrawRoundedBox(r, c.Sf(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
@@ -238,7 +238,7 @@ func (c *Context) TreeViewEx(
 	if st.HeightDp != nil && *st.HeightDp > 0 {
 		h = c.S(*st.HeightDp)
 	}
-	r := c.allocRect(w, h)
+	r := c.allocRectStyled(w, h, st)
 	c.registerFocusable(id)
 
 	c.Canvas.DrawRoundedBox(r, c.Sf(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
@@ -448,7 +448,7 @@ func (c *Context) TableEx(
 	if st.HeightDp != nil && *st.HeightDp > 0 {
 		h = c.S(*st.HeightDp)
 	}
-	r := c.allocRect(w, h)
+	r := c.allocRectStyled(w, h, st)
 	c.registerFocusable(id)
 
 	c.Canvas.DrawRoundedBox(r, c.Sf(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
@@ -467,22 +467,24 @@ func (c *Context) TableEx(
 		c.tableResizeStartW = make(map[string]int)
 	}
 
-	colWidths := c.tableColWidths[id]
-	if len(colWidths) != len(cols) {
-		colWidths = make([]int, len(cols))
-		for i, col := range cols {
-			wdp := col.WidthDp
-			if wdp <= 0 {
-				wdp = 120
-			}
-			colWidths[i] = c.S(wdp)
-		}
-		c.tableColWidths[id] = colWidths
-	}
-
 	checkColW := 0
 	if cfg.ShowCheckboxes {
 		checkColW = c.S(34)
+	}
+
+	colWidths := c.tableColWidths[id]
+	if len(colWidths) != len(cols) {
+		scale := c.Scale
+		if scale <= 0 {
+			scale = 1
+		}
+		availDp := int(float32(r.W-checkColW) / scale)
+		widthsDp := calcTableColWidthsDp(cols, availDp)
+		colWidths = make([]int, len(cols))
+		for i, wdp := range widthsDp {
+			colWidths[i] = c.S(wdp)
+		}
+		c.tableColWidths[id] = colWidths
 	}
 
 	frozenCols := cfg.FrozenCols

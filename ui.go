@@ -229,6 +229,16 @@ func (u *UI) ColumnFlex(gapDp int, items ...FlexItem) {
 	u.ctx.ColumnFlex(gapDp, items...)
 }
 
+// DockBottom резервирует bottomDp снизу для bottomFn, а всю оставшуюся высоту сверху отдаёт bodyFn.
+func (u *UI) DockBottom(gapDp, bottomDp int, bodyFn, bottomFn func()) {
+	u.ctx.DockBottom(gapDp, bottomDp, bodyFn, bottomFn)
+}
+
+// DockTop резервирует topDp сверху для topFn, а всю оставшуюся высоту снизу отдаёт bodyFn.
+func (u *UI) DockTop(gapDp, topDp int, topFn, bodyFn func()) {
+	u.ctx.DockTop(gapDp, topDp, topFn, bodyFn)
+}
+
 // RowWith располагает элементы горизонтально с заданным выравниванием Align и распределением Justify.
 func (u *UI) RowWith(align Align, justify Justify, gapDp, heightDp int, items ...func()) {
 	u.ctx.RowWith(align, justify, gapDp, heightDp, items...)

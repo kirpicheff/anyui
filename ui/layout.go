@@ -516,6 +516,24 @@ func (c *Context) ColumnFlex(gapDp int, items ...FlexItem) {
 	advanceParent(c.topLayout(), totalW, totalH)
 }
 
+// DockBottom резервирует bottomDp снизу для bottomFn (кнопки, статус-бар и т.д.),
+// а всю оставшуюся высоту сверху отдаёт bodyFn.
+func (c *Context) DockBottom(gapDp, bottomDp int, bodyFn, bottomFn func()) {
+	c.ColumnFlex(gapDp,
+		FlexItem{Weight: 1, Fn: bodyFn},
+		FlexItem{FixedDp: bottomDp, Fn: bottomFn},
+	)
+}
+
+// DockTop резервирует topDp сверху для topFn (шапка, тулбар, поиск),
+// а всю оставшуюся высоту снизу отдаёт bodyFn.
+func (c *Context) DockTop(gapDp, topDp int, topFn, bodyFn func()) {
+	c.ColumnFlex(gapDp,
+		FlexItem{FixedDp: topDp, Fn: topFn},
+		FlexItem{Weight: 1, Fn: bodyFn},
+	)
+}
+
 // calcJustifyOffsets вычисляет начальное смещение и массив шагов между элементами по главной оси.
 func calcJustifyOffsets(justify Justify, totalSize, gapPx int, sizes []int) (int, []int) {
 	n := len(sizes)

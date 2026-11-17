@@ -30,6 +30,45 @@ type TableEvent struct {
 	ColumnResized    bool
 }
 
+// calcTableColWidthsDp рассчитывает стартовые ширины колонок в dp.
+// Колонки с WidthDp <= 0 равномерно делят оставшуюся ширину таблицы.
+func calcTableColWidthsDp(cols []TableColumn, totalWidthDp int) []int {
+	widths := make([]int, len(cols))
+	fixedSum := 0
+	flexCount := 0
+	for i, col := range cols {
+		if col.WidthDp > 0 {
+			widths[i] = col.WidthDp
+			fixedSum += col.WidthDp
+		} else {
+			flexCount++
+		}
+	}
+	if flexCount == 0 {
+		return widths
+	}
+	rem := totalWidthDp - fixedSum
+	flexW := 120
+	if totalWidthDp > 0 {
+		flexW = rem / flexCount
+	}
+	for i, col := range cols {
+		if col.WidthDp > 0 {
+			continue
+		}
+		minW := col.MinWidthDp
+		if minW <= 0 {
+			minW = 60
+		}
+		w := flexW
+		if w < minW {
+			w = minW
+		}
+		widths[i] = w
+	}
+	return widths
+}
+
 // Table рисует таблицу с заголовками, ресайзом ширины колонок, сортировкой и виртуализацией строк.
 func (c *Context) Table(
 	id string,
@@ -58,7 +97,7 @@ func (c *Context) Table(
 		return ev
 	}
 
-	rect := c.allocRect(w, h)
+	rect := c.allocRectStyled(w, h, st)
 	if !st.Disabled {
 		c.registerFocusable(id)
 	}
@@ -92,14 +131,12 @@ func (c *Context) Table(
 
 	widthsDp, ok := c.tableColWidths[id]
 	if !ok || len(widthsDp) != len(cols) {
-		widthsDp = make([]int, len(cols))
-		for i, col := range cols {
-			if col.WidthDp > 0 {
-				widthsDp[i] = col.WidthDp
-			} else {
-				widthsDp[i] = 120
-			}
+		scale := c.Scale
+		if scale <= 0 {
+			scale = 1
 		}
+		totalDp := int(float32(rect.W) / scale)
+		widthsDp = calcTableColWidthsDp(cols, totalDp)
 		c.tableColWidths[id] = widthsDp
 		c.tableResizeCol[id] = -1
 	}
@@ -446,7 +483,7 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 		return false
 	}
 
-	rect := c.allocRect(w, h)
+	rect := c.allocRectStyled(w, h, st)
 	if !st.Disabled {
 		c.registerFocusable(id)
 	}

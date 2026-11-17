@@ -390,7 +390,7 @@ func (c *Context) ListView(id string, count int, itemHeightDp int, selected *int
 		h = c.S(200)
 	}
 
-	r := c.allocRect(w, h)
+	r := c.allocRectStyled(w, h, st)
 	if !st.Disabled {
 		c.registerFocusable(id)
 		c.RegisterHit(id, r, platform.CursorArrow)

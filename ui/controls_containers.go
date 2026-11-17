@@ -88,7 +88,7 @@ func (c *Context) ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)
 		h = c.S(*st.HeightDp)
 	}
 
-	r := c.allocRect(w, h)
+	r := c.allocRectStyled(w, h, st)
 	si := c.getScrollInfo("sv:" + id)
 
 	maxSc := si.contentH - r.H

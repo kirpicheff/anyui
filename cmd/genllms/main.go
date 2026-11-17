@@ -26,6 +26,10 @@ func main() {
 		{"Корневой пакет (константы, функции, типы, опции)", modulePath},
 		{"Config", modulePath + ".Config"},
 		{"TrayConfig", modulePath + ".TrayConfig"},
+		{"FlexItem", modulePath + ".FlexItem"},
+		{"TableColumn", modulePath + ".TableColumn"},
+		{"TabItem", modulePath + ".TabItem"},
+		{"StatusBarSection", modulePath + ".StatusBarSection"},
 		{"App", modulePath + ".App"},
 		{"Window", modulePath + ".Window"},
 		{"UI (Immediate Mode API)", modulePath + ".UI"},
@@ -83,7 +87,10 @@ func writeHeader(out *bytes.Buffer, version string) {
 	out.WriteString("- Все интерактивные виджеты требуют уникальный строковый `id`.\n")
 	out.WriteString("- Все размеры, координаты и отступы задаются в `dp` и масштабируются под DPI автоматически.\n")
 	out.WriteString("- Обновление UI из фоновых горутин выполняется только через `app.Dispatch(func() { ... })`.\n")
-	out.WriteString("- Иконка окна подхватывается автоматически из `.syso`-ресурсов или задаётся через `Config.IconRGBA` / `win.SetIcon(...)`.\n\n")
+	out.WriteString("- Иконка окна подхватывается автоматически из `.syso`-ресурсов или задаётся через `Config.IconRGBA` / `win.SetIcon(...)`.\n")
+	out.WriteString("- Раскладка без обрезания: не угадывай `Height(...)` у списков/таблиц/карточек перед нижними кнопками — используй `ui.DockBottom`, `ui.DockTop`, `ui.ColumnFlex` / `ui.RowFlex` и `anyui.FillHeight()`.\n")
+	out.WriteString("- `Card(fn, anyui.AutoHeight())` подбирает высоту по содержимому; без `AutoHeight()` карточка занимает весь остаток высоты.\n")
+	out.WriteString("- В `Table` / `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.\n\n")
 }
 
 func writeQuickStart(out *bytes.Buffer) {

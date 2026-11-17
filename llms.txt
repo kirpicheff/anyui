@@ -12,6 +12,9 @@
 - Все размеры, координаты и отступы задаются в `dp` и масштабируются под DPI автоматически.
 - Обновление UI из фоновых горутин выполняется только через `app.Dispatch(func() { ... })`.
 - Иконка окна подхватывается автоматически из `.syso`-ресурсов или задаётся через `Config.IconRGBA` / `win.SetIcon(...)`.
+- Раскладка без обрезания: не угадывай `Height(...)` у списков/таблиц/карточек перед нижними кнопками — используй `ui.DockBottom`, `ui.DockTop`, `ui.ColumnFlex` / `ui.RowFlex` и `anyui.FillHeight()`.
+- `Card(fn, anyui.AutoHeight())` подбирает высоту по содержимому; без `AutoHeight()` карточка занимает весь остаток высоты.
+- В `Table` / `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.
 
 ## Минимальный пример
 
@@ -276,6 +279,43 @@ type TrayConfig struct {
     TrayConfig задаёт настройки иконки в системном трее.
 ```
 
+## FlexItem
+
+```go
+package anyui // import "git.gtw.su/kirpich/anyui"
+
+type FlexItem = ui.FlexItem
+    FlexItem описывает элемент для пропорционального деления пространства в
+    RowFlex / ColumnFlex.
+```
+
+## TableColumn
+
+```go
+package anyui // import "git.gtw.su/kirpich/anyui"
+
+type TableColumn = ui.TableColumn
+    TableColumn описывает колонку таблицы.
+```
+
+## TabItem
+
+```go
+package anyui // import "git.gtw.su/kirpich/anyui"
+
+type TabItem = ui.TabItem
+    TabItem описывает вкладку в динамическом TabBar.
+```
+
+## StatusBarSection
+
+```go
+package anyui // import "git.gtw.su/kirpich/anyui"
+
+type StatusBarSection = ui.StatusBarSection
+    StatusBarSection описывает секцию нижней строки состояния StatusBar.
+```
+
 ## App
 
 ```go
@@ -377,6 +417,8 @@ func (u *UI) ContextMenu(id string, anchor Rect, items []ContextMenuItem)
 func (u *UI) CurrentArea() Rect
 func (u *UI) DatePicker(id string, date *time.Time, opts ...Option) bool
 func (u *UI) DateTimePicker(id string, dt *time.Time, opts ...Option) bool
+func (u *UI) DockBottom(gapDp, bottomDp int, bodyFn, bottomFn func())
+func (u *UI) DockTop(gapDp, topDp int, topFn, bodyFn func())
 func (u *UI) DoubleClicked() bool
 func (u *UI) DrawSVG(svgData string, x, y, sizeDp int, tint Color)
 func (u *UI) DrawText(x, y int, text string, sizeDp int, col Color)
