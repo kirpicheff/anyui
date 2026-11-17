@@ -191,10 +191,10 @@ func main() {
 - [x] Буфер обмена X11 (текст и изображения) и адаптация системных диалогов (`OpenFile`, `SaveFile`, `BrowseFolder`, `MessageBox`) под Linux.
 - [x] Трей (`Tray`), системные уведомления, `SingleInstance`, `WindowState`, `SystemTheme`, `OpenURL` / `RevealInFileManager` для Linux.
 
-### Фаза 9. Linux — Wayland (`platform_linux_wayland.go`) — [ ] В планах
-- [ ] Нативное окно Wayland (`wl_compositor`, `wl_shm`, `xdg_shell`) и вывод пиксельного буфера за интерфейсом `platform.Window`.
-- [ ] Ввод (`wl_seat`, `wl_pointer`, `wl_keyboard`), курсоры (`wl_cursor`), HiDPI / fractional scaling, буфер обмена и Drag & Drop.
-- [ ] Автовыбор бэкенда в рантайме (`WAYLAND_DISPLAY` -> Wayland, иначе X11).
+### Фаза 9. Linux — Wayland (`linux_wayland_*.go`, `linux_backend.go`) — [x] Готово
+- [x] Нативное окно Wayland (`wl_compositor`, `wl_shm`, `xdg_shell`) и вывод пиксельного буфера за интерфейсом `platform.Window`.
+- [x] Ввод (`wl_seat`, `wl_pointer`, `wl_keyboard`), курсоры (`wp_cursor_shape_manager_v1`), HiDPI / fractional scaling (`wp_fractional_scale_manager_v1`, `wp_viewporter`), буфер обмена и Drag & Drop (`wl_data_device_manager`).
+- [x] Автовыбор бэкенда в рантайме (`WAYLAND_DISPLAY` -> Wayland, иначе X11; fallback на X11 и поддержка `ANYUI_BACKEND`).
 
 ### Фаза 10. macOS (`platform_darwin.go` + CGO / Objective-C мост `.m`) — [ ] В планах
 - [ ] Допустить CGO только для `darwin`: небольшой Objective-C мост (`.m`) к Cocoa / AppKit вместо сложного FFI без CGO.

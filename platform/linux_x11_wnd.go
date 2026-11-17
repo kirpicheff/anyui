@@ -186,8 +186,8 @@ func (d *x11Display) wakeUp() {
 	_ = xproto.SendEventChecked(d.conn, false, d.wakeWin, 0, string(ev.Bytes())).Check()
 }
 
-// RunEventLoop запускает главный цикл событий X11.
-func RunEventLoop(onStart func() error) error {
+// runX11EventLoop запускает главный цикл событий X11.
+func runX11EventLoop(onStart func() error) error {
 	d, err := getX11Display()
 	if err != nil {
 		return err
@@ -380,8 +380,8 @@ type x11Window struct {
 	xdndTypes  []xproto.Atom
 }
 
-// NewWindow создаёт новое нативное окно X11.
-func NewWindow(cfg WindowConfig) (Window, error) {
+// newX11Window создаёт новое нативное окно X11.
+func newX11Window(cfg WindowConfig) (Window, error) {
 	d, err := getX11Display()
 	if err != nil {
 		return nil, err
@@ -521,7 +521,7 @@ func (w *x11Window) Run(handler func(Event)) error {
 	w.handler = handler
 	w.Show()
 	w.needsPaint.Store(true)
-	return RunEventLoop(nil)
+	return runX11EventLoop(nil)
 }
 
 func (w *x11Window) Open(handler func(Event)) error {

@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -47,6 +48,9 @@ func (noopLinuxTray) Close() error                          { return nil }
 // Если системный трей X11 недоступен (например, в XWayland/WSLg или GNOME без расширений),
 // возвращает безопасную заглушку, чтобы не блокировать запуск приложения.
 func NewTray(cfg TrayConfig) (Tray, error) {
+	if isWaylandBackendSelected() && os.Getenv("DISPLAY") == "" {
+		return noopLinuxTray{}, nil
+	}
 	d, err := getX11Display()
 	if err != nil {
 		return nil, err
