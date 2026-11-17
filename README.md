@@ -119,6 +119,14 @@ go doc -all .
 
 ---
 
+## Support the Project
+
+AnyUI is developed in my free time. If it saved you hours of work and RAM, you can buy me a coffee:
+
+- [Support on Boosty](https://boosty.to/artemalabin/donate)
+
+---
+
 ## License
 
 Licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution details.
