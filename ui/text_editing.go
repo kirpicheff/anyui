@@ -220,9 +220,10 @@ func (c *Context) textFieldContextMenu(id string, anchor render.Rect, value *str
 	selStart := clampRuneIdx(c.textSelStart[id], len(runes))
 	_, _, hasSel := selectionBounds(caret, selStart, len(runes))
 
+	loc := c.str()
 	items := []ContextMenuItem{
 		{
-			Label:    "Вырезать",
+			Label:    loc.Cut,
 			Shortcut: "Ctrl+X",
 			Disabled: st.ReadOnly || !hasSel || st.Password,
 			OnClick: func() {
@@ -242,7 +243,7 @@ func (c *Context) textFieldContextMenu(id string, anchor render.Rect, value *str
 			},
 		},
 		{
-			Label:    "Копировать",
+			Label:    loc.Copy,
 			Shortcut: "Ctrl+C",
 			Disabled: !hasSel || st.Password,
 			OnClick: func() {
@@ -256,7 +257,7 @@ func (c *Context) textFieldContextMenu(id string, anchor render.Rect, value *str
 			},
 		},
 		{
-			Label:    "Вставить",
+			Label:    loc.Paste,
 			Shortcut: "Ctrl+V",
 			Disabled: st.ReadOnly,
 			OnClick: func() {
@@ -302,7 +303,7 @@ func (c *Context) textFieldContextMenu(id string, anchor render.Rect, value *str
 		},
 		{Separator: true},
 		{
-			Label:    "Выделить всё",
+			Label:    loc.SelectAll,
 			Shortcut: "Ctrl+A",
 			Disabled: len(runes) == 0,
 			OnClick: func() {
@@ -326,9 +327,10 @@ func (c *Context) selectableContextMenu(id string, anchor render.Rect, text stri
 	selStart := clampRuneIdx(c.textSelStart[id], len(runes))
 	_, _, hasSel := selectionBounds(caret, selStart, len(runes))
 
+	loc := c.str()
 	items := []ContextMenuItem{
 		{
-			Label:    "Копировать",
+			Label:    loc.Copy,
 			Shortcut: "Ctrl+C",
 			Disabled: !hasSel,
 			OnClick: func() {
@@ -339,7 +341,7 @@ func (c *Context) selectableContextMenu(id string, anchor render.Rect, text stri
 			},
 		},
 		{
-			Label:    "Выделить всё",
+			Label:    loc.SelectAll,
 			Shortcut: "Ctrl+A",
 			Disabled: len(runes) == 0,
 			OnClick: func() {

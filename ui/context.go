@@ -130,6 +130,11 @@ type Context struct {
 	animTimerActive bool
 	animStopCh      chan struct{}
 
+	// Локализуемые строки встроенных контролов и состояние кастомной шапки
+	Strings             Strings
+	titleBarRect        render.Rect
+	titleBarInteractive []render.Rect
+
 	// Слои, кеш hit-областей и фильтрация EventMouseMove (Фаза 7.2)
 	layers            LayerManager
 	lastTheme         Theme
@@ -145,6 +150,8 @@ type Context struct {
 	prevPresentW      int
 	prevPresentH      int
 	paintRequested    bool
+	debugDirtyRect    bool
+	prevDebugDirty    render.Rect
 }
 
 // NewContext создаёт новый UI-контекст поверх окна и менеджера шрифтов.
@@ -167,6 +174,7 @@ func NewContext(win platform.Window, fm *render.FontManager) *Context {
 		Theme:          DeepNavyTheme(),
 		Scale:          scale,
 		Animator:       NewAnimator(),
+		Strings:        RussianStrings(),
 		caretPos:       make(map[string]int),
 		textScroll:     make(map[string]int),
 		layers:         newLayerManager(),
@@ -403,6 +411,16 @@ func (c *Context) Render(drawFn func(ctx *Context)) {
 	c.syncAnimTimer()
 }
 
+// SetDebugDirtyRect включает или отключает отладочную рамку DirtyRect без искажения расчёта diff.
+func (c *Context) SetDebugDirtyRect(enabled bool) {
+	if c.debugDirtyRect == enabled {
+		return
+	}
+	c.debugDirtyRect = enabled
+	c.paintRequested = true
+	c.RequestRedraw()
+}
+
 func (c *Context) presentFrame() {
 	w, h := c.Canvas.Width, c.Canvas.Height
 	need := w * h * 4
@@ -419,27 +437,48 @@ func (c *Context) presentFrame() {
 		c.prevPresentW = w
 		c.prevPresentH = h
 		c.lastDirtyRects = append(c.lastDirtyRects[:0], render.Rect{X: 0, Y: 0, W: w, H: h})
+		c.prevDebugDirty = render.Rect{}
 		c.Win.Present(c.Canvas.Pixels, w, h)
 		c.Canvas.ResetDirtyRects()
 		return
 	}
 
 	diff := computeDiffRect(c.prevPresentPixels, c.Canvas.Pixels, w, h)
-	if diff.Empty() {
+	if diff.Empty() && c.prevDebugDirty.Empty() {
 		c.lastDirtyRects = c.lastDirtyRects[:0]
 		c.Canvas.ResetDirtyRects()
 		return
 	}
 
-	rowBytes := diff.W * 4
-	for y := diff.Y; y < diff.Y+diff.H; y++ {
-		off := (y*w + diff.X) * 4
-		copy(c.prevPresentPixels[off:off+rowBytes], c.Canvas.Pixels[off:off+rowBytes])
+	if !diff.Empty() {
+		rowBytes := diff.W * 4
+		for y := diff.Y; y < diff.Y+diff.H; y++ {
+			off := (y*w + diff.X) * 4
+			copy(c.prevPresentPixels[off:off+rowBytes], c.Canvas.Pixels[off:off+rowBytes])
+		}
+		c.lastDirtyRects = append(c.lastDirtyRects[:0], diff)
+	} else {
+		c.lastDirtyRects = c.lastDirtyRects[:0]
 	}
 
-	c.lastDirtyRects = append(c.lastDirtyRects[:0], diff)
-	if dp, ok := c.Win.(platform.DirtyPresenter); ok && diff.W*diff.H < (w*h*3)/4 {
-		dp.PresentRect(c.Canvas.Pixels, w, h, diff.X, diff.Y, diff.W, diff.H)
+	sendRect := diff
+	if !c.prevDebugDirty.Empty() {
+		if sendRect.Empty() {
+			sendRect = c.prevDebugDirty
+		} else {
+			sendRect = sendRect.Union(c.prevDebugDirty)
+		}
+	}
+
+	if c.debugDirtyRect && !diff.Empty() {
+		c.Canvas.DrawRoundedBox(diff, 0, render.RGBA(0, 0, 0, 0), 2.0, c.Theme.Warning)
+		c.prevDebugDirty = diff
+	} else {
+		c.prevDebugDirty = render.Rect{}
+	}
+
+	if dp, ok := c.Win.(platform.DirtyPresenter); ok && sendRect.W*sendRect.H < (w*h*3)/4 {
+		dp.PresentRect(c.Canvas.Pixels, w, h, sendRect.X, sendRect.Y, sendRect.W, sendRect.H)
 	} else {
 		c.Win.Present(c.Canvas.Pixels, w, h)
 	}

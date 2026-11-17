@@ -834,8 +834,9 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 			}
 
 			if c.Font != nil {
+				loc := c.str()
 				px := c.S(13)
-				months := []string{"Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"}
+				months := loc.Months
 				if mode == dpModeYears {
 					title := formatYearRangeTitle(vm.Year())
 					tw, th := c.Font.MeasureText(title, px)
@@ -891,7 +892,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 			gridY := hdrR.Y + hdrR.H + c.S(8)
 
 			if mode == dpModeMonths {
-				shortMonths := []string{"Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"}
+				shortMonths := c.str().ShortMonths
 				mW := (popR.W - c.S(20)) / 3
 				mH := c.S(42)
 				for mi := 0; mi < 12; mi++ {
@@ -963,7 +964,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 				cellW := (popR.W - c.S(20)) / 7
 				cellH := c.S(28)
 
-				wdNames := []string{"Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"}
+				wdNames := c.str().Weekdays
 				if c.Font != nil {
 					pxSmall := c.S(11)
 					for i, wd := range wdNames {
@@ -1045,8 +1046,9 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 			}
 			c.Canvas.DrawRoundedBox(todayR, c.Sf(6), todayBg, 1.0, c.Theme.Border)
 			if c.Font != nil {
-				tw, th := c.Font.MeasureText("Сегодня", c.S(11))
-				c.Font.DrawText(c.Canvas, todayR.X+(todayR.W-tw)/2, todayR.Y+(todayR.H-th)/2, "Сегодня", c.S(11), c.Theme.Accent)
+				todayLbl := c.str().Today
+				tw, th := c.Font.MeasureText(todayLbl, c.S(11))
+				c.Font.DrawText(c.Canvas, todayR.X+(todayR.W-tw)/2, todayR.Y+(todayR.H-th)/2, todayLbl, c.S(11), c.Theme.Accent)
 			}
 		})
 	}

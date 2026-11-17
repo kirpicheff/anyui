@@ -65,7 +65,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 
 			// 1. Стенд слоёв (Static / Dynamic / Overlay) и Dirty Rectangles
 			ui.Label("1. Слои (Static / Dynamic / Overlay) и Dirty Rectangles", anyui.FontSize(13), anyui.Bold())
-			ui.Row(12, 165, func() {
+			ui.Row(12, 182, func() {
 				// Статический блок: не перерисовывается при кликах по Dynamic Layer
 				ui.StaticLayer("perf_static_card", func() {
 					perfTab.staticDraws++
@@ -92,7 +92,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 								c.DrawPolyline(pts, ui.Sf(2), th.Accent, false)
 							})
 						})
-					}, anyui.Width(370), anyui.Height(160), anyui.Padding(12))
+					}, anyui.Width(370), anyui.Height(176), anyui.Padding(12))
 				})
 
 				// Динамический блок справа
@@ -111,7 +111,9 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 						})
 						ui.RowCentered(10, 28, func() {
 							ui.Toggle("perf_ov_tog", "Overlay-подсказка", &perfTab.showOverlayTest)
-							ui.Checkbox("perf_dirty_hl", "Рамка DirtyRect", &perfTab.highlightDirty)
+							if ui.Checkbox("perf_dirty_hl", "Рамка DirtyRect", &perfTab.highlightDirty) {
+								ui.SetDebugDirtyRect(perfTab.highlightDirty)
+							}
 						})
 
 						blittedText := "Нет (полная отрисовка статики)"
@@ -128,7 +130,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 							perfTab.lastDirty.X, perfTab.lastDirty.Y, perfTab.lastDirty.W, perfTab.lastDirty.H, dirtyPct),
 							anyui.FontSize(11), anyui.TextColor(th.Success))
 					})
-				}, anyui.Flex(1), anyui.Height(160), anyui.Padding(12))
+				}, anyui.Flex(1), anyui.Height(176), anyui.Padding(12))
 			})
 
 			if perfTab.showOverlayTest {
@@ -146,14 +148,6 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 					ui.Canvas().DrawRoundedBox(ovRect, ui.Sf(8), th.Card, 1.5, th.Accent)
 					ui.DrawText(ovRect.X+ui.S(12), ovRect.Y+ui.S(12), "Overlay Layer поверх Static", 12, th.TextPrimary)
 					ui.DrawText(ovRect.X+ui.S(12), ovRect.Y+ui.S(34), "Static Layer под ним не перерисовывался", 11, th.TextMuted)
-				})
-			}
-
-			if perfTab.highlightDirty && !perfTab.lastDirty.Empty() {
-				dr := perfTab.lastDirty
-				// Показываем рамку последнего DirtyRect на слое оверлея без блокировки кликов
-				ui.PushOverlay(anyui.Rect{}, func() {
-					ui.Canvas().DrawRoundedBox(dr, 0, render.RGBA(0, 0, 0, 0), 2.0, th.Warning)
 				})
 			}
 

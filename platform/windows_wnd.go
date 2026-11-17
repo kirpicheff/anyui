@@ -57,6 +57,7 @@ var (
 	procGlobalAlloc      = modKernel32.NewProc("GlobalAlloc")
 	procGlobalLock       = modKernel32.NewProc("GlobalLock")
 	procGlobalUnlock     = modKernel32.NewProc("GlobalUnlock")
+	procGlobalSize       = modKernel32.NewProc("GlobalSize")
 
 	procDwmSetWindowAttribute = modDwmapi.NewProc("DwmSetWindowAttribute")
 
@@ -365,11 +366,8 @@ func (w *win32Window) Open(handler func(Event)) error {
 
 	// Уточняем DPI конкретного монитора после создания окна
 	w.updateScaleFromWindow()
-	w.updateClientSize()
+	w.applyInitialWindowTheme()
 
-	if w.cfg.DarkTitle {
-		w.enableDarkTitleBar()
-	}
 	if w.cfg.Frameless {
 		w.enableFramelessShadow()
 	}
@@ -377,8 +375,13 @@ func (w *win32Window) Open(handler func(Event)) error {
 		procDragAcceptFiles.Call(uintptr(w.hwnd), 1)
 	}
 
-	procShowWindow.Call(uintptr(w.hwnd), swShowDefault)
+	if w.cfg.InitialState != nil && isValidWindowState(*w.cfg.InitialState) {
+		w.RestoreState(*w.cfg.InitialState)
+	} else {
+		procShowWindow.Call(uintptr(w.hwnd), swShowDefault)
+	}
 	procUpdateWindow.Call(uintptr(w.hwnd))
+	w.updateClientSize()
 
 	// Уведомляем приложение о стартовом размере и масштабе
 	w.emit(Event{Type: EventDPIChange, Scale: w.scale})
@@ -386,28 +389,6 @@ func (w *win32Window) Open(handler func(Event)) error {
 	w.emit(Event{Type: EventPaint})
 
 	return nil
-}
-
-func (w *win32Window) enableDarkTitleBar() {
-	if err := procDwmSetWindowAttribute.Find(); err != nil {
-		return
-	}
-	var dark int32 = 1
-	r, _, _ := procDwmSetWindowAttribute.Call(
-		uintptr(w.hwnd),
-		dwmwaUseImmersiveDarkMode,
-		uintptr(unsafe.Pointer(&dark)),
-		unsafe.Sizeof(dark),
-	)
-	if r != 0 {
-		procDwmSetWindowAttribute.Call(
-			uintptr(w.hwnd),
-			dwmwaUseImmersiveDarkModeOld,
-			uintptr(unsafe.Pointer(&dark)),
-			unsafe.Sizeof(dark),
-		)
-	}
-	runtime.KeepAlive(&dark)
 }
 
 func (w *win32Window) updateScaleFromWindow() {
@@ -787,6 +768,18 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 			w.scale = float32(newDPI) / 96.0
 			w.emit(Event{Type: EventDPIChange, Scale: w.scale})
 			w.emit(Event{Type: EventPaint})
+		}
+		return 0
+
+	case wmSettingChange:
+		if lParam != 0 {
+			section := windows.UTF16PtrToString((*uint16)(unsafe.Pointer(lParam)))
+			if section == "ImmersiveColorSet" {
+				w.emit(Event{
+					Type:      EventThemeChange,
+					DarkTheme: IsSystemDarkTheme(),
+				})
+			}
 		}
 		return 0
 

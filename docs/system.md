@@ -131,7 +131,84 @@ app := anyui.NewApp(anyui.Config{
 
 ## Буфер обмена
 
-Работа с буфером обмена доступна через платформенный слой окна (`ClipboardText()` / `SetClipboardText(text)`), а также автоматически используется в `TextInput` по `Ctrl+C` / `Ctrl+V`.
+Работа с текстовым и графическим буфером обмена доступна через `*anyui.Window`:
+- Текст: `ClipboardText() (string, error)` / `SetClipboardText(text string) error` (автоматически используется в `TextInput` / `TextArea` по `Ctrl+C` / `Ctrl+V`).
+- Изображения: `ClipboardImage() (image.Image, error)` / `SetClipboardImage(img image.Image) error` (на Windows работает через `CF_DIB` 24/32 bpp).
+
+---
+
+## Системные уведомления (`ShowNotification`)
+
+Если настроен `Tray`, можно показывать нативные уведомления ОС (включая режим, когда окно свёрнуто в трей):
+
+```go
+err := app.ShowNotification(anyui.Notification{
+	Title:   "Синхронизация завершена",
+	Message: "Все файлы успешно обновлены",
+	Icon:    anyui.NotifyInfo, // NotifyNone, NotifyInfo, NotifyWarning, NotifyError
+	Silent:  false,
+})
+```
+
+Для реакции на клик по уведомлению задайте `OnNotificationClick` в `TrayConfig`.
+
+---
+
+## Защита от повторного запуска (`SingleInstance`)
+
+Чтобы запретить запуск второй копии приложения и передать аргументы командной строки уже работающему экземпляру:
+
+```go
+app := anyui.NewApp(anyui.Config{
+	Title: "My App",
+	SingleInstance: &anyui.SingleInstanceConfig{
+		ID: "com.example.myapp",
+		OnSecondInstance: func(a *anyui.App, args []string) {
+			// Главное окно поднимается автоматически (если не задан SkipActivate: true)
+		},
+	},
+})
+if err := app.Run(drawFn); errors.Is(err, anyui.ErrAlreadyRunning) {
+	return
+}
+```
+
+Для ранней проверки до инициализации шрифтов и окон можно также вызвать `guard, already, err := anyui.AcquireSingleInstance("com.example.myapp", os.Args[1:])` и передать `guard` в `SingleInstanceConfig.Guard`.
+
+---
+
+## Сохранение и восстановление геометрии окна (`WindowState`)
+
+```go
+state, _ := anyui.LoadWindowState("window.json")
+app := anyui.NewApp(anyui.Config{
+	Title:        "My App",
+	InitialState: &state,
+	OnClose: func(w *anyui.Window) bool {
+		_ = anyui.SaveWindowState("window.json", w.State())
+		return true
+	},
+})
+```
+
+Если сохранённый монитор был отключён, окно автоматически переносится в видимую рабочую область ближайшего экрана.
+
+---
+
+## Системная тема и цвета рамки окна (DWM)
+
+- `anyui.IsSystemDarkTheme() bool` и `anyui.SystemTheme() Theme` определяют текущую тему ОС.
+- При `FollowSystemTheme: true` приложение автоматически стартует в теме ОС, реагирует на её смену на лету (`WM_SETTINGCHANGE`) и обновляет `OnSystemThemeChange(app, dark)`.
+- На Windows 11 поддерживается настройка произвольного цвета системной шапки, текста заголовка и рамки окна через `Config` (`TitleBarColor`, `TitleTextColor`, `BorderColor`) или динамически методом `win.SetTitleBarColors(caption, text, border)`.
+- При вызове `win.SetTheme(theme)` или `ui.SetTheme(theme)` атрибут `DWMWA_USE_IMMERSIVE_DARK_MODE` обновляется автоматически. Для полного совпадения шапки с темой на Windows 7/10/Server используйте `Frameless: true` и виджет `ui.TitleBar`.
+
+---
+
+## Платформенные утилиты и локализация (`i18n`)
+
+- `anyui.OpenURL("https://example.com")` — безопасное открытие ссылок (`http`, `https`, `mailto`) в браузере по умолчанию.
+- `anyui.RevealInFileManager(path)` — открыть Проводник и выделить указанный файл.
+- Локализация встроенных строк контролов (контекстное меню текста, `DatePicker`, `TimePicker`, `MultiSelect`, `LogView`): передайте `Strings` в `Config` или вызывайте `app.SetStrings(anyui.EnglishStrings())` / `ui.SetStrings(...)` (доступны пресеты `RussianStrings()` и `EnglishStrings()`).
 
 ---
 
@@ -158,9 +235,11 @@ child, err := app.OpenWindow(anyui.Config{
 ## Нюансы сборки под старые версии Windows
 
 - Фреймворк использует только стандартные системные DLL (`user32.dll`, `gdi32.dll`, `kernel32.dll`, `shell32.dll`, `comdlg32.dll`, `ole32.dll`, `dwmapi.dll`) без зависимости от WebView2, OpenGL или DirectX.
+- Гарантирована сборка без CGO (`CGO_ENABLED=0`), все системные вызовы выполняются через `golang.org/x/sys/windows` и `syscall`.
 - Функции, появившиеся в новых версиях Windows (например, `SetProcessDpiAwarenessContext`, `GetDpiForWindow`, `DwmSetWindowAttribute`), загружаются лениво и имеют автоматический откат (fallback) для Windows 7 / Windows Server 2008 R2 / 2012.
-- Для сборки GUI-приложения без консольного окна используйте флаг линковщика:
+- Для сборки компактного GUI-приложения (3–5 МБ) без консольного окна используйте:
   ```bat
-  go build -ldflags="-H windowsgui" .
+  set CGO_ENABLED=0
+  go build -trimpath -ldflags="-s -w -H windowsgui" .
   ```
 

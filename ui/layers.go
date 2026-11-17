@@ -215,6 +215,9 @@ func (c *Context) registerHitRegion(id string, rect render.Rect, cursor platform
 	if id == "" || rect.Empty() {
 		return
 	}
+	if cursor != platform.CursorArrow && !c.IsInputBlocked() && rect.Contains(c.MouseX, c.MouseY) {
+		c.nextCursor = cursor
+	}
 	c.nextHitRegions = append(c.nextHitRegions, hitRegion{
 		id:        id,
 		rect:      rect,

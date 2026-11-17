@@ -2,6 +2,7 @@ package anyui
 
 import (
 	"errors"
+	"os"
 	"sync"
 
 	"anyui/platform"
@@ -36,45 +37,55 @@ type MenuItem struct {
 
 // TrayConfig задаёт настройки иконки в системном трее.
 type TrayConfig struct {
-	Tooltip       string
-	IconRGBA      []byte
-	IconWidth     int
-	IconHeight    int
-	Menu          []MenuItem
-	OnClick       func(app *App)
-	OnDoubleClick func(app *App)
-	OnRightClick  func(app *App)
+	Tooltip             string
+	IconRGBA            []byte
+	IconWidth           int
+	IconHeight          int
+	Menu                []MenuItem
+	OnClick             func(app *App)
+	OnDoubleClick       func(app *App)
+	OnRightClick        func(app *App)
+	OnNotificationClick func(app *App)
 }
 
 // Config задаёт параметры создания приложения или окна.
 type Config struct {
-	Title           string
-	Width           int
-	Height          int
-	MinWidth        int
-	MinHeight       int
-	DarkTitle       bool
-	Theme           Theme
-	Tray            *TrayConfig
-	Parent          *Window
-	Frameless       bool
-	TitleBarHeight  int
-	HitTest         func(x, y int) HitTestResult
-	AcceptDropFiles bool
-	HideOnClose     bool
-	OnClose         func(w *Window) bool
-	OnDropFiles     func(files []string, x, y int)
+	Title               string
+	Width               int
+	Height              int
+	MinWidth            int
+	MinHeight           int
+	DarkTitle           bool
+	TitleBarColor       *Color
+	TitleTextColor      *Color
+	BorderColor         *Color
+	InitialState        *WindowState
+	FollowSystemTheme   bool
+	OnSystemThemeChange func(app *App, dark bool)
+	Theme               Theme
+	Strings             *Strings
+	SingleInstance      *SingleInstanceConfig
+	Tray                *TrayConfig
+	Parent              *Window
+	Frameless           bool
+	TitleBarHeight      int
+	HitTest             func(x, y int) HitTestResult
+	AcceptDropFiles     bool
+	HideOnClose         bool
+	OnClose             func(w *Window) bool
+	OnDropFiles         func(files []string, x, y int)
 }
 
 // App управляет единым циклом событий ОС, реестром окон и потокобезопасной очередью Dispatch.
 type App struct {
-	cfg      Config
-	font     *render.FontManager
-	mu       sync.Mutex
-	windows  []*Window
-	mainWin  *Window
-	tray     platform.Tray
-	quitting bool
+	cfg         Config
+	font        *render.FontManager
+	mu          sync.Mutex
+	windows     []*Window
+	mainWin     *Window
+	tray        platform.Tray
+	singleGuard *SingleInstanceGuard
+	quitting    bool
 
 	dispatchMu    sync.Mutex
 	dispatchQueue []func()
@@ -89,11 +100,15 @@ func NewApp(cfg Config) *App {
 		cfg.Height = 600
 	}
 	if cfg.Theme.Bg.A == 0 && cfg.Theme.TextPrimary.A == 0 {
-		cfg.Theme = DeepNavyTheme()
+		if cfg.FollowSystemTheme {
+			cfg.Theme = SystemTheme()
+		} else {
+			cfg.Theme = DeepNavyTheme()
+		}
 	}
 	if !cfg.DarkTitle {
 		// По умолчанию включаем тёмный заголовок для тёмных тем
-		cfg.DarkTitle = cfg.Theme.Bg.R < 128 && cfg.Theme.Bg.G < 128 && cfg.Theme.Bg.B < 128
+		cfg.DarkTitle = isThemeDark(cfg.Theme)
 	}
 	return &App{
 		cfg: cfg,
@@ -106,6 +121,16 @@ func (a *App) Run(drawFn func(ui *UI)) error {
 		return errors.New("функция отрисовки не задана")
 	}
 
+	if err := a.setupSingleInstance(); err != nil {
+		return err
+	}
+	if a.singleGuard != nil {
+		defer func() {
+			_ = a.singleGuard.Close()
+			a.singleGuard = nil
+		}()
+	}
+
 	fm, err := render.LoadDefaultSystemFont()
 	if err != nil {
 		return err
@@ -113,6 +138,11 @@ func (a *App) Run(drawFn func(ui *UI)) error {
 	a.font = fm
 
 	return platform.RunEventLoop(func() error {
+		if a.singleGuard != nil {
+			if err := a.singleGuard.StartIPC(); err != nil {
+				return err
+			}
+		}
 		if a.cfg.Tray != nil {
 			if err := a.initTray(a.cfg.Tray); err != nil {
 				return err
@@ -165,6 +195,10 @@ func (a *App) createWindow(cfg Config, drawFn func(*UI)) (*Window, error) {
 		MinWidth:        cfg.MinWidth,
 		MinHeight:       cfg.MinHeight,
 		DarkTitle:       cfg.DarkTitle,
+		TitleBarColor:   toPlatformWindowColor(cfg.TitleBarColor),
+		TitleTextColor:  toPlatformWindowColor(cfg.TitleTextColor),
+		BorderColor:     toPlatformWindowColor(cfg.BorderColor),
+		InitialState:    cfg.InitialState,
 		Parent:          parentPlat,
 		Frameless:       cfg.Frameless,
 		TitleBarHeight:  cfg.TitleBarHeight,
@@ -180,6 +214,11 @@ func (a *App) createWindow(cfg Config, drawFn func(*UI)) (*Window, error) {
 		ctx.Theme = cfg.Theme
 	} else {
 		ctx.Theme = a.cfg.Theme
+	}
+	if cfg.Strings != nil {
+		ctx.Strings = *cfg.Strings
+	} else if a.cfg.Strings != nil {
+		ctx.Strings = *a.cfg.Strings
 	}
 
 	w := &Window{
@@ -309,6 +348,15 @@ func (a *App) isQuitting() bool {
 	return a.quitting
 }
 
+func (a *App) isPrimaryEventWindow(w *Window) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.mainWin != nil {
+		return a.mainWin == w
+	}
+	return len(a.windows) > 0 && a.windows[0] == w
+}
+
 func (a *App) initTray(cfg *TrayConfig) error {
 	pCfg := platform.TrayConfig{
 		Tooltip:    cfg.Tooltip,
@@ -328,6 +376,10 @@ func (a *App) initTray(cfg *TrayConfig) error {
 	if cfg.OnRightClick != nil {
 		fn := cfg.OnRightClick
 		pCfg.OnRightClick = func() { fn(a) }
+	}
+	if cfg.OnNotificationClick != nil {
+		fn := cfg.OnNotificationClick
+		pCfg.OnNotificationClick = func() { fn(a) }
 	}
 	tray, err := platform.NewTray(pCfg)
 	if err != nil {
@@ -392,5 +444,89 @@ func (a *App) SetTrayMenu(items []MenuItem) {
 		return
 	}
 	tray.SetMenu(a.convertTrayMenu(items))
+}
+
+// ShowNotification отображает нативное системное уведомление ОС от иконки трея.
+func (a *App) ShowNotification(n Notification) error {
+	a.mu.Lock()
+	tray := a.tray
+	a.mu.Unlock()
+	if tray == nil {
+		return errors.New("системный трей не настроен")
+	}
+	return tray.ShowNotification(n)
+}
+
+// SetStrings устанавливает локализацию встроенных строк для всех окон приложения.
+func (a *App) SetStrings(s Strings) {
+	a.mu.Lock()
+	sCopy := s
+	a.cfg.Strings = &sCopy
+	wins := make([]*Window, len(a.windows))
+	copy(wins, a.windows)
+	a.mu.Unlock()
+
+	for _, w := range wins {
+		w.SetStrings(s)
+	}
+}
+
+func (a *App) setupSingleInstance() error {
+	si := a.cfg.SingleInstance
+	if si == nil {
+		return nil
+	}
+	guard := si.Guard
+	if guard == nil {
+		if si.ID == "" {
+			return nil
+		}
+		args := si.Args
+		if args == nil && len(os.Args) > 1 {
+			args = os.Args[1:]
+		}
+		g, already, err := platform.AcquireSingleInstance(si.ID, args, nil)
+		if err != nil {
+			return err
+		}
+		if already {
+			return ErrAlreadyRunning
+		}
+		guard = g
+	}
+	guard.SetCallback(func(args []string) {
+		if !si.SkipActivate {
+			if mw := a.MainWindow(); mw != nil {
+				mw.BringToFront()
+			}
+		}
+		if si.OnSecondInstance != nil {
+			si.OnSecondInstance(a, args)
+		}
+	})
+	a.singleGuard = guard
+	return nil
+}
+
+func (a *App) handleSystemThemeChange(dark bool) {
+	if a.cfg.FollowSystemTheme {
+		nextTheme := LightTheme()
+		if dark {
+			nextTheme = DarkTheme()
+		}
+		a.mu.Lock()
+		a.cfg.Theme = nextTheme
+		a.cfg.DarkTitle = dark
+		wins := make([]*Window, len(a.windows))
+		copy(wins, a.windows)
+		a.mu.Unlock()
+
+		for _, w := range wins {
+			w.SetTheme(nextTheme)
+		}
+	}
+	if a.cfg.OnSystemThemeChange != nil {
+		a.cfg.OnSystemThemeChange(a, dark)
+	}
 }
 

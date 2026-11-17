@@ -39,9 +39,29 @@ func (u *UI) Theme() Theme {
 	return u.ctx.Theme
 }
 
-// SetTheme меняет тему текущего окна и запрашивает перерисовку.
+// SetTheme меняет тему текущего окна, синхронизирует заголовок ОС и запрашивает перерисовку.
 func (u *UI) SetTheme(theme Theme) {
+	if u.win != nil {
+		u.win.applyTheme(theme, false)
+		return
+	}
 	u.ctx.Theme = theme
+	u.ctx.InvalidateStatic()
+	u.ctx.RequestRedraw()
+}
+
+// Strings возвращает текущий набор локализованных строк встроенных контролов.
+func (u *UI) Strings() Strings {
+	return u.ctx.Strings
+}
+
+// SetStrings задаёт локализацию встроенных строк контролов для текущего окна.
+func (u *UI) SetStrings(s Strings) {
+	if u.ctx.Strings == s {
+		return
+	}
+	u.ctx.Strings = s
+	u.ctx.InvalidateStatic()
 	u.ctx.RequestRedraw()
 }
 
@@ -308,6 +328,11 @@ func (u *UI) LastFrameStaticBlitted() bool {
 // LastDirtyRects возвращает список изменённых областей последнего выведенного кадра.
 func (u *UI) LastDirtyRects() []Rect {
 	return u.ctx.LastDirtyRects()
+}
+
+// SetDebugDirtyRect включает или отключает отображение отладочной рамки DirtyRect.
+func (u *UI) SetDebugDirtyRect(enabled bool) {
+	u.ctx.SetDebugDirtyRect(enabled)
 }
 
 // MousePos возвращает текущие физические координаты курсора мыши в окне.

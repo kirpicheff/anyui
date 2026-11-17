@@ -73,6 +73,7 @@ ui.Button("btn_save", "Сохранить", anyui.Icon(saveSVG), anyui.Primary()
 
 - `ui.Image(img, wDp, hDp, anyui.ScaleFit)` — вывод `image.Image` (`ScaleFit`, `ScaleFill`, `ScaleOneToOne`).
 - Для высокочастотных видеопотоков (например, удалённый рабочий стол) используйте `canvas.DrawBGRA(area, pixels, srcW, srcH, anyui.ScaleFit)` внутри `ui.CanvasView`.
+- Для обмена изображениями с ОС используйте методы окна `win.ClipboardImage()` и `win.SetClipboardImage(img)` (поддерживается формат `CF_DIB` 24/32 bpp).
 
 ## Начертания шрифтов и fallback
 

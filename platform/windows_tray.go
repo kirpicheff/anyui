@@ -39,11 +39,19 @@ const (
 	nifMessage = 0x00000001
 	nifIcon    = 0x00000002
 	nifTip     = 0x00000004
+	nifInfo    = 0x00000010
 
-	wmTrayCallback = 0x8002
-	wmLButtonDbl   = 0x0203
-	wmRButtonUpMsg = 0x0205
-	wmLButtonUpMsg = 0x0202
+	niifNone    = 0x00000000
+	niifInfo    = 0x00000001
+	niifWarning = 0x00000002
+	niifError   = 0x00000003
+	niifNoSound = 0x00000010
+
+	wmTrayCallback      = 0x8002
+	wmLButtonDbl        = 0x0203
+	wmRButtonUpMsg      = 0x0205
+	wmLButtonUpMsg      = 0x0202
+	ninBalloonUserClick = 0x0405
 
 	mfString    = 0x00000000
 	mfSeparator = 0x00000800
@@ -222,6 +230,40 @@ func (t *win32Tray) SetMenu(items []TrayMenuItem) {
 	t.mu.Unlock()
 }
 
+func (t *win32Tray) ShowNotification(n TrayNotification) error {
+	if t.hwnd == 0 {
+		return errors.New("иконка трея не инициализирована")
+	}
+	var nid notifyIconDataW
+	nid.cbSize = uint32(unsafe.Sizeof(nid))
+	nid.hWnd = t.hwnd
+	nid.uID = 1
+	nid.uFlags = nifInfo
+	copyUTF16Fixed(nid.szInfoTitle[:], n.Title)
+	copyUTF16Fixed(nid.szInfo[:], n.Message)
+
+	switch n.Icon {
+	case NotifyInfo:
+		nid.dwInfoFlags = niifInfo
+	case NotifyWarning:
+		nid.dwInfoFlags = niifWarning
+	case NotifyError:
+		nid.dwInfoFlags = niifError
+	default:
+		nid.dwInfoFlags = niifNone
+	}
+	if n.Silent {
+		nid.dwInfoFlags |= niifNoSound
+	}
+
+	r, _, _ := procShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&nid)))
+	runtime.KeepAlive(&nid)
+	if r == 0 {
+		return errors.New("ошибка показа системного уведомления")
+	}
+	return nil
+}
+
 func (t *win32Tray) Close() error {
 	if t.hwnd != 0 {
 		_ = t.shellNotify(nimDelete)
@@ -329,6 +371,10 @@ func win32TrayWndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) u
 				t.cfg.OnRightClick()
 			}
 			t.showPopupMenu()
+		case ninBalloonUserClick:
+			if t.cfg.OnNotificationClick != nil {
+				t.cfg.OnNotificationClick()
+			}
 		}
 		return 0
 	}

@@ -361,3 +361,42 @@ ui.StatusBar("sb", []anyui.StatusBarSection{{Text: "Готово", Flex: 1}, {Te
 - `ui.ListViewEx`: мультивыбор (`Ctrl+Клик`, `Shift+Клик`, `Ctrl+A`) и опциональные чекбоксы.
 - `ui.TreeViewEx` + `anyui.SetTreeNodeChecked` / `anyui.SyncTreeCheckState`: мультивыбор узлов и каскадные чекбоксы с автоматическим `Indeterminate` у родителей.
 - `ui.TableEx`: мультивыбор строк (`Ctrl+Клик`, `Shift+Клик`, `Ctrl+A`), колонка чекбоксов с «Выбрать все» в шапке, закреплённые колонки (`FrozenCols`), inline-редактирование ячейки по двойному клику и автоподбор ширины колонки (`AutoFitOnDoubleClick`).
+
+---
+
+## Кастомная шапка окна и локализация контролов (Фаза 7.3)
+
+### `TitleBar` и `TitleBarHitTest`
+Готовый виджет кастомной шапки для режима `Frameless: true` (одинаково выглядит на Windows 7/10/11/Server, поддерживает перетаскивание, двойной клик для разворачивания, иконку, пользовательские слоты и кнопки `Minimize` / `Maximize` / `Close`):
+
+```go
+var currentUI *anyui.UI
+
+app := anyui.NewApp(anyui.Config{
+	Title:     "Custom App",
+	Frameless: true,
+	HitTest: func(x, y int) anyui.HitTestResult {
+		if currentUI != nil {
+			return currentUI.TitleBarHitTest(x, y)
+		}
+		return anyui.HitClient
+	},
+})
+
+app.Run(func(ui *anyui.UI) {
+	currentUI = ui
+	ui.TitleBar("main_title", "Custom App", anyui.TitleBarConfig{
+		IconSVG: appIconSVG,
+		LeftContent: func() {
+			ui.Button("menu_btn", "Файл", anyui.Ghost(), anyui.Height(26))
+		},
+	})
+})
+```
+
+### Локализация встроенных строк (`Strings`)
+Все встроенные подписи (`DatePicker`, `TimePicker`, `MultiSelect`, `Select`, `LogView`, контекстное меню текстовых полей) настраиваются через `anyui.Strings` (`RussianStrings()`, `EnglishStrings()`):
+
+```go
+ui.SetStrings(anyui.EnglishStrings())
+```

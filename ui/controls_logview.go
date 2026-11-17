@@ -92,7 +92,8 @@ func (c *Context) LogView(id string, entries []LogEntry, followTail *bool, opts 
 	searchRect := render.Rect{X: curX, Y: barRect.Y + c.S(4), W: searchW, H: barRect.H - c.S(8)}
 	curX += searchW + c.S(8)
 
-	c.drawInlineSearchBox(id+":search", searchRect, &lvs.searchText, "Фильтр логов...")
+	loc := c.str()
+	c.drawInlineSearchBox(id+":search", searchRect, &lvs.searchText, loc.LogFilterPlaceholder)
 
 	// Фильтрация записей
 	var visibleIndices []int
@@ -106,9 +107,9 @@ func (c *Context) LogView(id string, entries []LogEntry, followTail *bool, opts 
 	}
 
 	// Кнопка "Follow tail" справа
-	tailLabel := "Tail"
+	tailLabel := loc.LogTail
 	tailW := c.S(48)
-	copyLabel := "Копировать"
+	copyLabel := loc.LogCopy
 	copyW := c.S(76)
 	rightX := barRect.X + barRect.W - c.S(6)
 

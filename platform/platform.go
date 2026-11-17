@@ -1,5 +1,7 @@
 package platform
 
+import "image"
+
 // EventType описывает тип события окна или ввода.
 type EventType uint8
 
@@ -20,6 +22,7 @@ const (
 	EventDropFiles
 	EventCaptureLost
 	EventFocusLost
+	EventThemeChange
 )
 
 // MouseButton определяет кнопку мыши.
@@ -83,9 +86,24 @@ type Event struct {
 	WheelY   float32     // Для EventMouseWheel (положительное — вверх)
 	KeyCode  uint32      // Виртуальный код клавиши (VK_* на Windows)
 	ScanCode uint16      // Аппаратный скан-код клавиши
-	Char     rune        // Для EventChar (введённый символ Unicode)
-	Mods     Modifiers
-	Files    []string    // Для EventDropFiles (список путей перетащенных файлов)
+	Char      rune        // Для EventChar (введённый символ Unicode)
+	Mods      Modifiers
+	Files     []string    // Для EventDropFiles (список путей перетащенных файлов)
+	DarkTheme bool        // Для EventThemeChange (true, если системная тема тёмная)
+}
+
+// WindowColor задаёт RGB-цвет для оформления системной шапки и рамки окна.
+type WindowColor struct {
+	R, G, B uint8
+}
+
+// WindowState хранит геометрию окна для сохранения и восстановления между запусками.
+type WindowState struct {
+	X         int  `json:"x"`
+	Y         int  `json:"y"`
+	Width     int  `json:"width"`
+	Height    int  `json:"height"`
+	Maximized bool `json:"maximized"`
 }
 
 // WindowConfig задаёт параметры создания окна.
@@ -95,10 +113,14 @@ type WindowConfig struct {
 	Height          int  // Логическая высота при Scale = 1.0
 	MinWidth        int
 	MinHeight       int
-	DarkTitle       bool   // Включить тёмный системный заголовок (если поддерживается ОС)
-	Parent          Window // Родительское окно (owner), если есть
-	Frameless       bool   // Окно без системной рамки с поддержкой перетаскивания и Aero Snap
-	TitleBarHeight  int    // Логическая высота области перетаскивания (по умолчанию 36, если HitTest не задан)
+	DarkTitle       bool         // Включить тёмный системный заголовок (если поддерживается ОС)
+	TitleBarColor   *WindowColor // Цвет системной шапки окна (Windows 11+)
+	TitleTextColor  *WindowColor // Цвет текста системной шапки (Windows 11+)
+	BorderColor     *WindowColor // Цвет рамки окна (Windows 11+)
+	InitialState    *WindowState // Восстанавливаемая позиция и размер окна
+	Parent          Window       // Родительское окно (owner), если есть
+	Frameless       bool         // Окно без системной рамки с поддержкой перетаскивания и Aero Snap
+	TitleBarHeight  int          // Логическая высота области перетаскивания (по умолчанию 36, если HitTest не задан)
 	HitTest         func(x, y int) HitTestResult
 	AcceptDropFiles bool // Разрешить перетаскивание файлов из проводника (WM_DROPFILES)
 }
@@ -106,6 +128,29 @@ type WindowConfig struct {
 // DirtyPresenter — опциональный интерфейс окна для частичного обновления экрана (Dirty Rectangles).
 type DirtyPresenter interface {
 	PresentRect(pixels []byte, width, height, rx, ry, rw, rh int)
+}
+
+// WindowStater — опциональный интерфейс окна для сохранения и восстановления геометрии.
+type WindowStater interface {
+	State() WindowState
+	RestoreState(state WindowState)
+}
+
+// TitleBarStyler — опциональный интерфейс окна для динамической настройки системной шапки и рамки.
+type TitleBarStyler interface {
+	SetDarkTitle(dark bool)
+	SetTitleBarColors(caption, text, border *WindowColor)
+}
+
+// ClipboardImager — опциональный интерфейс окна для обмена изображениями через буфер обмена.
+type ClipboardImager interface {
+	ClipboardImage() (image.Image, error)
+	SetClipboardImage(img image.Image) error
+}
+
+// WindowActivator — опциональный интерфейс окна для вывода на передний план.
+type WindowActivator interface {
+	BringToFront()
 }
 
 // Window — кроссплатформенный интерфейс нативного окна.
@@ -208,16 +253,35 @@ type TrayMenuItem struct {
 	OnClick   func()
 }
 
+// NotificationIcon задаёт иконку нативного системного уведомления.
+type NotificationIcon uint8
+
+const (
+	NotifyNone NotificationIcon = iota
+	NotifyInfo
+	NotifyWarning
+	NotifyError
+)
+
+// TrayNotification описывает системное уведомление (Balloon / Toast) из области уведомлений.
+type TrayNotification struct {
+	Title   string
+	Message string
+	Icon    NotificationIcon
+	Silent  bool
+}
+
 // TrayConfig задаёт параметры иконки в системном трее.
 type TrayConfig struct {
-	Tooltip       string
-	IconRGBA      []byte
-	IconWidth     int
-	IconHeight    int
-	Menu          []TrayMenuItem
-	OnClick       func()
-	OnDoubleClick func()
-	OnRightClick  func()
+	Tooltip             string
+	IconRGBA            []byte
+	IconWidth           int
+	IconHeight          int
+	Menu                []TrayMenuItem
+	OnClick             func()
+	OnDoubleClick       func()
+	OnRightClick        func()
+	OnNotificationClick func()
 }
 
 // Tray — кроссплатформенный интерфейс иконки в системном трее.
@@ -225,6 +289,7 @@ type Tray interface {
 	SetTooltip(tooltip string) error
 	SetIconRGBA(rgba []byte, width, height int) error
 	SetMenu(items []TrayMenuItem)
+	ShowNotification(n TrayNotification) error
 	Close() error
 }
 

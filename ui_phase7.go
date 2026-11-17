@@ -40,6 +40,9 @@ type ChartSeries = ui.ChartSeries
 // TableExConfig задаёт расширенные настройки таблицы TableEx.
 type TableExConfig = ui.TableExConfig
 
+// TitleBarConfig задаёт настройки кастомной шапки окна TitleBar.
+type TitleBarConfig = ui.TitleBarConfig
+
 // SetTreeNodeChecked каскадно устанавливает состояние Checked узлу и всем его дочерним элементам.
 func SetTreeNodeChecked(node *TreeNode, checked bool) {
 	ui.SetTreeNodeChecked(node, checked)
@@ -138,4 +141,14 @@ func (u *UI) TreeViewEx(id string, roots []*TreeNode, selectedIDs map[string]boo
 // TableEx отрисовывает расширенную таблицу с мультивыбором, чекбоксами, закреплением колонок и inline-редактированием.
 func (u *UI) TableEx(id string, cols []TableColumn, rowCount int, cfg *TableExConfig, sort *TableSort, drawCell func(row, col int, area Rect, isSelected bool), opts ...Option) TableEvent {
 	return u.ctx.TableEx(id, cols, rowCount, cfg, sort, drawCell, opts...)
+}
+
+// TitleBar отрисовывает кастомную шапку окна с иконкой, заголовком, пользовательскими слотами и кнопками управления.
+func (u *UI) TitleBar(id, title string, cfg TitleBarConfig, opts ...Option) {
+	u.ctx.TitleBar(id, title, cfg, opts...)
+}
+
+// TitleBarHitTest определяет роль точки для HitTest в безрамочном окне с виджетом TitleBar.
+func (u *UI) TitleBarHitTest(x, y int) HitTestResult {
+	return u.ctx.TitleBarHitTest(x, y)
 }

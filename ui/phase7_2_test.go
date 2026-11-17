@@ -244,3 +244,62 @@ func TestStaticLayerInRowCenteredAndScroll(t *testing.T) {
 		t.Fatalf("клик по кнопке не должен вызывать перерисовку StaticLayer, hdr=%d body=%d", staticHeaderCalls, staticBodyCalls)
 	}
 }
+
+func TestHoverAreaCursorDoesNotLoopRedraws(t *testing.T) {
+	win := &dirtyMockWindow{mockWindow: mockWindow{w: 400, h: 200, scale: 1.0}}
+	ctx := NewContext(win, nil)
+
+	zone := render.Rect{X: 20, Y: 20, W: 200, H: 60}
+	draw := func(c *Context) {
+		c.RegisterHit("hover_zone", zone, platform.CursorHand)
+	}
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventPaint})
+	ctx.Render(draw)
+
+	// Вход в зону вызывает перерисовку и устанавливает CursorHand
+	if !ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 50, Y: 40}) {
+		t.Fatal("ожидалась перерисовка при входе в hover_zone")
+	}
+	ctx.Render(draw)
+	if win.lastCursor != platform.CursorHand {
+		t.Fatalf("ожидался CursorHand в зоне hover_zone, получено %v", win.lastCursor)
+	}
+
+	// Последующее движение внутри зоны с trackMove=false не должно вызывать перерисовку
+	if ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 90, Y: 45}) {
+		t.Fatal("движение внутри зоны trackMove=false не должно запускать Render")
+	}
+	if ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 140, Y: 50}) {
+		t.Fatal("повторное движение внутри зоны trackMove=false не должно запускать Render")
+	}
+}
+
+func TestDebugDirtyRectDoesNotSelfInflate(t *testing.T) {
+	win := &dirtyMockWindow{mockWindow: mockWindow{w: 500, h: 400, scale: 1.0}}
+	ctx := NewContext(win, nil)
+	ctx.SetDebugDirtyRect(true)
+
+	toggle := false
+	draw := func(c *Context) {
+		if toggle {
+			c.Canvas.FillRect(render.Rect{X: 40, Y: 40, W: 30, H: 20}, render.RGB(0, 200, 100))
+		}
+	}
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventPaint})
+	ctx.Render(draw)
+
+	toggle = true
+	ctx.Render(draw)
+	rects := ctx.LastDirtyRects()
+	if len(rects) != 1 || rects[0] != (render.Rect{X: 40, Y: 40, W: 30, H: 20}) {
+		t.Fatalf("ожидался точный DirtyRect (40,40,30,20), получено %+v", rects)
+	}
+
+	// Повторный кадр без изменений: diff должен быть пустым, а не раздуваться из-за рамки
+	ctx.Render(draw)
+	if len(ctx.LastDirtyRects()) != 0 {
+		t.Fatalf("без изменений diff должен быть пустым, получено %+v", ctx.LastDirtyRects())
+	}
+}

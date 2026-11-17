@@ -1,6 +1,9 @@
 package anyui
 
 import (
+	"errors"
+	"image"
+
 	"anyui/platform"
 	"anyui/ui"
 )
@@ -52,10 +55,91 @@ func (w *Window) Invalidate() {
 	}
 }
 
-// SetTheme устанавливает новую тему оформления для окна и перерисовывает его.
+// SetTheme устанавливает новую тему оформления для окна, синхронизирует режим заголовка ОС и перерисовывает окно.
 func (w *Window) SetTheme(theme Theme) {
+	w.applyTheme(theme, true)
+}
+
+func (w *Window) applyTheme(theme Theme, invalidate bool) {
+	if w.ctx == nil {
+		return
+	}
+	if w.ctx.Theme == theme {
+		return
+	}
+	w.ctx.Theme = theme
+	w.ctx.InvalidateStatic()
+	w.SetDarkTitle(isThemeDark(theme))
+	if invalidate {
+		w.Invalidate()
+	} else {
+		w.ctx.RequestRedraw()
+	}
+}
+
+// SetDarkTitle динамически включает или выключает тёмный режим системной шапки окна.
+func (w *Window) SetDarkTitle(dark bool) {
+	if styler, ok := w.platWin.(platform.TitleBarStyler); ok {
+		styler.SetDarkTitle(dark)
+	}
+}
+
+// SetTitleBarColors задаёт произвольные цвета системной шапки, текста заголовка и рамки окна (Windows 11+).
+// Передача nil сбрасывает соответствующий цвет к системному значению по умолчанию.
+func (w *Window) SetTitleBarColors(caption, text, border *Color) {
+	if styler, ok := w.platWin.(platform.TitleBarStyler); ok {
+		styler.SetTitleBarColors(
+			toPlatformWindowColor(caption),
+			toPlatformWindowColor(text),
+			toPlatformWindowColor(border),
+		)
+	}
+}
+
+// State возвращает текущую геометрию окна (позиция, размер, Maximized) для сохранения.
+func (w *Window) State() WindowState {
+	if stater, ok := w.platWin.(platform.WindowStater); ok {
+		return stater.State()
+	}
+	return WindowState{}
+}
+
+// RestoreState восстанавливает ранее сохранённую геометрию окна.
+func (w *Window) RestoreState(state WindowState) {
+	if stater, ok := w.platWin.(platform.WindowStater); ok {
+		stater.RestoreState(state)
+	}
+}
+
+// ClipboardImage считывает изображение из буфера обмена ОС.
+func (w *Window) ClipboardImage() (image.Image, error) {
+	if ci, ok := w.platWin.(platform.ClipboardImager); ok {
+		return ci.ClipboardImage()
+	}
+	return nil, errors.New("буфер обмена для изображений не поддерживается")
+}
+
+// SetClipboardImage записывает изображение в буфер обмена ОС.
+func (w *Window) SetClipboardImage(img image.Image) error {
+	if ci, ok := w.platWin.(platform.ClipboardImager); ok {
+		return ci.SetClipboardImage(img)
+	}
+	return errors.New("буфер обмена для изображений не поддерживается")
+}
+
+// BringToFront выводит окно на передний план, восстанавливая его из свёрнутого или скрытого состояния.
+func (w *Window) BringToFront() {
+	if act, ok := w.platWin.(platform.WindowActivator); ok {
+		act.BringToFront()
+		return
+	}
+	w.Show()
+}
+
+// SetStrings устанавливает локализацию встроенных строк контролов для данного окна.
+func (w *Window) SetStrings(s Strings) {
 	if w.ctx != nil {
-		w.ctx.Theme = theme
+		w.ctx.Strings = s
 		w.ctx.InvalidateStatic()
 		w.Invalidate()
 	}
@@ -183,6 +267,13 @@ func (w *Window) handleEvent(ev platform.Event) {
 		if w.onDropFiles != nil {
 			w.onDropFiles(ev.Files, ev.X, ev.Y)
 			w.Invalidate()
+		}
+		return
+	}
+
+	if ev.Type == platform.EventThemeChange {
+		if w.app != nil && w.app.isPrimaryEventWindow(w) {
+			w.app.handleSystemThemeChange(ev.DarkTheme)
 		}
 		return
 	}

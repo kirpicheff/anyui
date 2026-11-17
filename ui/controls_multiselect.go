@@ -69,11 +69,12 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 		}
 	}
 
+	loc := c.str()
 	if c.Font != nil {
 		c.Canvas.PushClip(render.Rect{X: rect.X + c.S(6), Y: rect.Y, W: rect.W - c.S(28), H: rect.H})
 		if len(selLabels) == 0 {
-			_, th := c.Font.MeasureText("Выберите...", c.S(13))
-			c.Font.DrawText(c.Canvas, rect.X+c.S(10), rect.Y+(rect.H-th)/2, "Выберите...", c.S(13), c.Theme.TextMuted)
+			_, th := c.Font.MeasureText(loc.SelectPlaceholder, c.S(13))
+			c.Font.DrawText(c.Canvas, rect.X+c.S(10), rect.Y+(rect.H-th)/2, loc.SelectPlaceholder, c.S(13), c.Theme.TextMuted)
 		} else {
 			// Пытаемся отрисовать чипсы; если их много, показываем сводку
 			curX := rect.X + c.S(6)
@@ -101,7 +102,7 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 					curX += cw + c.S(4)
 				}
 			} else {
-				summary := fmt.Sprintf("Выбрано: %d (%s)", len(selLabels), strings.Join(selLabels, ", "))
+				summary := fmt.Sprintf(loc.SelectedSummaryFmt, len(selLabels), strings.Join(selLabels, ", "))
 				_, th := c.Font.MeasureText(summary, c.S(12))
 				c.Font.DrawText(c.Canvas, rect.X+c.S(10), rect.Y+(rect.H-th)/2, summary, c.S(12), c.Theme.TextPrimary)
 			}
@@ -164,7 +165,7 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 		// Поле поиска
 		sr := render.Rect{X: popR.X + c.S(8), Y: popR.Y + c.S(8), W: popR.W - c.S(16), H: c.S(26)}
 		sVal := multiSelectSearch[id]
-		c.drawInlineSearchBox(id+":search", sr, &sVal, "Поиск...")
+		c.drawInlineSearchBox(id+":search", sr, &sVal, loc.SearchPlaceholder)
 		multiSelectSearch[id] = sVal
 
 		// Кнопки "Выбрать все" и "Сбросить"
@@ -173,8 +174,8 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 		allR := render.Rect{X: popR.X + c.S(8), Y: btnY, W: btnW, H: c.S(22)}
 		clrR := render.Rect{X: allR.X + btnW + c.S(6), Y: btnY, W: btnW, H: c.S(22)}
 
-		drawMiniBtn := func(br render.Rect, lbl string, fn func()) {
-			c.RegisterHit(id+":mb:"+lbl, br, platform.CursorHand)
+		drawMiniBtn := func(br render.Rect, key, lbl string, fn func()) {
+			c.RegisterHit(id+":mb:"+key, br, platform.CursorHand)
 			bhov := br.Contains(c.MouseX, c.MouseY)
 			bg := c.Theme.Surface
 			if bhov {
@@ -192,12 +193,12 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 				c.Font.DrawText(c.Canvas, br.X+(br.W-tw)/2, br.Y+(br.H-th)/2, lbl, c.S(11), c.Theme.TextMuted)
 			}
 		}
-		drawMiniBtn(allR, "Выбрать все", func() {
+		drawMiniBtn(allR, "all", loc.SelectAllBtn, func() {
 			for _, idx := range filtered {
 				(*selected)[idx] = true
 			}
 		})
-		drawMiniBtn(clrR, "Сбросить", func() {
+		drawMiniBtn(clrR, "reset", loc.ResetBtn, func() {
 			for i := range *selected {
 				(*selected)[i] = false
 			}

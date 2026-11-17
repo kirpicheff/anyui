@@ -184,8 +184,9 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 			}
 			c.Canvas.DrawRoundedBox(nowR, c.Sf(4), nowBg, 1.0, c.Theme.Border)
 			if c.Font != nil {
-				tw, th := c.Font.MeasureText("Сейчас", c.S(11))
-				c.Font.DrawText(c.Canvas, nowR.X+(nowR.W-tw)/2, nowR.Y+(nowR.H-th)/2, "Сейчас", c.S(11), c.Theme.Accent)
+				nowLbl := c.str().Now
+				tw, th := c.Font.MeasureText(nowLbl, c.S(11))
+				c.Font.DrawText(c.Canvas, nowR.X+(nowR.W-tw)/2, nowR.Y+(nowR.H-th)/2, nowLbl, c.S(11), c.Theme.Accent)
 			}
 		})
 	}

@@ -237,7 +237,7 @@ func (c *Context) Select(id string, items []string, selected *int, opts ...Optio
 				// Простой инлайн-фильтр через локальный буфер в layout
 				c.pushBox(render.Rect{X: dropRect.X + c.S(6), Y: listY, W: dropRect.W - c.S(12), H: searchH}, dirColumn, AlignStart, 0)
 				q := c.searchQuery(searchKey)
-				if c.TextInputOpts(searchKey, &q, "Поиск...", Height(32)) {
+				if c.TextInputOpts(searchKey, &q, c.str().SearchPlaceholder, Height(32)) {
 					c.setSearchQuery(searchKey, q)
 				}
 				c.popBox()
