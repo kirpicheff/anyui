@@ -1,16 +1,44 @@
+**English** | [Русский](README.ru.md)
+
 # AnyUI (`anyui`)
 
-Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и без зависимости от OpenGL/GPU).
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8.svg)](go.mod)
+[![CGO](https://img.shields.io/badge/CGO-Disabled_(Win%2FLinux)-success.svg)](#platform-support)
 
-## Ключевые особенности
+A lightweight, embeddable cross-platform Go UI framework powered by a pure-Go software 2D renderer — **no WebView2, no OpenGL/GPU, and no CGO** on Windows and Linux.
 
-- Единый корневой пакет `anyui` для построения интерфейса (`App`, `Window`, `UI`, `Theme`, `Option`).
-- Нулевая нагрузка на CPU в простое: цикл событий ОС пробуждается только при пользовательских событиях, `App.Dispatch` или активных анимациях.
-- Программный 2D-рендерер (`render`): сглаженные SDF-примитивы, градиенты, тени, кеш глифов и SVG, частичная перерисовка (dirty rectangles).
-- Темы оформления (`DeepNavyTheme`, `DarkTheme`, `LightTheme`, `SystemTheme`) и функциональные опции стилизации (`Primary`, `Width`, `FontSize` и др.).
-- Навигация фокуса (`Tab` / `Shift+Tab`), горячие клавиши, оверлеи, системный трей, диалоги и защита от повторного запуска.
+Designed for desktop tools, system utilities, background services with a tray icon, and environments without hardware acceleration (servers, VMs, RDP, SSH X11 forwarding).
 
-## Быстрый старт
+---
+
+## Key Features
+
+- **Zero Idle CPU Usage:** the OS event loop sleeps until woken by user input, `App.Dispatch`, or active animations.
+- **Software 2D Renderer (`render`):** anti-aliased SDF primitives, linear/radial gradients, soft shadows (`BoxShadow`), backdrop blur, SVG icon rasterization with tinting, LRU glyph/image caches, and dirty-rectangle presentation.
+- **Pure Go on Windows & Linux (`CGO_ENABLED=0`):** builds compact standalone binaries (3–5 MB) with zero external runtime dependencies.
+- **Rich Widget Set (`ui`):** Immediate Mode API with `Button`, `TextInput`, `MaskedInput`, `TextArea`, `Select`, `ComboBox`, `MultiSelect`, `Table`, `TreeView`, `ListView`, `TabBar`, `MenuBar`, `Toolbar`, `StatusBar`, `LogView`, charts (`Sparkline`, `LineChart`, `BarChart`), `DatePicker`, `TimePicker`, `ColorPicker`, `Modal`, `Drawer`, `SplitPane`, and more.
+- **Flexible Layout & Styling:** `Row`, `Column`, `RowFlex`, `ColumnFlex`, `Grid`, `FormLayout`, `Flow`, `ScrollView`, `Card`, `Page`, built-in themes (`DeepNavyTheme`, `DarkTheme`, `LightTheme`, `SystemTheme`), and functional `Option` modifiers.
+- **System Integration (`platform`):** system tray, native notifications, file/folder/message dialogs, text & image clipboard, file Drag & Drop, `Frameless` / custom `TitleBar`, `SingleInstance`, `WindowState` persistence, multi-window support, and `i18n`.
+
+---
+
+## Platform Support
+
+| Platform | Backend | CGO | Status |
+| --- | --- | --- | --- |
+| **Windows** (7 / 10 / 11 / Server) | Win32 + GDI + DWM | `CGO_ENABLED=0` | Supported |
+| **Linux (X11)** | `xgb` + MIT-SHM / PutImage | `CGO_ENABLED=0` | Supported |
+| **Linux (Wayland)** | Native Wayland (`wl_shm`, `xdg_shell`) | `CGO_ENABLED=0` | Supported |
+| **macOS** | Cocoa / AppKit | Planned (`CGO`) | Planned |
+
+---
+
+## Quick Start
+
+```bash
+go get git.gtw.su/kirpich/anyui
+```
 
 ```go
 package main
@@ -35,11 +63,11 @@ func main() {
 	err := app.Run(func(ui *anyui.UI) {
 		ui.Padding(20, func() {
 			ui.Column(12, func() {
-				ui.Label("Настройки", anyui.FontSize(18))
-				ui.TextInput("inp_name", &name, "Введите имя", anyui.Width(260))
-				ui.Toggle("tgl_on", "Включить уведомления", &enabled)
-				if ui.Button("btn_save", "Сохранить", anyui.Primary()) {
-					log.Println("Сохранено:", name, enabled)
+				ui.Label("Settings", anyui.FontSize(18), anyui.Bold())
+				ui.TextInput("inp_name", &name, "Enter name", anyui.Width(260))
+				ui.Toggle("tgl_on", "Enable notifications", &enabled)
+				if ui.Button("btn_save", "Save", anyui.Primary()) {
+					log.Println("Saved:", name, enabled)
 				}
 			})
 		})
@@ -50,18 +78,31 @@ func main() {
 }
 ```
 
-## Документация
+To run the interactive widget showcase:
 
-- [Обзор и архитектура](docs/README.md)
-- [Виджеты и раскладка](docs/widgets.md)
-- [Графика и 2D-рендеринг](docs/graphics.md)
-- [Темы и стилизация](docs/theming.md)
-- [Системная интеграция (окна, трей, диалоги)](docs/system.md)
+```bash
+go run ./cmd/demo
+```
 
-Для просмотра справочника API из терминала используйте стандартную команду:
+---
 
-```sh
+## Documentation
+
+- [Overview & Architecture](docs/en/README.md)
+- [Widgets & Layout](docs/en/widgets.md)
+- [Graphics & 2D Rendering](docs/en/graphics.md)
+- [Themes & Styling](docs/en/theming.md)
+- [System Integration (Windows, Tray, Dialogs, Linux)](docs/en/system.md)
+
+You can also inspect the Go API directly from the terminal:
+
+```bash
 go doc .
 go doc -all .
 ```
 
+---
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution details.

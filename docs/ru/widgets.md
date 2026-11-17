@@ -1,3 +1,5 @@
+[English](../en/widgets.md) | [Русский](widgets.md)
+
 # Справочник основных контролов (`anyui`)
 
 Все контролы вызываются внутри `drawFn(ui *anyui.UI)` в Immediate Mode. Для настройки внешнего вида и поведения используются функциональные опции `anyui.Option` (см. [theming.md](theming.md)).
@@ -169,7 +171,7 @@ ui.ProgressBar(0.65, anyui.Width(240))
 
 ---
 
-## Дополнительные контролы (Фаза 5)
+## Дополнительные контролы
 
 ### `Table`
 Таблица с заголовками колонок, ресайзом ширины колонок, сортировкой и виртуализацией строк.
@@ -232,7 +234,7 @@ ui.ShowToast("Готово", "Данные сохранены", anyui.ToastSucce
 
 ---
 
-## Продвинутая система раскладки (Фаза 6.1)
+## Продвинутая система раскладки
 
 ### `RowFlex`, `ColumnFlex` и `Expand`
 Пропорциональное деление доступного пространства по весам `FlexItem{Weight, FixedDp, Fn}`:
@@ -285,7 +287,7 @@ ui.Card(func() {
 }, anyui.AutoHeight(), anyui.Padding(12))
 ```
 
-## Расширенные события мыши, клавиатуры и фокуса (Фаза 6.3)
+## Расширенные события мыши, клавиатуры и фокуса
 
 ### Двойной клик (`DoubleClick`) и средняя кнопка мыши (`MiddleClick`)
 - В `UI` и `ui.Context` доступны методы `DoubleClicked() bool` и `MiddleClicked() bool` (в `ui.Context` — `MiddleMousePressed` / `MiddleMouseDown` / `MiddleMouseReleased`).
@@ -322,7 +324,7 @@ if ev.RowMiddleClicked >= 0 {
 
 ---
 
-## Десктоп-контролы, графики и мультивыбор (Фаза 7.1)
+## Десктоп-контролы, графики и мультивыбор
 
 ### `MenuBar`, `Toolbar`, `StatusBar`, `Breadcrumbs`, `Pagination`
 ```go
@@ -364,7 +366,7 @@ ui.StatusBar("sb", []anyui.StatusBarSection{{Text: "Готово", Flex: 1}, {Te
 
 ---
 
-## Кастомная шапка окна и локализация контролов (Фаза 7.3)
+## Кастомная шапка окна и локализация контролов
 
 ### `TitleBar` и `TitleBarHitTest`
 Готовый виджет кастомной шапки для режима `Frameless: true` (одинаково выглядит на Windows 7/10/11/Server, поддерживает перетаскивание, двойной клик для разворачивания, иконку, пользовательские слоты и кнопки `Minimize` / `Maximize` / `Close`):

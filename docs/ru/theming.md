@@ -1,3 +1,5 @@
+[English](../en/theming.md) | [Русский](theming.md)
+
 # Темы и стилизация (`Option`)
 
 ## Предустановленные темы
@@ -38,7 +40,7 @@ custom.RadiusSm = 6
 | `anyui.Height(dp)` | Фиксированная высота в `dp` | `anyui.Height(42)` |
 | `anyui.FontSize(dp)` | Размер шрифта в `dp` | `anyui.FontSize(16)` |
 | `anyui.Padding(dp)` | Внутренний отступ в `dp` | `anyui.Padding(12)` |
-| `anyui.Icon(svg)` | SVG-иконка (рендеринг с Фазы 2) | `anyui.Icon(saveSVG)` |
+| `anyui.Icon(svg)` | SVG-иконка | `anyui.Icon(saveSVG)` |
 | `anyui.Disabled(v)` | Блокировка ввода и приглушённый вид | `anyui.Disabled(isBusy)` |
 | `anyui.MinWidth(dp)` | Минимальная ширина виджета в `dp` | `anyui.MinWidth(120)` |
 | `anyui.MaxWidth(dp)` | Максимальная ширина виджета в `dp` | `anyui.MaxWidth(400)` |

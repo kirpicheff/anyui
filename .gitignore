@@ -11,3 +11,7 @@
 Thumbs.db
 *.log
 
+# Внутренние планы (остаются локально)
+MVP_PLAN.md
+ROADMAP.md
+
