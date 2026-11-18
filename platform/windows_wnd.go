@@ -6,6 +6,7 @@ import (
 	"errors"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"unicode/utf16"
 	"unsafe"
@@ -215,10 +216,12 @@ type win32Window struct {
 	bufH       int
 	closing          bool
 	onClose          func() bool
-	fullscreen       bool
-	savedStyle       uintptr
-	savedRect        rect
-	releasingCapture bool
+	fullscreen        bool
+	savedStyle        uintptr
+	savedRect         rect
+	releasingCapture  bool
+	wakePending       atomic.Bool
+	invalidatePending atomic.Bool
 }
 
 // NewWindow создаёт нативное окно для текущей операционной системы.
@@ -507,14 +510,13 @@ func (w *win32Window) PresentRect(pixels []byte, width, height, rx, ry, rw, rh i
 }
 
 func (w *win32Window) Invalidate() {
-	if w.hwnd != 0 {
+	if w.hwnd != 0 && w.invalidatePending.CompareAndSwap(false, true) {
 		procInvalidateRect.Call(uintptr(w.hwnd), 0, 0)
-		procUpdateWindow.Call(uintptr(w.hwnd))
 	}
 }
 
 func (w *win32Window) WakeUp() {
-	if w.hwnd != 0 {
+	if w.hwnd != 0 && w.wakePending.CompareAndSwap(false, true) {
 		procPostMessageW.Call(uintptr(w.hwnd), wmAppWakeUp, 0, 0)
 	}
 }
@@ -834,11 +836,18 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 		return 0
 
 	case wmPaint:
+		w.invalidatePending.Store(false)
 		var ps paintStruct
 		hdc, _, _ := procBeginPaint.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&ps)))
 		w.mu.Lock()
 		if len(w.pixels) > 0 && w.bufW > 0 && w.bufH > 0 {
-			blitBGRA(windows.Handle(hdc), w.width, w.height, w.pixels, w.bufW, w.bufH)
+			rw := int(ps.rcPaint.right - ps.rcPaint.left)
+			rh := int(ps.rcPaint.bottom - ps.rcPaint.top)
+			if w.width == w.bufW && w.height == w.bufH && rw > 0 && rh > 0 && (rw < w.bufW || rh < w.bufH) {
+				blitBGRARect(windows.Handle(hdc), int(ps.rcPaint.left), int(ps.rcPaint.top), rw, rh, w.pixels, w.bufW, w.bufH)
+			} else {
+				blitBGRA(windows.Handle(hdc), w.width, w.height, w.pixels, w.bufW, w.bufH)
+			}
 		}
 		w.mu.Unlock()
 		procEndPaint.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&ps)))
@@ -846,6 +855,7 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 		return 0
 
 	case wmAppWakeUp:
+		w.wakePending.Store(false)
 		w.emit(Event{Type: EventWakeUp})
 		return 0
 

@@ -60,6 +60,30 @@ func sampleStops(stops []GradientStop, t float32) Color {
 	return last.Color
 }
 
+func lutIndex(t float32) int {
+	if t <= 0 {
+		return 0
+	}
+	if t >= 1 {
+		return 255
+	}
+	return int(t*255 + 0.5)
+}
+
+func fillSolidSpan(pix []byte, off, count int, col Color) {
+	if count <= 0 {
+		return
+	}
+	b, g, r, a := col.B, col.G, col.R, col.A
+	end := off + count*4
+	for i := off; i < end; i += 4 {
+		pix[i+0] = b
+		pix[i+1] = g
+		pix[i+2] = r
+		pix[i+3] = a
+	}
+}
+
 // FillLinearGradient заливает скруглённый прямоугольник линейным градиентом.
 func (c *Canvas) FillLinearGradient(r Rect, cr CornerRadii, grad LinearGradient) {
 	if r.Empty() || len(grad.Stops) == 0 {
@@ -77,6 +101,52 @@ func (c *Canvas) FillLinearGradient(r Rect, cr CornerRadii, grad LinearGradient)
 	cx := float32(r.X) + hx
 	cy := float32(r.Y) + hy
 
+	// Предрасчёт 1D LUT (256 шагов) на стеке без аллокаций в куче
+	var lut [256]Color
+	allOpaque := true
+	for i := 0; i < 256; i++ {
+		col := sampleStops(grad.Stops, float32(i)/255.0)
+		lut[i] = col
+		if col.A < 255 {
+			allOpaque = false
+		}
+	}
+
+	maxR := cr.TL
+	if cr.TR > maxR {
+		maxR = cr.TR
+	}
+	if cr.BR > maxR {
+		maxR = cr.BR
+	}
+	if cr.BL > maxR {
+		maxR = cr.BL
+	}
+	hasCorners := maxR > 0
+	pad := 0
+	if hasCorners {
+		pad = int(math.Ceil(float64(maxR))) + 1
+	}
+
+	areaEndX := area.X + area.W
+	areaEndY := area.Y + area.H
+	innerY0 := r.Y + pad
+	innerY1 := r.Y + r.H - pad
+	innerX0 := r.X + pad
+	innerX1 := r.X + r.W - pad
+	if innerX0 < area.X {
+		innerX0 = area.X
+	}
+	if innerX0 > areaEndX {
+		innerX0 = areaEndX
+	}
+	if innerX1 < innerX0 {
+		innerX1 = innerX0
+	}
+	if innerX1 > areaEndX {
+		innerX1 = areaEndX
+	}
+
 	sx := float32(r.X) + grad.StartX*float32(r.W)
 	sy := float32(r.Y) + grad.StartY*float32(r.H)
 	ex := float32(r.X) + grad.EndX*float32(r.W)
@@ -86,22 +156,218 @@ func (c *Canvas) FillLinearGradient(r Rect, cr CornerRadii, grad LinearGradient)
 	vy := ey - sy
 	lenSq := vx*vx + vy*vy
 
-	for y := area.Y; y < area.Y+area.H; y++ {
-		py := float32(y) + 0.5
-		for x := area.X; x < area.X+area.W; x++ {
-			px := float32(x) + 0.5
-			dist := roundedBoxSDF(px, py, cx, cy, hx, hy, cr)
-			cov := clamp01(0.5 - dist)
-			if cov <= 0 {
+	// Быстрая ветка: вертикальный градиент (или вырожденный градиент с одним цветом)
+	if lenSq <= 1e-6 || math.Abs(float64(vx)) < 1e-4 {
+		invVy := float32(0)
+		if lenSq > 1e-6 {
+			invVy = vy / lenSq
+		}
+		for y := area.Y; y < areaEndY; y++ {
+			py := float32(y) + 0.5
+			var t float32
+			if lenSq > 1e-6 {
+				t = (py - sy) * invVy
+			}
+			col := lut[lutIndex(t)]
+			if col.A == 0 {
 				continue
 			}
 
-			var t float32
-			if lenSq > 1e-6 {
-				t = ((px-sx)*vx + (py-sy)*vy) / lenSq
+			inCornerRow := hasCorners && (y < innerY0 || y >= innerY1)
+			rowBase := y * c.Width * 4
+			if !inCornerRow {
+				if col.A == 255 {
+					fillSolidSpan(c.Pixels, rowBase+area.X*4, area.W, col)
+				} else {
+					for x := area.X; x < areaEndX; x++ {
+						c.blendPixelUnchecked(x, y, col, 255)
+					}
+				}
+				continue
 			}
-			col := sampleStops(grad.Stops, t)
-			if col.A > 0 {
+
+			for x := area.X; x < innerX0; x++ {
+				dist := roundedBoxSDF(float32(x)+0.5, py, cx, cy, hx, hy, cr)
+				cov := clamp01(0.5 - dist)
+				if cov > 0 {
+					c.blendPixelUnchecked(x, y, col, uint8(cov*255+0.5))
+				}
+			}
+			if innerX1 > innerX0 {
+				if col.A == 255 {
+					fillSolidSpan(c.Pixels, rowBase+innerX0*4, innerX1-innerX0, col)
+				} else {
+					for x := innerX0; x < innerX1; x++ {
+						c.blendPixelUnchecked(x, y, col, 255)
+					}
+				}
+			}
+			for x := innerX1; x < areaEndX; x++ {
+				dist := roundedBoxSDF(float32(x)+0.5, py, cx, cy, hx, hy, cr)
+				cov := clamp01(0.5 - dist)
+				if cov > 0 {
+					c.blendPixelUnchecked(x, y, col, uint8(cov*255+0.5))
+				}
+			}
+		}
+		return
+	}
+
+	// Быстрая ветка: горизонтальный градиент — предрасчёт одной строки и copy по строкам
+	if math.Abs(float64(vy)) < 1e-4 {
+		invVx := vx / lenSq
+		if allOpaque {
+			rowBuf := make([]byte, area.W*4)
+			t := (float32(area.X) + 0.5 - sx) * invVx
+			for i := 0; i < area.W; i++ {
+				col := lut[lutIndex(t)]
+				off := i * 4
+				rowBuf[off+0] = col.B
+				rowBuf[off+1] = col.G
+				rowBuf[off+2] = col.R
+				rowBuf[off+3] = 255
+				t += invVx
+			}
+			rowBytes := area.W * 4
+			midOff := (innerX0 - area.X) * 4
+			midBytes := (innerX1 - innerX0) * 4
+
+			for y := area.Y; y < areaEndY; y++ {
+				dstRow := (y*c.Width + area.X) * 4
+				inCornerRow := hasCorners && (y < innerY0 || y >= innerY1)
+				if !inCornerRow {
+					copy(c.Pixels[dstRow:dstRow+rowBytes], rowBuf)
+					continue
+				}
+				py := float32(y) + 0.5
+				for x := area.X; x < innerX0; x++ {
+					dist := roundedBoxSDF(float32(x)+0.5, py, cx, cy, hx, hy, cr)
+					cov := clamp01(0.5 - dist)
+					if cov > 0 {
+						so := (x - area.X) * 4
+						col := Color{B: rowBuf[so+0], G: rowBuf[so+1], R: rowBuf[so+2], A: 255}
+						c.blendPixelUnchecked(x, y, col, uint8(cov*255+0.5))
+					}
+				}
+				if midBytes > 0 {
+					dstMid := (y*c.Width + innerX0) * 4
+					copy(c.Pixels[dstMid:dstMid+midBytes], rowBuf[midOff:midOff+midBytes])
+				}
+				for x := innerX1; x < areaEndX; x++ {
+					dist := roundedBoxSDF(float32(x)+0.5, py, cx, cy, hx, hy, cr)
+					cov := clamp01(0.5 - dist)
+					if cov > 0 {
+						so := (x - area.X) * 4
+						col := Color{B: rowBuf[so+0], G: rowBuf[so+1], R: rowBuf[so+2], A: 255}
+						c.blendPixelUnchecked(x, y, col, uint8(cov*255+0.5))
+					}
+				}
+			}
+			return
+		}
+
+		// Горизонтальный градиент с прозрачностью
+		rowCols := make([]Color, area.W)
+		t := (float32(area.X) + 0.5 - sx) * invVx
+		for i := 0; i < area.W; i++ {
+			rowCols[i] = lut[lutIndex(t)]
+			t += invVx
+		}
+		for y := area.Y; y < areaEndY; y++ {
+			py := float32(y) + 0.5
+			inCornerRow := hasCorners && (y < innerY0 || y >= innerY1)
+			if !inCornerRow {
+				for x := area.X; x < areaEndX; x++ {
+					col := rowCols[x-area.X]
+					if col.A == 255 {
+						off := (y*c.Width + x) * 4
+						c.Pixels[off+0] = col.B
+						c.Pixels[off+1] = col.G
+						c.Pixels[off+2] = col.R
+						c.Pixels[off+3] = 255
+					} else if col.A > 0 {
+						c.blendPixelUnchecked(x, y, col, 255)
+					}
+				}
+				continue
+			}
+			for x := area.X; x < areaEndX; x++ {
+				col := rowCols[x-area.X]
+				if col.A == 0 {
+					continue
+				}
+				if x >= innerX0 && x < innerX1 {
+					if col.A == 255 {
+						off := (y*c.Width + x) * 4
+						c.Pixels[off+0] = col.B
+						c.Pixels[off+1] = col.G
+						c.Pixels[off+2] = col.R
+						c.Pixels[off+3] = 255
+					} else {
+						c.blendPixelUnchecked(x, y, col, 255)
+					}
+					continue
+				}
+				dist := roundedBoxSDF(float32(x)+0.5, py, cx, cy, hx, hy, cr)
+				cov := clamp01(0.5 - dist)
+				if cov > 0 {
+					c.blendPixelUnchecked(x, y, col, uint8(cov*255+0.5))
+				}
+			}
+		}
+		return
+	}
+
+	// Произвольный (диагональный) градиент с инкрементальным шагом по X и LUT
+	invLenSq := 1.0 / lenSq
+	dtX := vx * invLenSq
+	startPX := float32(area.X) + 0.5 - sx
+
+	for y := area.Y; y < areaEndY; y++ {
+		py := float32(y) + 0.5
+		t := (startPX*vx + (py-sy)*vy) * invLenSq
+		inCornerRow := hasCorners && (y < innerY0 || y >= innerY1)
+
+		if !inCornerRow {
+			rowBase := y * c.Width * 4
+			for x := area.X; x < areaEndX; x++ {
+				col := lut[lutIndex(t)]
+				t += dtX
+				if col.A == 255 {
+					off := rowBase + x*4
+					c.Pixels[off+0] = col.B
+					c.Pixels[off+1] = col.G
+					c.Pixels[off+2] = col.R
+					c.Pixels[off+3] = 255
+				} else if col.A > 0 {
+					c.blendPixelUnchecked(x, y, col, 255)
+				}
+			}
+			continue
+		}
+
+		rowBase := y * c.Width * 4
+		for x := area.X; x < areaEndX; x++ {
+			col := lut[lutIndex(t)]
+			t += dtX
+			if col.A == 0 {
+				continue
+			}
+			if x >= innerX0 && x < innerX1 {
+				if col.A == 255 {
+					off := rowBase + x*4
+					c.Pixels[off+0] = col.B
+					c.Pixels[off+1] = col.G
+					c.Pixels[off+2] = col.R
+					c.Pixels[off+3] = 255
+				} else {
+					c.blendPixelUnchecked(x, y, col, 255)
+				}
+				continue
+			}
+			dist := roundedBoxSDF(float32(x)+0.5, py, cx, cy, hx, hy, cr)
+			cov := clamp01(0.5 - dist)
+			if cov > 0 {
 				c.blendPixelUnchecked(x, y, col, uint8(cov*255+0.5))
 			}
 		}

@@ -447,3 +447,164 @@ func TestInteractiveCanvasInputCaptureAndFocus(t *testing.T) {
 		t.Fatalf("ожидался OnFocusLost=1 и focused=false, получено count=%d focused=%v", focusLostCount, lastFocused)
 	}
 }
+
+func TestInteractiveCanvasDirectInputSkipsRender(t *testing.T) {
+	win := &dirtyMockWindow{mockWindow: mockWindow{w: 400, h: 300, scale: 1.0}}
+	ctx := NewContext(win, nil)
+
+	var moves, downs, ups, wheels, keys int
+	var lastMoveX, lastMoveY int
+	var requestOnDown bool
+	var showOverlay bool
+
+	draw := func(c *Context) {
+		c.Padding(20, func() {
+			c.InteractiveCanvas("rdp", 200, 100, CanvasCallbacks{
+				DirectInput: true,
+				OnMouseMove: func(x, y int, mods platform.Modifiers) {
+					moves++
+					lastMoveX, lastMoveY = x, y
+				},
+				OnMouseDown: func(x, y int, button platform.MouseButton, mods platform.Modifiers) {
+					downs++
+					if requestOnDown {
+						c.RequestRedraw()
+					}
+				},
+				OnMouseUp: func(x, y int, button platform.MouseButton, mods platform.Modifiers) {
+					ups++
+				},
+				OnMouseWheel: func(x, y int, wheelX, wheelY float32, mods platform.Modifiers) {
+					wheels++
+				},
+				OnKey: func(ev RawKeyEvent) {
+					keys++
+				},
+			})
+		})
+		if showOverlay {
+			c.PushOverlay(render.Rect{X: 0, Y: 0, W: 100, H: 100}, func() {})
+		}
+	}
+
+	// Стартовый рендер
+	ctx.HandleEvent(platform.Event{Type: platform.EventPaint})
+	ctx.Render(draw)
+
+	// Вход курсора в холст и первый клик (установка фокуса) требуют Render()
+	if !ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 50, Y: 50}) {
+		t.Fatal("вход курсора в холст должен запросить один Render для обновления hit/cursor")
+	}
+	ctx.Render(draw)
+	if !ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 50}) {
+		t.Fatal("первый клик для захвата фокуса должен запросить Render")
+	}
+	ctx.Render(draw)
+	if !ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 50, Y: 50}) {
+		// Холст уже в фокусе — MouseUp обрабатывается напрямую без Render
+	} else {
+		t.Fatal("MouseUp в сфокусированном холсте DirectInput не должен требовать Render")
+	}
+
+	movesBefore := moves
+	downsBefore := downs
+	upsBefore := ups
+
+	// Движения мыши внутри холста должны доставляться напрямую БЕЗ Render()
+	if ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 70, Y: 60}) {
+		t.Fatal("MouseMove внутри DirectInput-холста не должен вызывать Render")
+	}
+	if ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 80, Y: 65}) {
+		t.Fatal("повторный MouseMove внутри DirectInput-холста не должен вызывать Render")
+	}
+	if moves != movesBefore+2 || lastMoveX != 60 || lastMoveY != 45 {
+		t.Fatalf("ожидалось +2 прямых OnMouseMove и координаты (60,45), получено moves=%d (%d,%d)", moves, lastMoveX, lastMoveY)
+	}
+
+	// Клик, колесо, клавиши и EventChar внутри сфокусированного холста — без Render()
+	if ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 80, Y: 65}) {
+		t.Fatal("MouseDown в сфокусированном DirectInput-холсте не должен вызывать Render")
+	}
+	if ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 80, Y: 65}) {
+		t.Fatal("MouseUp в сфокусированном DirectInput-холсте не должен вызывать Render")
+	}
+	if ctx.HandleEvent(platform.Event{Type: platform.EventMouseWheel, WheelY: 1.0}) {
+		t.Fatal("MouseWheel в сфокусированном DirectInput-холсте не должен вызывать Render")
+	}
+	if ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: 'A', ScanCode: 0x1E}) {
+		t.Fatal("KeyDown в сфокусированном DirectInput-холсте не должен вызывать Render")
+	}
+	if ctx.HandleEvent(platform.Event{Type: platform.EventChar, Char: 'a'}) {
+		t.Fatal("EventChar в сфокусированном DirectInput-холсте не должен вызывать Render")
+	}
+	if ctx.HandleEvent(platform.Event{Type: platform.EventKeyUp, KeyCode: 'A', ScanCode: 0x1E}) {
+		t.Fatal("KeyUp в сфокусированном DirectInput-холсте не должен вызывать Render")
+	}
+
+	if downs != downsBefore+1 || ups != upsBefore+1 || wheels != 1 || keys != 2 {
+		t.Fatalf("некорректная доставка прямых событий: downs=%d ups=%d wheels=%d keys=%d", downs, ups, wheels, keys)
+	}
+
+	// Если коллбек явно зовёт RequestRedraw(), HandleEvent должен вернуть true
+	requestOnDown = true
+	if !ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 80, Y: 65}) {
+		t.Fatal("при вызове RequestRedraw() из коллбека HandleEvent должен вернуть true")
+	}
+	requestOnDown = false
+
+	// При активном оверлее DirectInput должен отключиться
+	showOverlay = true
+	ctx.Render(draw)
+	if !ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 80, Y: 65}) {
+		t.Fatal("при открытом оверлее клик не должен перехватываться DirectInput без Render")
+	}
+}
+
+func TestInteractiveCanvasStreamingFastPath(t *testing.T) {
+	win := &dirtyMockWindow{mockWindow: mockWindow{w: 400, h: 300, scale: 1.0}}
+	ctx := NewContext(win, nil)
+
+	frameColor := render.RGB(10, 20, 30)
+	draw := func(c *Context) {
+		c.Padding(20, func() {
+			c.InteractiveCanvas("video", 200, 100, CanvasCallbacks{
+				Streaming: true,
+				OnDraw: func(canvas *render.Canvas, area render.Rect, focused bool) {
+					canvas.FillRect(area, frameColor)
+				},
+			})
+		})
+	}
+
+	// Первый кадр (Paint) -> полный Present
+	ctx.HandleEvent(platform.Event{Type: platform.EventPaint})
+	ctx.Render(draw)
+	if win.fullPresents != 1 || win.rectPresents != 0 {
+		t.Fatalf("первый кадр должен идти через full Present, получено full=%d rect=%d", win.fullPresents, win.rectPresents)
+	}
+
+	// Фоновое обновление видеокадра по EventWakeUp -> fast-path PresentRect ровно по области холста
+	frameColor = render.RGB(200, 100, 50)
+	ctx.HandleEvent(platform.Event{Type: platform.EventWakeUp})
+	ctx.Render(draw)
+	if win.fullPresents != 1 || win.rectPresents != 1 {
+		t.Fatalf("стриминговый кадр должен идти через PresentRect, получено full=%d rect=%d", win.fullPresents, win.rectPresents)
+	}
+	wantRect := render.Rect{X: 20, Y: 20, W: 200, H: 100}
+	if win.lastRect != wantRect {
+		t.Fatalf("ожидался PresentRect %+v, получено %+v", wantRect, win.lastRect)
+	}
+	if !ctx.prevPresentStale {
+		t.Fatal("после стримингового fast-path флаг prevPresentStale должен быть установлен")
+	}
+
+	// Последующее обычное событие (например, клик вне холста) должно синхронизировать prevPresentPixels
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 350, Y: 250})
+	ctx.Render(draw)
+	if win.fullPresents != 2 {
+		t.Fatalf("обычный кадр после стриминга должен синхронизировать prevPresentPixels через full Present, получено full=%d", win.fullPresents)
+	}
+	if ctx.prevPresentStale {
+		t.Fatal("флаг prevPresentStale должен быть сброшен после полной синхронизации")
+	}
+}

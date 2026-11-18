@@ -165,3 +165,101 @@ func TestSVGPathArcs(t *testing.T) {
 	}
 }
 
+func TestFillLinearGradientBranches(t *testing.T) {
+	c := NewCanvas(120, 120)
+
+	// 1. Вертикальный непрозрачный градиент со скруглением
+	c.Clear(RGB(0, 0, 0))
+	c.FillLinearGradient(Rect{X: 10, Y: 10, W: 100, H: 100}, UniformRadii(12), LinearGradient{
+		StartX: 0, StartY: 0,
+		EndX: 0, EndY: 1,
+		Stops: []GradientStop{
+			{Pos: 0, Color: RGB(255, 0, 0)},
+			{Pos: 1, Color: RGB(0, 255, 0)},
+		},
+	})
+	if p := pixelAt(c, 10, 10); p.R != 0 || p.G != 0 {
+		t.Fatalf("вертикальный: угол за скруглением должен остаться чёрным, получено %+v", p)
+	}
+	if p := pixelAt(c, 60, 12); p.R < 220 || p.G > 40 {
+		t.Fatalf("вертикальный: верх должен быть красным, получено %+v", p)
+	}
+	if p := pixelAt(c, 60, 108); p.G < 220 || p.R > 40 {
+		t.Fatalf("вертикальный: низ должен быть зелёным, получено %+v", p)
+	}
+
+	// 2. Диагональный градиент с прозрачностью
+	c.Clear(RGB(0, 0, 0))
+	c.FillLinearGradient(Rect{X: 10, Y: 10, W: 100, H: 100}, UniformRadii(0), LinearGradient{
+		StartX: 0, StartY: 0,
+		EndX: 1, EndY: 1,
+		Stops: []GradientStop{
+			{Pos: 0, Color: RGBA(255, 0, 0, 128)},
+			{Pos: 1, Color: RGBA(0, 0, 255, 255)},
+		},
+	})
+	topLeft := pixelAt(c, 12, 12)
+	if topLeft.R < 100 || topLeft.R > 160 || topLeft.B > 30 {
+		t.Fatalf("диагональный alpha: ожидался полупрозрачный красный на чёрном фоне, получено %+v", topLeft)
+	}
+	botRight := pixelAt(c, 108, 108)
+	if botRight.B < 230 || botRight.R > 20 {
+		t.Fatalf("диагональный alpha: ожидался синий в нижнем правом углу, получено %+v", botRight)
+	}
+}
+
+func BenchmarkFillLinearGradientHorizontal(b *testing.B) {
+	c := NewCanvas(1280, 720)
+	r := Rect{X: 0, Y: 0, W: 1280, H: 720}
+	cr := UniformRadii(12)
+	grad := LinearGradient{
+		StartX: 0, StartY: 0,
+		EndX: 1, EndY: 0,
+		Stops: []GradientStop{
+			{Pos: 0, Color: RGB(20, 30, 60)},
+			{Pos: 0.5, Color: RGB(40, 80, 140)},
+			{Pos: 1, Color: RGB(15, 25, 45)},
+		},
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		c.FillLinearGradient(r, cr, grad)
+	}
+}
+
+func BenchmarkFillLinearGradientVertical(b *testing.B) {
+	c := NewCanvas(1280, 720)
+	r := Rect{X: 0, Y: 0, W: 1280, H: 720}
+	cr := UniformRadii(12)
+	grad := LinearGradient{
+		StartX: 0, StartY: 0,
+		EndX: 0, EndY: 1,
+		Stops: []GradientStop{
+			{Pos: 0, Color: RGB(20, 30, 60)},
+			{Pos: 1, Color: RGB(15, 25, 45)},
+		},
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		c.FillLinearGradient(r, cr, grad)
+	}
+}
+
+func BenchmarkFillLinearGradientDiagonal(b *testing.B) {
+	c := NewCanvas(1280, 720)
+	r := Rect{X: 0, Y: 0, W: 1280, H: 720}
+	cr := UniformRadii(12)
+	grad := LinearGradient{
+		StartX: 0, StartY: 0,
+		EndX: 1, EndY: 1,
+		Stops: []GradientStop{
+			{Pos: 0, Color: RGB(20, 30, 60)},
+			{Pos: 1, Color: RGB(15, 25, 45)},
+		},
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		c.FillLinearGradient(r, cr, grad)
+	}
+}
+

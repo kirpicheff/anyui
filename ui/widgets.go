@@ -582,6 +582,14 @@ type CanvasCallbacks struct {
 	// KeepFocusNavigation отключает перехват Tab/Escape/горячих клавиш при фокусе на холсте.
 	// По умолчанию (false) все клавиши передаются в OnKey без переключения фокуса по Tab/Escape.
 	KeepFocusNavigation bool
+	// Streaming включает fast-path в presentFrame(): при фоновом обновлении кадра (EventWakeUp)
+	// пропускается computeDiffRect и копирование в prevPresentPixels, а область холста отправляется
+	// напрямую в PresentRect.
+	Streaming bool
+	// DirectInput включает прямую доставку событий мыши и клавиатуры в коллбеки без полного Render(),
+	// когда курсор и фокус находятся внутри холста и нет открытых оверлеев.
+	// При необходимости перерисовать UI коллбек может вызвать RequestRedraw().
+	DirectInput bool
 }
 
 // InteractiveCanvas выделяет интерактивную область wDp x hDp с поддержкой фокуса,
@@ -607,7 +615,19 @@ func (c *Context) InteractiveCanvas(id string, wDp, hDp int, cb CanvasCallbacks,
 	}
 
 	c.registerFocusable(id)
-	c.RegisterHitTrack(id, r, cb.Cursor)
+	if cb.DirectInput {
+		c.RegisterHit(id, r, cb.Cursor)
+		c.nextDirectCanvases = append(c.nextDirectCanvases, directCanvasEntry{
+			id:   id,
+			rect: r,
+			cb:   cb,
+		})
+	} else {
+		c.RegisterHitTrack(id, r, cb.Cursor)
+	}
+	if cb.Streaming {
+		c.SetStreamingDirtyRect(r)
+	}
 
 	blocked := c.IsInputBlocked()
 	if !blocked && r.Contains(c.MouseX, c.MouseY) {

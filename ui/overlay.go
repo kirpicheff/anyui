@@ -52,6 +52,11 @@ func (o *OverlayLayer) IsBlocked(x, y int) bool {
 	return false
 }
 
+// HasActive возвращает true, если в последнем отрендеренном кадре были активные оверлеи (меню, попапы, модалки).
+func (o *OverlayLayer) HasActive() bool {
+	return len(o.nextBlocks) > 0 || len(o.items) > 0
+}
+
 // Flush отрисовывает все накопленные оверлеи поверх основного интерфейса.
 func (o *OverlayLayer) Flush() {
 	o.FlushWithHook(nil)

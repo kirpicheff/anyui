@@ -70,6 +70,12 @@ type RawMouseEvent struct {
 	Mods   platform.Modifiers
 }
 
+type directCanvasEntry struct {
+	id   string
+	rect render.Rect
+	cb   CanvasCallbacks
+}
+
 // Context хранит состояние текущего кадра Immediate Mode UI.
 type Context struct {
 	Win      platform.Window
@@ -191,9 +197,14 @@ type Context struct {
 	prevPresentPixels []byte
 	prevPresentW      int
 	prevPresentH      int
-	paintRequested    bool
-	debugDirtyRect    bool
-	prevDebugDirty    render.Rect
+	paintRequested     bool
+	debugDirtyRect     bool
+	prevDebugDirty     render.Rect
+	prevPresentStale   bool
+	wakeOnlyFrame      bool
+	streamingDirty     render.Rect
+	directCanvases     []directCanvasEntry
+	nextDirectCanvases []directCanvasEntry
 }
 
 // NewContext создаёт новый UI-контекст поверх окна и менеджера шрифтов.
@@ -297,8 +308,188 @@ func (c *Context) Run(drawFn func(ctx *Context)) error {
 	})
 }
 
+// SetStreamingDirtyRect регистрирует область потокового обновления (например, видеокадр InteractiveCanvas),
+// для которой в presentFrame() можно пропустить computeDiffRect и копирование в prevPresentPixels.
+func (c *Context) SetStreamingDirtyRect(r render.Rect) {
+	if r.Empty() {
+		return
+	}
+	c.streamingDirty = c.streamingDirty.Union(r)
+}
+
+func (c *Context) findDirectCanvasByID(id string) *directCanvasEntry {
+	for i := len(c.directCanvases) - 1; i >= 0; i-- {
+		if c.directCanvases[i].id == id {
+			return &c.directCanvases[i]
+		}
+	}
+	return nil
+}
+
+func (c *Context) findDirectCanvasAt(x, y int) *directCanvasEntry {
+	hitID, _, _, found := c.hitTest(x, y)
+	if !found {
+		return nil
+	}
+	for i := len(c.directCanvases) - 1; i >= 0; i-- {
+		e := &c.directCanvases[i]
+		if e.id == hitID && e.rect.Contains(x, y) {
+			return e
+		}
+	}
+	return nil
+}
+
+// tryDirectCanvasEvent пытается доставить событие напрямую в InteractiveCanvas с DirectInput=true
+// без запуска полного цикла Render(). Возвращает (handled, needRedraw).
+func (c *Context) tryDirectCanvasEvent(ev platform.Event) (bool, bool) {
+	if len(c.directCanvases) == 0 || c.Overlays.HasActive() {
+		return false, false
+	}
+
+	switch ev.Type {
+	case platform.EventMouseMove:
+		var entry *directCanvasEntry
+		if c.ActiveID != "" {
+			entry = c.findDirectCanvasByID(c.ActiveID)
+		} else {
+			cand := c.findDirectCanvasAt(ev.X, ev.Y)
+			if cand != nil && c.lastHitID == cand.id {
+				entry = cand
+			}
+		}
+		if entry == nil {
+			return false, false
+		}
+		c.MouseX = ev.X
+		c.MouseY = ev.Y
+		c.needsRedraw = false
+		if entry.cb.OnMouseMove != nil {
+			entry.cb.OnMouseMove(ev.X-entry.rect.X, ev.Y-entry.rect.Y, ev.Mods)
+		}
+		if !c.needsRedraw {
+			c.skippedMouseMove++
+		}
+		return true, c.needsRedraw
+
+	case platform.EventMouseDown:
+		if ev.Button != platform.MouseLeft && ev.Button != platform.MouseRight && ev.Button != platform.MouseMiddle {
+			return false, false
+		}
+		entry := c.findDirectCanvasAt(ev.X, ev.Y)
+		if entry == nil || c.FocusID != entry.id {
+			return false, false
+		}
+		c.MouseX = ev.X
+		c.MouseY = ev.Y
+		c.MouseMods = ev.Mods
+		switch ev.Button {
+		case platform.MouseLeft:
+			c.MouseDown = true
+		case platform.MouseRight:
+			c.RightMouseDown = true
+			c.RightMouseX = ev.X
+			c.RightMouseY = ev.Y
+		case platform.MouseMiddle:
+			c.MiddleMouseDown = true
+			c.MiddleMouseX = ev.X
+			c.MiddleMouseY = ev.Y
+		}
+		c.ActiveID = entry.id
+		c.needsRedraw = false
+		if entry.cb.OnMouseDown != nil {
+			entry.cb.OnMouseDown(ev.X-entry.rect.X, ev.Y-entry.rect.Y, ev.Button, ev.Mods)
+		}
+		return true, c.needsRedraw
+
+	case platform.EventMouseUp:
+		if ev.Button != platform.MouseLeft && ev.Button != platform.MouseRight && ev.Button != platform.MouseMiddle {
+			return false, false
+		}
+		var entry *directCanvasEntry
+		if c.ActiveID != "" {
+			entry = c.findDirectCanvasByID(c.ActiveID)
+		} else {
+			entry = c.findDirectCanvasAt(ev.X, ev.Y)
+		}
+		if entry == nil || c.FocusID != entry.id {
+			return false, false
+		}
+		c.MouseX = ev.X
+		c.MouseY = ev.Y
+		switch ev.Button {
+		case platform.MouseLeft:
+			c.MouseDown = false
+		case platform.MouseRight:
+			c.RightMouseDown = false
+		case platform.MouseMiddle:
+			c.MiddleMouseDown = false
+		}
+		if !c.MouseDown && !c.RightMouseDown && !c.MiddleMouseDown {
+			c.ActiveID = ""
+		}
+		c.needsRedraw = false
+		if entry.cb.OnMouseUp != nil {
+			entry.cb.OnMouseUp(ev.X-entry.rect.X, ev.Y-entry.rect.Y, ev.Button, ev.Mods)
+		}
+		return true, c.needsRedraw
+
+	case platform.EventMouseWheel:
+		mx, my := ev.X, ev.Y
+		if mx == 0 && my == 0 {
+			mx, my = c.MouseX, c.MouseY
+		}
+		entry := c.findDirectCanvasAt(mx, my)
+		if entry == nil || c.FocusID != entry.id {
+			return false, false
+		}
+		c.needsRedraw = false
+		if entry.cb.OnMouseWheel != nil {
+			entry.cb.OnMouseWheel(mx-entry.rect.X, my-entry.rect.Y, ev.WheelX, ev.WheelY, ev.Mods)
+		}
+		return true, c.needsRedraw
+
+	case platform.EventKeyDown, platform.EventKeyUp:
+		if c.FocusID == "" || !c.captureKeysFocus {
+			return false, false
+		}
+		entry := c.findDirectCanvasByID(c.FocusID)
+		if entry == nil {
+			return false, false
+		}
+		c.needsRedraw = false
+		if entry.cb.OnKey != nil {
+			entry.cb.OnKey(RawKeyEvent{
+				Pressed:  ev.Type == platform.EventKeyDown,
+				KeyCode:  ev.KeyCode,
+				ScanCode: ev.ScanCode,
+				Extended: ev.Extended,
+				Mods:     ev.Mods,
+			})
+		}
+		return true, c.needsRedraw
+
+	case platform.EventChar:
+		if c.FocusID == "" || !c.captureKeysFocus {
+			return false, false
+		}
+		if c.findDirectCanvasByID(c.FocusID) != nil {
+			return true, false
+		}
+	}
+
+	return false, false
+}
+
 // HandleEvent обрабатывает платформенное событие и возвращает true, если требуется перерисовка.
 func (c *Context) HandleEvent(ev platform.Event) bool {
+	if handled, needRedraw := c.tryDirectCanvasEvent(ev); handled {
+		if needRedraw {
+			c.wakeOnlyFrame = false
+		}
+		return needRedraw && c.Canvas.Width > 0 && c.Canvas.Height > 0
+	}
+
 	redraw := false
 
 	switch ev.Type {
@@ -308,17 +499,21 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 		if ev.Scale > 0 {
 			c.Scale = ev.Scale
 			c.layers.InvalidateStatic()
+			c.wakeOnlyFrame = false
 			redraw = true
 		}
 	case platform.EventResize:
 		c.Canvas.Resize(ev.Width, ev.Height)
 		c.layers.InvalidateStatic()
+		c.wakeOnlyFrame = false
 		redraw = true
 	case platform.EventPaint:
 		c.paintRequested = true
+		c.wakeOnlyFrame = false
 		redraw = true
 	case platform.EventWakeUp:
 		c.wakePending.Store(false)
+		c.wakeOnlyFrame = true
 		redraw = true
 	case platform.EventMouseMove:
 		c.MouseX = ev.X
@@ -490,6 +685,10 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 		redraw = true
 	}
 
+	if redraw && ev.Type != platform.EventWakeUp {
+		c.wakeOnlyFrame = false
+	}
+
 	return redraw && c.Canvas.Width > 0 && c.Canvas.Height > 0
 }
 
@@ -529,8 +728,34 @@ func (c *Context) SetDebugDirtyRect(enabled bool) {
 func (c *Context) presentFrame() {
 	w, h := c.Canvas.Width, c.Canvas.Height
 	need := w * h * 4
+	wakeOnly := c.wakeOnlyFrame
+	c.wakeOnlyFrame = false
+
 	forceFull := c.paintRequested || c.prevPresentW != w || c.prevPresentH != h || len(c.prevPresentPixels) != need
 	c.paintRequested = false
+
+	// Fast-path для потокового обновления InteractiveCanvas (например, видеокадр по EventWakeUp):
+	// пропускаем computeDiffRect и копирование в prevPresentPixels, отправляя известную область напрямую.
+	if !forceFull && wakeOnly && !c.streamingDirty.Empty() && !c.debugDirtyRect &&
+		!c.Overlays.HasActive() && (c.Animator == nil || !c.Animator.HasActive()) {
+		sr := c.streamingDirty.Intersect(render.Rect{X: 0, Y: 0, W: w, H: h})
+		if !sr.Empty() {
+			c.prevPresentStale = true
+			c.lastDirtyRects = append(c.lastDirtyRects[:0], sr)
+			if dp, ok := c.Win.(platform.DirtyPresenter); ok && (sr.W < w || sr.H < h) {
+				dp.PresentRect(c.Canvas.Pixels, w, h, sr.X, sr.Y, sr.W, sr.H)
+			} else {
+				c.Win.Present(c.Canvas.Pixels, w, h)
+			}
+			c.Canvas.ResetDirtyRects()
+			return
+		}
+	}
+
+	if c.prevPresentStale {
+		forceFull = true
+		c.prevPresentStale = false
+	}
 
 	if forceFull {
 		if cap(c.prevPresentPixels) < need {
@@ -652,6 +877,8 @@ func (c *Context) beginFrame() {
 	c.idSeqStack = append(c.idSeqStack[:0], 0)
 	c.nextFocusOrder = c.nextFocusOrder[:0]
 	c.nextHitRegions = c.nextHitRegions[:0]
+	c.nextDirectCanvases = c.nextDirectCanvases[:0]
+	c.streamingDirty = render.Rect{}
 	c.layers.lastFrameBlitted = false
 	c.layers.activeLayer = LayerDynamic
 	if c.Theme != c.lastTheme || c.Scale != c.lastScale {
@@ -687,6 +914,7 @@ func (c *Context) endFrame() {
 	})
 	c.focusOrder, c.nextFocusOrder = c.nextFocusOrder, c.focusOrder[:0]
 	c.hitRegions, c.nextHitRegions = c.nextHitRegions, c.hitRegions[:0]
+	c.directCanvases, c.nextDirectCanvases = c.nextDirectCanvases, c.directCanvases[:0]
 	c.lastHotID = c.HotID
 	c.lastHitID, _, _, _ = c.hitTest(c.MouseX, c.MouseY)
 	if !c.needsRedraw {
