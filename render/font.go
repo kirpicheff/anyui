@@ -239,6 +239,10 @@ func LoadDefaultSystemFont() (*FontManager, error) {
 		`C:\Windows\Fonts\segoeui.ttf`,
 		`C:\Windows\Fonts\arial.ttf`,
 		`C:\Windows\Fonts\tahoma.ttf`,
+		`/System/Library/Fonts/SFNS.ttf`,
+		`/System/Library/Fonts/Supplemental/Arial.ttf`,
+		`/System/Library/Fonts/Supplemental/Tahoma.ttf`,
+		`/Library/Fonts/Arial.ttf`,
 		`/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf`,
 		`/usr/share/fonts/TTF/DejaVuSans.ttf`,
 	}
@@ -259,6 +263,9 @@ func LoadDefaultSystemFont() (*FontManager, error) {
 	boldCandidates := []string{
 		`C:\Windows\Fonts\segoeuib.ttf`,
 		`C:\Windows\Fonts\arialbd.ttf`,
+		`/System/Library/Fonts/Supplemental/Arial Bold.ttf`,
+		`/Library/Fonts/Arial Bold.ttf`,
+		`/System/Library/Fonts/SFNS.ttf`,
 		`/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf`,
 		`/usr/share/fonts/TTF/DejaVuSans-Bold.ttf`,
 	}
@@ -271,6 +278,9 @@ func LoadDefaultSystemFont() (*FontManager, error) {
 	monoCandidates := []string{
 		`C:\Windows\Fonts\consola.ttf`,
 		`C:\Windows\Fonts\cour.ttf`,
+		`/System/Library/Fonts/SFNSMono.ttf`,
+		`/System/Library/Fonts/Supplemental/Courier New.ttf`,
+		`/Library/Fonts/Courier New.ttf`,
 		`/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf`,
 		`/usr/share/fonts/TTF/DejaVuSansMono.ttf`,
 	}
@@ -283,6 +293,8 @@ func LoadDefaultSystemFont() (*FontManager, error) {
 	fallbackCandidates := []string{
 		`C:\Windows\Fonts\seguisym.ttf`,
 		`C:\Windows\Fonts\arial.ttf`,
+		`/System/Library/Fonts/Apple Symbols.ttf`,
+		`/System/Library/Fonts/Supplemental/Arial.ttf`,
 	}
 	for _, p := range fallbackCandidates {
 		_ = fm.AddFallbackFile(p)
