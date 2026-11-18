@@ -27,8 +27,8 @@ func buildNotificationScript(n TrayNotification) string {
 	return fmt.Sprintf(`display notification "%s"`, msg)
 }
 
-// sendDarwinNotification отправляет системное уведомление через osascript (без CGO).
-func sendDarwinNotification(n TrayNotification) error {
+// sendDarwinNotificationAppleScript отправляет системное уведомление через osascript.
+func sendDarwinNotificationAppleScript(n TrayNotification) error {
 	script := buildNotificationScript(n)
 	return exec.Command("osascript", "-e", script).Run()
 }

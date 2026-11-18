@@ -21,6 +21,7 @@ extern void goDarwinOnKey(uint64_t winID, int isDown, uint16_t keyCode, uint64_t
 extern void goDarwinOnFlagsChanged(uint64_t winID, uint64_t mods);
 extern void goDarwinOnFocusLost(uint64_t winID);
 extern int goDarwinHitTest(uint64_t winID, double x, double y, double viewH, double scale);
+extern void goDarwinOnDropFiles(uint64_t winID, const char* pathsNewlineSep);
 
 static char kAnyUIDelegateKey;
 
@@ -40,9 +41,10 @@ static void runOnMainAsync(dispatch_block_t block) {
     }
 }
 
-@interface AnyUIView : NSView
+@interface AnyUIView : NSView <NSDraggingDestination>
 @property (nonatomic, assign) uint64_t winID;
 @property (nonatomic, assign) BOOL frameless;
+@property (nonatomic, assign) BOOL acceptDropFiles;
 @property (nonatomic, strong) NSTrackingArea *trackingArea;
 @property (nonatomic, strong) NSCursor *currentCursor;
 @end
@@ -170,6 +172,42 @@ static void runOnMainAsync(dispatch_block_t block) {
 - (void)flagsChanged:(NSEvent *)event {
     goDarwinOnFlagsChanged(self.winID, (uint64_t)event.modifierFlags);
 }
+
+- (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
+    if (!self.acceptDropFiles) {
+        return NSDragOperationNone;
+    }
+    NSPasteboard *pb = [sender draggingPasteboard];
+    if ([pb canReadObjectForClasses:@[[NSURL class]]
+                            options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}]) {
+        return NSDragOperationCopy;
+    }
+    return NSDragOperationNone;
+}
+
+- (BOOL)performDragOperation:(id<NSDraggingInfo>)sender {
+    if (!self.acceptDropFiles) {
+        return NO;
+    }
+    NSPasteboard *pb = [sender draggingPasteboard];
+    NSArray<NSURL *> *urls = [pb readObjectsForClasses:@[[NSURL class]]
+                                               options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}];
+    if (!urls || urls.count == 0) {
+        return NO;
+    }
+    NSMutableArray<NSString *> *paths = [NSMutableArray arrayWithCapacity:urls.count];
+    for (NSURL *u in urls) {
+        if (u.path && u.path.length > 0) {
+            [paths addObject:u.path];
+        }
+    }
+    if (paths.count == 0) {
+        return NO;
+    }
+    NSString *joined = [paths componentsJoinedByString:@"\n"];
+    goDarwinOnDropFiles(self.winID, [joined UTF8String]);
+    return YES;
+}
 @end
 
 @interface AnyUIWindowDelegate : NSObject <NSWindowDelegate>
@@ -295,7 +333,8 @@ uintptr_t anyui_darwin_create_window(
     int minWidth,
     int minHeight,
     int darkTitle,
-    int frameless
+    int frameless,
+    int acceptDropFiles
 ) {
     __block uintptr_t result = 0;
     NSString *titleStr = title ? [NSString stringWithUTF8String:title] : @"";
@@ -335,8 +374,12 @@ uintptr_t anyui_darwin_create_window(
             AnyUIView *view = [[AnyUIView alloc] initWithFrame:rect];
             view.winID = winID;
             view.frameless = (frameless != 0);
+            view.acceptDropFiles = (acceptDropFiles != 0);
             view.wantsLayer = YES;
             view.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
+            if (acceptDropFiles != 0) {
+                [view registerForDraggedTypes:@[NSPasteboardTypeFileURL]];
+            }
             [win setContentView:view];
 
             AnyUIWindowDelegate *delegate = [[AnyUIWindowDelegate alloc] init];

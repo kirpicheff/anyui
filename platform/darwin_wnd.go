@@ -4,7 +4,7 @@ package platform
 
 /*
 #cgo CFLAGS: -x objective-c -fobjc-arc
-#cgo LDFLAGS: -framework Cocoa -framework QuartzCore
+#cgo LDFLAGS: -framework Cocoa -framework QuartzCore -framework UserNotifications
 #include <stdlib.h>
 #include "darwin_bridge.h"
 */
@@ -14,14 +14,10 @@ import (
 	"errors"
 	"math"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"unsafe"
-)
-
-var (
-	errDarwinTrayNotImplemented = errors.New("системный трей на macOS будет реализован на следующем этапе")
-	errDarwinClipboardNotImpl   = errors.New("буфер обмена macOS будет реализован на этапе системной интеграции")
 )
 
 var (
@@ -85,12 +81,6 @@ func RunEventLoop(onStart func() error) error {
 	return nil
 }
 
-// NewTray возвращает заглушку до реализации NSStatusItem на этапе нативной системной интеграции.
-func NewTray(cfg TrayConfig) (Tray, error) {
-	_ = cfg
-	return nil, errDarwinTrayNotImplemented
-}
-
 func (w *darwinWindow) Run(handler func(Event)) error {
 	return RunEventLoop(func() error {
 		return w.Open(handler)
@@ -117,6 +107,10 @@ func (w *darwinWindow) Open(handler func(Event)) error {
 	if w.cfg.Frameless {
 		frameless = 1
 	}
+	acceptDrop := C.int(0)
+	if w.cfg.AcceptDropFiles {
+		acceptDrop = 1
+	}
 
 	handle := uintptr(C.anyui_darwin_create_window(
 		C.uint64_t(w.id),
@@ -127,6 +121,7 @@ func (w *darwinWindow) Open(handler func(Event)) error {
 		C.int(w.cfg.MinHeight),
 		darkTitle,
 		frameless,
+		acceptDrop,
 	))
 	if handle == 0 {
 		return errors.New("не удалось создать NSWindow")
@@ -273,15 +268,6 @@ func (w *darwinWindow) Scale() float32 {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.scale
-}
-
-func (w *darwinWindow) ClipboardText() (string, error) {
-	return "", errDarwinClipboardNotImpl
-}
-
-func (w *darwinWindow) SetClipboardText(text string) error {
-	_ = text
-	return errDarwinClipboardNotImpl
 }
 
 func (w *darwinWindow) Minimize() {
@@ -803,5 +789,37 @@ func goDarwinHitTest(winID C.uint64_t, x, y, viewH, scale C.double) C.int {
 
 	hit := ComputeFramelessHitTest(px, py, ww, wh, borderPx, titlePx, w.IsMaximized(), customHit)
 	return C.int(hit)
+}
+
+//export goDarwinOnDropFiles
+func goDarwinOnDropFiles(winID C.uint64_t, pathsNewlineSep *C.char) {
+	if pathsNewlineSep == nil {
+		return
+	}
+	w := lookupDarwinWindow(uint64(winID))
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	handler := w.handler
+	closed := w.closed
+	w.mu.Unlock()
+	if handler == nil || closed {
+		return
+	}
+	raw := C.GoString(pathsNewlineSep)
+	var files []string
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			files = append(files, line)
+		}
+	}
+	if len(files) > 0 {
+		handler(Event{
+			Type:  EventDropFiles,
+			Files: files,
+		})
+	}
 }
 
