@@ -440,6 +440,21 @@ func parseSVGPath(d string) ([][]PointF, bool) {
 		}
 		return float32(f), true
 	}
+	nextFlag := func() (bool, bool) {
+		skipSep()
+		if i >= n {
+			return false, false
+		}
+		if d[i] == '0' {
+			i++
+			return false, true
+		}
+		if d[i] == '1' {
+			i++
+			return true, true
+		}
+		return false, false
+	}
 
 	flushContour := func() {
 		if len(cur) > 0 {
@@ -579,6 +594,24 @@ func parseSVGPath(d string) ([][]PointF, bool) {
 			lastCtrlX, lastCtrlY = x1, y1
 			cx, cy = x, y
 			lastCmd = 'Q'
+		case 'A', 'a':
+			rx, ok1 := nextNum()
+			ry, ok2 := nextNum()
+			rot, ok3 := nextNum()
+			largeArc, ok4 := nextFlag()
+			sweep, ok5 := nextFlag()
+			x, ok6 := nextNum()
+			y, ok7 := nextNum()
+			if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 || !ok6 || !ok7 {
+				break
+			}
+			if cmd == 'a' {
+				x += cx
+				y += cy
+			}
+			appendArc(&cur, cx, cy, rx, ry, rot, largeArc, sweep, x, y)
+			cx, cy = x, y
+			lastCmd = 'A'
 		case 'Z', 'z':
 			anyClosed = true
 			cx, cy = startX, startY
@@ -615,5 +648,106 @@ func appendQuad(pts *[]PointF, x0, y0, x1, y1, x2, y2 float32) {
 		y := u*u*y0 + 2*u*t*y1 + t*t*y2
 		*pts = append(*pts, PointF{X: x, Y: y})
 	}
+}
+
+// appendArc аппроксимирует эллиптическую дугу SVG (команда A/a) по параметризации W3C SVG F.6.5.
+func appendArc(pts *[]PointF, x0, y0, rxIn, ryIn, xAxisRotDeg float32, largeArc, sweep bool, x, y float32) {
+	if x0 == x && y0 == y {
+		return
+	}
+	rx := math.Abs(float64(rxIn))
+	ry := math.Abs(float64(ryIn))
+	if rx == 0 || ry == 0 {
+		*pts = append(*pts, PointF{X: x, Y: y})
+		return
+	}
+
+	phi := float64(xAxisRotDeg) * math.Pi / 180.0
+	cosPhi := math.Cos(phi)
+	sinPhi := math.Sin(phi)
+
+	dx2 := float64(x0-x) / 2.0
+	dy2 := float64(y0-y) / 2.0
+	x1p := cosPhi*dx2 + sinPhi*dy2
+	y1p := -sinPhi*dx2 + cosPhi*dy2
+
+	rxSq := rx * rx
+	rySq := ry * ry
+	x1pSq := x1p * x1p
+	y1pSq := y1p * y1p
+
+	lambda := x1pSq/rxSq + y1pSq/rySq
+	if lambda > 1.0 {
+		scale := math.Sqrt(lambda)
+		rx *= scale
+		ry *= scale
+		rxSq = rx * rx
+		rySq = ry * ry
+	}
+
+	num := rxSq*rySq - rxSq*y1pSq - rySq*x1pSq
+	den := rxSq*y1pSq + rySq*x1pSq
+	if den == 0 {
+		*pts = append(*pts, PointF{X: x, Y: y})
+		return
+	}
+	factor := 0.0
+	if num > 0 {
+		factor = math.Sqrt(num / den)
+	}
+	if largeArc == sweep {
+		factor = -factor
+	}
+
+	cxp := factor * (rx * y1p / ry)
+	cyp := factor * (-ry * x1p / rx)
+
+	cx := cosPhi*cxp - sinPhi*cyp + float64(x0+x)/2.0
+	cy := sinPhi*cxp + cosPhi*cyp + float64(y0+y)/2.0
+
+	theta1 := svgVecAngle(1, 0, (x1p-cxp)/rx, (y1p-cyp)/ry)
+	dTheta := svgVecAngle((x1p-cxp)/rx, (y1p-cyp)/ry, (-x1p-cxp)/rx, (-y1p-cyp)/ry)
+	if !sweep && dTheta > 0 {
+		dTheta -= 2 * math.Pi
+	} else if sweep && dTheta < 0 {
+		dTheta += 2 * math.Pi
+	}
+
+	steps := int(math.Ceil(math.Abs(dTheta) / (math.Pi / 12.0)))
+	if steps < 8 {
+		steps = 8
+	}
+	for s := 1; s <= steps; s++ {
+		if s == steps {
+			*pts = append(*pts, PointF{X: x, Y: y})
+			break
+		}
+		th := theta1 + dTheta*float64(s)/float64(steps)
+		px := rx * math.Cos(th)
+		py := ry * math.Sin(th)
+		*pts = append(*pts, PointF{
+			X: float32(cosPhi*px - sinPhi*py + cx),
+			Y: float32(sinPhi*px + cosPhi*py + cy),
+		})
+	}
+}
+
+func svgVecAngle(ux, uy, vx, vy float64) float64 {
+	dot := ux*vx + uy*vy
+	lenProd := math.Hypot(ux, uy) * math.Hypot(vx, vy)
+	if lenProd == 0 {
+		return 0
+	}
+	ratio := dot / lenProd
+	if ratio > 1 {
+		ratio = 1
+	} else if ratio < -1 {
+		ratio = -1
+	}
+	ang := math.Acos(ratio)
+	if ux*vy-uy*vx < 0 {
+		return -ang
+	}
+	return ang
 }
 

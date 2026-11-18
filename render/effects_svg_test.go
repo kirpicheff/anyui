@@ -127,3 +127,41 @@ func TestDrawImageAndBGRA(t *testing.T) {
 	}
 }
 
+func TestSVGPathArcs(t *testing.T) {
+	// Проверка абсолютной дуги и слитных флагов 01 в относительной дуге
+	contours, closed := parseSVGPath("M4 12A8 8 0 0 1 20 12a4 4 0 01-4 4")
+	if closed {
+		t.Fatal("контур не должен быть замкнут")
+	}
+	if len(contours) != 1 {
+		t.Fatalf("ожидался 1 контур, получено %d", len(contours))
+	}
+	pts := contours[0]
+	if len(pts) < 10 {
+		t.Fatalf("ожидалось разбиение дуг на точки, получено %d", len(pts))
+	}
+	last := pts[len(pts)-1]
+	if math.Abs(float64(last.X-16)) > 0.05 || math.Abs(float64(last.Y-16)) > 0.05 {
+		t.Fatalf("конечная точка дуги ожидалась (16,16), получено %+v", last)
+	}
+
+	// Вырожденная дуга (rx == 0) должна давать прямую линию до (15, 20)
+	degContours, _ := parseSVGPath("M5 5A0 5 0 0 1 15 20")
+	if len(degContours) != 1 || len(degContours[0]) != 2 {
+		t.Fatalf("вырожденная дуга должна давать отрезок из 2 точек, получено %+v", degContours)
+	}
+	if degContours[0][1].X != 15 || degContours[0][1].Y != 20 {
+		t.Fatalf("конечная точка вырожденной дуги ожидалась (15,20), получено %+v", degContours[0][1])
+	}
+
+	// Рендеринг иконки с дугой (верхняя полуокружность радиусом 8 вокруг (12, 12))
+	c := NewCanvas(32, 32)
+	c.Clear(RGB(0, 0, 0))
+	svg := `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 0116 0"/></svg>`
+	c.DrawSVG(svg, 4, 4, 24, RGB(255, 255, 255))
+	// Верхняя точка дуги (12, 4) в viewBox -> (16, 8) на холсте
+	if px := pixelAt(c, 16, 8); px.R < 100 {
+		t.Fatalf("ожидался отрисованный пиксель в верхней точке дуги (16,8), получено %+v", px)
+	}
+}
+
