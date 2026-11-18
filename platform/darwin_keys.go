@@ -101,3 +101,41 @@ func darwinKeycodeToVK(keyCode uint16) uint32 {
 	return darwinKeycodeTable[keyCode]
 }
 
+// darwinExtractChars фильтрует печатные Unicode-символы из строки [NSEvent characters] для EventChar.
+func darwinExtractChars(s string, mods Modifiers) []rune {
+	if s == "" || mods.Ctrl {
+		return nil
+	}
+	var out []rune
+	for _, r := range s {
+		// Отсекаем управляющие символы и диапазон PUA AppKit (стрелки, F1..F12 и т.д.).
+		if r < 0x20 || r == 0x7F || (r >= 0xF700 && r <= 0xF8FF) {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
+type darwinModChange struct {
+	vk   uint32
+	down bool
+}
+
+// darwinChangedModifiers определяет изменившиеся клавиши-модификаторы между двумя масками NSEventModifierFlags.
+func darwinChangedModifiers(prevFlags, newFlags uint64) []darwinModChange {
+	prev := darwinModifiersFromFlags(prevFlags)
+	curr := darwinModifiersFromFlags(newFlags)
+	var changes []darwinModChange
+	if prev.Shift != curr.Shift {
+		changes = append(changes, darwinModChange{vk: 0x10, down: curr.Shift})
+	}
+	if prev.Ctrl != curr.Ctrl {
+		changes = append(changes, darwinModChange{vk: 0x11, down: curr.Ctrl})
+	}
+	if prev.Alt != curr.Alt {
+		changes = append(changes, darwinModChange{vk: 0x12, down: curr.Alt})
+	}
+	return changes
+}
+

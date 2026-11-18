@@ -45,6 +45,9 @@ int anyui_darwin_is_fullscreen(uintptr_t handle);
 void anyui_darwin_bring_to_front(uintptr_t handle);
 void anyui_darwin_set_dark_title(uintptr_t handle, int dark);
 int anyui_darwin_double_click_ms(void);
+void anyui_darwin_set_cursor(uintptr_t handle, int cursorType);
+void anyui_darwin_set_capture(uintptr_t handle);
+void anyui_darwin_release_capture(uintptr_t handle);
 
 #endif // ANYUI_DARWIN_BRIDGE_H
 

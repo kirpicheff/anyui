@@ -12,6 +12,7 @@ import "C"
 
 import (
 	"errors"
+	"math"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -35,12 +36,14 @@ type darwinWindow struct {
 	handle  uintptr
 	handler func(Event)
 
-	mu      sync.Mutex
-	onClose func() bool
-	width   int
-	height  int
-	scale   float32
-	closed  bool
+	mu           sync.Mutex
+	onClose      func() bool
+	width        int
+	height       int
+	scale        float32
+	closed       bool
+	capturing    bool
+	lastModFlags uint64
 }
 
 var (
@@ -251,7 +254,13 @@ func (w *darwinWindow) SetTitle(title string) {
 }
 
 func (w *darwinWindow) SetCursor(cursor CursorType) {
-	_ = cursor
+	w.mu.Lock()
+	handle := w.handle
+	closed := w.closed
+	w.mu.Unlock()
+	if handle != 0 && !closed {
+		C.anyui_darwin_set_cursor(C.uintptr_t(handle), C.int(cursor))
+	}
 }
 
 func (w *darwinWindow) Size() (int, int) {
@@ -388,9 +397,29 @@ func (w *darwinWindow) NativeHandle() uintptr {
 	return w.handle
 }
 
-func (w *darwinWindow) SetCapture() {}
+func (w *darwinWindow) SetCapture() {
+	w.mu.Lock()
+	handle := w.handle
+	closed := w.closed
+	if handle != 0 && !closed {
+		w.capturing = true
+	}
+	w.mu.Unlock()
+	if handle != 0 && !closed {
+		C.anyui_darwin_set_capture(C.uintptr_t(handle))
+	}
+}
 
-func (w *darwinWindow) ReleaseCapture() {}
+func (w *darwinWindow) ReleaseCapture() {
+	w.mu.Lock()
+	handle := w.handle
+	wasCapturing := w.capturing
+	w.capturing = false
+	w.mu.Unlock()
+	if handle != 0 && wasCapturing {
+		C.anyui_darwin_release_capture(C.uintptr_t(handle))
+	}
+}
 
 func (w *darwinWindow) DoubleClickTimeMs() int {
 	return int(C.anyui_darwin_double_click_ms())
@@ -562,5 +591,217 @@ func goDarwinOnWakeUp(winID C.uint64_t) {
 	if handler != nil && !closed {
 		handler(Event{Type: EventWakeUp})
 	}
+}
+
+func darwinMouseButton(btn int) MouseButton {
+	switch btn {
+	case 0:
+		return MouseLeft
+	case 1:
+		return MouseRight
+	case 2:
+		return MouseMiddle
+	default:
+		return 0
+	}
+}
+
+//export goDarwinOnMouse
+func goDarwinOnMouse(winID C.uint64_t, eventKind C.int, x, y, viewH, scale C.double, button C.int, mods C.uint64_t) {
+	w := lookupDarwinWindow(uint64(winID))
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	handler := w.handler
+	closed := w.closed
+	if eventKind == 3 {
+		w.capturing = false
+	}
+	w.mu.Unlock()
+	if handler == nil || closed {
+		return
+	}
+
+	px, py := appKitPointToGoUIPixels(float64(x), float64(y), float64(viewH), float64(scale))
+	m := darwinModifiersFromFlags(uint64(mods))
+	btn := darwinMouseButton(int(button))
+
+	var evType EventType
+	switch int(eventKind) {
+	case 1:
+		evType = EventMouseMove
+		btn = 0
+	case 2:
+		evType = EventMouseDown
+	case 3:
+		evType = EventMouseUp
+	default:
+		return
+	}
+
+	handler(Event{
+		Type:   evType,
+		X:      px,
+		Y:      py,
+		Button: btn,
+		Mods:   m,
+	})
+}
+
+//export goDarwinOnWheel
+func goDarwinOnWheel(winID C.uint64_t, x, y, viewH, scale, deltaX, deltaY C.double, precise C.int, mods C.uint64_t) {
+	w := lookupDarwinWindow(uint64(winID))
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	handler := w.handler
+	closed := w.closed
+	w.mu.Unlock()
+	if handler == nil || closed {
+		return
+	}
+
+	px, py := appKitPointToGoUIPixels(float64(x), float64(y), float64(viewH), float64(scale))
+	wx, wy := darwinNormalizeWheel(float64(deltaX), float64(deltaY), precise != 0)
+	if wx == 0 && wy == 0 {
+		return
+	}
+
+	handler(Event{
+		Type:   EventMouseWheel,
+		X:      px,
+		Y:      py,
+		WheelX: wx,
+		WheelY: wy,
+		Mods:   darwinModifiersFromFlags(uint64(mods)),
+	})
+}
+
+//export goDarwinOnKey
+func goDarwinOnKey(winID C.uint64_t, isDown C.int, keyCode C.uint16_t, mods C.uint64_t, charsUTF8 *C.char) {
+	w := lookupDarwinWindow(uint64(winID))
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	handler := w.handler
+	closed := w.closed
+	w.mu.Unlock()
+	if handler == nil || closed {
+		return
+	}
+
+	vk := darwinKeycodeToVK(uint16(keyCode))
+	m := darwinModifiersFromFlags(uint64(mods))
+
+	if isDown != 0 {
+		if vk != 0 {
+			handler(Event{
+				Type:     EventKeyDown,
+				KeyCode:  vk,
+				ScanCode: uint16(keyCode),
+				Mods:     m,
+			})
+		}
+		if charsUTF8 != nil {
+			for _, r := range darwinExtractChars(C.GoString(charsUTF8), m) {
+				handler(Event{
+					Type: EventChar,
+					Char: r,
+					Mods: m,
+				})
+			}
+		}
+		return
+	}
+
+	if vk != 0 {
+		handler(Event{
+			Type:     EventKeyUp,
+			KeyCode:  vk,
+			ScanCode: uint16(keyCode),
+			Mods:     m,
+		})
+	}
+}
+
+//export goDarwinOnFlagsChanged
+func goDarwinOnFlagsChanged(winID C.uint64_t, mods C.uint64_t) {
+	w := lookupDarwinWindow(uint64(winID))
+	if w == nil {
+		return
+	}
+	newFlags := uint64(mods)
+	w.mu.Lock()
+	prevFlags := w.lastModFlags
+	w.lastModFlags = newFlags
+	handler := w.handler
+	closed := w.closed
+	w.mu.Unlock()
+	if handler == nil || closed {
+		return
+	}
+
+	m := darwinModifiersFromFlags(newFlags)
+	for _, ch := range darwinChangedModifiers(prevFlags, newFlags) {
+		evType := EventKeyUp
+		if ch.down {
+			evType = EventKeyDown
+		}
+		handler(Event{
+			Type:    evType,
+			KeyCode: ch.vk,
+			Mods:    m,
+		})
+	}
+}
+
+//export goDarwinOnFocusLost
+func goDarwinOnFocusLost(winID C.uint64_t) {
+	w := lookupDarwinWindow(uint64(winID))
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	handler := w.handler
+	closed := w.closed
+	wasCapturing := w.capturing
+	w.capturing = false
+	w.lastModFlags = 0
+	w.mu.Unlock()
+	if handler == nil || closed {
+		return
+	}
+	if wasCapturing {
+		handler(Event{Type: EventCaptureLost})
+	}
+	handler(Event{Type: EventFocusLost})
+}
+
+//export goDarwinHitTest
+func goDarwinHitTest(winID C.uint64_t, x, y, viewH, scale C.double) C.int {
+	w := lookupDarwinWindow(uint64(winID))
+	if w == nil {
+		return C.int(HitClient)
+	}
+	w.mu.Lock()
+	ww := w.width
+	wh := w.height
+	s := float64(normalizeDarwinScale(float64(scale)))
+	customHit := w.cfg.HitTest
+	titleH := w.cfg.TitleBarHeight
+	w.mu.Unlock()
+
+	if titleH <= 0 {
+		titleH = 36
+	}
+	borderPx := int(math.Round(6.0 * s))
+	titlePx := int(math.Round(float64(titleH) * s))
+	px, py := appKitPointToGoUIPixels(float64(x), float64(y), float64(viewH), float64(scale))
+
+	hit := ComputeFramelessHitTest(px, py, ww, wh, borderPx, titlePx, w.IsMaximized(), customHit)
+	return C.int(hit)
 }
 

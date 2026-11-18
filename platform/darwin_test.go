@@ -80,3 +80,32 @@ func TestDarwinKeycodeAndModifiers(t *testing.T) {
 	}
 }
 
+func TestDarwinNormalizeWheel(t *testing.T) {
+	wx, wy := darwinNormalizeWheel(-20, 30, true)
+	if wx != 2.0 || wy != 3.0 {
+		t.Fatalf("precise wheel: ожидалось (2.0, 3.0), получено (%v, %v)", wx, wy)
+	}
+
+	wx, wy = darwinNormalizeWheel(1, -1, false)
+	if wx != -1.0 || wy != -1.0 {
+		t.Fatalf("discrete wheel: ожидалось (-1.0, -1.0), получено (%v, %v)", wx, wy)
+	}
+}
+
+func TestDarwinExtractCharsAndChangedModifiers(t *testing.T) {
+	chars := darwinExtractChars("aБ\r\x7f\uF700!", Modifiers{})
+	want := []rune{'a', 'Б', '!'}
+	if !reflect.DeepEqual(chars, want) {
+		t.Fatalf("darwinExtractChars: получено %v, ожидалось %v", chars, want)
+	}
+
+	if got := darwinExtractChars("a", Modifiers{Ctrl: true}); len(got) != 0 {
+		t.Fatalf("при Ctrl/Cmd не должно быть EventChar, получено %v", got)
+	}
+
+	changes := darwinChangedModifiers(0, nsEventModifierFlagShift|nsEventModifierFlagCommand)
+	if len(changes) != 2 || changes[0].vk != 0x10 || !changes[0].down || changes[1].vk != 0x11 || !changes[1].down {
+		t.Fatalf("неожиданные изменения модификаторов: %+v", changes)
+	}
+}
+

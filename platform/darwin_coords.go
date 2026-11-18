@@ -41,3 +41,15 @@ func goUITopLeftYToAppKit(topY, winHeightPx int, screenHeightPts, scale float64)
 	return screenHeightPts - topPts - winHPts
 }
 
+// darwinNormalizeWheel преобразует дельты прокрутки AppKit (scrollingDeltaX/Y)
+// в значения WheelX (положительное — вправо) и WheelY (положительное — вверх) для GoUI.
+func darwinNormalizeWheel(deltaX, deltaY float64, precise bool) (float32, float32) {
+	wx := -deltaX
+	wy := deltaY
+	if precise {
+		wx /= 10.0
+		wy /= 10.0
+	}
+	return float32(wx), float32(wy)
+}
+

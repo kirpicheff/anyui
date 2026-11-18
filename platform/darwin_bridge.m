@@ -15,6 +15,12 @@ extern void goDarwinOnResize(uint64_t winID, int width, int height);
 extern void goDarwinOnDPIChange(uint64_t winID, float scale);
 extern void goDarwinOnPaint(uint64_t winID);
 extern void goDarwinOnWakeUp(uint64_t winID);
+extern void goDarwinOnMouse(uint64_t winID, int eventKind, double x, double y, double viewH, double scale, int button, uint64_t mods);
+extern void goDarwinOnWheel(uint64_t winID, double x, double y, double viewH, double scale, double deltaX, double deltaY, int precise, uint64_t mods);
+extern void goDarwinOnKey(uint64_t winID, int isDown, uint16_t keyCode, uint64_t mods, const char* charsUTF8);
+extern void goDarwinOnFlagsChanged(uint64_t winID, uint64_t mods);
+extern void goDarwinOnFocusLost(uint64_t winID);
+extern int goDarwinHitTest(uint64_t winID, double x, double y, double viewH, double scale);
 
 static char kAnyUIDelegateKey;
 
@@ -36,6 +42,9 @@ static void runOnMainAsync(dispatch_block_t block) {
 
 @interface AnyUIView : NSView
 @property (nonatomic, assign) uint64_t winID;
+@property (nonatomic, assign) BOOL frameless;
+@property (nonatomic, strong) NSTrackingArea *trackingArea;
+@property (nonatomic, strong) NSCursor *currentCursor;
 @end
 
 @implementation AnyUIView
@@ -45,6 +54,122 @@ static void runOnMainAsync(dispatch_block_t block) {
 - (BOOL)acceptsFirstResponder {
     return YES;
 }
+- (BOOL)mouseDownCanMoveWindow {
+    return NO;
+}
+
+- (void)updateTrackingAreas {
+    [super updateTrackingAreas];
+    if (self.trackingArea) {
+        [self removeTrackingArea:self.trackingArea];
+        self.trackingArea = nil;
+    }
+    NSTrackingAreaOptions opts = NSTrackingMouseMoved |
+                                 NSTrackingActiveInKeyWindow |
+                                 NSTrackingInVisibleRect;
+    self.trackingArea = [[NSTrackingArea alloc] initWithRect:self.bounds
+                                                     options:opts
+                                                       owner:self
+                                                    userInfo:nil];
+    [self addTrackingArea:self.trackingArea];
+}
+
+- (void)resetCursorRects {
+    if (self.currentCursor) {
+        [self addCursorRect:self.bounds cursor:self.currentCursor];
+    } else {
+        [super resetCursorRects];
+    }
+}
+
+- (void)cursorUpdate:(NSEvent *)event {
+    if (self.currentCursor) {
+        [self.currentCursor set];
+    } else {
+        [super cursorUpdate:event];
+    }
+}
+
+- (void)sendMouseEvent:(NSEvent *)event kind:(int)kind button:(int)button {
+    NSPoint pt = [self convertPoint:[event locationInWindow] fromView:nil];
+    CGFloat viewH = self.bounds.size.height;
+    CGFloat scale = (self.window && self.window.backingScaleFactor > 0) ? self.window.backingScaleFactor : 1.0;
+    goDarwinOnMouse(self.winID, kind, pt.x, pt.y, viewH, scale, button, (uint64_t)event.modifierFlags);
+}
+
+- (void)mouseDown:(NSEvent *)event {
+    if (self.frameless && self.window) {
+        NSPoint pt = [self convertPoint:[event locationInWindow] fromView:nil];
+        CGFloat viewH = self.bounds.size.height;
+        CGFloat scale = self.window.backingScaleFactor > 0 ? self.window.backingScaleFactor : 1.0;
+        if (goDarwinHitTest(self.winID, pt.x, pt.y, viewH, scale) == 1) {
+            [self.window performWindowDragWithEvent:event];
+            return;
+        }
+    }
+    [self sendMouseEvent:event kind:2 button:0];
+}
+
+- (void)mouseUp:(NSEvent *)event {
+    [self sendMouseEvent:event kind:3 button:0];
+}
+
+- (void)rightMouseDown:(NSEvent *)event {
+    [self sendMouseEvent:event kind:2 button:1];
+}
+
+- (void)rightMouseUp:(NSEvent *)event {
+    [self sendMouseEvent:event kind:3 button:1];
+}
+
+- (void)otherMouseDown:(NSEvent *)event {
+    if (event.buttonNumber == 2) {
+        [self sendMouseEvent:event kind:2 button:2];
+    }
+}
+
+- (void)otherMouseUp:(NSEvent *)event {
+    if (event.buttonNumber == 2) {
+        [self sendMouseEvent:event kind:3 button:2];
+    }
+}
+
+- (void)mouseMoved:(NSEvent *)event {
+    [self sendMouseEvent:event kind:1 button:0];
+}
+
+- (void)mouseDragged:(NSEvent *)event {
+    [self sendMouseEvent:event kind:1 button:0];
+}
+
+- (void)rightMouseDragged:(NSEvent *)event {
+    [self sendMouseEvent:event kind:1 button:1];
+}
+
+- (void)otherMouseDragged:(NSEvent *)event {
+    [self sendMouseEvent:event kind:1 button:2];
+}
+
+- (void)scrollWheel:(NSEvent *)event {
+    NSPoint pt = [self convertPoint:[event locationInWindow] fromView:nil];
+    CGFloat viewH = self.bounds.size.height;
+    CGFloat scale = (self.window && self.window.backingScaleFactor > 0) ? self.window.backingScaleFactor : 1.0;
+    int precise = [event hasPreciseScrollingDeltas] ? 1 : 0;
+    goDarwinOnWheel(self.winID, pt.x, pt.y, viewH, scale, event.scrollingDeltaX, event.scrollingDeltaY, precise, (uint64_t)event.modifierFlags);
+}
+
+- (void)keyDown:(NSEvent *)event {
+    const char *utf8 = event.characters ? [event.characters UTF8String] : NULL;
+    goDarwinOnKey(self.winID, 1, (uint16_t)event.keyCode, (uint64_t)event.modifierFlags, utf8);
+}
+
+- (void)keyUp:(NSEvent *)event {
+    goDarwinOnKey(self.winID, 0, (uint16_t)event.keyCode, (uint64_t)event.modifierFlags, NULL);
+}
+
+- (void)flagsChanged:(NSEvent *)event {
+    goDarwinOnFlagsChanged(self.winID, (uint64_t)event.modifierFlags);
+}
 @end
 
 @interface AnyUIWindowDelegate : NSObject <NSWindowDelegate>
@@ -52,9 +177,22 @@ static void runOnMainAsync(dispatch_block_t block) {
 @property (nonatomic, weak) NSWindow *window;
 @property (nonatomic, assign) NSRect savedFrame;
 @property (nonatomic, assign) BOOL isMaximizedState;
+@property (nonatomic, strong) id localMonitor;
+@property (nonatomic, strong) id globalMonitor;
 @end
 
 @implementation AnyUIWindowDelegate
+
+- (void)releaseCaptureMonitors {
+    if (self.localMonitor) {
+        [NSEvent removeMonitor:self.localMonitor];
+        self.localMonitor = nil;
+    }
+    if (self.globalMonitor) {
+        [NSEvent removeMonitor:self.globalMonitor];
+        self.globalMonitor = nil;
+    }
+}
 
 - (BOOL)windowShouldClose:(NSWindow *)sender {
     (void)sender;
@@ -63,7 +201,14 @@ static void runOnMainAsync(dispatch_block_t block) {
 
 - (void)windowWillClose:(NSNotification *)notification {
     (void)notification;
+    [self releaseCaptureMonitors];
     goDarwinOnDestroy(self.winID);
+}
+
+- (void)windowDidResignKey:(NSNotification *)notification {
+    (void)notification;
+    [self releaseCaptureMonitors];
+    goDarwinOnFocusLost(self.winID);
 }
 
 - (void)windowDidResize:(NSNotification *)notification {
@@ -189,6 +334,7 @@ uintptr_t anyui_darwin_create_window(
 
             AnyUIView *view = [[AnyUIView alloc] initWithFrame:rect];
             view.winID = winID;
+            view.frameless = (frameless != 0);
             view.wantsLayer = YES;
             view.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
             [win setContentView:view];
@@ -511,6 +657,157 @@ int anyui_darwin_double_click_ms(void) {
         return 500;
     }
     return (int)llround(interval * 1000.0);
+}
+
+static NSCursor* resolveDarwinCursor(int cursorType) {
+    switch (cursorType) {
+        case 1: // CursorHand
+            return [NSCursor pointingHandCursor];
+        case 2: // CursorIBeam
+            return [NSCursor IBeamCursor];
+        case 3: // CursorResizeH
+            return [NSCursor resizeLeftRightCursor];
+        case 4: // CursorResizeV
+            return [NSCursor resizeUpDownCursor];
+        case 5: { // CursorResizeNWSE
+            SEL sel = NSSelectorFromString(@"_windowResizeNorthWestSouthEastCursor");
+            if ([NSCursor respondsToSelector:sel]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                NSCursor *c = [NSCursor performSelector:sel];
+#pragma clang diagnostic pop
+                if (c) return c;
+            }
+            return [NSCursor crosshairCursor];
+        }
+        case 6: { // CursorResizeNESW
+            SEL sel = NSSelectorFromString(@"_windowResizeNorthEastSouthWestCursor");
+            if ([NSCursor respondsToSelector:sel]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                NSCursor *c = [NSCursor performSelector:sel];
+#pragma clang diagnostic pop
+                if (c) return c;
+            }
+            return [NSCursor crosshairCursor];
+        }
+        case 7: // CursorNotAllowed
+            return [NSCursor operationNotAllowedCursor];
+        case 8: // CursorCrosshair
+            return [NSCursor crosshairCursor];
+        case 9: // CursorMove
+            return [NSCursor openHandCursor];
+        default: // CursorArrow
+            return [NSCursor arrowCursor];
+    }
+}
+
+void anyui_darwin_set_cursor(uintptr_t handle, int cursorType) {
+    if (!handle) return;
+    NSWindow *win = (__bridge NSWindow *)(void *)handle;
+    runOnMainAsync(^{
+        @autoreleasepool {
+            NSCursor *cursor = resolveDarwinCursor(cursorType);
+            if ([win.contentView isKindOfClass:[AnyUIView class]]) {
+                AnyUIView *view = (AnyUIView *)win.contentView;
+                view.currentCursor = cursor;
+                [win invalidateCursorRectsForView:view];
+            }
+            [cursor set];
+        }
+    });
+}
+
+static void dispatchCapturedMouseEvent(NSWindow *win, AnyUIWindowDelegate *del, NSEvent *event) {
+    if (!win || !del || !win.contentView) return;
+    NSPoint screenPt = [NSEvent mouseLocation];
+    NSRect screenRect = NSMakeRect(screenPt.x, screenPt.y, 0, 0);
+    NSRect winRect = [win convertRectFromScreen:screenRect];
+    NSPoint pt = [win.contentView convertPoint:winRect.origin fromView:nil];
+    CGFloat viewH = win.contentView.bounds.size.height;
+    CGFloat scale = win.backingScaleFactor > 0 ? win.backingScaleFactor : 1.0;
+
+    int kind = 1;
+    int button = 0;
+    switch (event.type) {
+        case NSEventTypeLeftMouseUp:
+            kind = 3; button = 0; break;
+        case NSEventTypeRightMouseUp:
+            kind = 3; button = 1; break;
+        case NSEventTypeOtherMouseUp:
+            if (event.buttonNumber != 2) return;
+            kind = 3; button = 2; break;
+        case NSEventTypeLeftMouseDragged:
+            kind = 1; button = 0; break;
+        case NSEventTypeRightMouseDragged:
+            kind = 1; button = 1; break;
+        case NSEventTypeOtherMouseDragged:
+            kind = 1; button = 2; break;
+        case NSEventTypeMouseMoved:
+            kind = 1; button = 0; break;
+        default:
+            return;
+    }
+
+    goDarwinOnMouse(del.winID, kind, pt.x, pt.y, viewH, scale, button, (uint64_t)event.modifierFlags);
+    if (kind == 3) {
+        [del releaseCaptureMonitors];
+    }
+}
+
+void anyui_darwin_set_capture(uintptr_t handle) {
+    if (!handle) return;
+    NSWindow *win = (__bridge NSWindow *)(void *)handle;
+    runOnMainAsync(^{
+        @autoreleasepool {
+            AnyUIWindowDelegate *del = getDelegateForWindow(win);
+            if (!del || del.localMonitor || del.globalMonitor) {
+                return;
+            }
+            NSEventMask mask = NSEventMaskLeftMouseDragged |
+                               NSEventMaskRightMouseDragged |
+                               NSEventMaskOtherMouseDragged |
+                               NSEventMaskLeftMouseUp |
+                               NSEventMaskRightMouseUp |
+                               NSEventMaskOtherMouseUp |
+                               NSEventMaskMouseMoved;
+
+            __weak NSWindow *weakWin = win;
+            __weak AnyUIWindowDelegate *weakDel = del;
+
+            del.localMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:mask handler:^NSEvent *(NSEvent *event) {
+                NSWindow *strongWin = weakWin;
+                AnyUIWindowDelegate *strongDel = weakDel;
+                if (!strongWin || !strongDel) return event;
+                // Если событие уже адресовано нашему окну, оно обработается в AnyUIView без дублирования.
+                if (event.window == strongWin) {
+                    return event;
+                }
+                dispatchCapturedMouseEvent(strongWin, strongDel, event);
+                return event;
+            }];
+
+            del.globalMonitor = [NSEvent addGlobalMonitorForEventsMatchingMask:mask handler:^(NSEvent *event) {
+                NSWindow *strongWin = weakWin;
+                AnyUIWindowDelegate *strongDel = weakDel;
+                if (!strongWin || !strongDel) return;
+                dispatchCapturedMouseEvent(strongWin, strongDel, event);
+            }];
+        }
+    });
+}
+
+void anyui_darwin_release_capture(uintptr_t handle) {
+    if (!handle) return;
+    NSWindow *win = (__bridge NSWindow *)(void *)handle;
+    runOnMainAsync(^{
+        @autoreleasepool {
+            AnyUIWindowDelegate *del = getDelegateForWindow(win);
+            if (del) {
+                [del releaseCaptureMonitors];
+            }
+        }
+    });
 }
 
 #endif // __APPLE__
