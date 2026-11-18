@@ -31,6 +31,8 @@ func main() {
 		{"TableColumn", modulePath + ".TableColumn"},
 		{"TabItem", modulePath + ".TabItem"},
 		{"StatusBarSection", modulePath + ".StatusBarSection"},
+		{"CanvasCallbacks", modulePath + ".CanvasCallbacks"},
+		{"KeyEvent", modulePath + ".KeyEvent"},
 		{"App", modulePath + ".App"},
 		{"Window", modulePath + ".Window"},
 		{"UI (Immediate Mode API)", modulePath + ".UI"},

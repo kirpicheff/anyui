@@ -560,3 +560,112 @@ func (c *Context) CanvasView(wDp, hDp int, drawFn func(canvas *render.Canvas, ar
 	c.Canvas.PopClip()
 }
 
+// CanvasCallbacks задаёт обработчики рисования и сырого ввода для InteractiveCanvas.
+// Все координаты мыши (x, y) передаются в физических пикселях относительно левого верхнего угла area (area.X, area.Y).
+type CanvasCallbacks struct {
+	// OnDraw вызывается для отрисовки содержимого холста. focused == true, если холст в фокусе.
+	OnDraw func(canvas *render.Canvas, area render.Rect, focused bool)
+	// OnKey вызывается при KeyDown/KeyUp (со ScanCode и флагом Extended), когда холст находится в фокусе.
+	OnKey func(ev RawKeyEvent)
+	// OnMouseMove вызывается при движении мыши над холстом или при захвате перетаскивания (Mouse Capture).
+	OnMouseMove func(x, y int, mods platform.Modifiers)
+	// OnMouseDown вызывается при нажатии кнопки мыши внутри холста (x, y — физические пиксели относительно area).
+	OnMouseDown func(x, y int, button platform.MouseButton, mods platform.Modifiers)
+	// OnMouseUp вызывается при отпускании кнопки мыши над холстом или при активном захвате перетаскивания.
+	OnMouseUp func(x, y int, button platform.MouseButton, mods platform.Modifiers)
+	// OnMouseWheel вызывается при прокрутке колеса мыши над холстом (x, y — физические пиксели относительно area).
+	OnMouseWheel func(x, y int, wheelX, wheelY float32, mods platform.Modifiers)
+	// OnFocusLost вызывается в момент потери фокуса холстом (клик вне холста, переключение окна / Alt+Tab).
+	OnFocusLost func()
+	// Cursor задаёт системный курсор над областью холста (по умолчанию CursorArrow).
+	Cursor platform.CursorType
+	// KeepFocusNavigation отключает перехват Tab/Escape/горячих клавиш при фокусе на холсте.
+	// По умолчанию (false) все клавиши передаются в OnKey без переключения фокуса по Tab/Escape.
+	KeepFocusNavigation bool
+}
+
+// InteractiveCanvas выделяет интерактивную область wDp x hDp с поддержкой фокуса,
+// захвата мыши при перетаскивании и передачи сырых событий клавиатуры (включая ScanCode/Extended) и мыши.
+func (c *Context) InteractiveCanvas(id string, wDp, hDp int, cb CanvasCallbacks, opts ...Option) {
+	id = c.ResolveID("canvas", id)
+	_ = ApplyOptions(opts)
+
+	w := c.S(wDp)
+	if wDp <= 0 {
+		w = c.RemainingWidth()
+	}
+	h := c.S(hDp)
+	if hDp <= 0 {
+		h = c.RemainingHeight()
+	}
+	r := c.allocRect(w, h)
+	if r.Empty() {
+		if c.prevFocusID == id && c.FocusID != id && cb.OnFocusLost != nil {
+			cb.OnFocusLost()
+		}
+		return
+	}
+
+	c.registerFocusable(id)
+	c.RegisterHitTrack(id, r, cb.Cursor)
+
+	blocked := c.IsInputBlocked()
+	if !blocked && r.Contains(c.MouseX, c.MouseY) {
+		c.HotID = id
+	}
+
+	for _, mev := range c.rawMouseEvents {
+		lx, ly := mev.X-r.X, mev.Y-r.Y
+		switch mev.Kind {
+		case RawMouseDown:
+			if !blocked && r.Contains(mev.X, mev.Y) {
+				c.FocusID = id
+				c.ActiveID = id
+				if cb.OnMouseDown != nil {
+					cb.OnMouseDown(lx, ly, mev.Button, mev.Mods)
+				}
+			}
+		case RawMouseMove:
+			if c.ActiveID == id || (!blocked && r.Contains(mev.X, mev.Y)) {
+				if cb.OnMouseMove != nil {
+					cb.OnMouseMove(lx, ly, mev.Mods)
+				}
+			}
+		case RawMouseUp:
+			if c.ActiveID == id || (!blocked && r.Contains(mev.X, mev.Y)) {
+				if cb.OnMouseUp != nil {
+					cb.OnMouseUp(lx, ly, mev.Button, mev.Mods)
+				}
+			}
+		case RawMouseWheel:
+			if !blocked && r.Contains(mev.X, mev.Y) {
+				if cb.OnMouseWheel != nil {
+					cb.OnMouseWheel(lx, ly, mev.WheelX, mev.WheelY, mev.Mods)
+				}
+			}
+		}
+	}
+
+	if c.prevFocusID == id && c.FocusID != id && cb.OnFocusLost != nil {
+		cb.OnFocusLost()
+	}
+
+	focused := c.FocusID == id
+	if focused {
+		if !cb.KeepFocusNavigation {
+			c.nextCaptureKeys = true
+		}
+		if cb.OnKey != nil {
+			for _, kev := range c.rawKeyEvents {
+				cb.OnKey(kev)
+			}
+		}
+	}
+
+	if cb.OnDraw != nil {
+		c.Canvas.PushClip(r)
+		cb.OnDraw(c.Canvas, r, focused)
+		c.Canvas.PopClip()
+	}
+}
+

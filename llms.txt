@@ -1,4 +1,4 @@
-# AnyUI (v0.7.5)
+# AnyUI (v0.7.6)
 
 Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).
 
@@ -83,11 +83,11 @@ pixels) и автоматически масштабируются под тек
 
 # Архитектура подпакетов
 
-  - github.com/kirpicheff/anyui/ui — внутренний движок раскладки, фокуса, анимаций
+  - git.gtw.su/kirpich/anyui/ui — внутренний движок раскладки, фокуса, анимаций
     и виджетов.
-  - github.com/kirpicheff/anyui/render — программный 2D-рендерер (BGRA),
+  - git.gtw.su/kirpich/anyui/render — программный 2D-рендерер (BGRA),
     SDF-примитивы и кеш шрифтов.
-  - github.com/kirpicheff/anyui/platform — абстракция окна ОС, диалоги, трей и цикл
+  - git.gtw.su/kirpich/anyui/platform — абстракция окна ОС, диалоги, трей и цикл
     событий.
 
 const HitClient = platform.HitClient ...
@@ -97,6 +97,7 @@ const ResNone = platform.ResNone ...
 const NotifyNone = platform.NotifyNone ...
 const ScaleFit = render.ScaleFit ...
 const FontRegular = render.FontRegular ...
+const MouseLeft = platform.MouseLeft ...
 const CursorArrow = platform.CursorArrow ...
 const AlignStart = ui.AlignStart ...
 const JustifyStart = ui.JustifyStart ...
@@ -123,6 +124,7 @@ type App struct{ ... }
 type BarMenuItem = ui.BarMenuItem
 type BoxShadow = render.BoxShadow
 type BreadcrumbItem = ui.BreadcrumbItem
+type CanvasCallbacks = ui.CanvasCallbacks
 type ChartSeries = ui.ChartSeries
 type Color = render.Color
     func Hex(rgb uint32) Color
@@ -143,6 +145,7 @@ type GradientStop = render.GradientStop
 type HitTestResult = platform.HitTestResult
 type ImageScaleMode = render.ImageScaleMode
 type Justify = ui.Justify
+type KeyEvent = ui.RawKeyEvent
 type LinearGradient = render.LinearGradient
 type LogEntry = ui.LogEntry
 type LogLevel = ui.LogLevel
@@ -153,6 +156,7 @@ type MessageBoxResult = platform.MessageBoxResult
     func MessageBox(owner *Window, title, text string, style MessageBoxStyle, ...) MessageBoxResult
 type MessageBoxStyle = platform.MessageBoxStyle
 type Modifiers = platform.Modifiers
+type MouseButton = platform.MouseButton
 type Notification = platform.TrayNotification
 type NotificationIcon = platform.NotificationIcon
 type Option = ui.Option
@@ -328,6 +332,26 @@ type StatusBarSection = ui.StatusBarSection
     StatusBarSection описывает секцию нижней строки состояния StatusBar.
 ```
 
+## CanvasCallbacks
+
+```go
+package anyui // import "github.com/kirpicheff/anyui"
+
+type CanvasCallbacks = ui.CanvasCallbacks
+    CanvasCallbacks задаёт обработчики рисования и сырого ввода для
+    InteractiveCanvas.
+```
+
+## KeyEvent
+
+```go
+package anyui // import "github.com/kirpicheff/anyui"
+
+type KeyEvent = ui.RawKeyEvent
+    KeyEvent описывает сырое событие нажатия или отпускания клавиши для
+    InteractiveCanvas.
+```
+
 ## App
 
 ```go
@@ -449,6 +473,7 @@ func (u *UI) Hyperlink(id, text string, opts ...Option) bool
 func (u *UI) IDScope(key any, fn func())
 func (u *UI) IconButton(id, svg string, opts ...Option) bool
 func (u *UI) Image(img image.Image, wDp, hDp int, mode ImageScaleMode)
+func (u *UI) InteractiveCanvas(id string, wDp, hDp int, cb CanvasCallbacks, opts ...Option)
 func (u *UI) InvalidateRemember(key any)
 func (u *UI) InvalidateStatic()
 func (u *UI) Label(text string, opts ...Option)

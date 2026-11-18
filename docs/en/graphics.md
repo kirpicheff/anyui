@@ -74,7 +74,28 @@ ui.Button("btn_save", "Save", anyui.Icon(saveSVG), anyui.Primary())
 ## Images and Video Frames
 
 - `ui.Image(img, wDp, hDp, anyui.ScaleFit)` — render an `image.Image` (`ScaleFit`, `ScaleFill`, `ScaleOneToOne`).
-- For high-frequency video streams (e.g., remote desktop), use `canvas.DrawBGRA(area, pixels, srcW, srcH, anyui.ScaleFit)` inside `ui.CanvasView`.
+- For high-frequency video streams (e.g., remote desktop), use `canvas.DrawBGRAFast(area, pixels, srcW, srcH, anyui.ScaleFit)` (zero-allocation, bypasses image cache) inside `ui.InteractiveCanvas` or `ui.CanvasView`.
+- For an interactive canvas with focus, mouse drag capture, and raw keyboard (`ScanCode`, `Extended`, `KeyDown`/`KeyUp`) and mouse/wheel input, use `ui.InteractiveCanvas`:
+
+```go
+ui.InteractiveCanvas("rdp_view", 0, 0, anyui.CanvasCallbacks{
+	OnDraw: func(canvas *render.Canvas, area anyui.Rect, focused bool) {
+		canvas.DrawBGRAFast(area, frameBGRA, frameW, frameH, anyui.ScaleFit)
+	},
+	OnKey: func(ev anyui.KeyEvent) {
+		// ev.Pressed, ev.KeyCode, ev.ScanCode, ev.Extended, ev.Mods
+	},
+	OnMouseMove: func(x, y int, mods anyui.Modifiers) {
+		// x, y are physical pixels relative to area.X, area.Y
+	},
+	OnMouseDown:  func(x, y int, btn anyui.MouseButton, mods anyui.Modifiers) {},
+	OnMouseUp:    func(x, y int, btn anyui.MouseButton, mods anyui.Modifiers) {},
+	OnMouseWheel: func(x, y int, wx, wy float32, mods anyui.Modifiers) {},
+	OnFocusLost: func() {
+		// Release held modifier keys on blur
+	},
+})
+```
 - For OS image clipboard exchange, use `win.ClipboardImage()` and `win.SetClipboardImage(img)`.
 
 ## Font Styles and Fallback

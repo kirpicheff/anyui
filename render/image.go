@@ -53,6 +53,66 @@ func (c *Canvas) DrawBGRA(dst Rect, src []byte, srcW, srcH int, mode ImageScaleM
 	c.blitRawBuffer(dst, src, srcW, srcH, true, mode)
 }
 
+// DrawBGRAFast быстро рисует внешний непрозрачный буфер BGRA (например, видеопоток)
+// без использования кеша и промежуточных аллокаций памяти.
+// При совпадении размеров выполняет построчный copy, при масштабировании — 16.16 fixed-point выборку.
+func (c *Canvas) DrawBGRAFast(dst Rect, src []byte, srcW, srcH int, mode ImageScaleMode) {
+	if c == nil || dst.Empty() || srcW <= 0 || srcH <= 0 || len(src) < srcW*srcH*4 {
+		return
+	}
+	target := computeTargetRect(dst, srcW, srcH, mode)
+	if target.Empty() {
+		return
+	}
+	vis := c.CurrentClip().Intersect(dst).Intersect(target).Intersect(Rect{X: 0, Y: 0, W: c.Width, H: c.Height})
+	if vis.Empty() {
+		return
+	}
+
+	c.AddDirtyRect(vis)
+
+	// Ветка 1:1 без масштабирования — прямое построчное копирование
+	if target.W == srcW && target.H == srcH {
+		rowBytes := vis.W * 4
+		srcXOff := (vis.X - target.X) * 4
+		for y := vis.Y; y < vis.Y+vis.H; y++ {
+			sy := y - target.Y
+			srcOff := sy*srcW*4 + srcXOff
+			dstOff := (y*c.Width + vis.X) * 4
+			copy(c.Pixels[dstOff:dstOff+rowBytes], src[srcOff:srcOff+rowBytes])
+		}
+		return
+	}
+
+	// Быстрое масштабирование через 16.16 fixed-point без аллокаций
+	stepX := (srcW << 16) / target.W
+	stepY := (srcH << 16) / target.H
+	startSX := (vis.X - target.X) * stepX
+
+	for y := vis.Y; y < vis.Y+vis.H; y++ {
+		sy := ((y - target.Y) * stepY) >> 16
+		if sy >= srcH {
+			sy = srcH - 1
+		}
+		srcRow := src[sy*srcW*4:]
+		dstRow := c.Pixels[(y*c.Width+vis.X)*4:]
+		sxFP := startSX
+		for i := 0; i < vis.W; i++ {
+			sx := sxFP >> 16
+			if sx >= srcW {
+				sx = srcW - 1
+			}
+			so := sx * 4
+			do := i * 4
+			dstRow[do+0] = srcRow[so+0]
+			dstRow[do+1] = srcRow[so+1]
+			dstRow[do+2] = srcRow[so+2]
+			dstRow[do+3] = 255
+			sxFP += stepX
+		}
+	}
+}
+
 // DrawRGBA рисует внешний буфер пикселей в формате RGBA (4 байта на пиксель).
 func (c *Canvas) DrawRGBA(dst Rect, src []byte, srcW, srcH int, mode ImageScaleMode) {
 	c.blitRawBuffer(dst, src, srcW, srcH, false, mode)

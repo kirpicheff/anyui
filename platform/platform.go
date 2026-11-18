@@ -86,7 +86,8 @@ type Event struct {
 	WheelY   float32     // Для EventMouseWheel (положительное — вверх)
 	KeyCode  uint32      // Виртуальный код клавиши (VK_* на Windows)
 	ScanCode uint16      // Аппаратный скан-код клавиши
-	Char      rune        // Для EventChar (введённый символ Unicode)
+	Extended bool        // Признак расширенной клавиши (bit 24 lParam на Windows)
+	Char      rune       // Для EventChar (введённый символ Unicode)
 	Mods      Modifiers
 	Files     []string    // Для EventDropFiles (список путей перетащенных файлов)
 	DarkTheme bool        // Для EventThemeChange (true, если системная тема тёмная)

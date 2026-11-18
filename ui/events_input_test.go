@@ -321,3 +321,129 @@ func TestFocusLostAndScrollbarCapture(t *testing.T) {
 		t.Fatalf("ожидалась прокрутка ScrollView при перетаскивании скроллбара за пределы окна, si.y=%d", si.y)
 	}
 }
+
+func TestInteractiveCanvasInputCaptureAndFocus(t *testing.T) {
+	ctx := newTestContext(400, 300)
+
+	var keys []RawKeyEvent
+	var downs, moves, ups, wheels int
+	var lastDownX, lastDownY int
+	var lastMoveX, lastMoveY int
+	var lastUpX, lastUpY int
+	var lastUpBtn platform.MouseButton
+	var focusLostCount int
+	var lastFocused bool
+
+	draw := func(c *Context) {
+		c.Padding(20, func() {
+			c.InteractiveCanvas("rdp", 200, 100, CanvasCallbacks{
+				OnDraw: func(canvas *render.Canvas, area render.Rect, focused bool) {
+					lastFocused = focused
+				},
+				OnKey: func(ev RawKeyEvent) {
+					keys = append(keys, ev)
+				},
+				OnMouseDown: func(x, y int, button platform.MouseButton, mods platform.Modifiers) {
+					downs++
+					lastDownX, lastDownY = x, y
+				},
+				OnMouseMove: func(x, y int, mods platform.Modifiers) {
+					moves++
+					lastMoveX, lastMoveY = x, y
+				},
+				OnMouseUp: func(x, y int, button platform.MouseButton, mods platform.Modifiers) {
+					ups++
+					lastUpX, lastUpY = x, y
+					lastUpBtn = button
+				},
+				OnMouseWheel: func(x, y int, wheelX, wheelY float32, mods platform.Modifiers) {
+					wheels++
+				},
+				OnFocusLost: func() {
+					focusLostCount++
+				},
+			})
+		})
+	}
+
+	// Первый кадр: область холста находится по (20, 20, 200, 100)
+	ctx.Render(draw)
+	if lastFocused {
+		t.Fatalf("до клика холст не должен быть в фокусе")
+	}
+
+	// Без фокуса клавиши не должны доходить до OnKey
+	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: 'A', ScanCode: 0x1E})
+	ctx.Render(draw)
+	if len(keys) != 0 {
+		t.Fatalf("без фокуса OnKey не должен вызываться, получено %d событий", len(keys))
+	}
+
+	// Клик ПКМ внутри области (x=50, y=45) -> локальные координаты (30, 25), фокус устанавливается
+	ctx.HandleEvent(platform.Event{
+		Type:   platform.EventMouseDown,
+		Button: platform.MouseRight,
+		X:      50,
+		Y:      45,
+	})
+	ctx.Render(draw)
+	if !lastFocused || downs != 1 || lastDownX != 30 || lastDownY != 25 {
+		t.Fatalf("ожидался фокус и локальные координаты (30,25), получено focused=%v downs=%d (%d,%d)",
+			lastFocused, downs, lastDownX, lastDownY)
+	}
+
+	// Mouse Capture: уводим мышь за пределы холста (350, 250) и отпускаем ПКМ
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 350, Y: 250})
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseRight, X: 350, Y: 250})
+	ctx.Render(draw)
+	if moves != 1 || lastMoveX != 330 || lastMoveY != 230 {
+		t.Fatalf("ожидался MouseMove при захвате (330,230), получено moves=%d (%d,%d)", moves, lastMoveX, lastMoveY)
+	}
+	if ups != 1 || lastUpBtn != platform.MouseRight || lastUpX != 330 || lastUpY != 230 {
+		t.Fatalf("ожидался MouseUp ПКМ при захвате (330,230), получено ups=%d btn=%v (%d,%d)", ups, lastUpBtn, lastUpX, lastUpY)
+	}
+
+	// Колесо мыши над холстом
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 40, Y: 40})
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseWheel, WheelY: 1.0})
+	ctx.Render(draw)
+	if wheels != 1 {
+		t.Fatalf("ожидался вызов OnMouseWheel, получено %d", wheels)
+	}
+
+	// KeyDown / KeyUp со ScanCode, Extended, Tab, Escape и VK_LWIN в фокусе
+	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: KeyTab, ScanCode: 0x0F})
+	ctx.HandleEvent(platform.Event{Type: platform.EventKeyUp, KeyCode: KeyTab, ScanCode: 0x0F})
+	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: KeyRight, ScanCode: 0x4D, Extended: true})
+	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: 0x5B, ScanCode: 0x5B, Extended: true}) // VK_LWIN
+	ctx.Render(draw)
+	if len(keys) != 4 {
+		t.Fatalf("ожидалось 4 сырых события клавиатуры (включая Tab, KeyUp, Extended, VK_LWIN), получено %d", len(keys))
+	}
+	if !keys[0].Pressed || keys[0].KeyCode != KeyTab || keys[0].ScanCode != 0x0F {
+		t.Fatalf("некорректное событие Tab KeyDown: %+v", keys[0])
+	}
+	if keys[1].Pressed || keys[1].KeyCode != KeyTab {
+		t.Fatalf("некорректное событие Tab KeyUp: %+v", keys[1])
+	}
+	if !keys[2].Extended || keys[2].ScanCode != 0x4D {
+		t.Fatalf("ожидался флаг Extended=true и ScanCode=0x4D, получено %+v", keys[2])
+	}
+	if keys[3].KeyCode != 0x5B || !keys[3].Extended {
+		t.Fatalf("ожидалось событие VK_LWIN, получено %+v", keys[3])
+	}
+
+	// Проверяем на втором кадре, что Tab не сбросил и не переключил фокус (т.к. captureKeysFocus сработал)
+	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: KeyEscape, ScanCode: 0x01})
+	ctx.Render(draw)
+	if !lastFocused || len(keys) != 5 || keys[4].KeyCode != KeyEscape {
+		t.Fatalf("Escape не должен сбрасывать фокус и должен попасть в OnKey: focused=%v len=%d", lastFocused, len(keys))
+	}
+
+	// Потеря фокуса окном (Alt+Tab / WM_KILLFOCUS) вызывает OnFocusLost
+	ctx.HandleEvent(platform.Event{Type: platform.EventFocusLost})
+	ctx.Render(draw)
+	if lastFocused || focusLostCount != 1 {
+		t.Fatalf("ожидался OnFocusLost=1 и focused=false, получено count=%d focused=%v", focusLostCount, lastFocused)
+	}
+}

@@ -40,6 +40,36 @@ type KeyPress struct {
 	Mods platform.Modifiers
 }
 
+// RawKeyEvent описывает сырое событие нажатия или отпускания клавиши за кадр.
+type RawKeyEvent struct {
+	Pressed  bool               // true — KeyDown, false — KeyUp
+	KeyCode  uint32             // Виртуальный код клавиши (VK_* на Windows)
+	ScanCode uint16             // Аппаратный скан-код клавиши
+	Extended bool               // Признак расширенной клавиши (bit 24 lParam на Windows)
+	Mods     platform.Modifiers // Состояние модификаторов
+}
+
+// RawMouseEventKind задаёт тип сырого события мыши или колеса.
+type RawMouseEventKind uint8
+
+const (
+	RawMouseMove RawMouseEventKind = iota
+	RawMouseDown
+	RawMouseUp
+	RawMouseWheel
+)
+
+// RawMouseEvent описывает сырое событие мыши или колеса за кадр.
+type RawMouseEvent struct {
+	Kind   RawMouseEventKind
+	X      int
+	Y      int
+	Button platform.MouseButton
+	WheelX float32
+	WheelY float32
+	Mods   platform.Modifiers
+}
+
 // Context хранит состояние текущего кадра Immediate Mode UI.
 type Context struct {
 	Win      platform.Window
@@ -58,7 +88,9 @@ type Context struct {
 	MouseReleased       bool
 	WheelX              float32
 	WheelY              float32
+	RightMouseDown      bool
 	RightMousePressed   bool
+	RightMouseReleased  bool
 	RightMouseX         int
 	RightMouseY         int
 	MiddleMouseDown     bool
@@ -69,8 +101,13 @@ type Context struct {
 	MouseMods           platform.Modifiers
 
 	// Ввод с клавиатуры за текущий кадр
-	TypedRunes []rune
-	KeyEvents  []KeyPress
+	TypedRunes       []rune
+	KeyEvents        []KeyPress
+	rawKeyEvents     []RawKeyEvent
+	rawMouseEvents   []RawMouseEvent
+	captureKeysFocus bool
+	nextCaptureKeys  bool
+	prevFocusID      string
 
 	// Идентификаторы активных виджетов
 	HotID    string
@@ -286,6 +323,12 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 	case platform.EventMouseMove:
 		c.MouseX = ev.X
 		c.MouseY = ev.Y
+		c.rawMouseEvents = append(c.rawMouseEvents, RawMouseEvent{
+			Kind: RawMouseMove,
+			X:    ev.X,
+			Y:    ev.Y,
+			Mods: ev.Mods,
+		})
 		if c.shouldRedrawOnMouseMove(ev.X, ev.Y) {
 			redraw = true
 		} else {
@@ -336,9 +379,11 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 		} else if ev.Button == platform.MouseRight {
 			c.MouseX = ev.X
 			c.MouseY = ev.Y
+			c.RightMouseDown = true
 			c.RightMousePressed = true
 			c.RightMouseX = ev.X
 			c.RightMouseY = ev.Y
+			c.MouseMods = ev.Mods
 			redraw = true
 		} else if ev.Button == platform.MouseMiddle {
 			c.MouseX = ev.X
@@ -347,9 +392,31 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 			c.MiddleMousePressed = true
 			c.MiddleMouseX = ev.X
 			c.MiddleMouseY = ev.Y
+			c.MouseMods = ev.Mods
 			redraw = true
 		}
+		if ev.Button == platform.MouseLeft || ev.Button == platform.MouseRight || ev.Button == platform.MouseMiddle {
+			c.rawMouseEvents = append(c.rawMouseEvents, RawMouseEvent{
+				Kind:   RawMouseDown,
+				X:      ev.X,
+				Y:      ev.Y,
+				Button: ev.Button,
+				Mods:   ev.Mods,
+			})
+		}
 	case platform.EventMouseWheel:
+		mx, my := ev.X, ev.Y
+		if mx == 0 && my == 0 {
+			mx, my = c.MouseX, c.MouseY
+		}
+		c.rawMouseEvents = append(c.rawMouseEvents, RawMouseEvent{
+			Kind:   RawMouseWheel,
+			X:      mx,
+			Y:      my,
+			WheelX: ev.WheelX,
+			WheelY: ev.WheelY,
+			Mods:   ev.Mods,
+		})
 		c.WheelX += ev.WheelX
 		if ev.Mods.Shift && ev.WheelY != 0 && ev.WheelX == 0 {
 			c.WheelX -= ev.WheelY
@@ -364,6 +431,12 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 			c.MouseDown = false
 			c.MouseReleased = true
 			redraw = true
+		} else if ev.Button == platform.MouseRight {
+			c.MouseX = ev.X
+			c.MouseY = ev.Y
+			c.RightMouseDown = false
+			c.RightMouseReleased = true
+			redraw = true
 		} else if ev.Button == platform.MouseMiddle {
 			c.MouseX = ev.X
 			c.MouseY = ev.Y
@@ -371,19 +444,46 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 			c.MiddleMouseReleased = true
 			redraw = true
 		}
+		if ev.Button == platform.MouseLeft || ev.Button == platform.MouseRight || ev.Button == platform.MouseMiddle {
+			c.rawMouseEvents = append(c.rawMouseEvents, RawMouseEvent{
+				Kind:   RawMouseUp,
+				X:      ev.X,
+				Y:      ev.Y,
+				Button: ev.Button,
+				Mods:   ev.Mods,
+			})
+		}
 	case platform.EventCaptureLost:
 		c.MouseDown = false
+		c.RightMouseDown = false
 		c.MiddleMouseDown = false
 		c.ActiveID = ""
 		redraw = true
 	case platform.EventFocusLost:
 		c.FocusID = ""
 		c.MouseDown = false
+		c.RightMouseDown = false
 		c.MiddleMouseDown = false
 		c.ActiveID = ""
 		redraw = true
 	case platform.EventKeyDown:
 		c.KeyEvents = append(c.KeyEvents, KeyPress{Code: ev.KeyCode, Mods: ev.Mods})
+		c.rawKeyEvents = append(c.rawKeyEvents, RawKeyEvent{
+			Pressed:  true,
+			KeyCode:  ev.KeyCode,
+			ScanCode: ev.ScanCode,
+			Extended: ev.Extended,
+			Mods:     ev.Mods,
+		})
+		redraw = true
+	case platform.EventKeyUp:
+		c.rawKeyEvents = append(c.rawKeyEvents, RawKeyEvent{
+			Pressed:  false,
+			KeyCode:  ev.KeyCode,
+			ScanCode: ev.ScanCode,
+			Extended: ev.Extended,
+			Mods:     ev.Mods,
+		})
 		redraw = true
 	case platform.EventChar:
 		c.TypedRunes = append(c.TypedRunes, ev.Char)
@@ -546,6 +646,7 @@ func (c *Context) beginFrame() {
 	c.HotID = ""
 	c.nextCursor = platform.CursorArrow
 	c.needsRedraw = false
+	c.nextCaptureKeys = false
 	c.layoutSeq = 0
 	c.idScopeStack = c.idScopeStack[:0]
 	c.idSeqStack = append(c.idSeqStack[:0], 0)
@@ -592,22 +693,28 @@ func (c *Context) endFrame() {
 		c.layers.staticDirty = false
 	}
 
-	if c.MouseReleased {
+	if (c.MouseReleased || c.RightMouseReleased || c.MiddleMouseReleased) &&
+		!c.MouseDown && !c.RightMouseDown && !c.MiddleMouseDown {
 		c.ActiveID = ""
 	}
 	if c.nextCursor != c.lastCursor {
 		c.Win.SetCursor(c.nextCursor)
 		c.lastCursor = c.nextCursor
 	}
+	c.captureKeysFocus = c.nextCaptureKeys
+	c.prevFocusID = c.FocusID
 	c.MousePressed = false
 	c.MouseReleased = false
 	c.WheelX = 0
 	c.WheelY = 0
 	c.RightMousePressed = false
+	c.RightMouseReleased = false
 	c.MiddleMousePressed = false
 	c.MiddleMouseReleased = false
 	c.TypedRunes = c.TypedRunes[:0]
 	c.KeyEvents = c.KeyEvents[:0]
+	c.rawKeyEvents = c.rawKeyEvents[:0]
+	c.rawMouseEvents = c.rawMouseEvents[:0]
 }
 
 func formatIDKey(key any) string {

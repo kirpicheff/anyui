@@ -11,6 +11,21 @@ import (
 // Modifiers хранит состояние модификаторов клавиатуры для горячих клавиш.
 type Modifiers = platform.Modifiers
 
+// KeyEvent описывает сырое событие нажатия или отпускания клавиши для InteractiveCanvas.
+type KeyEvent = ui.RawKeyEvent
+
+// MouseButton задаёт кнопку мыши для событий InteractiveCanvas.
+type MouseButton = platform.MouseButton
+
+const (
+	MouseLeft   = platform.MouseLeft
+	MouseRight  = platform.MouseRight
+	MouseMiddle = platform.MouseMiddle
+)
+
+// CanvasCallbacks задаёт обработчики рисования и сырого ввода для InteractiveCanvas.
+type CanvasCallbacks = ui.CanvasCallbacks
+
 // CursorType задаёт системный курсор мыши.
 type CursorType = platform.CursorType
 
@@ -143,6 +158,12 @@ func (u *UI) Image(img image.Image, wDp, hDp int, mode ImageScaleMode) {
 // CanvasView выделяет область wDp x hDp для кастомного рисования (графики, видеокадры, градиенты).
 func (u *UI) CanvasView(wDp, hDp int, drawFn func(canvas *render.Canvas, area Rect)) {
 	u.ctx.CanvasView(wDp, hDp, drawFn)
+}
+
+// InteractiveCanvas выделяет интерактивную область wDp x hDp с поддержкой фокуса,
+// захвата перетаскивания мыши и передачи сырых событий клавиатуры (со ScanCode/Extended) и мыши/колеса.
+func (u *UI) InteractiveCanvas(id string, wDp, hDp int, cb CanvasCallbacks, opts ...Option) {
+	u.ctx.InteractiveCanvas(id, wDp, hDp, cb, opts...)
 }
 
 // DrawSVG рисует SVG-иконку по координатам (x, y) с размером sizeDp и цветом tint.

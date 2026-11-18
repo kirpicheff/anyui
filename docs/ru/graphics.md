@@ -74,7 +74,28 @@ ui.Button("btn_save", "Сохранить", anyui.Icon(saveSVG), anyui.Primary()
 ## Вывод изображений и видеокадров
 
 - `ui.Image(img, wDp, hDp, anyui.ScaleFit)` — вывод `image.Image` (`ScaleFit`, `ScaleFill`, `ScaleOneToOne`).
-- Для высокочастотных видеопотоков (например, удалённый рабочий стол) используйте `canvas.DrawBGRA(area, pixels, srcW, srcH, anyui.ScaleFit)` внутри `ui.CanvasView`.
+- Для высокочастотных видеопотоков (например, удалённый рабочий стол) используйте `canvas.DrawBGRAFast(area, pixels, srcW, srcH, anyui.ScaleFit)` (без аллокаций и кеша) внутри `ui.InteractiveCanvas` или `ui.CanvasView`.
+- Для интерактивного холста с фокусом, захватом мыши при перетаскивании и сырым вводом клавиатуры (`ScanCode`, `Extended`, `KeyDown`/`KeyUp`) и мыши/колеса используйте `ui.InteractiveCanvas`:
+
+```go
+ui.InteractiveCanvas("rdp_view", 0, 0, anyui.CanvasCallbacks{
+	OnDraw: func(canvas *render.Canvas, area anyui.Rect, focused bool) {
+		canvas.DrawBGRAFast(area, frameBGRA, frameW, frameH, anyui.ScaleFit)
+	},
+	OnKey: func(ev anyui.KeyEvent) {
+		// ev.Pressed, ev.KeyCode, ev.ScanCode, ev.Extended, ev.Mods
+	},
+	OnMouseMove: func(x, y int, mods anyui.Modifiers) {
+		// x, y — физические пиксели относительно area.X, area.Y
+	},
+	OnMouseDown: func(x, y int, btn anyui.MouseButton, mods anyui.Modifiers) {},
+	OnMouseUp:   func(x, y int, btn anyui.MouseButton, mods anyui.Modifiers) {},
+	OnMouseWheel: func(x, y int, wx, wy float32, mods anyui.Modifiers) {},
+	OnFocusLost: func() {
+		// Сброс зажатых модификаторов при уходе фокуса
+	},
+})
+```
 - Для обмена изображениями с ОС используйте методы окна `win.ClipboardImage()` и `win.SetClipboardImage(img)` (поддерживается формат `CF_DIB` 24/32 bpp).
 
 ## Начертания шрифтов и fallback

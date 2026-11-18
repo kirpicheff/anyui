@@ -42,6 +42,12 @@ func (c *Context) processFocusAndShortcuts() {
 	if len(c.KeyEvents) == 0 {
 		return
 	}
+	// Если сфокусированный виджет перехватывает все клавиши (например, InteractiveCanvas),
+	// не съедаем Tab, Escape и горячие клавиши на уровне окна.
+	if c.captureKeysFocus && c.FocusID != "" {
+		c.KeyEvents = c.KeyEvents[:0]
+		return
+	}
 
 	remaining := c.KeyEvents[:0]
 	for _, kp := range c.KeyEvents {

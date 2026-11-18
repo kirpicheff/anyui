@@ -901,20 +901,24 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 
 	case wmKeyDown, wmSysKeyDown:
 		scan := uint16((lParam >> 16) & 0xFF)
+		ext := (lParam & (1 << 24)) != 0
 		w.emit(Event{
 			Type:     EventKeyDown,
 			KeyCode:  uint32(wParam),
 			ScanCode: scan,
+			Extended: ext,
 			Mods:     getModifiers(),
 		})
 		return 0
 
 	case wmKeyUp, wmSysKeyUp:
 		scan := uint16((lParam >> 16) & 0xFF)
+		ext := (lParam & (1 << 24)) != 0
 		w.emit(Event{
 			Type:     EventKeyUp,
 			KeyCode:  uint32(wParam),
 			ScanCode: scan,
+			Extended: ext,
 			Mods:     getModifiers(),
 		})
 		return 0
