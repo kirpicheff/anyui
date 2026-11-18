@@ -1,0 +1,566 @@
+//go:build darwin && cgo
+
+package platform
+
+/*
+#cgo CFLAGS: -x objective-c -fobjc-arc
+#cgo LDFLAGS: -framework Cocoa -framework QuartzCore
+#include <stdlib.h>
+#include "darwin_bridge.h"
+*/
+import "C"
+
+import (
+	"errors"
+	"runtime"
+	"sync"
+	"sync/atomic"
+	"unsafe"
+)
+
+var (
+	errDarwinTrayNotImplemented = errors.New("системный трей на macOS будет реализован на следующем этапе")
+	errDarwinClipboardNotImpl   = errors.New("буфер обмена macOS будет реализован на этапе системной интеграции")
+)
+
+var (
+	darwinNextWinID atomic.Uint64
+	darwinWinMu     sync.RWMutex
+	darwinWindows   = make(map[uint64]*darwinWindow)
+)
+
+type darwinWindow struct {
+	id      uint64
+	cfg     WindowConfig
+	handle  uintptr
+	handler func(Event)
+
+	mu      sync.Mutex
+	onClose func() bool
+	width   int
+	height  int
+	scale   float32
+	closed  bool
+}
+
+var (
+	_ Window          = (*darwinWindow)(nil)
+	_ WindowActivator = (*darwinWindow)(nil)
+	_ TitleBarStyler  = (*darwinWindow)(nil)
+	_ WindowStater    = (*darwinWindow)(nil)
+)
+
+// NewWindow создаёт экземпляр нативного окна macOS (AppKit).
+func NewWindow(cfg WindowConfig) (Window, error) {
+	if cfg.Width <= 0 {
+		cfg.Width = 800
+	}
+	if cfg.Height <= 0 {
+		cfg.Height = 600
+	}
+	return &darwinWindow{
+		id:    darwinNextWinID.Add(1),
+		cfg:   cfg,
+		scale: 1.0,
+	}, nil
+}
+
+// RunEventLoop запускает главный цикл событий Cocoa/AppKit на текущем потоке ОС.
+func RunEventLoop(onStart func() error) error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	C.anyui_darwin_init_app()
+
+	if onStart != nil {
+		if err := onStart(); err != nil {
+			return err
+		}
+	}
+
+	C.anyui_darwin_run_app()
+	return nil
+}
+
+// NewTray возвращает заглушку до реализации NSStatusItem на этапе нативной системной интеграции.
+func NewTray(cfg TrayConfig) (Tray, error) {
+	_ = cfg
+	return nil, errDarwinTrayNotImplemented
+}
+
+func (w *darwinWindow) Run(handler func(Event)) error {
+	return RunEventLoop(func() error {
+		return w.Open(handler)
+	})
+}
+
+func (w *darwinWindow) Open(handler func(Event)) error {
+	if handler == nil {
+		return errors.New("обработчик событий не задан")
+	}
+
+	w.mu.Lock()
+	w.handler = handler
+	w.mu.Unlock()
+
+	cTitle := C.CString(w.cfg.Title)
+	defer C.free(unsafe.Pointer(cTitle))
+
+	darkTitle := C.int(0)
+	if w.cfg.DarkTitle {
+		darkTitle = 1
+	}
+	frameless := C.int(0)
+	if w.cfg.Frameless {
+		frameless = 1
+	}
+
+	handle := uintptr(C.anyui_darwin_create_window(
+		C.uint64_t(w.id),
+		cTitle,
+		C.int(w.cfg.Width),
+		C.int(w.cfg.Height),
+		C.int(w.cfg.MinWidth),
+		C.int(w.cfg.MinHeight),
+		darkTitle,
+		frameless,
+	))
+	if handle == 0 {
+		return errors.New("не удалось создать NSWindow")
+	}
+
+	w.mu.Lock()
+	w.handle = handle
+	w.closed = false
+	w.mu.Unlock()
+
+	darwinWinMu.Lock()
+	darwinWindows[w.id] = w
+	darwinWinMu.Unlock()
+
+	if w.cfg.InitialState != nil && isValidWindowState(*w.cfg.InitialState) {
+		w.RestoreState(*w.cfg.InitialState)
+	}
+
+	C.anyui_darwin_show_window(C.uintptr_t(handle))
+
+	var cw, ch C.int
+	var cscale C.float
+	C.anyui_darwin_get_size(C.uintptr_t(handle), &cw, &ch, &cscale)
+
+	scale := normalizeDarwinScale(float64(cscale))
+	pw, ph := int(cw), int(ch)
+	if pw < 1 {
+		pw = w.cfg.Width
+	}
+	if ph < 1 {
+		ph = w.cfg.Height
+	}
+
+	w.mu.Lock()
+	w.width = pw
+	w.height = ph
+	w.scale = scale
+	w.mu.Unlock()
+
+	handler(Event{Type: EventDPIChange, Scale: scale})
+	handler(Event{Type: EventResize, Width: pw, Height: ph})
+	handler(Event{Type: EventPaint})
+
+	return nil
+}
+
+func (w *darwinWindow) Present(pixels []byte, width, height int) {
+	if width <= 0 || height <= 0 {
+		return
+	}
+	need := width * height * 4
+	if len(pixels) < need {
+		return
+	}
+
+	w.mu.Lock()
+	handle := w.handle
+	closed := w.closed
+	w.mu.Unlock()
+	if handle == 0 || closed {
+		return
+	}
+
+	C.anyui_darwin_present(C.uintptr_t(handle), unsafe.Pointer(&pixels[0]), C.int(width), C.int(height))
+	runtime.KeepAlive(pixels)
+}
+
+func (w *darwinWindow) Invalidate() {
+	w.mu.Lock()
+	handle := w.handle
+	closed := w.closed
+	w.mu.Unlock()
+	if handle != 0 && !closed {
+		C.anyui_darwin_invalidate(C.uintptr_t(handle))
+	}
+}
+
+func (w *darwinWindow) WakeUp() {
+	w.mu.Lock()
+	closed := w.closed
+	w.mu.Unlock()
+	if !closed {
+		C.anyui_darwin_wakeup(C.uint64_t(w.id))
+	}
+}
+
+func (w *darwinWindow) Show() {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle != 0 {
+		C.anyui_darwin_show_window(C.uintptr_t(handle))
+	}
+}
+
+func (w *darwinWindow) Hide() {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle != 0 {
+		C.anyui_darwin_hide_window(C.uintptr_t(handle))
+	}
+}
+
+func (w *darwinWindow) Close() {
+	w.mu.Lock()
+	handle := w.handle
+	closed := w.closed
+	w.mu.Unlock()
+	if handle != 0 && !closed {
+		C.anyui_darwin_close_window(C.uintptr_t(handle))
+	}
+}
+
+func (w *darwinWindow) SetTitle(title string) {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle == 0 {
+		return
+	}
+	cTitle := C.CString(title)
+	defer C.free(unsafe.Pointer(cTitle))
+	C.anyui_darwin_set_title(C.uintptr_t(handle), cTitle)
+}
+
+func (w *darwinWindow) SetCursor(cursor CursorType) {
+	_ = cursor
+}
+
+func (w *darwinWindow) Size() (int, int) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.width, w.height
+}
+
+func (w *darwinWindow) Scale() float32 {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.scale
+}
+
+func (w *darwinWindow) ClipboardText() (string, error) {
+	return "", errDarwinClipboardNotImpl
+}
+
+func (w *darwinWindow) SetClipboardText(text string) error {
+	_ = text
+	return errDarwinClipboardNotImpl
+}
+
+func (w *darwinWindow) Minimize() {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle != 0 {
+		C.anyui_darwin_minimize(C.uintptr_t(handle))
+	}
+}
+
+func (w *darwinWindow) Maximize() {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle != 0 {
+		C.anyui_darwin_maximize(C.uintptr_t(handle))
+	}
+}
+
+func (w *darwinWindow) Restore() {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle != 0 {
+		C.anyui_darwin_restore(C.uintptr_t(handle))
+	}
+}
+
+func (w *darwinWindow) IsMaximized() bool {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle == 0 {
+		return false
+	}
+	return C.anyui_darwin_is_maximized(C.uintptr_t(handle)) != 0
+}
+
+func (w *darwinWindow) IsMinimized() bool {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle == 0 {
+		return false
+	}
+	return C.anyui_darwin_is_minimized(C.uintptr_t(handle)) != 0
+}
+
+func (w *darwinWindow) SetFullscreen(fullscreen bool) {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle == 0 {
+		return
+	}
+	flag := C.int(0)
+	if fullscreen {
+		flag = 1
+	}
+	C.anyui_darwin_set_fullscreen(C.uintptr_t(handle), flag)
+}
+
+func (w *darwinWindow) IsFullscreen() bool {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle == 0 {
+		return false
+	}
+	return C.anyui_darwin_is_fullscreen(C.uintptr_t(handle)) != 0
+}
+
+func (w *darwinWindow) Position() (int, int) {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle == 0 {
+		return 0, 0
+	}
+	var cx, cy C.int
+	C.anyui_darwin_get_position(C.uintptr_t(handle), &cx, &cy)
+	return int(cx), int(cy)
+}
+
+func (w *darwinWindow) SetPosition(x, y int) {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle != 0 {
+		C.anyui_darwin_set_position(C.uintptr_t(handle), C.int(x), C.int(y))
+	}
+}
+
+func (w *darwinWindow) SetSize(width, height int) {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle != 0 {
+		C.anyui_darwin_set_size(C.uintptr_t(handle), C.int(width), C.int(height))
+	}
+}
+
+func (w *darwinWindow) SetOnClose(fn func() bool) {
+	w.mu.Lock()
+	w.onClose = fn
+	w.mu.Unlock()
+}
+
+func (w *darwinWindow) NativeHandle() uintptr {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.handle
+}
+
+func (w *darwinWindow) SetCapture() {}
+
+func (w *darwinWindow) ReleaseCapture() {}
+
+func (w *darwinWindow) DoubleClickTimeMs() int {
+	return int(C.anyui_darwin_double_click_ms())
+}
+
+func (w *darwinWindow) BringToFront() {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle != 0 {
+		C.anyui_darwin_bring_to_front(C.uintptr_t(handle))
+	}
+}
+
+func (w *darwinWindow) SetDarkTitle(dark bool) {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle == 0 {
+		return
+	}
+	flag := C.int(0)
+	if dark {
+		flag = 1
+	}
+	C.anyui_darwin_set_dark_title(C.uintptr_t(handle), flag)
+}
+
+func (w *darwinWindow) SetTitleBarColors(caption, text, border *WindowColor) {
+	_, _, _ = caption, text, border
+}
+
+func (w *darwinWindow) State() WindowState {
+	x, y := w.Position()
+	pw, ph := w.Size()
+	scale := w.Scale()
+	if scale <= 0 {
+		scale = 1.0
+	}
+	return WindowState{
+		X:         x,
+		Y:         y,
+		Width:     int(float32(pw) / scale),
+		Height:    int(float32(ph) / scale),
+		Maximized: w.IsMaximized(),
+	}
+}
+
+func (w *darwinWindow) RestoreState(state WindowState) {
+	if !isValidWindowState(state) {
+		return
+	}
+	w.SetSize(state.Width, state.Height)
+	w.SetPosition(state.X, state.Y)
+	if state.Maximized {
+		w.Maximize()
+	}
+}
+
+func lookupDarwinWindow(winID uint64) *darwinWindow {
+	darwinWinMu.RLock()
+	w := darwinWindows[winID]
+	darwinWinMu.RUnlock()
+	return w
+}
+
+//export goDarwinOnClose
+func goDarwinOnClose(winID C.uint64_t) C.int {
+	w := lookupDarwinWindow(uint64(winID))
+	if w == nil {
+		return 1
+	}
+	w.mu.Lock()
+	fn := w.onClose
+	w.mu.Unlock()
+	if fn != nil && !fn() {
+		return 0
+	}
+	return 1
+}
+
+//export goDarwinOnDestroy
+func goDarwinOnDestroy(winID C.uint64_t) {
+	darwinWinMu.Lock()
+	w := darwinWindows[uint64(winID)]
+	delete(darwinWindows, uint64(winID))
+	remaining := len(darwinWindows)
+	darwinWinMu.Unlock()
+
+	if w != nil {
+		w.mu.Lock()
+		handle := w.handle
+		handler := w.handler
+		w.handle = 0
+		w.closed = true
+		w.mu.Unlock()
+
+		if handler != nil {
+			handler(Event{Type: EventClose})
+		}
+		if handle != 0 {
+			C.anyui_darwin_destroy_window(C.uintptr_t(handle))
+		}
+	}
+
+	if remaining == 0 {
+		C.anyui_darwin_stop_app()
+	}
+}
+
+//export goDarwinOnResize
+func goDarwinOnResize(winID C.uint64_t, width, height C.int) {
+	w := lookupDarwinWindow(uint64(winID))
+	if w == nil {
+		return
+	}
+	pw, ph := int(width), int(height)
+	w.mu.Lock()
+	w.width = pw
+	w.height = ph
+	handler := w.handler
+	w.mu.Unlock()
+	if handler != nil {
+		handler(Event{Type: EventResize, Width: pw, Height: ph})
+	}
+}
+
+//export goDarwinOnDPIChange
+func goDarwinOnDPIChange(winID C.uint64_t, scale C.float) {
+	w := lookupDarwinWindow(uint64(winID))
+	if w == nil {
+		return
+	}
+	s := normalizeDarwinScale(float64(scale))
+	w.mu.Lock()
+	w.scale = s
+	handler := w.handler
+	w.mu.Unlock()
+	if handler != nil {
+		handler(Event{Type: EventDPIChange, Scale: s})
+	}
+}
+
+//export goDarwinOnPaint
+func goDarwinOnPaint(winID C.uint64_t) {
+	w := lookupDarwinWindow(uint64(winID))
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	handler := w.handler
+	closed := w.closed
+	w.mu.Unlock()
+	if handler != nil && !closed {
+		handler(Event{Type: EventPaint})
+	}
+}
+
+//export goDarwinOnWakeUp
+func goDarwinOnWakeUp(winID C.uint64_t) {
+	w := lookupDarwinWindow(uint64(winID))
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	handler := w.handler
+	closed := w.closed
+	w.mu.Unlock()
+	if handler != nil && !closed {
+		handler(Event{Type: EventWakeUp})
+	}
+}
+

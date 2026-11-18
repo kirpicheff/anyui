@@ -32,3 +32,15 @@ jobs:
         env:
           CGO_ENABLED: "0"
         run: go build ./...
+
+      - name: Test (macOS CGO)
+        if: matrix.os == 'macos-latest'
+        env:
+          CGO_ENABLED: "1"
+        run: go test ./...
+
+      - name: Build (macOS CGO)
+        if: matrix.os == 'macos-latest'
+        env:
+          CGO_ENABLED: "1"
+        run: go build ./...
