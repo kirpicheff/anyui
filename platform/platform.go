@@ -71,6 +71,7 @@ type Modifiers struct {
 	Shift bool
 	Ctrl  bool
 	Alt   bool
+	Win   bool
 }
 
 // Event представляет единое событие от платформенного слоя.

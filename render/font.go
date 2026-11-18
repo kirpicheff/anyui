@@ -29,12 +29,14 @@ const (
 type glyphKey struct {
 	r    rune
 	size int
+	subX uint8
 }
 
 type coloredGlyphKey struct {
 	style FontStyle
 	r     rune
 	size  int
+	subX  uint8
 	color Color
 }
 
@@ -42,7 +44,7 @@ type cachedGlyph struct {
 	w, h     int
 	offX     int
 	offY     int
-	advance  int
+	advance  fixed.Int26_6
 	alpha    []byte
 	notEmpty bool
 }
@@ -51,7 +53,7 @@ type coloredGlyph struct {
 	w, h     int
 	offX     int
 	offY     int
-	advance  int
+	advance  fixed.Int26_6
 	bgra     []byte
 	notEmpty bool
 }
@@ -99,7 +101,7 @@ func (fs *fontSet) getFace(sizePx int) *faceEntry {
 	face, err := opentype.NewFace(fs.sfntFont, &opentype.FaceOptions{
 		Size:    float64(sizePx),
 		DPI:     72,
-		Hinting: font.HintingFull,
+		Hinting: font.HintingNone,
 	})
 	if err != nil {
 		return nil
@@ -114,8 +116,19 @@ func (fs *fontSet) getFace(sizePx int) *faceEntry {
 	return fe
 }
 
-func (fs *fontSet) getGlyph(r rune, sizePx int) *cachedGlyph {
-	key := glyphKey{r: r, size: sizePx}
+func (fs *fontSet) kern(sizePx int, prev, cur rune) fixed.Int26_6 {
+	fe := fs.getFace(sizePx)
+	if fe == nil {
+		return 0
+	}
+	fs.mu.Lock()
+	k := fe.face.Kern(prev, cur)
+	fs.mu.Unlock()
+	return k
+}
+
+func (fs *fontSet) getGlyph(r rune, sizePx int, subX uint8) *cachedGlyph {
+	key := glyphKey{r: r, size: sizePx, subX: subX}
 	if g, ok := fs.glyphs.Get(key); ok {
 		return g
 	}
@@ -126,9 +139,10 @@ func (fs *fontSet) getGlyph(r rune, sizePx int) *cachedGlyph {
 	}
 
 	fs.mu.Lock()
-	dr, mask, maskp, adv, ok := fe.face.Glyph(fixed.P(0, 0), r)
+	dot := fixed.Point26_6{X: fixed.Int26_6(subX) * 16, Y: 0}
+	dr, mask, maskp, adv, ok := fe.face.Glyph(dot, r)
 	g := &cachedGlyph{
-		advance: adv.Round(),
+		advance: adv,
 	}
 	if ok && !dr.Empty() && mask != nil {
 		w := dr.Dx()
@@ -366,26 +380,104 @@ func (fm *FontManager) styleSet(style FontStyle) *fontSet {
 	return fm.styles[FontRegular]
 }
 
-func (fm *FontManager) resolveGlyph(style FontStyle, r rune, sizePx int) *cachedGlyph {
+func (fm *FontManager) resolveGlyphWithSet(style FontStyle, r rune, sizePx int, subX uint8) (*cachedGlyph, *fontSet) {
 	if sizePx < 6 {
 		sizePx = 6
 	}
 	primary := fm.styleSet(style)
 	if primary == nil {
-		return nil
+		return nil, nil
 	}
 	if r <= ' ' || primary.hasRune(r) {
-		return primary.getGlyph(r, sizePx)
+		return primary.getGlyph(r, sizePx, subX), primary
 	}
 	for _, fb := range fm.fallbacks {
 		if fb.hasRune(r) {
-			return fb.getGlyph(r, sizePx)
+			return fb.getGlyph(r, sizePx, subX), fb
 		}
 	}
-	return primary.getGlyph(r, sizePx)
+	return primary.getGlyph(r, sizePx, subX), primary
 }
 
-func (fm *FontManager) resolveColoredGlyph(style FontStyle, r rune, sizePx int, col Color) *coloredGlyph {
+func (fm *FontManager) resolveColoredGlyph(style FontStyle, r rune, sizePx int, subX uint8, col Color) (*coloredGlyph, *fontSet) {
+	if sizePx < 6 {
+		sizePx = 6
+	}
+	g, usedSet := fm.resolveGlyphWithSet(style, r, sizePx, subX)
+	if g == nil {
+		return nil, nil
+	}
+
+	cache := fm.ensureColoredCache()
+	key := coloredGlyphKey{
+		style: style,
+		r:     r,
+		size:  sizePx,
+		subX:  subX,
+		color: col,
+	}
+	if cg, ok := cache.Get(key); ok {
+		return cg, usedSet
+	}
+
+	cg := &coloredGlyph{
+		w:        g.w,
+		h:        g.h,
+		offX:     g.offX,
+		offY:     g.offY,
+		advance:  g.advance,
+		notEmpty: g.notEmpty,
+	}
+	if g.notEmpty && len(g.alpha) == g.w*g.h {
+		bgra := make([]byte, g.w*g.h*4)
+		for i, cov := range g.alpha {
+			if cov == 0 {
+				continue
+			}
+			a := (uint32(col.A)*uint32(cov) + 127) / 255
+			if a == 0 {
+				continue
+			}
+			off := i * 4
+			if a >= 255 {
+				bgra[off+0] = col.B
+				bgra[off+1] = col.G
+				bgra[off+2] = col.R
+				bgra[off+3] = 255
+			} else {
+				bgra[off+0] = uint8((uint32(col.B)*a + 127) / 255)
+				bgra[off+1] = uint8((uint32(col.G)*a + 127) / 255)
+				bgra[off+2] = uint8((uint32(col.R)*a + 127) / 255)
+				bgra[off+3] = uint8(a)
+			}
+		}
+		cg.bgra = bgra
+	}
+
+	cache.Put(key, cg, int64(len(cg.bgra)))
+	return cg, usedSet
+}
+
+func (fm *FontManager) resolveFontSet(style FontStyle, r rune) *fontSet {
+	primary := fm.styleSet(style)
+	if primary == nil {
+		return nil
+	}
+	if r <= ' ' || primary.hasRune(r) {
+		return primary
+	}
+	for _, fb := range fm.fallbacks {
+		if fb.hasRune(r) {
+			return fb
+		}
+	}
+	return primary
+}
+
+func (fm *FontManager) resolveColoredGlyphForSet(usedSet *fontSet, style FontStyle, r rune, sizePx int, subX uint8, col Color) *coloredGlyph {
+	if usedSet == nil {
+		return nil
+	}
 	if sizePx < 6 {
 		sizePx = 6
 	}
@@ -394,13 +486,14 @@ func (fm *FontManager) resolveColoredGlyph(style FontStyle, r rune, sizePx int, 
 		style: style,
 		r:     r,
 		size:  sizePx,
+		subX:  subX,
 		color: col,
 	}
 	if cg, ok := cache.Get(key); ok {
 		return cg
 	}
 
-	g := fm.resolveGlyph(style, r, sizePx)
+	g := usedSet.getGlyph(r, sizePx, subX)
 	if g == nil {
 		return nil
 	}
@@ -464,14 +557,27 @@ func (fm *FontManager) MeasureTextStyled(text string, sizePx int, style FontStyl
 	if text == "" {
 		return 0, fe.lineHeight
 	}
-	width := 0
-	for _, r := range text {
-		g := fm.resolveGlyph(style, r, sizePx)
-		if g != nil {
-			width += g.advance
-		}
+	if sizePx < 6 {
+		sizePx = 6
 	}
-	return width, fe.lineHeight
+	var penX fixed.Int26_6
+	var prevR rune
+	var prevSet *fontSet
+	for _, r := range text {
+		curSet := fm.resolveFontSet(style, r)
+		if curSet == nil {
+			continue
+		}
+		if prevSet != nil && curSet == prevSet {
+			penX += curSet.kern(sizePx, prevR, r)
+		}
+		if g := curSet.getGlyph(r, sizePx, 0); g != nil {
+			penX += g.advance
+		}
+		prevR = r
+		prevSet = curSet
+	}
+	return penX.Ceil(), fe.lineHeight
 }
 
 // DrawText рисует строку текста начертанием Regular, где (x, y) — левый верхний угол строки.
@@ -492,23 +598,38 @@ func (fm *FontManager) DrawTextStyled(c *Canvas, x, y int, text string, sizePx i
 	if fe == nil {
 		return
 	}
+	if sizePx < 6 {
+		sizePx = 6
+	}
 
 	clip := c.CurrentClip()
 	if clip.Empty() || y >= clip.Y+clip.H || y+fe.lineHeight <= clip.Y {
 		return
 	}
 
-	penX := x
+	penX := fixed.I(x)
 	baselineY := y + fe.ascent
 	var dirty Rect
+	var prevR rune
+	var prevSet *fontSet
 
 	for _, r := range text {
-		cg := fm.resolveColoredGlyph(style, r, sizePx, col)
+		curSet := fm.resolveFontSet(style, r)
+		if curSet == nil {
+			continue
+		}
+		if prevSet != nil && curSet == prevSet {
+			penX += curSet.kern(sizePx, prevR, r)
+		}
+		subX := uint8((penX & 63) >> 4)
+		cg := fm.resolveColoredGlyphForSet(curSet, style, r, sizePx, subX, col)
 		if cg == nil {
+			prevR = r
+			prevSet = curSet
 			continue
 		}
 		if cg.notEmpty && len(cg.bgra) == cg.w*cg.h*4 {
-			gx := penX + cg.offX
+			gx := int(penX>>6) + cg.offX
 			gy := baselineY + cg.offY
 
 			// Быстрая проверка видимости глифа относительно клипа
@@ -564,6 +685,8 @@ func (fm *FontManager) DrawTextStyled(c *Canvas, x, y int, text string, sizePx i
 			}
 		}
 		penX += cg.advance
+		prevR = r
+		prevSet = curSet
 	}
 
 	if !dirty.Empty() {

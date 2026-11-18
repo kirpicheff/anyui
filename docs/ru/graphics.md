@@ -100,7 +100,7 @@ ui.InteractiveCanvas("rdp_view", 0, 0, anyui.CanvasCallbacks{
 
 ## Начертания шрифтов и fallback
 
-`FontManager` автоматически загружает начертания `FontRegular`, `FontBold` и `FontMono`. В виджетах используйте опции `anyui.Bold()` и `anyui.Mono()`:
+`FontManager` автоматически загружает начертания `FontRegular`, `FontBold` и `FontMono`, использует субпиксельное позиционирование по X (4 фазы) и учитывает кернинг. В виджетах используйте опции `anyui.Bold()` и `anyui.Mono()`:
 
 ```go
 ui.Label("Код: 000 000", anyui.Mono(), anyui.FontSize(18))

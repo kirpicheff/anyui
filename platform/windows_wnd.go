@@ -118,6 +118,10 @@ const (
 	vkShift   = 0x10
 	vkControl = 0x11
 	vkMenu    = 0x12
+	vkLWin    = 0x5B
+	vkRWin    = 0x5C
+	vkLShift  = 0xA0
+	vkRShift  = 0xA1
 
 	idcArrow    = 32512
 	idcIBeam    = 32513
@@ -679,10 +683,34 @@ func getModifiers() Modifiers {
 	shift, _, _ := procGetKeyState.Call(vkShift)
 	ctrl, _, _ := procGetKeyState.Call(vkControl)
 	alt, _, _ := procGetKeyState.Call(vkMenu)
+	lwin, _, _ := procGetKeyState.Call(vkLWin)
+	rwin, _, _ := procGetKeyState.Call(vkRWin)
 	return Modifiers{
 		Shift: (uint16(shift) & 0x8000) != 0,
 		Ctrl:  (uint16(ctrl) & 0x8000) != 0,
 		Alt:   (uint16(alt) & 0x8000) != 0,
+		Win:   ((uint16(lwin) | uint16(rwin)) & 0x8000) != 0,
+	}
+}
+
+// winKeyEvent формирует событие клавиатуры с различением ShiftLeft/ShiftRight по скан-коду и флагом Extended.
+func winKeyEvent(evType EventType, wParam, lParam uintptr) Event {
+	vk := uint32(wParam)
+	scan := uint16((lParam >> 16) & 0xFF)
+	ext := (lParam & (1 << 24)) != 0
+	if vk == vkShift {
+		if scan == 0x36 {
+			vk = vkRShift
+		} else if scan == 0x2A {
+			vk = vkLShift
+		}
+	}
+	return Event{
+		Type:     evType,
+		KeyCode:  vk,
+		ScanCode: scan,
+		Extended: ext,
+		Mods:     getModifiers(),
 	}
 }
 
@@ -900,27 +928,11 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 		return 0
 
 	case wmKeyDown, wmSysKeyDown:
-		scan := uint16((lParam >> 16) & 0xFF)
-		ext := (lParam & (1 << 24)) != 0
-		w.emit(Event{
-			Type:     EventKeyDown,
-			KeyCode:  uint32(wParam),
-			ScanCode: scan,
-			Extended: ext,
-			Mods:     getModifiers(),
-		})
+		w.emit(winKeyEvent(EventKeyDown, wParam, lParam))
 		return 0
 
 	case wmKeyUp, wmSysKeyUp:
-		scan := uint16((lParam >> 16) & 0xFF)
-		ext := (lParam & (1 << 24)) != 0
-		w.emit(Event{
-			Type:     EventKeyUp,
-			KeyCode:  uint32(wParam),
-			ScanCode: scan,
-			Extended: ext,
-			Mods:     getModifiers(),
-		})
+		w.emit(winKeyEvent(EventKeyUp, wParam, lParam))
 		return 0
 
 	case wmChar:

@@ -100,7 +100,7 @@ ui.InteractiveCanvas("rdp_view", 0, 0, anyui.CanvasCallbacks{
 
 ## Font Styles and Fallback
 
-`FontManager` automatically loads `FontRegular`, `FontBold`, and `FontMono`. Use `anyui.Bold()` and `anyui.Mono()` on widgets:
+`FontManager` automatically loads `FontRegular`, `FontBold`, and `FontMono`, using 4-phase subpixel X positioning and font kerning. Use `anyui.Bold()` and `anyui.Mono()` on widgets:
 
 ```go
 ui.Label("Code: 000 000", anyui.Mono(), anyui.FontSize(18))
