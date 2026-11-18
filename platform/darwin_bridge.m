@@ -6,6 +6,7 @@
 #import <QuartzCore/QuartzCore.h>
 #import <objc/runtime.h>
 #include <math.h>
+#include <stdatomic.h>
 #include "darwin_bridge.h"
 
 // Обратные вызовы в Go (экспортируются через //export в darwin_wnd.go).
@@ -45,13 +46,45 @@ static void runOnMainAsync(dispatch_block_t block) {
 @property (nonatomic, assign) uint64_t winID;
 @property (nonatomic, assign) BOOL frameless;
 @property (nonatomic, assign) BOOL acceptDropFiles;
+@property (nonatomic, assign) CGImageRef lastImage;
 @property (nonatomic, strong) NSTrackingArea *trackingArea;
 @property (nonatomic, strong) NSCursor *currentCursor;
 @end
 
 @implementation AnyUIView
+- (void)dealloc {
+    if (_lastImage) {
+        CGImageRelease(_lastImage);
+        _lastImage = NULL;
+    }
+}
 - (BOOL)wantsUpdateLayer {
-    return NO;
+    return YES;
+}
+- (void)updateLayer {
+    CALayer *layer = self.layer;
+    if (!layer) return;
+    CGFloat scale = (self.window && self.window.backingScaleFactor > 0) ? self.window.backingScaleFactor : 1.0;
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    layer.contentsScale = scale;
+    if (_lastImage) {
+        layer.contents = (__bridge id)_lastImage;
+    }
+    [CATransaction commit];
+}
+- (void)setPresentedImage:(CGImageRef)img {
+    if (_lastImage != img) {
+        if (_lastImage) {
+            CGImageRelease(_lastImage);
+        }
+        _lastImage = img ? CGImageRetain(img) : NULL;
+    }
+    if (self.layer) {
+        [self updateLayer];
+    } else {
+        [self setNeedsDisplay:YES];
+    }
 }
 - (BOOL)acceptsFirstResponder {
     return YES;
@@ -210,7 +243,10 @@ static void runOnMainAsync(dispatch_block_t block) {
 }
 @end
 
-@interface AnyUIWindowDelegate : NSObject <NSWindowDelegate>
+@interface AnyUIWindowDelegate : NSObject <NSWindowDelegate> {
+@public
+    atomic_bool _pendingPaint;
+}
 @property (nonatomic, assign) uint64_t winID;
 @property (nonatomic, weak) NSWindow *window;
 @property (nonatomic, assign) NSRect savedFrame;
@@ -376,7 +412,7 @@ uintptr_t anyui_darwin_create_window(
             view.frameless = (frameless != 0);
             view.acceptDropFiles = (acceptDropFiles != 0);
             view.wantsLayer = YES;
-            view.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
+            view.layerContentsRedrawPolicy = NSViewLayerContentsRedrawOnSetNeedsDisplay;
             if (acceptDropFiles != 0) {
                 [view registerForDraggedTypes:@[NSPasteboardTypeFileURL]];
             }
@@ -481,13 +517,15 @@ void anyui_darwin_present(uintptr_t handle, const void* bgraPixels, int width, i
     NSWindow *win = (__bridge NSWindow *)(void *)handle;
     runOnMainAsync(^{
         @autoreleasepool {
-            NSView *view = win.contentView;
-            if (view && view.layer) {
+            NSView *contentView = win.contentView;
+            if ([contentView isKindOfClass:[AnyUIView class]]) {
+                [(AnyUIView *)contentView setPresentedImage:image];
+            } else if (contentView && contentView.layer) {
                 CGFloat scale = win.backingScaleFactor > 0 ? win.backingScaleFactor : 1.0;
                 [CATransaction begin];
                 [CATransaction setDisableActions:YES];
-                view.layer.contentsScale = scale;
-                view.layer.contents = (__bridge id)image;
+                contentView.layer.contentsScale = scale;
+                contentView.layer.contents = (__bridge id)image;
                 [CATransaction commit];
             }
             CGImageRelease(image);
@@ -498,12 +536,17 @@ void anyui_darwin_present(uintptr_t handle, const void* bgraPixels, int width, i
 void anyui_darwin_invalidate(uintptr_t handle) {
     if (!handle) return;
     NSWindow *win = (__bridge NSWindow *)(void *)handle;
-    runOnMainAsync(^{
+    AnyUIWindowDelegate *del = getDelegateForWindow(win);
+    if (!del) return;
+
+    // Всегда планируем перерисовку асинхронно на следующей итерации RunLoop и схлопываем дубли.
+    if (atomic_exchange_explicit(&del->_pendingPaint, true, memory_order_acq_rel)) {
+        return;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
         @autoreleasepool {
-            AnyUIWindowDelegate *del = getDelegateForWindow(win);
-            if (del) {
-                goDarwinOnPaint(del.winID);
-            }
+            atomic_store_explicit(&del->_pendingPaint, false, memory_order_release);
+            goDarwinOnPaint(del.winID);
         }
     });
 }
