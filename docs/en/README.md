@@ -98,7 +98,7 @@ Interactive widgets accept:
 `App` manages a single OS event loop. Additional independent or child windows can be opened with `app.OpenWindow(cfg, drawFn)`:
 
 ```go
-_, _ = app.OpenWindow(anyui.Config{
+win, _ := app.OpenWindow(anyui.Config{
 	Title:  "Logs",
 	Width:  640,
 	Height: 400,
@@ -108,4 +108,7 @@ _, _ = app.OpenWindow(anyui.Config{
 	})
 })
 ```
+
+To wake up and redraw only a specific window from a background goroutine (for example, when streaming frames to an `InteractiveCanvas` with `Streaming: true`), call `win.WakeUp()` instead of `app.Dispatch(...)` — this avoids waking other windows and preserves the `EventWakeUp` fast-path.
+
 

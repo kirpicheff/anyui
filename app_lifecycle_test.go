@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/kirpicheff/anyui/platform"
+	"github.com/kirpicheff/anyui/render"
 	"github.com/kirpicheff/anyui/ui"
 )
 
@@ -17,13 +18,17 @@ type stylerMockWindow struct {
 	textCol     *platform.WindowColor
 	borderCol   *platform.WindowColor
 	brought     int
+	wakeUps     int
+	presents    int
+	presentRects int
 }
 
 func (m *stylerMockWindow) Run(func(platform.Event)) error          { return nil }
 func (m *stylerMockWindow) Open(func(platform.Event)) error         { return nil }
-func (m *stylerMockWindow) Present([]byte, int, int)                {}
+func (m *stylerMockWindow) Present([]byte, int, int)                { m.presents++ }
+func (m *stylerMockWindow) PresentRect([]byte, int, int, int, int, int, int) { m.presentRects++ }
 func (m *stylerMockWindow) Invalidate()                             {}
-func (m *stylerMockWindow) WakeUp()                                 {}
+func (m *stylerMockWindow) WakeUp()                                 { m.wakeUps++ }
 func (m *stylerMockWindow) Show()                                   {}
 func (m *stylerMockWindow) Hide()                                   {}
 func (m *stylerMockWindow) Close()                                  {}
@@ -204,4 +209,155 @@ func TestThemeSwitchingAndStaticLayer(t *testing.T) {
 		t.Fatalf("фон DarkTheme не перерисовался: got RGB(%d,%d,%d)", bgDark[2], bgDark[1], bgDark[0])
 	}
 }
+
+func TestMultiWindowDispatchMouseMoveDirectInputNoLostWakeup(t *testing.T) {
+	app := NewApp(Config{})
+
+	mw1 := &stylerMockWindow{w: 400, h: 300, scale: 1.0}
+	ctx1 := ui.NewContext(mw1, nil)
+	w1Renders := 0
+	w1 := &Window{
+		app:     app,
+		platWin: mw1,
+		ctx:     ctx1,
+		drawFn: func(u *UI) {
+			w1Renders++
+		},
+	}
+	w1.ui = &UI{ctx: ctx1, win: w1}
+
+	mw2 := &stylerMockWindow{w: 400, h: 300, scale: 1.0}
+	ctx2 := ui.NewContext(mw2, nil)
+	w2Renders := 0
+	frameReady := false
+	w2 := &Window{
+		app:     app,
+		platWin: mw2,
+		ctx:     ctx2,
+		drawFn: func(u *UI) {
+			w2Renders++
+			u.ctx.InteractiveCanvas("viewer", 200, 150, ui.CanvasCallbacks{
+				DirectInput: true,
+				Streaming:   true,
+				OnDraw: func(cv *render.Canvas, area render.Rect, _ bool) {
+					if frameReady {
+						cv.FillRect(render.Rect{X: area.X, Y: area.Y, W: 50, H: 50}, render.RGB(255, 0, 0))
+					}
+				},
+			})
+		},
+	}
+	w2.ui = &UI{ctx: ctx2, win: w2}
+
+	app.windows = []*Window{w1, w2}
+	app.mainWin = w1
+
+	// Начальная отрисовка обоих окон
+	w1.handleEvent(platform.Event{Type: platform.EventPaint})
+	w2.handleEvent(platform.Event{Type: platform.EventPaint})
+
+	mw1.wakeUps, mw2.wakeUps = 0, 0
+	mw1.presents, mw2.presents = 0, 0
+	mw1.presentRects, mw2.presentRects = 0, 0
+	w1Renders, w2Renders = 0, 0
+
+	// Фоновая горутина ставит задачу в Dispatch — WakeUp уходит в a.windows[0] (w1)
+	dispatchedExecuted := false
+	app.Dispatch(func() {
+		dispatchedExecuted = true
+		frameReady = true
+	})
+	if mw1.wakeUps != 1 || mw2.wakeUps != 0 {
+		t.Fatalf("ожидалось пробуждение только w1: w1=%d w2=%d", mw1.wakeUps, mw2.wakeUps)
+	}
+
+	// До обработки WakeUp в w1 во второе окно w2 приходит MouseMove над DirectInput-холстом
+	mw1.wakeUps = 0
+	w2.handleEvent(platform.Event{Type: platform.EventMouseMove, X: 20, Y: 20})
+
+	if !dispatchedExecuted {
+		t.Fatal("ожидалось выполнение коллбека из dispatchQueue в w2.handleEvent")
+	}
+	if mw1.wakeUps != 1 {
+		t.Fatalf("ожидался invalidateAllExcept(w2) для w1: got %d", mw1.wakeUps)
+	}
+	if mw2.wakeUps != 1 {
+		t.Fatalf("потеряно пробуждение для w2 при HandleEvent(MouseMove)==false: got wakeUps=%d", mw2.wakeUps)
+	}
+	if w2Renders != 0 {
+		t.Fatalf("DirectInput MouseMove не должен вызывать синхронный Render: got %d", w2Renders)
+	}
+
+	// При последующем EventWakeUp окно w2 должно перерисоваться с fast-path Streaming (PresentRect)
+	w2.handleEvent(platform.Event{Type: platform.EventWakeUp})
+	if w2Renders != 1 {
+		t.Fatalf("ожидался Render в w2 по EventWakeUp: got %d", w2Renders)
+	}
+	if mw2.presentRects != 1 || mw2.presents != 0 {
+		t.Fatalf("ожидался fast-path PresentRect для Streaming=true: presentRects=%d presents=%d", mw2.presentRects, mw2.presents)
+	}
+}
+
+func TestWindowWakeUpTargeted(t *testing.T) {
+	app := NewApp(Config{})
+
+	mw1 := &stylerMockWindow{w: 400, h: 300, scale: 1.0}
+	ctx1 := ui.NewContext(mw1, nil)
+	w1Renders := 0
+	w1 := &Window{
+		app:     app,
+		platWin: mw1,
+		ctx:     ctx1,
+		drawFn: func(u *UI) {
+			w1Renders++
+		},
+	}
+	w1.ui = &UI{ctx: ctx1, win: w1}
+
+	mw2 := &stylerMockWindow{w: 400, h: 300, scale: 1.0}
+	ctx2 := ui.NewContext(mw2, nil)
+	w2Renders := 0
+	w2 := &Window{
+		app:     app,
+		platWin: mw2,
+		ctx:     ctx2,
+		drawFn: func(u *UI) {
+			w2Renders++
+			u.ctx.InteractiveCanvas("viewer", 200, 150, ui.CanvasCallbacks{
+				DirectInput: true,
+				Streaming:   true,
+				OnDraw: func(cv *render.Canvas, area render.Rect, _ bool) {
+					cv.FillRect(render.Rect{X: area.X, Y: area.Y, W: 40, H: 40}, render.RGB(0, 255, 0))
+				},
+			})
+		},
+	}
+	w2.ui = &UI{ctx: ctx2, win: w2}
+
+	app.windows = []*Window{w1, w2}
+	app.mainWin = w1
+
+	w1.handleEvent(platform.Event{Type: platform.EventPaint})
+	w2.handleEvent(platform.Event{Type: platform.EventPaint})
+
+	mw1.wakeUps, mw2.wakeUps = 0, 0
+	mw1.presents, mw2.presents = 0, 0
+	mw1.presentRects, mw2.presentRects = 0, 0
+	w1Renders, w2Renders = 0, 0
+
+	// Адресное пробуждение только w2
+	w2.WakeUp()
+	if mw2.wakeUps != 1 || mw1.wakeUps != 0 {
+		t.Fatalf("w2.WakeUp() должен будить только w2: w1=%d w2=%d", mw1.wakeUps, mw2.wakeUps)
+	}
+
+	w2.handleEvent(platform.Event{Type: platform.EventWakeUp})
+	if w2Renders != 1 || w1Renders != 0 {
+		t.Fatalf("ожидалась перерисовка только w2: w1=%d w2=%d", w1Renders, w2Renders)
+	}
+	if mw2.presentRects != 1 || mw1.presents != 0 || mw1.presentRects != 0 {
+		t.Fatalf("ожидался fast-path PresentRect только у w2: w2.presentRects=%d w1.presents=%d", mw2.presentRects, mw1.presents)
+	}
+}
+
 

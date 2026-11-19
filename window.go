@@ -64,6 +64,14 @@ func (w *Window) Invalidate() {
 	}
 }
 
+// WakeUp безопасно пробуждает цикл событий конкретного окна из любой горутины
+// для выполнения Render() (с поддержкой fast-path Streaming).
+func (w *Window) WakeUp() {
+	if w != nil && w.platWin != nil {
+		w.platWin.WakeUp()
+	}
+}
+
 // SetTheme устанавливает новую тему оформления для окна, синхронизирует режим заголовка ОС и перерисовывает окно.
 func (w *Window) SetTheme(theme Theme) {
 	w.applyTheme(theme, true)
@@ -258,8 +266,10 @@ func (w *Window) handleCloseRequest() bool {
 }
 
 func (w *Window) handleEvent(ev platform.Event) {
+	dispatched := false
 	if w.app != nil {
-		if w.app.flushDispatch() {
+		dispatched = w.app.flushDispatch()
+		if dispatched {
 			w.app.invalidateAllExcept(w)
 		}
 	}
@@ -277,12 +287,18 @@ func (w *Window) handleEvent(ev platform.Event) {
 			w.onDropFiles(ev.Files, ev.X, ev.Y)
 			w.Invalidate()
 		}
+		if dispatched {
+			w.WakeUp()
+		}
 		return
 	}
 
 	if ev.Type == platform.EventThemeChange {
 		if w.app != nil && w.app.isPrimaryEventWindow(w) {
 			w.app.handleSystemThemeChange(ev.DarkTheme)
+		}
+		if dispatched {
+			w.WakeUp()
 		}
 		return
 	}
@@ -293,6 +309,10 @@ func (w *Window) handleEvent(ev platform.Event) {
 				w.drawFn(w.ui)
 			}
 		})
+	} else if dispatched {
+		// Если событие не вызвало перерисовку (например, MouseMove при DirectInput или smartMouseMove),
+		// пробуждаем текущее окно через EventWakeUp, чтобы не потерять обновление от Dispatch.
+		w.WakeUp()
 	}
 }
 

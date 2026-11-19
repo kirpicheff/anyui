@@ -98,7 +98,7 @@ if loading {
 `App` управляет единым циклом событий ОС. Дополнительные независимые окна открываются через `app.OpenWindow(cfg, drawFn)`:
 
 ```go
-_, _ = app.OpenWindow(anyui.Config{
+win, _ := app.OpenWindow(anyui.Config{
 	Title:  "Логи",
 	Width:  640,
 	Height: 400,
@@ -108,4 +108,7 @@ _, _ = app.OpenWindow(anyui.Config{
 	})
 })
 ```
+
+Для адресного пробуждения и перерисовки только конкретного окна из фоновой горутины (например, при потоковом выводе видеокадров в `InteractiveCanvas` со `Streaming: true`) используйте `win.WakeUp()` вместо `app.Dispatch(...)` — это не будит остальные окна и задействует fast-path `EventWakeUp`.
+
 
