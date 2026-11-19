@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"git.gtw.su/kirpich/anyui"
+	"github.com/kirpicheff/anyui"
 )
 
 func recordStartup(start time.Time) {

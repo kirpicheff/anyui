@@ -91,12 +91,13 @@ ui.TextArea("notes", &notes, "Комментарий...",
 
 ### `Label`, `SelectableLabel` и `Hyperlink`
 - **Сигнатуры:**
-  - `ui.Label(text string, opts ...Option)` — вывод текста с опциями `WordWrap(true)`, `Ellipsis(true)`, `LetterSpacing(dp)` и `TextShadow(offsetX, offsetY, blur, col)`.
+  - `ui.Label(text string, opts ...Option)` — вывод текста с опциями `WordWrap(true)` (с аккуратным переносом по пробелам между словами), `Ellipsis(true)`, выравнивания (`TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`), `LetterSpacing(dp)` и `TextShadow(offsetX, offsetY, blur, col)`.
   - `ui.SelectableLabel(id, text string, opts ...Option)` — статический текст с выделением мышью (включая двойной/тройной клик), `Ctrl+C`/`Ctrl+A` и контекстным меню по ПКМ.
   - `ui.Hyperlink(id, text string, opts ...Option) bool` — кликабельная ссылка с подчёркиванием при наведении и курсором руки.
 - **Пример:**
 ```go
-ui.Label("Длинный текст с автопереносом...", anyui.WordWrap(true))
+ui.Label("Длинный текст с автопереносом по словам...", anyui.WordWrap(true))
+ui.Label("Текст по центру карточки", anyui.WordWrap(true), anyui.TextAlignCenter(), anyui.FillWidth())
 ui.Label("Заголовок, обрезаемый по ширине", anyui.Width(220), anyui.Ellipsis(true))
 ui.SelectableLabel("session_id", "ID: 8f4c-2a19-b70e | IP: 10.24.18.5", anyui.Mono())
 if ui.Hyperlink("docs_link", "Открыть документацию") {

@@ -37,3 +37,4 @@ codesign --force --deep --sign - "${APP_DIR}"
 echo "Архивация в ${ZIP_PATH}..."
 ditto -c -k --sequesterRsrc --keepParent "${APP_DIR}" "${ZIP_PATH}"
 ls -lh "${ZIP_PATH}"
+

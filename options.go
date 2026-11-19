@@ -131,13 +131,13 @@ func HoverBorderColor(c Color) Option { return ui.HoverBorderColor(c) }
 // FocusBorderColor переопределяет цвет рамки при фокусе (для TextInput).
 func FocusBorderColor(c Color) Option { return ui.FocusBorderColor(c) }
 
-// TextAlignCenter выравнивает текст и placeholder по центру (для TextInput).
+// TextAlignCenter выравнивает текст и placeholder по центру (для TextInput и Label).
 func TextAlignCenter() Option { return ui.TextAlignCenter() }
 
-// TextAlignLeft выравнивает текст и placeholder по левому краю (для TextInput).
+// TextAlignLeft выравнивает текст и placeholder по левому краю (для TextInput и Label).
 func TextAlignLeft() Option { return ui.TextAlignLeft() }
 
-// TextAlignRight выравнивает текст и placeholder по правому краю (для TextInput).
+// TextAlignRight выравнивает текст и placeholder по правому краю (для TextInput и Label).
 func TextAlignRight() Option { return ui.TextAlignRight() }
 
 // LetterSpacing задаёт межбуквенный интервал в логических пикселях (для Label и Button).

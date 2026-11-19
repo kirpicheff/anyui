@@ -252,3 +252,59 @@ func TestLayoutRectInsidePushOverlayAndHoverOptions(t *testing.T) {
 	}
 }
 
+func TestWrapTextLinesWordBoundaryAndLabelAlignCenter(t *testing.T) {
+	fm, err := render.LoadDefaultSystemFont()
+	if err != nil {
+		t.Skip("системный шрифт недоступен в тестовой среде")
+	}
+	win := &dirtyMockWindow{}
+	ctx := NewContext(win, fm)
+	ctx.Canvas = render.NewCanvas(400, 300)
+	ctx.Theme = DarkTheme()
+
+	pxSize := ctx.S(14)
+	wPart1, _ := fm.MeasureTextStyled("слово ", pxSize, render.FontRegular)
+	wPart2, _ := fm.MeasureTextStyled("слово э", pxSize, render.FontRegular)
+
+	// Задаём ширину между "слово " и "слово э", чтобы "это" не помещалось даже на одну букву
+	maxW := (wPart1 + wPart2) / 2
+	if maxW <= wPart1 {
+		maxW = wPart1 + 1
+	}
+
+	text := "слово это"
+	runes := []rune(text)
+	lines := ctx.WrapTextLines(runes, maxW, pxSize, render.FontRegular)
+	if len(lines) != 2 {
+		t.Fatalf("ожидалось 2 строки, получено %d", len(lines))
+	}
+
+	line1 := string(runes[lines[0].start:lines[0].end])
+	line2 := string(runes[lines[1].start:lines[1].end])
+	if line1 != "слово " {
+		t.Fatalf("ожидалась первая строка 'слово ', получено %q", line1)
+	}
+	if line2 != "это" {
+		t.Fatalf("слово 'это' разорвалось: ожидалась вторая строка 'это', получено %q", line2)
+	}
+
+	// Проверяем, что длинное непрерывное слово без пробелов переносится посимвольно без паники
+	longWord := "оченьдлинноесловобезпробелов"
+	linesLong := ctx.WrapTextLines([]rune(longWord), maxW, pxSize, render.FontRegular)
+	if len(linesLong) < 2 {
+		t.Fatalf("длинное слово должно было быть перенесено посимвольно, строк %d", len(linesLong))
+	}
+
+	// Проверяем рендеринг многострочного текста с TextAlignCenter внутри карточки
+	rendered := false
+	ctx.Render(func(c *Context) {
+		c.Card(200, 100, 10, func() {
+			c.LabelOpts("строка раз это два", WordWrap(true), TextAlignCenter(), Width(180))
+			rendered = true
+		})
+	})
+	if !rendered {
+		t.Fatal("виджет LabelOpts не был отрендерен")
+	}
+}
+

@@ -351,21 +351,21 @@ func FocusBorderColor(c render.Color) Option {
 	}
 }
 
-// TextAlignCenter выравнивает текст и placeholder по центру (для TextInput).
+// TextAlignCenter выравнивает текст и placeholder по центру (для TextInput и Label).
 func TextAlignCenter() Option {
 	return func(s *WidgetStyle) {
 		s.TextAlign = AlignTextCenter
 	}
 }
 
-// TextAlignLeft выравнивает текст и placeholder по левому краю (для TextInput).
+// TextAlignLeft выравнивает текст и placeholder по левому краю (для TextInput и Label).
 func TextAlignLeft() Option {
 	return func(s *WidgetStyle) {
 		s.TextAlign = AlignTextLeft
 	}
 }
 
-// TextAlignRight выравнивает текст и placeholder по правому краю (для TextInput).
+// TextAlignRight выравнивает текст и placeholder по правому краю (для TextInput и Label).
 func TextAlignRight() Option {
 	return func(s *WidgetStyle) {
 		s.TextAlign = AlignTextRight

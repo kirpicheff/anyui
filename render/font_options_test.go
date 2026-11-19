@@ -55,3 +55,4 @@ func TestMeasureAndDrawTextWithOptions(t *testing.T) {
 		t.Fatal("ожидались пиксели мягкого свечения вокруг текста при Blur > 0")
 	}
 }
+

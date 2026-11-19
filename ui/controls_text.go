@@ -615,6 +615,18 @@ func (c *Context) WrapTextLines(runes []rune, maxW, pxSize int, style render.Fon
 				}
 				end++
 			}
+			if end < rl.end {
+				breakPos := -1
+				for k := end - 1; k >= cur; k-- {
+					if runes[k] == ' ' || runes[k] == '\t' {
+						breakPos = k
+						break
+					}
+				}
+				if breakPos >= cur {
+					end = breakPos + 1
+				}
+			}
 			lines = append(lines, textLineSpan{start: cur, end: end})
 			cur = end
 		}

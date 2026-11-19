@@ -36,3 +36,4 @@ func TestWin32DIBBackBufferAndFree(t *testing.T) {
 	// Проверяем, что PresentRect с тем же срезом (zero-copy) не падает и обновляет без пересоздания
 	w.PresentRect(buf3, 400, 300, 10, 10, 50, 50)
 }
+

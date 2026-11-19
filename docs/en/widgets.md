@@ -91,12 +91,13 @@ ui.TextArea("notes", &notes, "Comment...",
 
 ### `Label`, `SelectableLabel`, and `Hyperlink`
 - **Signatures:**
-  - `ui.Label(text string, opts ...Option)` — static text with `WordWrap(true)`, `Ellipsis(true)`, `LetterSpacing(dp)`, and `TextShadow(offsetX, offsetY, blur, col)` options.
+  - `ui.Label(text string, opts ...Option)` — static text with `WordWrap(true)` (word boundary wrapping by spaces), `Ellipsis(true)`, text alignment (`TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`), `LetterSpacing(dp)`, and `TextShadow(offsetX, offsetY, blur, col)` options.
   - `ui.SelectableLabel(id, text string, opts ...Option)` — selectable static text (including double/triple-click), `Ctrl+C`/`Ctrl+A`, and right-click context menu.
   - `ui.Hyperlink(id, text string, opts ...Option) bool` — clickable link with hover underline and hand cursor.
 - **Example:**
 ```go
-ui.Label("Long text with automatic wrapping...", anyui.WordWrap(true))
+ui.Label("Long text with word boundary wrapping...", anyui.WordWrap(true))
+ui.Label("Centered card text", anyui.WordWrap(true), anyui.TextAlignCenter(), anyui.FillWidth())
 ui.Label("Truncated heading", anyui.Width(220), anyui.Ellipsis(true))
 ui.SelectableLabel("session_id", "ID: 8f4c-2a19-b70e | IP: 10.24.18.5", anyui.Mono())
 if ui.Hyperlink("docs_link", "Open Documentation") {

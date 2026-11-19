@@ -2,6 +2,7 @@ package ui
 
 import (
 	"image"
+	"strings"
 
 	"github.com/kirpicheff/anyui/platform"
 	"github.com/kirpicheff/anyui/render"
@@ -101,7 +102,17 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 		}
 		r := c.allocRectStyled(totalW, totalH, st)
 		for i, sp := range lines {
-			c.Font.DrawTextWithOptions(c.Canvas, r.X, r.Y+i*lineStep, string(runes[sp.start:sp.end]), pxSize, col, textOpts)
+			lineStr := string(runes[sp.start:sp.end])
+			lineX := r.X
+			if st.TextAlign != AlignTextLeft {
+				lw, _ := c.Font.MeasureTextWithOptions(strings.TrimRight(lineStr, " \t"), pxSize, textOpts)
+				if st.TextAlign == AlignTextCenter {
+					lineX = r.X + (r.W-lw)/2
+				} else if st.TextAlign == AlignTextRight {
+					lineX = r.X + r.W - lw
+				}
+			}
+			c.Font.DrawTextWithOptions(c.Canvas, lineX, r.Y+i*lineStep, lineStr, pxSize, col, textOpts)
 		}
 		return
 	}
@@ -136,7 +147,15 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 		}
 	}
 	r := c.allocRectStyled(w, h, st)
-	c.Font.DrawTextWithOptions(c.Canvas, r.X, r.Y, drawText, pxSize, col, textOpts)
+	lineX := r.X
+	if st.TextAlign != AlignTextLeft {
+		if st.TextAlign == AlignTextCenter {
+			lineX = r.X + (r.W-w)/2
+		} else if st.TextAlign == AlignTextRight {
+			lineX = r.X + r.W - w
+		}
+	}
+	c.Font.DrawTextWithOptions(c.Canvas, lineX, r.Y, drawText, pxSize, col, textOpts)
 }
 
 // StatusDot рисует цветной кружок-индикатор и подпись справа от него.
