@@ -5,10 +5,46 @@ import (
 	"image"
 	"image/color"
 	"log"
+	"runtime/debug"
 	"time"
 
 	"github.com/kirpicheff/anyui"
 )
+
+// buildVersion задаётся при сборке через -ldflags "-X main.buildVersion=...".
+var buildVersion = "dev"
+
+// resolveBuildVersion возвращает версию билда: переданную через ldflags, тег модуля или короткий хэш коммита.
+func resolveBuildVersion() string {
+	if buildVersion != "" && buildVersion != "dev" {
+		return buildVersion
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok {
+		if bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+			return bi.Main.Version
+		}
+		var rev string
+		var dirty bool
+		for _, s := range bi.Settings {
+			switch s.Key {
+			case "vcs.revision":
+				rev = s.Value
+			case "vcs.modified":
+				dirty = (s.Value == "true")
+			}
+		}
+		if len(rev) > 7 {
+			rev = rev[:7]
+		}
+		if rev != "" {
+			if dirty {
+				return rev + "-dirty"
+			}
+			return rev
+		}
+	}
+	return "dev"
+}
 
 const (
 	svgStar = `<svg viewBox="0 0 24 24"><path d="M12 2L15 8.5L22 9.3L17 14.2L18.2 21L12 17.6L5.8 21L7 14.2L2 9.3L9 8.5Z"/></svg>`
@@ -161,6 +197,7 @@ func makeSampleImage(w, h int) image.Image {
 
 func main() {
 	st := newDemoState()
+	buildVer := resolveBuildVersion()
 
 	app := anyui.NewApp(anyui.Config{
 		Title:           "AnyUI — Витрина возможностей (Фазы 1–7)",
@@ -229,6 +266,7 @@ func main() {
 					ui.StaticLayer("demo_header_brand", func() {
 						ui.Label("AnyUI Showcase", anyui.FontSize(18), anyui.Bold())
 						ui.Badge("v0.7", anyui.Primary())
+						ui.Badge(buildVer, anyui.Secondary())
 					})
 					ui.FlexSpacer(240)
 					if ui.Button("th_navy", "DeepNavy", anyui.Ghost(), anyui.Padding(10)) {

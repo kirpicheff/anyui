@@ -12,13 +12,21 @@ import "C"
 
 import (
 	"errors"
+	"fmt"
 	"math"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"unsafe"
 )
+
+func init() {
+	// Закрепляем главную горутину за главным потоком ОС (Thread 0) до старта планировщика,
+	// так как Cocoa/AppKit и dispatch_get_main_queue требуют выполнения на main thread.
+	runtime.LockOSThread()
+}
 
 var (
 	darwinNextWinID atomic.Uint64
@@ -69,15 +77,20 @@ func RunEventLoop(onStart func() error) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
+	fmt.Fprintln(os.Stderr, "[anyui-darwin] RunEventLoop: старт инициализации AppKit")
 	C.anyui_darwin_init_app()
 
 	if onStart != nil {
+		fmt.Fprintln(os.Stderr, "[anyui-darwin] RunEventLoop: вызов onStart")
 		if err := onStart(); err != nil {
+			fmt.Fprintf(os.Stderr, "[anyui-darwin] RunEventLoop: ошибка onStart: %v\n", err)
 			return err
 		}
 	}
 
+	fmt.Fprintln(os.Stderr, "[anyui-darwin] RunEventLoop: запуск [NSApp run]")
 	C.anyui_darwin_run_app()
+	fmt.Fprintln(os.Stderr, "[anyui-darwin] RunEventLoop: выход из [NSApp run]")
 	return nil
 }
 
@@ -112,6 +125,7 @@ func (w *darwinWindow) Open(handler func(Event)) error {
 		acceptDrop = 1
 	}
 
+	fmt.Fprintf(os.Stderr, "[anyui-darwin] Open(id=%d): создание NSWindow\n", w.id)
 	handle := uintptr(C.anyui_darwin_create_window(
 		C.uint64_t(w.id),
 		cTitle,
@@ -140,6 +154,7 @@ func (w *darwinWindow) Open(handler func(Event)) error {
 		w.RestoreState(*w.cfg.InitialState)
 	}
 
+	fmt.Fprintf(os.Stderr, "[anyui-darwin] Open(id=%d): показ окна и первичный рендер\n", w.id)
 	C.anyui_darwin_show_window(C.uintptr_t(handle))
 
 	var cw, ch C.int
@@ -213,7 +228,8 @@ func (w *darwinWindow) Show() {
 	handle := w.handle
 	w.mu.Unlock()
 	if handle != 0 {
-		C.anyui_darwin_show_window(C.uintptr_t(handle))
+		fmt.Fprintf(os.Stderr, "[anyui-darwin] Open(id=%d): показ окна и первичный рендер\n", w.id)
+	C.anyui_darwin_show_window(C.uintptr_t(handle))
 	}
 }
 

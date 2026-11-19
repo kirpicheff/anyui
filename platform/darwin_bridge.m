@@ -7,6 +7,7 @@
 #import <objc/runtime.h>
 #include <math.h>
 #include <stdatomic.h>
+#include <stdio.h>
 #include "darwin_bridge.h"
 
 // Обратные вызовы в Go (экспортируются через //export в darwin_wnd.go).
@@ -328,6 +329,12 @@ static AnyUIWindowDelegate* getDelegateForWindow(NSWindow *win) {
 
 void anyui_darwin_init_app(void) {
     @autoreleasepool {
+        BOOL isMain = [NSThread isMainThread];
+        fprintf(stderr, "[anyui-darwin] anyui_darwin_init_app: isMainThread=%d\n", isMain ? 1 : 0);
+        if (!isMain) {
+            fprintf(stderr, "[anyui-darwin] ОШИБКА: anyui_darwin_init_app вызван НЕ на главном потоке ОС!\n");
+        }
+        fflush(stderr);
         [NSApplication sharedApplication];
         [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
     }
@@ -335,6 +342,9 @@ void anyui_darwin_init_app(void) {
 
 void anyui_darwin_run_app(void) {
     @autoreleasepool {
+        BOOL isMain = [NSThread isMainThread];
+        fprintf(stderr, "[anyui-darwin] anyui_darwin_run_app: isMainThread=%d\n", isMain ? 1 : 0);
+        fflush(stderr);
         [NSApp activateIgnoringOtherApps:YES];
         [NSApp run];
     }
@@ -374,6 +384,9 @@ uintptr_t anyui_darwin_create_window(
 ) {
     __block uintptr_t result = 0;
     NSString *titleStr = title ? [NSString stringWithUTF8String:title] : @"";
+    fprintf(stderr, "[anyui-darwin] anyui_darwin_create_window(id=%llu): isMainThread=%d\n",
+            (unsigned long long)winID, [NSThread isMainThread] ? 1 : 0);
+    fflush(stderr);
 
     runOnMainSync(^{
         @autoreleasepool {
@@ -444,6 +457,9 @@ void anyui_darwin_destroy_window(uintptr_t handle) {
 
 void anyui_darwin_show_window(uintptr_t handle) {
     if (!handle) return;
+    fprintf(stderr, "[anyui-darwin] anyui_darwin_show_window: isMainThread=%d\n",
+            [NSThread isMainThread] ? 1 : 0);
+    fflush(stderr);
     NSWindow *win = (__bridge NSWindow *)(void *)handle;
     runOnMainAsync(^{
         @autoreleasepool {
