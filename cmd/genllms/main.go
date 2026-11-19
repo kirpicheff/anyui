@@ -92,6 +92,9 @@ func writeHeader(out *bytes.Buffer, version string) {
 	out.WriteString("- Обновление UI из фоновых горутин выполняется через `app.Dispatch(func() { ... })`, либо через `anyui.Remember(ui, key, loader)` прямо внутри `drawFn`.\n")
 	out.WriteString("- Иконка окна подхватывается автоматически из `.syso`-ресурсов или задаётся через `Config.IconRGBA` / `win.SetIcon(...)`.\n")
 	out.WriteString("- Раскладка без обрезания: для экранов с шапкой/телом/футером используйте `ui.Page(cfg, headerFn, bodyFn, footerFn)` или `ui.DockBottom` / `ui.DockTop` / `ui.ColumnFlex` и `anyui.FillHeight()`.\n")
+	out.WriteString("- Модальные окна и диалоги: всегда используйте `ui.Modal(id, open, title, fn, opts...)`, который сам затемняет фон, центрирует окно, изолирует ввод и обрабатывает Escape/крестик. Запрещено создавать самодельные модалки через `PushOverlay(fullRect)` — передача полноэкранного прямоугольника в `PushOverlay` заблокирует весь экран на последующих кадрах.\n")
+	out.WriteString("- `PushOverlay(bounds, fn)` предназначен только для всплывающих контролов (кастомных выпадающих списков, меню, тултипов), которым нужно отрисоваться поверх родительских контейнеров без обрезания клипом.\n")
+	out.WriteString("- Горячие клавиши: `ui.Shortcut` регистрирует глобальный шорткат окна; не вызывайте его повторно на каждом кадре внутри циклических веток UI.\n")
 	out.WriteString("- `Card(fn, ...)` по умолчанию подбирает высоту по содержимому (`AutoHeight`); чтобы растянуть карточку на весь остаток высоты, передайте `anyui.FillHeight()`.\n")
 	out.WriteString("- В `Table` / `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.\n\n")
 }

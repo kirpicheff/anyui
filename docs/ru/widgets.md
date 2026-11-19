@@ -151,15 +151,108 @@ if ev.Closed >= 0 {
 - **Сигнатура:** `ui.ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)`
 - **Возможности:** вертикальная прокрутка колесом мыши и перетаскиванием скроллбара.
 
-### `Modal`, `Popover`, `FloatingPanel`, `Drawer`
-- `ui.Modal(id string, open *bool, title string, fn func(), opts ...Option)` — модальное окно с затемнением и блокировкой кликов.
-- `ui.Popover(id string, open *bool, anchor Rect, fn func(), opts ...Option)` — выпадающая панель у элемента-якоря.
-- `ui.FloatingPanel(id, title string, open *bool, fn func(), opts ...Option)` — перетаскиваемая сворачиваемая панель.
-- `ui.Drawer(id string, open *bool, side DrawerSide, fn func(), opts ...Option)` — выезжающая панель (`DrawerLeft`, `DrawerRight`).
+### Модальные окна, оверлеи и всплывающие панели
 
-### `ContextMenu` и `Tooltip`
-- `ui.ContextMenu(id string, anchor Rect, items []ContextMenuItem)` — меню по правому клику.
-- `ui.Tooltip(text string, anchor Rect)` — всплывающая подсказка при наведении.
+AnyUI предоставляет набор специализированных контейнеров для всплывающих элементов разного типа.
+
+#### `Modal` (модальные диалоговые окна)
+- **Сигнатура:** `ui.Modal(id string, open *bool, title string, fn func(), opts ...Option)`
+- **Назначение:** диалоги подтверждения, формы авторизации, всплывающие настройки, алерты.
+- **Поведение:**
+  - Автоматически центрирует карточку на экране и затемняет весь остальной интерфейс (`rgba(0, 0, 0, 140)`).
+  - Блокирует клики и фокус сквозь затемнение на основном интерфейсе, при этом внутри диалога (`fn`) весь ввод полностью активен.
+  - Содержит шапку с заголовком и кнопкой закрытия `×`, автоматически закрывается по нажатию клавиши `Escape` (`*open = false`).
+  - Опции: `anyui.Width(wDp)` (по умолчанию 400 dp), `anyui.Height(hDp)` (по умолчанию 300 dp).
+  - **Важно:** всегда используйте `ui.Modal` для диалоговых окон. Не создавайте самодельные модалки через `PushOverlay(fullRect)` — это приведёт к блокировке всего экрана на последующих кадрах.
+
+```go
+var showLoginModal bool
+
+if ui.Button("btn_open_login", "Войти") {
+    showLoginModal = true
+}
+
+ui.Modal("modal_login", &showLoginModal, "Авторизация", func() {
+    ui.Column(12, func() {
+        ui.Label("Введите ваши учётные данные:")
+        ui.TextInput("login_email", &email, "Email", anyui.FillWidth())
+        ui.TextInput("login_pass", &pass, "Пароль", anyui.Password(), anyui.FillWidth())
+        ui.RowWith(anyui.AlignCenter, anyui.JustifyEnd, 8, 36,
+            func() {
+                if ui.Button("btn_cancel", "Отмена", anyui.Secondary()) {
+                    showLoginModal = false
+                }
+            },
+            func() {
+                if ui.Button("btn_submit", "Войти", anyui.Primary()) {
+                    showLoginModal = false
+                }
+            },
+        )
+    })
+}, anyui.Width(420), anyui.Height(280))
+```
+
+#### `Popover` (всплывающая карточка у элемента-якоря)
+- **Сигнатура:** `ui.Popover(id string, open *bool, anchor Rect, fn func(), opts ...Option)`
+- **Назначение:** выпадающие меню профиля, фильтры, быстрые подсказки с кнопками.
+- **Поведение:**
+  - Привязывается к координатам прямоугольника-якоря `anchor` (например, под кнопкой).
+  - Автоматически переворачивается вверх или сдвигается, если не помещается в границы окна.
+  - Закрывается по клику вне области карточки или по `Escape`.
+
+```go
+var popoverOpen bool
+
+btnArea := ui.CurrentArea()
+if ui.Button("btn_filters", "Фильтры") {
+    popoverOpen = !popoverOpen
+    btnArea = ui.CurrentArea()
+}
+
+ui.Popover("pop_filters", &popoverOpen, btnArea, func() {
+    ui.Padding(12, func() {
+        ui.Column(8, func() {
+            ui.Toggle("tog_active", "Только активные", &onlyActive)
+            ui.Toggle("tog_archived", "Включая архив", &includeArchived)
+        })
+    })
+}, anyui.Width(220), anyui.Height(100))
+```
+
+#### `FloatingPanel` (плавающее перемещаемое окно)
+- **Сигнатура:** `ui.FloatingPanel(id, title string, open *bool, fn func(), opts ...Option)`
+- **Назначение:** плавающие панели инструментов, палитры, окна инспекторов свойств.
+- **Поведение:**
+  - Перетаскивается за заголовок мышью (курсор `CursorMove`).
+  - Поддерживает сворачивание тела по кнопке в шапке и закрытие крестиком.
+  - Запоминает координаты перемещения между кадрами по `id`.
+  - Опции: `anyui.Width(wDp)`, `anyui.Height(hDp)`, `anyui.Pos(xDp, yDp)`.
+
+#### `Drawer` (выезжающая боковая панель)
+- **Сигнатура:** `ui.Drawer(id string, open *bool, side DrawerSide, fn func(), opts ...Option)`
+- **Назначение:** боковое меню навигации, корзина, подробная панель выбранного элемента.
+- **Поведение:**
+  - Выезжает на всю высоту экрана слева (`DrawerLeft`) или справа (`DrawerRight`).
+  - Затемняет остальной экран и закрывается по клику на затемнённую область или `Escape`.
+  - Опция `anyui.Width(wDp)` (по умолчанию 320 dp).
+
+#### `ContextMenu` (контекстное меню по правому клику)
+- **Сигнатура:** `ui.ContextMenu(id string, anchor Rect, items []ContextMenuItem)`
+- **Поведение:** открывается в точке клика курсора, поддерживает разделители (`Separator: true`), иконки, статус `Disabled`, горячие клавиши и подменю. Закрывается по клику вне меню или Escape.
+
+#### `Tooltip` (всплывающая подсказка)
+- **Сигнатура:** `ui.Tooltip(text string, anchor Rect)`
+- **Поведение:** всплывает поверх экрана рядом с элементом `anchor` при наведении курсора с автоматическим расчётом размера и скруглением.
+
+#### `PushOverlay` и `LayoutRect` (низкоуровневые оверлеи)
+- **`ui.PushOverlay(bounds Rect, drawFn func())`**:
+  - Откладывает вызов `drawFn` на конец кадра (`endFrame`), чтобы гарантированно нарисовать элемент **поверх всего остального UI** и обойти клиппинг родительских контейнеров (`ScrollView`, `Card`).
+  - Прямоугольник `bounds` регистрируется как блокирующий клики для основного слоя на следующем кадре.
+  - **Правило:** используйте `PushOverlay` исключительно для создания всплывающих контролов (кастомных выпадающих списков, пикеров, меню). Никогда не передавайте в `PushOverlay` полноэкранный `fullRect` для эмуляции модального окна — для этого предназначен `ui.Modal()`.
+- **`ui.LayoutRect(rect Rect, fn func())`**:
+  - Создаёт изолированную вертикальную область разметки строго по прямоугольнику `rect` с клиппингом `PushClip`.
+  - Удобен для верстки виджетов внутри пользовательских оверлеев `PushOverlay`, плавающих окон или кастомных карточек.
 
 ### `Separator`, `Badge`, `StatusDot`, `ProgressBar`
 ```go

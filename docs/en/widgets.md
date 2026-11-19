@@ -151,15 +151,108 @@ if ev.Closed >= 0 {
 - **Signature:** `ui.ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)`
 - **Features:** vertical and horizontal scrolling via mouse wheel and draggable scrollbars.
 
-### `Modal`, `Popover`, `FloatingPanel`, `Drawer`
-- `ui.Modal(id string, open *bool, title string, fn func(), opts ...Option)` — modal dialog with backdrop dimming and click blocking.
-- `ui.Popover(id string, open *bool, anchor Rect, fn func(), opts ...Option)` — floating panel anchored to a widget.
-- `ui.FloatingPanel(id, title string, open *bool, fn func(), opts ...Option)` — draggable, collapsible floating panel.
-- `ui.Drawer(id string, open *bool, side DrawerSide, fn func(), opts ...Option)` — slide-out panel (`DrawerLeft`, `DrawerRight`).
+### Modal Dialogs, Overlays, and Floating Panels
 
-### `ContextMenu` and `Tooltip`
-- `ui.ContextMenu(id string, anchor Rect, items []ContextMenuItem)` — right-click popup menu.
-- `ui.Tooltip(text string, anchor Rect)` — hover tooltip.
+AnyUI provides a dedicated set of containers for overlays and floating UI elements.
+
+#### `Modal` (Modal Dialog Windows)
+- **Signature:** `ui.Modal(id string, open *bool, title string, fn func(), opts ...Option)`
+- **Use case:** confirmation dialogs, login forms, alert popups, settings dialogs.
+- **Behavior:**
+  - Automatically centers the dialog box and dims the backdrop across the rest of the window (`rgba(0, 0, 0, 140)`).
+  - Blocks clicks and keyboard focus through the backdrop onto widgets beneath it, while all input inside the modal (`fn`) remains fully active.
+  - Includes a header with title and close button `×`, automatically closes on `Escape` key press (`*open = false`).
+  - Options: `anyui.Width(wDp)` (default 400 dp), `anyui.Height(hDp)` (default 300 dp).
+  - **Important:** always use `ui.Modal` for modal dialogs. Do not construct homemade modals with `PushOverlay(fullRect)` — this marks the entire screen as input-blocked on subsequent frames.
+
+```go
+var showLoginModal bool
+
+if ui.Button("btn_open_login", "Log In") {
+    showLoginModal = true
+}
+
+ui.Modal("modal_login", &showLoginModal, "Authentication", func() {
+    ui.Column(12, func() {
+        ui.Label("Enter your credentials:")
+        ui.TextInput("login_email", &email, "Email", anyui.FillWidth())
+        ui.TextInput("login_pass", &pass, "Password", anyui.Password(), anyui.FillWidth())
+        ui.RowWith(anyui.AlignCenter, anyui.JustifyEnd, 8, 36,
+            func() {
+                if ui.Button("btn_cancel", "Cancel", anyui.Secondary()) {
+                    showLoginModal = false
+                }
+            },
+            func() {
+                if ui.Button("btn_submit", "Log In", anyui.Primary()) {
+                    showLoginModal = false
+                }
+            },
+        )
+    })
+}, anyui.Width(420), anyui.Height(280))
+```
+
+#### `Popover` (Floating Card Anchored to a Widget)
+- **Signature:** `ui.Popover(id string, open *bool, anchor Rect, fn func(), opts ...Option)`
+- **Use case:** profile dropdowns, filter menus, quick action popups.
+- **Behavior:**
+  - Anchors to the given `anchor` rectangle (e.g. directly below a button).
+  - Automatically flips upward or shifts horizontally if it would overflow the window boundary.
+  - Closes on outside click or `Escape`.
+
+```go
+var popoverOpen bool
+
+btnArea := ui.CurrentArea()
+if ui.Button("btn_filters", "Filters") {
+    popoverOpen = !popoverOpen
+    btnArea = ui.CurrentArea()
+}
+
+ui.Popover("pop_filters", &popoverOpen, btnArea, func() {
+    ui.Padding(12, func() {
+        ui.Column(8, func() {
+            ui.Toggle("tog_active", "Active only", &onlyActive)
+            ui.Toggle("tog_archived", "Include archived", &includeArchived)
+        })
+    })
+}, anyui.Width(220), anyui.Height(100))
+```
+
+#### `FloatingPanel` (Movable Floating Window)
+- **Signature:** `ui.FloatingPanel(id, title string, open *bool, fn func(), opts ...Option)`
+- **Use case:** floating toolbars, color palettes, property inspectors.
+- **Behavior:**
+  - Can be dragged by its header using the mouse (`CursorMove`).
+  - Supports collapsing the panel body via header toggle and closing via `×`.
+  - Persists dragged window coordinates between frames by `id`.
+  - Options: `anyui.Width(wDp)`, `anyui.Height(hDp)`, `anyui.Pos(xDp, yDp)`.
+
+#### `Drawer` (Slide-Out Side Panel)
+- **Signature:** `ui.Drawer(id string, open *bool, side DrawerSide, fn func(), opts ...Option)`
+- **Use case:** side navigation menu, shopping cart, item details panel.
+- **Behavior:**
+  - Slides out along full window height from the left (`DrawerLeft`) or right (`DrawerRight`).
+  - Dims the remaining screen area and closes when clicking the dimmed backdrop or pressing `Escape`.
+  - Option: `anyui.Width(wDp)` (defaults to 320 dp).
+
+#### `ContextMenu` (Right-Click Popup Menu)
+- **Signature:** `ui.ContextMenu(id string, anchor Rect, items []ContextMenuItem)`
+- **Behavior:** opens at click location or anchor rect, supports separators (`Separator: true`), icons, `Disabled` items, keyboard shortcuts, and submenus. Closes on outside click or `Escape`.
+
+#### `Tooltip` (Hover Tooltip)
+- **Signature:** `ui.Tooltip(text string, anchor Rect)`
+- **Behavior:** renders a rounded floating card with shadow above the UI near `anchor` on hover, automatically sized to content.
+
+#### `PushOverlay` and `LayoutRect` (Low-Level Overlays)
+- **`ui.PushOverlay(bounds Rect, drawFn func())`**:
+  - Defers `drawFn` execution to the end of the frame (`endFrame`), ensuring the element renders **on top of all other UI** without being clipped by parent containers (`ScrollView`, `Card`).
+  - The `bounds` rectangle is recorded to block input clicks on the underlying layer on the next frame (`IsInputBlocked()`).
+  - **Rule:** use `PushOverlay` strictly for custom floating controls (custom dropdowns, pickers, menus). Never pass a full-window `fullRect` to emulate a modal dialog — use `ui.Modal()` instead.
+- **`ui.LayoutRect(rect Rect, fn func())`**:
+  - Creates an isolated vertical layout box strictly matching `rect` with clipping enabled (`PushClip`).
+  - Ideal for arranging widgets inside custom `PushOverlay` callbacks, floating windows, or custom cards.
 
 ### `Separator`, `Badge`, `StatusDot`, `ProgressBar`
 ```go
