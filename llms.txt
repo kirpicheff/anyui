@@ -1,4 +1,4 @@
-# AnyUI (v0.7.18)
+# AnyUI (v0.7.19)
 
 Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).
 
@@ -197,6 +197,7 @@ type Option = ui.Option
     func Mono() Option
     func Padding(dp int) Option
     func Password() Option
+    func PasswordToggle(visible ...*bool) Option
     func Primary() Option
     func Radius(dp float32) Option
     func ReadOnly(v bool) Option
