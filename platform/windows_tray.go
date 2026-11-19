@@ -453,23 +453,3 @@ func createHIconFromRGBA(rgba []byte, width, height int) (windows.Handle, error)
 	return windows.Handle(hIcon), nil
 }
 
-// defaultTrayIconRGBA генерирует простую 16x16 иконку скруглённого квадрата, если пользователь не задал свою.
-func defaultTrayIconRGBA() ([]byte, int, int) {
-	const size = 16
-	buf := make([]byte, size*size*4)
-	for y := 0; y < size; y++ {
-		for x := 0; x < size; x++ {
-			dx := x - 7
-			dy := y - 7
-			if x >= 1 && x <= 14 && y >= 1 && y <= 14 && !(dx*dx+dy*dy > 72) {
-				idx := (y*size + x) * 4
-				buf[idx+0] = 59  // R
-				buf[idx+1] = 130 // G
-				buf[idx+2] = 246 // B
-				buf[idx+3] = 255 // A
-			}
-		}
-	}
-	return buf, size, size
-}
-

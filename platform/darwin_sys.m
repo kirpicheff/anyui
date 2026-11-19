@@ -108,6 +108,7 @@ uintptr_t anyui_darwin_tray_create(uint64_t trayID, const char* tooltip) {
                 btn.target = target;
                 btn.action = @selector(onStatusButtonClick:);
                 [btn sendActionOn:(NSEventMaskLeftMouseUp | NSEventMaskRightMouseUp)];
+                btn.title = @"●";
                 if (tip && tip.length > 0) {
                     btn.toolTip = tip;
                 }
@@ -175,6 +176,7 @@ void anyui_darwin_tray_set_icon(uintptr_t handle, const void* rgbaPixels, int wi
             // Шаблонный режим позволяет macOS автоматически адаптировать монохромную иконку под тему панели меню.
             [img setTemplate:YES];
 
+            target.statusItem.button.title = @"";
             target.statusItem.button.image = img;
             target.statusItem.button.imageScaling = NSImageScaleProportionallyDown;
         }

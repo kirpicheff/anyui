@@ -62,9 +62,11 @@ func NewTray(cfg TrayConfig) (Tray, error) {
 		darwinNotifyMu.Unlock()
 	}
 
-	if len(cfg.IconRGBA) > 0 && cfg.IconWidth > 0 && cfg.IconHeight > 0 {
-		_ = t.SetIconRGBA(cfg.IconRGBA, cfg.IconWidth, cfg.IconHeight)
+	rgba, w, h := cfg.IconRGBA, cfg.IconWidth, cfg.IconHeight
+	if len(rgba) == 0 || w <= 0 || h <= 0 {
+		rgba, w, h = defaultTrayIconRGBA()
 	}
+	_ = t.SetIconRGBA(rgba, w, h)
 	if len(cfg.Menu) > 0 {
 		t.SetMenu(cfg.Menu)
 	}

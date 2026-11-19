@@ -252,6 +252,7 @@ static void runOnMainAsync(dispatch_block_t block) {
 @property (nonatomic, weak) NSWindow *window;
 @property (nonatomic, assign) NSRect savedFrame;
 @property (nonatomic, assign) BOOL isMaximizedState;
+@property (nonatomic, assign) BOOL pendingHideOnExitFullScreen;
 @property (nonatomic, strong) id localMonitor;
 @property (nonatomic, strong) id globalMonitor;
 @end
@@ -320,7 +321,41 @@ static void runOnMainAsync(dispatch_block_t block) {
     goDarwinOnPaint(self.winID);
 }
 
+- (void)windowDidExitFullScreen:(NSNotification *)notification {
+    (void)notification;
+    if (self.pendingHideOnExitFullScreen) {
+        self.pendingHideOnExitFullScreen = NO;
+        NSWindow *win = self.window;
+        if (win) {
+            [win orderOut:nil];
+        }
+    }
+}
+
 @end
+
+// Делегат приложения для обработки клика по иконке в Dock.
+@interface AnyUIAppDelegate : NSObject <NSApplicationDelegate>
+@end
+
+@implementation AnyUIAppDelegate
+
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag {
+    if (!flag) {
+        for (NSWindow *win in [sender windows]) {
+            if ([win canBecomeKeyWindow] && ![win isKindOfClass:[NSPanel class]]) {
+                [win makeKeyAndOrderFront:nil];
+                [sender activateIgnoringOtherApps:YES];
+                return YES;
+            }
+        }
+    }
+    return YES;
+}
+
+@end
+
+static AnyUIAppDelegate *g_anyui_app_delegate = nil;
 
 static AnyUIWindowDelegate* getDelegateForWindow(NSWindow *win) {
     if (!win) return nil;
@@ -337,6 +372,10 @@ void anyui_darwin_init_app(void) {
         fflush(stderr);
         [NSApplication sharedApplication];
         [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+        if (!g_anyui_app_delegate) {
+            g_anyui_app_delegate = [[AnyUIAppDelegate alloc] init];
+            [NSApp setDelegate:g_anyui_app_delegate];
+        }
     }
 }
 
@@ -463,6 +502,10 @@ void anyui_darwin_show_window(uintptr_t handle) {
     NSWindow *win = (__bridge NSWindow *)(void *)handle;
     runOnMainAsync(^{
         @autoreleasepool {
+            AnyUIWindowDelegate *del = getDelegateForWindow(win);
+            if (del) {
+                del.pendingHideOnExitFullScreen = NO;
+            }
             [win makeKeyAndOrderFront:nil];
             [NSApp activateIgnoringOtherApps:YES];
         }
@@ -474,7 +517,15 @@ void anyui_darwin_hide_window(uintptr_t handle) {
     NSWindow *win = (__bridge NSWindow *)(void *)handle;
     runOnMainAsync(^{
         @autoreleasepool {
-            [win orderOut:nil];
+            if ((win.styleMask & NSWindowStyleMaskFullScreen) != 0) {
+                AnyUIWindowDelegate *del = getDelegateForWindow(win);
+                if (del) {
+                    del.pendingHideOnExitFullScreen = YES;
+                }
+                [win toggleFullScreen:nil];
+            } else {
+                [win orderOut:nil];
+            }
         }
     });
 }
@@ -733,6 +784,10 @@ void anyui_darwin_bring_to_front(uintptr_t handle) {
     NSWindow *win = (__bridge NSWindow *)(void *)handle;
     runOnMainAsync(^{
         @autoreleasepool {
+            AnyUIWindowDelegate *del = getDelegateForWindow(win);
+            if (del) {
+                del.pendingHideOnExitFullScreen = NO;
+            }
             [win makeKeyAndOrderFront:nil];
             [NSApp activateIgnoringOtherApps:YES];
         }
