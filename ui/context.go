@@ -984,7 +984,6 @@ func (c *Context) beginFrame() {
 }
 
 func (c *Context) endFrame() {
-	c.drawToasts()
 	ovIdx := 0
 	c.Overlays.FlushWithHook(func(bounds render.Rect) {
 		if !bounds.Empty() {
@@ -992,6 +991,7 @@ func (c *Context) endFrame() {
 		}
 		ovIdx++
 	})
+	c.drawToasts()
 	c.focusOrder, c.nextFocusOrder = c.nextFocusOrder, c.focusOrder[:0]
 	c.hitRegions, c.nextHitRegions = c.nextHitRegions, c.hitRegions[:0]
 	c.directCanvases, c.nextDirectCanvases = c.nextDirectCanvases, c.directCanvases[:0]

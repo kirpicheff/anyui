@@ -268,3 +268,25 @@ func TestDatePickerRender(t *testing.T) {
 		t.Fatalf("expected DatePicker popup to open on click")
 	}
 }
+
+func TestToastDoesNotBlockOverlayOrInput(t *testing.T) {
+	ctx := newTestContext(800, 600)
+	ctx.ShowToast("Notice", "Something happened", ToastInfo, 5*time.Second)
+
+	ctx.Render(func(c *Context) {
+		// Обычный кадр с тостом
+	})
+
+	// Тосты не должны регистрироваться в оверлеях
+	if ctx.Overlays.HasActive() {
+		t.Fatalf("expected Overlays.HasActive() == false when only toast is present")
+	}
+
+	// Тосты не должны блокировать ввод
+	ctx.MouseX = 700
+	ctx.MouseY = 550
+	if ctx.IsInputBlocked() {
+		t.Fatalf("expected IsInputBlocked() == false under toast area")
+	}
+}
+

@@ -147,54 +147,51 @@ func (c *Context) drawToasts() {
 			remainRatio = 0
 		}
 
-		toastRef := t
-		c.PushOverlay(tr, func() {
-			c.Canvas.DrawBoxShadow(tr, render.BoxShadow{
-				OffsetY: c.Sf(4),
-				Blur:    c.Sf(12),
-				Color:   render.RGBA(0, 0, 0, 120),
-				Radii:   render.UniformRadii(c.Sf(10)),
-			})
-			c.Canvas.DrawRoundedBox(tr, c.Sf(10), c.Theme.Card, 1.0, c.Theme.Border)
-
-			// Левая цветная полоса типа уведомления
-			barR := render.Rect{X: tr.X + c.S(4), Y: tr.Y + c.S(8), W: c.S(4), H: tr.H - c.S(16)}
-			c.Canvas.FillRoundedRect(barR, c.Sf(2), accent)
-
-			// Кнопка закрытия '×'
-			closeR := render.Rect{X: tr.X + tr.W - c.S(26), Y: tr.Y + c.S(8), W: c.S(18), H: c.S(18)}
-			c.RegisterHit("toast:close:"+toastRef.Title, closeR, platform.CursorHand)
-			if closeR.Contains(c.MouseX, c.MouseY) {
-				c.nextCursor = platform.CursorHand
-				c.Canvas.FillRoundedRect(closeR, c.Sf(4), c.Theme.Surface)
-				if c.MousePressed {
-					toastRef.Duration = 0
-					c.RequestRedraw()
-				}
-			}
-			p := c.Sf(4)
-			c.Canvas.DrawLine(float32(closeR.X)+p, float32(closeR.Y)+p, float32(closeR.X+closeR.W)-p, float32(closeR.Y+closeR.H)-p, c.Sf(1.4), c.Theme.TextMuted)
-			c.Canvas.DrawLine(float32(closeR.X+closeR.W)-p, float32(closeR.Y)+p, float32(closeR.X)+p, float32(closeR.Y+closeR.H)-p, c.Sf(1.4), c.Theme.TextMuted)
-
-			if c.Font != nil {
-				textX := tr.X + c.S(16)
-				textW := tr.W - c.S(46)
-				c.Canvas.PushClip(render.Rect{X: textX, Y: tr.Y, W: textW, H: tr.H})
-				if toastRef.Title != "" {
-					c.Font.DrawTextStyled(c.Canvas, textX, tr.Y+c.S(10), toastRef.Title, c.S(13), c.Theme.TextPrimary, render.FontBold)
-				}
-				if toastRef.Text != "" {
-					c.Font.DrawText(c.Canvas, textX, tr.Y+c.S(32), toastRef.Text, c.S(12), c.Theme.TextMuted)
-				}
-				c.Canvas.PopClip()
-			}
-
-			// Индикатор оставшегося времени внизу
-			progW := int(float32(tr.W-c.S(16)) * remainRatio)
-			if progW > 0 {
-				c.Canvas.FillRoundedRect(render.Rect{X: tr.X + c.S(8), Y: tr.Y + tr.H - c.S(4), W: progW, H: c.S(2)}, c.Sf(1), accent.WithAlpha(180))
-			}
+		c.Canvas.DrawBoxShadow(tr, render.BoxShadow{
+			OffsetY: c.Sf(4),
+			Blur:    c.Sf(12),
+			Color:   render.RGBA(0, 0, 0, 120),
+			Radii:   render.UniformRadii(c.Sf(10)),
 		})
+		c.Canvas.DrawRoundedBox(tr, c.Sf(10), c.Theme.Card, 1.0, c.Theme.Border)
+
+		// Левая цветная полоса типа уведомления
+		barR := render.Rect{X: tr.X + c.S(4), Y: tr.Y + c.S(8), W: c.S(4), H: tr.H - c.S(16)}
+		c.Canvas.FillRoundedRect(barR, c.Sf(2), accent)
+
+		// Кнопка закрытия '×'
+		closeR := render.Rect{X: tr.X + tr.W - c.S(26), Y: tr.Y + c.S(8), W: c.S(18), H: c.S(18)}
+		c.RegisterHit("toast:close:"+t.Title, closeR, platform.CursorHand)
+		if closeR.Contains(c.MouseX, c.MouseY) {
+			c.nextCursor = platform.CursorHand
+			c.Canvas.FillRoundedRect(closeR, c.Sf(4), c.Theme.Surface)
+			if c.MousePressed {
+				t.Duration = 0
+				c.RequestRedraw()
+			}
+		}
+		p := c.Sf(4)
+		c.Canvas.DrawLine(float32(closeR.X)+p, float32(closeR.Y)+p, float32(closeR.X+closeR.W)-p, float32(closeR.Y+closeR.H)-p, c.Sf(1.4), c.Theme.TextMuted)
+		c.Canvas.DrawLine(float32(closeR.X+closeR.W)-p, float32(closeR.Y)+p, float32(closeR.X)+p, float32(closeR.Y+closeR.H)-p, c.Sf(1.4), c.Theme.TextMuted)
+
+		if c.Font != nil {
+			textX := tr.X + c.S(16)
+			textW := tr.W - c.S(46)
+			c.Canvas.PushClip(render.Rect{X: textX, Y: tr.Y, W: textW, H: tr.H})
+			if t.Title != "" {
+				c.Font.DrawTextStyled(c.Canvas, textX, tr.Y+c.S(10), t.Title, c.S(13), c.Theme.TextPrimary, render.FontBold)
+			}
+			if t.Text != "" {
+				c.Font.DrawText(c.Canvas, textX, tr.Y+c.S(32), t.Text, c.S(12), c.Theme.TextMuted)
+			}
+			c.Canvas.PopClip()
+		}
+
+		// Индикатор оставшегося времени внизу
+		progW := int(float32(tr.W-c.S(16)) * remainRatio)
+		if progW > 0 {
+			c.Canvas.FillRoundedRect(render.Rect{X: tr.X + c.S(8), Y: tr.Y + tr.H - c.S(4), W: progW, H: c.S(2)}, c.Sf(1), accent.WithAlpha(180))
+		}
 	}
 }
 

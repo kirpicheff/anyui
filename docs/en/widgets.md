@@ -228,6 +228,7 @@ ui.DatePicker("dp", &dateVal, anyui.Width(170))
 
 ### `Toast` and `Spinner`
 - **Toast positioning:** `ui.SetToastPosition(pos)` (`ToastBottomRight`, `ToastBottomLeft`, `ToastTopRight`, `ToastTopLeft`, `ToastBottomCenter`, `ToastTopCenter`) and `ui.SetToastOffset(xDp, yDp)` (window edge offsets in `dp`, defaults to `16, 16`).
+- Toast notifications are rendered on top of the UI directly without blocking mouse clicks or focus in other parts of the screen.
 ```go
 ui.Spinner("loader", 28)
 ui.SetToastPosition(anyui.ToastBottomRight)

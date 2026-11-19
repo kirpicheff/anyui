@@ -229,6 +229,7 @@ ui.DatePicker("dp", &dateVal, anyui.Width(170))
 
 ### `Toast` и `Spinner`
 - **Позиционирование тостов:** `ui.SetToastPosition(pos)` (`ToastBottomRight`, `ToastBottomLeft`, `ToastTopRight`, `ToastTopLeft`, `ToastBottomCenter`, `ToastTopCenter`) и `ui.SetToastOffset(xDp, yDp)` (отступы от краёв окна в `dp`, по умолчанию `16, 16`).
+- Всплывающие уведомления рисуются поверх интерфейса напрямую и не блокируют клики, фокус и мышь в других частях экрана.
 ```go
 ui.Spinner("loader", 28)
 ui.SetToastPosition(anyui.ToastBottomRight)
