@@ -227,8 +227,11 @@ ui.DatePicker("dp", &dateVal, anyui.Width(170))
 ```
 
 ### `Toast` и `Spinner`
+- **Позиционирование тостов:** `ui.SetToastPosition(pos)` (`ToastBottomRight`, `ToastBottomLeft`, `ToastTopRight`, `ToastTopLeft`, `ToastBottomCenter`, `ToastTopCenter`) и `ui.SetToastOffset(xDp, yDp)` (отступы от краёв окна в `dp`, по умолчанию `16, 16`).
 ```go
 ui.Spinner("loader", 28)
+ui.SetToastPosition(anyui.ToastBottomRight)
+ui.SetToastOffset(16, 48) // приподнять над футером/статус-баром
 ui.ShowToast("Готово", "Данные сохранены", anyui.ToastSuccess)
 ```
 

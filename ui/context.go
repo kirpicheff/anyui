@@ -156,6 +156,10 @@ type Context struct {
 	spinnerAngle      map[string]float32
 	toasts            []*ToastMessage
 	nextToastID       int
+	toastPos          ToastPosition
+	toastOffsetXDp    int
+	toastOffsetYDp    int
+	toastHasOffset    bool
 
 	focusOrder     []string
 	nextFocusOrder []string

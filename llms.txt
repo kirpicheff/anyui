@@ -1,4 +1,4 @@
-# AnyUI (v0.7.12)
+# AnyUI (v0.7.13)
 
 Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).
 
@@ -105,6 +105,7 @@ const JustifyStart = ui.JustifyStart ...
 const DrawerLeft = ui.DrawerLeft ...
 const SplitHorizontal = ui.SplitHorizontal ...
 const ToastInfo = ui.ToastInfo ...
+const ToastBottomRight = ui.ToastBottomRight ...
 const LogInfo = ui.LogInfo ...
 var ErrAlreadyRunning = errors.New("приложение уже запущено")
 func IsSystemDarkTheme() bool
@@ -229,6 +230,7 @@ type Theme = ui.Theme
     func SystemTheme() Theme
 type TitleBarConfig = ui.TitleBarConfig
 type ToastKind = ui.ToastKind
+type ToastPosition = ui.ToastPosition
 type ToolbarItem = ui.ToolbarItem
 type TrayConfig struct{ ... }
 type TreeNode = ui.TreeNode
@@ -533,6 +535,8 @@ func (u *UI) SetFocus(id string)
 func (u *UI) SetSmartMouseMove(enabled bool)
 func (u *UI) SetStrings(s Strings)
 func (u *UI) SetTheme(theme Theme)
+func (u *UI) SetToastOffset(xDp, yDp int)
+func (u *UI) SetToastPosition(pos ToastPosition)
 func (u *UI) Sf(dp float32) float32
 func (u *UI) Shortcut(keyCode uint32, mods Modifiers, fn func())
 func (u *UI) ShowToast(title, text string, kind ToastKind, duration ...time.Duration)

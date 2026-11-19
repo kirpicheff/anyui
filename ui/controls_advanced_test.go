@@ -229,6 +229,34 @@ func TestToastAndSpinner(t *testing.T) {
 	}
 }
 
+func TestToastPositionAndOffset(t *testing.T) {
+	ctx := newTestContext(800, 600)
+
+	// По умолчанию: правый нижний угол с отступом 16, 16
+	rx, ry, ok := ctx.calcToastRectPos(300, 64, 10, 16, 16, 8, 0)
+	if !ok || rx != 800-300-16 || ry != 600-16-64 {
+		t.Fatalf("неожиданная позиция по умолчанию: rx=%d ry=%d ok=%v", rx, ry, ok)
+	}
+
+	// Верхний центр с кастомным отступом
+	ctx.SetToastPosition(ToastTopCenter)
+	ctx.SetToastOffset(24, 56)
+	if !ctx.toastHasOffset || ctx.toastOffsetXDp != 24 || ctx.toastOffsetYDp != 56 {
+		t.Fatalf("отступы тоста не сохранились: %+v %d %d", ctx.toastHasOffset, ctx.toastOffsetXDp, ctx.toastOffsetYDp)
+	}
+	rx, ry, ok = ctx.calcToastRectPos(300, 64, 10, ctx.toastOffsetXDp, ctx.toastOffsetYDp, 8, 0)
+	if !ok || rx != (800-300)/2 || ry != 56 {
+		t.Fatalf("неожиданная позиция ToastTopCenter: rx=%d ry=%d ok=%v", rx, ry, ok)
+	}
+
+	// Левый нижний угол с отрицательным отступом (должен зажаться к 0)
+	ctx.SetToastPosition(ToastBottomLeft)
+	ctx.SetToastOffset(-10, -5)
+	if ctx.toastOffsetXDp != 0 || ctx.toastOffsetYDp != 0 {
+		t.Fatalf("отрицательные отступы должны зажиматься к 0: x=%d y=%d", ctx.toastOffsetXDp, ctx.toastOffsetYDp)
+	}
+}
+
 func TestDatePickerRender(t *testing.T) {
 	ctx := newTestContext(500, 400)
 	d := time.Date(2026, 5, 15, 0, 0, 0, 0, time.UTC)

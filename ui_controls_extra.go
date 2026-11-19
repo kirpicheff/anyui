@@ -40,6 +40,18 @@ const (
 	ToastError   = ui.ToastError
 )
 
+// ToastPosition задаёт позицию всплывающих уведомлений на экране.
+type ToastPosition = ui.ToastPosition
+
+const (
+	ToastBottomRight  = ui.ToastBottomRight
+	ToastBottomLeft   = ui.ToastBottomLeft
+	ToastTopRight     = ui.ToastTopRight
+	ToastTopLeft      = ui.ToastTopLeft
+	ToastBottomCenter = ui.ToastBottomCenter
+	ToastTopCenter    = ui.ToastTopCenter
+)
+
 // Table рисует таблицу с заголовками, ресайзом ширины колонок, сортировкой и виртуализацией строк.
 func (u *UI) Table(id string, cols []TableColumn, rowCount int, selected *int, sort *TableSort, drawCell func(row, col int, area Rect, isSelected bool), opts ...Option) TableEvent {
 	return u.ctx.Table(id, cols, rowCount, selected, sort, drawCell, opts...)
@@ -93,6 +105,16 @@ func (u *UI) DatePicker(id string, date *time.Time, opts ...Option) bool {
 // ShowToast добавляет всплывающее уведомление в очередь отображения.
 func (u *UI) ShowToast(title, text string, kind ToastKind, duration ...time.Duration) {
 	u.ctx.ShowToast(title, text, kind, duration...)
+}
+
+// SetToastPosition задаёт угол или сторону окна для отображения всплывающих уведомлений.
+func (u *UI) SetToastPosition(pos ToastPosition) {
+	u.ctx.SetToastPosition(pos)
+}
+
+// SetToastOffset задаёт отступы всплывающих уведомлений от краёв окна в логических пикселях (по умолчанию 16, 16).
+func (u *UI) SetToastOffset(xDp, yDp int) {
+	u.ctx.SetToastOffset(xDp, yDp)
 }
 
 // Spinner рисует анимированный индикатор загрузки.

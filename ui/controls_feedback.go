@@ -18,6 +18,18 @@ const (
 	ToastError
 )
 
+// ToastPosition задаёт позицию всплывающих уведомлений на экране.
+type ToastPosition uint8
+
+const (
+	ToastBottomRight ToastPosition = iota
+	ToastBottomLeft
+	ToastTopRight
+	ToastTopLeft
+	ToastBottomCenter
+	ToastTopCenter
+)
+
 // ToastMessage описывает активное всплывающее уведомление.
 type ToastMessage struct {
 	ID        int
@@ -59,7 +71,25 @@ func (c *Context) ToastsCount() int {
 	return len(c.toasts)
 }
 
-// drawToasts удаляет просроченные уведомления и рисует активные в правом нижнем углу поверх UI.
+// SetToastPosition задаёт угол или сторону окна для отображения всплывающих уведомлений.
+func (c *Context) SetToastPosition(pos ToastPosition) {
+	c.toastPos = pos
+}
+
+// SetToastOffset задаёт отступы всплывающих уведомлений от краёв окна в логических пикселях (по умолчанию 16, 16).
+func (c *Context) SetToastOffset(xDp, yDp int) {
+	if xDp < 0 {
+		xDp = 0
+	}
+	if yDp < 0 {
+		yDp = 0
+	}
+	c.toastOffsetXDp = xDp
+	c.toastOffsetYDp = yDp
+	c.toastHasOffset = true
+}
+
+// drawToasts удаляет просроченные уведомления и рисует активные поверх UI.
 func (c *Context) drawToasts() {
 	if len(c.toasts) == 0 {
 		return
@@ -84,17 +114,19 @@ func (c *Context) drawToasts() {
 	toastW := c.S(300)
 	toastH := c.S(64)
 	gap := c.S(10)
-	margin := c.S(16)
+	offX := c.S(16)
+	offY := c.S(16)
+	if c.toastHasOffset {
+		offX = c.S(c.toastOffsetXDp)
+		offY = c.S(c.toastOffsetYDp)
+	}
+	minPad := c.S(8)
 
 	for i := len(c.toasts) - 1; i >= 0; i-- {
 		t := c.toasts[i]
-		idxFromBottom := len(c.toasts) - 1 - i
-		rx := c.Canvas.Width - toastW - margin
-		ry := c.Canvas.Height - margin - (idxFromBottom+1)*toastH - idxFromBottom*gap
-		if rx < margin {
-			rx = margin
-		}
-		if ry < margin {
+		idxFromEdge := len(c.toasts) - 1 - i
+		rx, ry, ok := c.calcToastRectPos(toastW, toastH, gap, offX, offY, minPad, idxFromEdge)
+		if !ok {
 			continue
 		}
 		tr := render.Rect{X: rx, Y: ry, W: toastW, H: toastH}
@@ -212,4 +244,34 @@ func (c *Context) Spinner(id string, sizeDp int, opts ...Option) {
 	// Фоновое кольцо + вращающаяся дуга
 	c.Canvas.DrawArc(cx, cy, rad, 0, float32(2*math.Pi), thick, c.Theme.Border.WithAlpha(90))
 	c.Canvas.DrawArc(cx, cy, rad, angle, angle+float32(math.Pi*1.15), thick, col)
+}
+
+func (c *Context) calcToastRectPos(toastW, toastH, gap, offX, offY, minPad, idx int) (int, int, bool) {
+	var rx int
+	switch c.toastPos {
+	case ToastBottomLeft, ToastTopLeft:
+		rx = offX
+	case ToastBottomCenter, ToastTopCenter:
+		rx = (c.Canvas.Width - toastW) / 2
+	default:
+		rx = c.Canvas.Width - toastW - offX
+	}
+	if rx < minPad {
+		rx = minPad
+	}
+
+	var ry int
+	switch c.toastPos {
+	case ToastTopRight, ToastTopLeft, ToastTopCenter:
+		ry = offY + idx*(toastH+gap)
+		if ry+toastH > c.Canvas.Height-minPad {
+			return 0, 0, false
+		}
+	default:
+		ry = c.Canvas.Height - offY - (idx+1)*toastH - idx*gap
+		if ry < minPad {
+			return 0, 0, false
+		}
+	}
+	return rx, ry, true
 }

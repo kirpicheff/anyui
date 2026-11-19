@@ -226,8 +226,11 @@ ui.DatePicker("dp", &dateVal, anyui.Width(170))
 ```
 
 ### `Toast` and `Spinner`
+- **Toast positioning:** `ui.SetToastPosition(pos)` (`ToastBottomRight`, `ToastBottomLeft`, `ToastTopRight`, `ToastTopLeft`, `ToastBottomCenter`, `ToastTopCenter`) and `ui.SetToastOffset(xDp, yDp)` (window edge offsets in `dp`, defaults to `16, 16`).
 ```go
 ui.Spinner("loader", 28)
+ui.SetToastPosition(anyui.ToastBottomRight)
+ui.SetToastOffset(16, 48) // lift above a footer or status bar
 ui.ShowToast("Done", "Data saved", anyui.ToastSuccess)
 ```
 
