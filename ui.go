@@ -350,6 +350,14 @@ func (u *UI) InvalidateStatic() {
 	u.ctx.InvalidateStatic()
 }
 
+// RequestRedraw запрашивает полный проход перерисовки UI в рамках текущего цикла Render
+// (в частности, переключает Streaming fast-path на полную отрисовку drawFn).
+func (u *UI) RequestRedraw() {
+	if u != nil && u.ctx != nil {
+		u.ctx.RequestRedraw()
+	}
+}
+
 // SetCursor задаёт системный курсор для текущего кадра.
 func (u *UI) SetCursor(cursor CursorType) {
 	u.ctx.SetCursor(cursor)

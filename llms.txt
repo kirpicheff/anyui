@@ -504,6 +504,7 @@ func (u *UI) RadioButton(id, label string, selected bool, opts ...Option) bool
 func (u *UI) RadioGroup(id string, options []string, selected *int, opts ...Option) bool
 func (u *UI) RangeSlider(id string, low, high *float32, minVal, maxVal float32, opts ...Option) bool
 func (u *UI) RegisterHoverArea(id string, rect Rect, cursor CursorType, trackMove bool)
+func (u *UI) RequestRedraw()
 func (u *UI) Row(gapDp, heightDp int, fn func())
 func (u *UI) RowCentered(gapDp, heightDp int, fn func())
 func (u *UI) RowFlex(gapDp, heightDp int, items ...FlexItem)
