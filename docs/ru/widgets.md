@@ -12,7 +12,7 @@
 - **Сигнатуры:**
   - `ui.Button(id, label string, opts ...Option) bool`
   - `ui.IconButton(id, svg string, opts ...Option) bool`
-- **Опции:** `Primary()`, `Secondary()`, `Danger()`, `Ghost()`, `Bg(c)`, `TextColor(c)`, `HoverTextColor(c)`, `LetterSpacing(dp)`, `TextShadow(ox, oy, blur, c)`, `Icon(svg)`, `Width(dp)`, `Height(dp)`, `Radius(dp)`, `Disabled(bool)`. При полностью прозрачном `Bg` (`A == 0`) подложка при наведении и нажатии остаётся прозрачной.
+- **Опции:** `Primary()`, `Secondary()`, `Danger()`, `Ghost()`, `Bg(c)`, `HoverBg(c)`, `BorderColor(c)`, `HoverBorderColor(c)`, `TextColor(c)`, `HoverTextColor(c)`, `LetterSpacing(dp)`, `TextShadow(ox, oy, blur, c)`, `Icon(svg)`, `Width(dp)`, `Height(dp)`, `Radius(dp)`, `Disabled(bool)`. При полностью прозрачном `Bg` (`A == 0`) подложка при наведении и нажатии остаётся прозрачной (если не задан `HoverBg`).
 - **Пример:**
 ```go
 if ui.Button("save", "Сохранить", anyui.Primary(), anyui.Icon(saveSVG)) {

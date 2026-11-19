@@ -355,6 +355,9 @@ func (c *Context) ButtonOpts(id, label string, opts ...Option) bool {
 	if !st.Disabled && st.HoverTextColor != nil {
 		textCol = render.LerpColor(textCol, *st.HoverTextColor, hoverAnim)
 	}
+	if !st.Disabled && st.HoverBorderColor != nil {
+		border = render.LerpColor(border, *st.HoverBorderColor, hoverAnim)
+	}
 
 	if c.FocusID == id && !st.Disabled {
 		border = c.Theme.BorderFocus
@@ -415,6 +418,9 @@ func (c *Context) resolveButtonColors(st WidgetStyle) (bg, hoverBg, downBg, bord
 			hoverBg = render.LerpColor(bg, render.RGB(255, 255, 255), 0.08)
 			downBg = render.LerpColor(bg, render.RGB(0, 0, 0), 0.12)
 		}
+	}
+	if st.HoverBg != nil {
+		hoverBg = *st.HoverBg
 	}
 	if st.BorderColor != nil {
 		border = *st.BorderColor

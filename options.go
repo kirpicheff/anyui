@@ -122,6 +122,12 @@ const (
 // HoverTextColor переопределяет цвет текста и иконки при наведении (для Button).
 func HoverTextColor(c Color) Option { return ui.HoverTextColor(c) }
 
+// HoverBg переопределяет цвет фона при наведении (для Button).
+func HoverBg(c Color) Option { return ui.HoverBg(c) }
+
+// HoverBorderColor переопределяет цвет рамки при наведении (для Button).
+func HoverBorderColor(c Color) Option { return ui.HoverBorderColor(c) }
+
 // FocusBorderColor переопределяет цвет рамки при фокусе (для TextInput).
 func FocusBorderColor(c Color) Option { return ui.FocusBorderColor(c) }
 

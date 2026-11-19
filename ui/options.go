@@ -25,9 +25,11 @@ const (
 // WidgetStyle хранит переопределения оформления и размеров конкретного виджета.
 type WidgetStyle struct {
 	Bg               *render.Color
+	HoverBg          *render.Color
 	Color            *render.Color
 	HoverTextColor   *render.Color
 	BorderColor      *render.Color
+	HoverBorderColor *render.Color
 	FocusBorderColor *render.Color
 	Radius           *float32
 	WidthDp          *int
@@ -325,6 +327,20 @@ func Error(text string) Option {
 func HoverTextColor(c render.Color) Option {
 	return func(s *WidgetStyle) {
 		s.HoverTextColor = &c
+	}
+}
+
+// HoverBg переопределяет цвет фона при наведении (для Button).
+func HoverBg(c render.Color) Option {
+	return func(s *WidgetStyle) {
+		s.HoverBg = &c
+	}
+}
+
+// HoverBorderColor переопределяет цвет рамки при наведении (для Button).
+func HoverBorderColor(c render.Color) Option {
+	return func(s *WidgetStyle) {
+		s.HoverBorderColor = &c
 	}
 }
 

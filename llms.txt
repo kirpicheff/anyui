@@ -1,4 +1,4 @@
-# AnyUI (v0.7.13)
+# AnyUI (v0.7.14)
 
 Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).
 
@@ -178,6 +178,8 @@ type Option = ui.Option
     func FontSize(dp int) Option
     func Ghost() Option
     func Height(dp int) Option
+    func HoverBg(c Color) Option
+    func HoverBorderColor(c Color) Option
     func HoverTextColor(c Color) Option
     func Icon(svg string) Option
     func IconRight(svg string) Option
@@ -494,6 +496,7 @@ func (u *UI) InvalidateStatic()
 func (u *UI) Label(text string, opts ...Option)
 func (u *UI) LastDirtyRects() []Rect
 func (u *UI) LastFrameStaticBlitted() bool
+func (u *UI) LayoutRect(rect Rect, fn func())
 func (u *UI) LineChart(id string, labels []string, series []ChartSeries, opts ...Option)
 func (u *UI) ListView(id string, count int, itemHeightDp int, selected *int, ...) bool
 func (u *UI) ListViewEx(id string, count int, itemHeightDp int, selected map[int]bool, checked []bool, ...) bool

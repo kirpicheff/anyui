@@ -583,6 +583,19 @@ func (c *Context) Page(cfg PageConfig, headerFn, bodyFn, footerFn func()) {
 	c.ColumnFlex(gap, items...)
 }
 
+// LayoutRect создаёт область раскладки (колонку без отступов) строго по заданному прямоугольнику rect
+// с клиппингом содержимого. Удобно для размещения виджетов внутри PushOverlay.
+func (c *Context) LayoutRect(rect render.Rect, fn func()) {
+	if fn == nil || rect.Empty() {
+		return
+	}
+	c.Canvas.PushClip(rect)
+	c.pushBox(rect, dirColumn, AlignStart, 0)
+	fn()
+	c.popBox()
+	c.Canvas.PopClip()
+}
+
 // calcJustifyOffsets вычисляет начальное смещение и массив шагов между элементами по главной оси.
 func calcJustifyOffsets(justify Justify, totalSize, gapPx int, sizes []int) (int, []int) {
 	n := len(sizes)

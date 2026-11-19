@@ -210,3 +210,45 @@ func TestTextInputAlignCenterAndFocusBorderColor(t *testing.T) {
 	}
 }
 
+func TestLayoutRectInsidePushOverlayAndHoverOptions(t *testing.T) {
+	ctx := newTestContext(600, 400)
+	hBg := render.Hex(0x223344)
+	hBr := render.Hex(0x556677)
+	st := ApplyOptions([]Option{
+		Bg(render.RGBA(0, 0, 0, 0)),
+		HoverBg(hBg),
+		HoverBorderColor(hBr),
+	})
+	_, hoverBg, _, _, _ := ctx.resolveButtonColors(st)
+	if hoverBg != hBg {
+		t.Fatalf("ожидался HoverBg=%+v, получено %+v", hBg, hoverBg)
+	}
+	if st.HoverBorderColor == nil || *st.HoverBorderColor != hBr {
+		t.Fatal("HoverBorderColor не применён")
+	}
+
+	var overlayArea render.Rect
+	var dockArea render.Rect
+	panelRect := render.Rect{X: 300, Y: 20, W: 280, H: 360}
+	ctx.Render(func(c *Context) {
+		// Сдвигаем основной layout вниз
+		c.allocRect(100, 200)
+		c.PushOverlay(panelRect, func() {
+			c.LayoutRect(panelRect, func() {
+				overlayArea = c.CurrentArea()
+				c.DockTop(0, 56, func() {
+					dockArea = c.CurrentArea()
+				}, func() {})
+			})
+		})
+	})
+
+	if overlayArea != panelRect {
+		t.Fatalf("ожидалась область раскладки %+v, получено %+v", panelRect, overlayArea)
+	}
+	wantDock := render.Rect{X: 300, Y: 20, W: 280, H: 56}
+	if dockArea != wantDock {
+		t.Fatalf("ожидалась область DockTop %+v, получено %+v", wantDock, dockArea)
+	}
+}
+

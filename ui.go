@@ -319,6 +319,12 @@ func (u *UI) PushOverlay(bounds Rect, drawFn func()) {
 	u.ctx.PushOverlay(bounds, drawFn)
 }
 
+// LayoutRect создаёт область раскладки (колонку без отступов) строго по заданному прямоугольнику rect
+// с клиппингом содержимого. Удобно для размещения виджетов внутри PushOverlay.
+func (u *UI) LayoutRect(rect Rect, fn func()) {
+	u.ctx.LayoutRect(rect, fn)
+}
+
 // FocusID возвращает идентификатор виджета, находящегося в фокусе.
 func (u *UI) FocusID() string {
 	return u.ctx.FocusID

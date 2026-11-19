@@ -12,7 +12,7 @@ All widgets are invoked inside `drawFn(ui *anyui.UI)` in Immediate Mode. Use fun
 - **Signatures:**
   - `ui.Button(id, label string, opts ...Option) bool`
   - `ui.IconButton(id, svg string, opts ...Option) bool`
-- **Options:** `Primary()`, `Secondary()`, `Danger()`, `Ghost()`, `Bg(c)`, `TextColor(c)`, `HoverTextColor(c)`, `LetterSpacing(dp)`, `TextShadow(ox, oy, blur, c)`, `Icon(svg)`, `Width(dp)`, `Height(dp)`, `Radius(dp)`, `Disabled(bool)`. When `Bg` is fully transparent (`A == 0`), hover and pressed backgrounds stay transparent.
+- **Options:** `Primary()`, `Secondary()`, `Danger()`, `Ghost()`, `Bg(c)`, `HoverBg(c)`, `BorderColor(c)`, `HoverBorderColor(c)`, `TextColor(c)`, `HoverTextColor(c)`, `LetterSpacing(dp)`, `TextShadow(ox, oy, blur, c)`, `Icon(svg)`, `Width(dp)`, `Height(dp)`, `Radius(dp)`, `Disabled(bool)`. When `Bg` is fully transparent (`A == 0`), hover and pressed backgrounds stay transparent (unless `HoverBg` is specified).
 - **Example:**
 ```go
 if ui.Button("save", "Save", anyui.Primary(), anyui.Icon(saveSVG)) {
