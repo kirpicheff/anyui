@@ -385,4 +385,22 @@ func TestAppInitFontManager(t *testing.T) {
 	}
 }
 
+func TestUIMousePressedAndMouseDown(t *testing.T) {
+	mockWin := &stylerMockWindow{w: 300, h: 200, scale: 1.0}
+	ctx := ui.NewContext(mockWin, nil)
+	u := &UI{ctx: ctx}
+
+	ctx.MousePressed = true
+	ctx.MouseDown = true
+	if !u.MousePressed() || !u.MouseDown() {
+		t.Fatalf("ожидалось true для MousePressed и MouseDown")
+	}
+
+	ctx.MousePressed = false
+	ctx.MouseDown = false
+	if u.MousePressed() || u.MouseDown() {
+		t.Fatalf("ожидалось false для MousePressed и MouseDown")
+	}
+}
+
 

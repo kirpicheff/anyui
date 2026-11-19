@@ -296,7 +296,7 @@ ui.Card(func() {
 ## Extended Mouse, Keyboard & Focus Events
 
 ### `DoubleClick` and `MiddleClick`
-- `UI` and `ui.Context` expose `DoubleClicked() bool` and `MiddleClicked() bool` (`MiddleMousePressed` / `MiddleMouseDown` / `MiddleMouseReleased` on `ui.Context`).
+- `UI` and `ui.Context` expose `MousePos() (int, int)`, `MousePressed() bool` (LMB pressed this frame), `MouseDown() bool` (LMB held down), `DoubleClicked() bool`, and `MiddleClicked() bool` (`MiddleMousePressed` / `MiddleMouseDown` / `MiddleMouseReleased` on `ui.Context`).
 - `TableEvent` returns `RowDoubleClicked` and `RowMiddleClicked` (`-1` if none):
 ```go
 ev := ui.Table("tbl", cols, len(rows), &sel, &sort, drawCell)

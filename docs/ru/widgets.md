@@ -295,7 +295,7 @@ ui.Card(func() {
 ## Расширенные события мыши, клавиатуры и фокуса
 
 ### Двойной клик (`DoubleClick`) и средняя кнопка мыши (`MiddleClick`)
-- В `UI` и `ui.Context` доступны методы `DoubleClicked() bool` и `MiddleClicked() bool` (в `ui.Context` — `MiddleMousePressed` / `MiddleMouseDown` / `MiddleMouseReleased`).
+- В `UI` и `ui.Context` доступны методы `MousePos() (int, int)`, `MousePressed() bool` (клик ЛКМ в текущем кадре), `MouseDown() bool` (зажата ли ЛКМ), `DoubleClicked() bool` и `MiddleClicked() bool` (в `ui.Context` — `MiddleMousePressed` / `MiddleMouseDown` / `MiddleMouseReleased`).
 - В `Table` структура `TableEvent` возвращает поля `RowDoubleClicked` и `RowMiddleClicked` (`-1`, если события не было):
 ```go
 ev := ui.Table("tbl", cols, len(rows), &sel, &sort, drawCell)

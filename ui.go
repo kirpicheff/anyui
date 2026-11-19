@@ -408,6 +408,16 @@ func (u *UI) MousePos() (int, int) {
 	return u.ctx.MouseX, u.ctx.MouseY
 }
 
+// MousePressed возвращает true, если в текущем кадре нажата левая кнопка мыши.
+func (u *UI) MousePressed() bool {
+	return u.ctx.MousePressed
+}
+
+// MouseDown возвращает true, если левая кнопка мыши зажата.
+func (u *UI) MouseDown() bool {
+	return u.ctx.MouseDown
+}
+
 // GlyphCacheStats возвращает число записей и объём памяти (в байтах) LRU-кеша глифов.
 func (u *UI) GlyphCacheStats() (entries int, bytes int64) {
 	if u.ctx.Font == nil {

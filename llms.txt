@@ -1,4 +1,4 @@
-# AnyUI (v0.7.16)
+# AnyUI (v0.7.17)
 
 Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).
 
@@ -505,7 +505,9 @@ func (u *UI) MaskedInput(id string, value *string, mask string, opts ...Option) 
 func (u *UI) MenuBar(id string, menus []MenuBarItem, opts ...Option)
 func (u *UI) MiddleClicked() bool
 func (u *UI) Modal(id string, open *bool, title string, fn func(), opts ...Option)
+func (u *UI) MouseDown() bool
 func (u *UI) MousePos() (int, int)
+func (u *UI) MousePressed() bool
 func (u *UI) MultiSelect(id string, items []string, selected *[]bool, opts ...Option) bool
 func (u *UI) NumberInput(id string, value *float64, minVal, maxVal, step float64, decimals int, ...) bool
 func (u *UI) Padding(padDp int, fn func())
