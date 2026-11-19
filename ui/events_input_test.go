@@ -608,3 +608,84 @@ func TestInteractiveCanvasStreamingFastPath(t *testing.T) {
 		t.Fatal("флаг prevPresentStale должен быть сброшен после полной синхронизации")
 	}
 }
+
+func TestStreamingWakeOnlySkipsFullRedraw(t *testing.T) {
+	win := &dirtyMockWindow{mockWindow: mockWindow{w: 320, h: 240, scale: 1.0}}
+	ctx := NewContext(win, nil)
+
+	drawCalls := 0
+	canvasCalls := 0
+	frameColor := render.RGB(10, 20, 30)
+
+	draw := func(c *Context) {
+		drawCalls++
+		c.Padding(16, func() {
+			c.InteractiveCanvas("video", 160, 120, CanvasCallbacks{
+				Streaming: true,
+				OnDraw: func(canvas *render.Canvas, area render.Rect, focused bool) {
+					canvasCalls++
+					canvas.FillRect(area, frameColor)
+				},
+			})
+		})
+	}
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventPaint})
+	ctx.Render(draw)
+	if drawCalls != 1 || canvasCalls != 1 {
+		t.Fatalf("после первого Paint ожидались drawCalls=1 canvasCalls=1, получено %d и %d", drawCalls, canvasCalls)
+	}
+
+	// Повторяем несколько EventWakeUp подряд: draw() и Canvas.Clear не должны вызываться
+	for i := 0; i < 3; i++ {
+		frameColor = render.RGB(uint8(50+i*40), 100, 150)
+		ctx.HandleEvent(platform.Event{Type: platform.EventWakeUp})
+		ctx.Render(draw)
+	}
+	if drawCalls != 1 {
+		t.Fatalf("на EventWakeUp полное дерево draw() не должно перестраиваться: drawCalls=%d", drawCalls)
+	}
+	if canvasCalls != 4 {
+		t.Fatalf("ожидалось 4 вызова OnDraw потокового холста, получено %d", canvasCalls)
+	}
+	if win.rectPresents != 3 || win.fullPresents != 1 {
+		t.Fatalf("ожидалось full=1 rect=3, получено full=%d rect=%d", win.fullPresents, win.rectPresents)
+	}
+}
+
+type backBufferMockWindow struct {
+	dirtyMockWindow
+	backBuf []byte
+}
+
+func (b *backBufferMockWindow) BackBuffer(width, height int) []byte {
+	need := width * height * 4
+	if need <= 0 {
+		return nil
+	}
+	if len(b.backBuf) != need {
+		b.backBuf = make([]byte, need)
+	}
+	return b.backBuf
+}
+
+func TestBackBufferProviderZeroCopy(t *testing.T) {
+	win := &backBufferMockWindow{dirtyMockWindow: dirtyMockWindow{mockWindow: mockWindow{w: 200, h: 100, scale: 1.0}}}
+	ctx := NewContext(win, nil)
+
+	if len(ctx.Canvas.Pixels) == 0 || &ctx.Canvas.Pixels[0] != &win.backBuf[0] {
+		t.Fatal("ожидалась прямая привязка Canvas.Pixels к BackBuffer окна")
+	}
+
+	// Ресайз должен обновить привязку к новому буферу
+	ctx.HandleEvent(platform.Event{Type: platform.EventResize, Width: 300, Height: 150})
+	if len(ctx.Canvas.Pixels) != 300*150*4 || &ctx.Canvas.Pixels[0] != &win.backBuf[0] {
+		t.Fatal("после Resize Canvas.Pixels должен указывать на обновлённый BackBuffer")
+	}
+
+	// Закрытие должно отвязать срез от платформенной памяти
+	ctx.HandleEvent(platform.Event{Type: platform.EventClose})
+	if ctx.Canvas.Pixels != nil {
+		t.Fatal("после EventClose Canvas.Pixels должен быть отвязан (nil)")
+	}
+}

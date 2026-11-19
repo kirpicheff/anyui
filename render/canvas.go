@@ -134,6 +134,28 @@ func (c *Canvas) Resize(w, h int) {
 	c.MarkFullDirty()
 }
 
+// ResizeWithBuffer меняет размер холста и привязывает внешний буфер пикселей (если он передан),
+// позволяя рисовать напрямую в память платформы (например, Windows DIBSection) без копирования.
+func (c *Canvas) ResizeWithBuffer(w, h int, external []byte) {
+	if w < 0 {
+		w = 0
+	}
+	if h < 0 {
+		h = 0
+	}
+	need := w * h * 4
+	if need > 0 && len(external) >= need {
+		c.Width = w
+		c.Height = h
+		c.Pixels = external[:need]
+		c.clips = c.clips[:0]
+		c.clips = append(c.clips, Rect{X: 0, Y: 0, W: w, H: h})
+		c.MarkFullDirty()
+		return
+	}
+	c.Resize(w, h)
+}
+
 // Clear заливает весь буфер указанным цветом.
 func (c *Canvas) Clear(col Color) {
 	if len(c.Pixels) == 0 {

@@ -229,6 +229,7 @@ func TestMultiWindowDispatchMouseMoveDirectInputNoLostWakeup(t *testing.T) {
 	mw2 := &stylerMockWindow{w: 400, h: 300, scale: 1.0}
 	ctx2 := ui.NewContext(mw2, nil)
 	w2Renders := 0
+	w2CanvasDraws := 0
 	frameReady := false
 	w2 := &Window{
 		app:     app,
@@ -240,6 +241,7 @@ func TestMultiWindowDispatchMouseMoveDirectInputNoLostWakeup(t *testing.T) {
 				DirectInput: true,
 				Streaming:   true,
 				OnDraw: func(cv *render.Canvas, area render.Rect, _ bool) {
+					w2CanvasDraws++
 					if frameReady {
 						cv.FillRect(render.Rect{X: area.X, Y: area.Y, W: 50, H: 50}, render.RGB(255, 0, 0))
 					}
@@ -259,7 +261,7 @@ func TestMultiWindowDispatchMouseMoveDirectInputNoLostWakeup(t *testing.T) {
 	mw1.wakeUps, mw2.wakeUps = 0, 0
 	mw1.presents, mw2.presents = 0, 0
 	mw1.presentRects, mw2.presentRects = 0, 0
-	w1Renders, w2Renders = 0, 0
+	w1Renders, w2Renders, w2CanvasDraws = 0, 0, 0
 
 	// Фоновая горутина ставит задачу в Dispatch — WakeUp уходит в a.windows[0] (w1)
 	dispatchedExecuted := false
@@ -288,10 +290,13 @@ func TestMultiWindowDispatchMouseMoveDirectInputNoLostWakeup(t *testing.T) {
 		t.Fatalf("DirectInput MouseMove не должен вызывать синхронный Render: got %d", w2Renders)
 	}
 
-	// При последующем EventWakeUp окно w2 должно перерисоваться с fast-path Streaming (PresentRect)
+	// При последующем EventWakeUp окно w2 должно перерисоваться с fast-path Streaming (OnDraw + PresentRect без полного drawFn)
 	w2.handleEvent(platform.Event{Type: platform.EventWakeUp})
-	if w2Renders != 1 {
-		t.Fatalf("ожидался Render в w2 по EventWakeUp: got %d", w2Renders)
+	if w2Renders != 0 {
+		t.Fatalf("при wakeOnly + Streaming полный drawFn должен пропускаться: got w2Renders=%d", w2Renders)
+	}
+	if w2CanvasDraws != 1 {
+		t.Fatalf("ожидался вызов OnDraw в w2 по EventWakeUp: got %d", w2CanvasDraws)
 	}
 	if mw2.presentRects != 1 || mw2.presents != 0 {
 		t.Fatalf("ожидался fast-path PresentRect для Streaming=true: presentRects=%d presents=%d", mw2.presentRects, mw2.presents)
@@ -317,6 +322,7 @@ func TestWindowWakeUpTargeted(t *testing.T) {
 	mw2 := &stylerMockWindow{w: 400, h: 300, scale: 1.0}
 	ctx2 := ui.NewContext(mw2, nil)
 	w2Renders := 0
+	w2CanvasDraws := 0
 	w2 := &Window{
 		app:     app,
 		platWin: mw2,
@@ -327,6 +333,7 @@ func TestWindowWakeUpTargeted(t *testing.T) {
 				DirectInput: true,
 				Streaming:   true,
 				OnDraw: func(cv *render.Canvas, area render.Rect, _ bool) {
+					w2CanvasDraws++
 					cv.FillRect(render.Rect{X: area.X, Y: area.Y, W: 40, H: 40}, render.RGB(0, 255, 0))
 				},
 			})
@@ -343,7 +350,7 @@ func TestWindowWakeUpTargeted(t *testing.T) {
 	mw1.wakeUps, mw2.wakeUps = 0, 0
 	mw1.presents, mw2.presents = 0, 0
 	mw1.presentRects, mw2.presentRects = 0, 0
-	w1Renders, w2Renders = 0, 0
+	w1Renders, w2Renders, w2CanvasDraws = 0, 0, 0
 
 	// Адресное пробуждение только w2
 	w2.WakeUp()
@@ -352,8 +359,8 @@ func TestWindowWakeUpTargeted(t *testing.T) {
 	}
 
 	w2.handleEvent(platform.Event{Type: platform.EventWakeUp})
-	if w2Renders != 1 || w1Renders != 0 {
-		t.Fatalf("ожидалась перерисовка только w2: w1=%d w2=%d", w1Renders, w2Renders)
+	if w1Renders != 0 || w2Renders != 0 || w2CanvasDraws != 1 {
+		t.Fatalf("ожидался fast-path OnDraw только у w2 без полного drawFn: w1=%d w2=%d canvas=%d", w1Renders, w2Renders, w2CanvasDraws)
 	}
 	if mw2.presentRects != 1 || mw1.presents != 0 || mw1.presentRects != 0 {
 		t.Fatalf("ожидался fast-path PresentRect только у w2: w2.presentRects=%d w1.presents=%d", mw2.presentRects, mw1.presents)

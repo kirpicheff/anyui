@@ -76,6 +76,12 @@ type directCanvasEntry struct {
 	cb   CanvasCallbacks
 }
 
+type streamingCanvasEntry struct {
+	id     string
+	rect   render.Rect
+	onDraw func(canvas *render.Canvas, area render.Rect, focused bool)
+}
+
 // Context хранит состояние текущего кадра Immediate Mode UI.
 type Context struct {
 	Win      platform.Window
@@ -201,10 +207,12 @@ type Context struct {
 	debugDirtyRect     bool
 	prevDebugDirty     render.Rect
 	prevPresentStale   bool
-	wakeOnlyFrame      bool
-	streamingDirty     render.Rect
-	directCanvases     []directCanvasEntry
-	nextDirectCanvases []directCanvasEntry
+	wakeOnlyFrame         bool
+	streamingDirty        render.Rect
+	directCanvases        []directCanvasEntry
+	nextDirectCanvases    []directCanvasEntry
+	streamingCanvases     []streamingCanvasEntry
+	nextStreamingCanvases []streamingCanvasEntry
 }
 
 // NewContext создаёт новый UI-контекст поверх окна и менеджера шрифтов.
@@ -220,9 +228,15 @@ func NewContext(win platform.Window, fm *render.FontManager) *Context {
 	if scale <= 0 {
 		scale = 1.0
 	}
+	canvas := render.NewCanvas(0, 0)
+	if bp, ok := win.(platform.BackBufferProvider); ok {
+		canvas.ResizeWithBuffer(w, h, bp.BackBuffer(w, h))
+	} else {
+		canvas.Resize(w, h)
+	}
 	return &Context{
 		Win:            win,
-		Canvas:         render.NewCanvas(w, h),
+		Canvas:         canvas,
 		Font:           fm,
 		Theme:          DeepNavyTheme(),
 		Scale:          scale,
@@ -495,6 +509,11 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 	switch ev.Type {
 	case platform.EventClose:
 		c.stopAnimTimer()
+		if _, ok := c.Win.(platform.BackBufferProvider); ok {
+			c.Canvas.Pixels = nil
+			c.Canvas.Width = 0
+			c.Canvas.Height = 0
+		}
 	case platform.EventDPIChange:
 		if ev.Scale > 0 {
 			c.Scale = ev.Scale
@@ -503,7 +522,12 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 			redraw = true
 		}
 	case platform.EventResize:
-		c.Canvas.Resize(ev.Width, ev.Height)
+		if bp, ok := c.Win.(platform.BackBufferProvider); ok {
+			c.Canvas.Pixels = nil
+			c.Canvas.ResizeWithBuffer(ev.Width, ev.Height, bp.BackBuffer(ev.Width, ev.Height))
+		} else {
+			c.Canvas.Resize(ev.Width, ev.Height)
+		}
 		c.layers.InvalidateStatic()
 		c.wakeOnlyFrame = false
 		redraw = true
@@ -700,6 +724,19 @@ func (c *Context) Render(drawFn func(ctx *Context)) {
 	c.inRender = true
 	defer func() { c.inRender = false }()
 
+	// Быстрый путь для фонового потокового кадра (EventWakeUp + Streaming):
+	// пропускаем полную очистку Canvas и перестроение дерева виджетов,
+	// перерисовывая только зарегистрированные потоковые холсты поверх готового буфера.
+	if c.canSkipFullFrameForStreaming() {
+		c.renderStreamingOnly()
+		if !c.needsRedraw {
+			c.presentFrame()
+			c.syncAnimTimer()
+			return
+		}
+		c.wakeOnlyFrame = false
+	}
+
 	// Максимум 2 прохода на случай, если событие изменило состояние виджета
 	for pass := 0; pass < 2; pass++ {
 		c.beginFrame()
@@ -713,6 +750,44 @@ func (c *Context) Render(drawFn func(ctx *Context)) {
 
 	c.presentFrame()
 	c.syncAnimTimer()
+}
+
+func (c *Context) canSkipFullFrameForStreaming() bool {
+	if !c.wakeOnlyFrame || c.paintRequested || len(c.streamingCanvases) == 0 {
+		return false
+	}
+	w, h := c.Canvas.Width, c.Canvas.Height
+	need := w * h * 4
+	if c.prevPresentW != w || c.prevPresentH != h || len(c.prevPresentPixels) != need {
+		return false
+	}
+	if c.debugDirtyRect || c.needsRedraw || c.layers.staticDirty {
+		return false
+	}
+	if c.Theme != c.lastTheme || c.Scale != c.lastScale {
+		return false
+	}
+	if c.Overlays.HasActive() || len(c.toasts) > 0 {
+		return false
+	}
+	if c.Animator != nil && c.Animator.HasActive() {
+		return false
+	}
+	return true
+}
+
+func (c *Context) renderStreamingOnly() {
+	c.streamingDirty = render.Rect{}
+	for _, entry := range c.streamingCanvases {
+		if entry.onDraw == nil || entry.rect.Empty() {
+			continue
+		}
+		focused := c.FocusID == entry.id
+		c.Canvas.PushClip(entry.rect)
+		entry.onDraw(c.Canvas, entry.rect, focused)
+		c.Canvas.PopClip()
+		c.SetStreamingDirtyRect(entry.rect)
+	}
 }
 
 // SetDebugDirtyRect включает или отключает отладочную рамку DirtyRect без искажения расчёта diff.
@@ -878,6 +953,7 @@ func (c *Context) beginFrame() {
 	c.nextFocusOrder = c.nextFocusOrder[:0]
 	c.nextHitRegions = c.nextHitRegions[:0]
 	c.nextDirectCanvases = c.nextDirectCanvases[:0]
+	c.nextStreamingCanvases = c.nextStreamingCanvases[:0]
 	c.streamingDirty = render.Rect{}
 	c.layers.lastFrameBlitted = false
 	c.layers.activeLayer = LayerDynamic
@@ -915,6 +991,7 @@ func (c *Context) endFrame() {
 	c.focusOrder, c.nextFocusOrder = c.nextFocusOrder, c.focusOrder[:0]
 	c.hitRegions, c.nextHitRegions = c.nextHitRegions, c.hitRegions[:0]
 	c.directCanvases, c.nextDirectCanvases = c.nextDirectCanvases, c.directCanvases[:0]
+	c.streamingCanvases, c.nextStreamingCanvases = c.nextStreamingCanvases, c.streamingCanvases[:0]
 	c.lastHotID = c.HotID
 	c.lastHitID, _, _, _ = c.hitTest(c.MouseX, c.MouseY)
 	if !c.needsRedraw {

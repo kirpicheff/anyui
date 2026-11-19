@@ -135,6 +135,12 @@ type DirtyPresenter interface {
 	PresentRect(pixels []byte, width, height, rx, ry, rw, rh int)
 }
 
+// BackBufferProvider — опциональный интерфейс окна для предоставления прямого пиксельного буфера
+// (например, Windows DIBSection), позволяющего рендерить кадр без промежуточного копирования.
+type BackBufferProvider interface {
+	BackBuffer(width, height int) []byte
+}
+
 // WindowStater — опциональный интерфейс окна для сохранения и восстановления геометрии.
 type WindowStater interface {
 	State() WindowState

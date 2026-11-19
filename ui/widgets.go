@@ -627,6 +627,13 @@ func (c *Context) InteractiveCanvas(id string, wDp, hDp int, cb CanvasCallbacks,
 	}
 	if cb.Streaming {
 		c.SetStreamingDirtyRect(r)
+		if cb.OnDraw != nil {
+			c.nextStreamingCanvases = append(c.nextStreamingCanvases, streamingCanvasEntry{
+				id:     id,
+				rect:   r,
+				onDraw: cb.OnDraw,
+			})
+		}
 	}
 
 	blocked := c.IsInputBlocked()

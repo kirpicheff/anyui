@@ -212,6 +212,9 @@ type win32Window struct {
 
 	mu         sync.Mutex
 	pixels     []byte
+	memDC      windows.Handle
+	hBitmap    windows.Handle
+	oldBitmap  windows.Handle
 	bufW       int
 	bufH       int
 	closing          bool
@@ -437,20 +440,94 @@ func (w *win32Window) updateClientSize() {
 	w.height = int(rc.bottom - rc.top)
 }
 
+func (w *win32Window) freeDIBLocked() {
+	if w.memDC != 0 && w.oldBitmap != 0 {
+		procSelectObject.Call(uintptr(w.memDC), uintptr(w.oldBitmap))
+		w.oldBitmap = 0
+	}
+	if w.hBitmap != 0 {
+		procDeleteObject.Call(uintptr(w.hBitmap))
+		w.hBitmap = 0
+	}
+	if w.memDC != 0 {
+		w.pixels = nil
+	}
+}
+
+func (w *win32Window) freeGDILocked() {
+	w.freeDIBLocked()
+	if w.memDC != 0 {
+		procDeleteDC.Call(uintptr(w.memDC))
+		w.memDC = 0
+	}
+	w.pixels = nil
+	w.bufW = 0
+	w.bufH = 0
+}
+
+func (w *win32Window) ensureDIBLocked(width, height int) bool {
+	if width <= 0 || height <= 0 {
+		return false
+	}
+	if w.hBitmap != 0 && w.bufW == width && w.bufH == height && len(w.pixels) == width*height*4 {
+		return true
+	}
+	w.freeDIBLocked()
+	if w.memDC == 0 {
+		screenDC, _, _ := procGetDC.Call(0)
+		dc, _, _ := procCreateCompatibleDC.Call(screenDC)
+		if screenDC != 0 {
+			procReleaseDC.Call(0, screenDC)
+		}
+		w.memDC = windows.Handle(dc)
+	}
+	if w.memDC == 0 {
+		return false
+	}
+	hbmp, dibPixels := createTopDownDIB(w.memDC, width, height)
+	if hbmp == 0 || len(dibPixels) < width*height*4 {
+		return false
+	}
+	old, _, _ := procSelectObject.Call(uintptr(w.memDC), uintptr(hbmp))
+	w.hBitmap = hbmp
+	w.oldBitmap = windows.Handle(old)
+	w.pixels = dibPixels
+	w.bufW = width
+	w.bufH = height
+	return true
+}
+
+// BackBuffer возвращает прямой срез пикселей DIBSection для рендера без промежуточного копирования.
+func (w *win32Window) BackBuffer(width, height int) []byte {
+	if width <= 0 || height <= 0 {
+		return nil
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.ensureDIBLocked(width, height) {
+		return nil
+	}
+	return w.pixels
+}
+
 func (w *win32Window) Present(pixels []byte, width, height int) {
 	if width <= 0 || height <= 0 || len(pixels) < width*height*4 {
 		return
 	}
 	w.mu.Lock()
 	need := width * height * 4
-	if cap(w.pixels) < need {
-		w.pixels = make([]byte, need)
-	} else {
-		w.pixels = w.pixels[:need]
+	if !w.ensureDIBLocked(width, height) {
+		if cap(w.pixels) < need {
+			w.pixels = make([]byte, need)
+		} else {
+			w.pixels = w.pixels[:need]
+		}
+		w.bufW = width
+		w.bufH = height
 	}
-	copy(w.pixels, pixels[:need])
-	w.bufW = width
-	w.bufH = height
+	if len(w.pixels) >= need && &w.pixels[0] != &pixels[0] {
+		copy(w.pixels[:need], pixels[:need])
+	}
 	w.mu.Unlock()
 
 	if w.hwnd != 0 {
@@ -489,10 +566,12 @@ func (w *win32Window) PresentRect(pixels []byte, width, height, rx, ry, rw, rh i
 		w.Present(pixels, width, height)
 		return
 	}
-	rowBytes := rw * 4
-	for y := ry; y < ry+rh; y++ {
-		off := (y*width + rx) * 4
-		copy(w.pixels[off:off+rowBytes], pixels[off:off+rowBytes])
+	if &w.pixels[0] != &pixels[0] {
+		rowBytes := rw * 4
+		for y := ry; y < ry+rh; y++ {
+			off := (y*width + rx) * 4
+			copy(w.pixels[off:off+rowBytes], pixels[off:off+rowBytes])
+		}
 	}
 	w.mu.Unlock()
 
@@ -840,13 +919,21 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 		var ps paintStruct
 		hdc, _, _ := procBeginPaint.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&ps)))
 		w.mu.Lock()
-		if len(w.pixels) > 0 && w.bufW > 0 && w.bufH > 0 {
+		if w.bufW > 0 && w.bufH > 0 {
 			rw := int(ps.rcPaint.right - ps.rcPaint.left)
 			rh := int(ps.rcPaint.bottom - ps.rcPaint.top)
-			if w.width == w.bufW && w.height == w.bufH && rw > 0 && rh > 0 && (rw < w.bufW || rh < w.bufH) {
-				blitBGRARect(windows.Handle(hdc), int(ps.rcPaint.left), int(ps.rcPaint.top), rw, rh, w.pixels, w.bufW, w.bufH)
-			} else {
-				blitBGRA(windows.Handle(hdc), w.width, w.height, w.pixels, w.bufW, w.bufH)
+			if w.memDC != 0 && w.hBitmap != 0 {
+				if w.width == w.bufW && w.height == w.bufH && rw > 0 && rh > 0 && (rw < w.bufW || rh < w.bufH) {
+					blitMemDCRect(windows.Handle(hdc), int(ps.rcPaint.left), int(ps.rcPaint.top), rw, rh, w.memDC, w.bufW, w.bufH)
+				} else {
+					blitMemDC(windows.Handle(hdc), w.width, w.height, w.memDC, w.bufW, w.bufH)
+				}
+			} else if len(w.pixels) > 0 {
+				if w.width == w.bufW && w.height == w.bufH && rw > 0 && rh > 0 && (rw < w.bufW || rh < w.bufH) {
+					blitBGRARect(windows.Handle(hdc), int(ps.rcPaint.left), int(ps.rcPaint.top), rw, rh, w.pixels, w.bufW, w.bufH)
+				} else {
+					blitBGRA(windows.Handle(hdc), w.width, w.height, w.pixels, w.bufW, w.bufH)
+				}
 			}
 		}
 		w.mu.Unlock()
@@ -968,6 +1055,9 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 		return 0
 
 	case wmDestroy:
+		w.mu.Lock()
+		w.freeGDILocked()
+		w.mu.Unlock()
 		if w.hIcon != 0 {
 			procDestroyIcon.Call(uintptr(w.hIcon))
 			w.hIcon = 0
