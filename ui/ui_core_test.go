@@ -131,3 +131,82 @@ func TestApplyOptions(t *testing.T) {
 	}
 }
 
+func TestNewStylingOptionsAndButtonTransparentBg(t *testing.T) {
+	hoverCol := render.Hex(0xAABBCC)
+	focusCol := render.RGBA(0, 0, 0, 0)
+	shadowCol := render.RGBA(10, 20, 30, 128)
+
+	st := ApplyOptions([]Option{
+		HoverTextColor(hoverCol),
+		FocusBorderColor(focusCol),
+		TextAlignCenter(),
+		LetterSpacing(1.5),
+		TextShadow(1, 2, 4, shadowCol),
+		Bg(render.RGBA(0, 0, 0, 0)),
+	})
+
+	if st.HoverTextColor == nil || *st.HoverTextColor != hoverCol {
+		t.Fatal("HoverTextColor не применён")
+	}
+	if st.FocusBorderColor == nil || *st.FocusBorderColor != focusCol {
+		t.Fatal("FocusBorderColor не применён")
+	}
+	if st.TextAlign != AlignTextCenter {
+		t.Fatalf("ожидался AlignTextCenter, получено %v", st.TextAlign)
+	}
+	if st.LetterSpacing != 1.5 {
+		t.Fatalf("ожидался LetterSpacing 1.5, получено %v", st.LetterSpacing)
+	}
+	if st.TextShadow == nil || st.TextShadow.Blur != 4 || st.TextShadow.Color != shadowCol {
+		t.Fatal("TextShadow не применён")
+	}
+
+	ctx := NewContext(&dirtyMockWindow{}, nil)
+	bg, hoverBg, downBg, _, _ := ctx.resolveButtonColors(st)
+	if bg.A != 0 || hoverBg.A != 0 || downBg.A != 0 {
+		t.Fatalf("для полностью прозрачного Bg подложка при наведении/нажатии должна оставаться прозрачной: bg=%+v hover=%+v down=%+v", bg, hoverBg, downBg)
+	}
+}
+
+func TestTextInputAlignCenterAndFocusBorderColor(t *testing.T) {
+	fm, err := render.LoadDefaultSystemFont()
+	if err != nil {
+		t.Skip("системный шрифт недоступен в тестовой среде")
+	}
+	win := &dirtyMockWindow{}
+	ctx := NewContext(win, fm)
+	ctx.Canvas = render.NewCanvas(320, 120)
+	ctx.Theme = DarkTheme()
+
+	val := ""
+	ctx.Render(func(c *Context) {
+		c.TextInputOpts("inp_center", &val, "Код сессии",
+			Width(220),
+			Height(40),
+			TextAlignCenter(),
+			BorderColor(render.RGBA(0, 0, 0, 0)),
+			FocusBorderColor(render.RGBA(0, 0, 0, 0)),
+		)
+	})
+
+	// Переводим фокус на поле и рендерим кадр — проверяем отсутствие рамки фокуса
+	ctx.FocusID = ctx.ResolveID("inp", "inp_center")
+	ctx.Canvas.Clear(render.RGB(10, 10, 10))
+	ctx.Render(func(c *Context) {
+		c.TextInputOpts("inp_center", &val, "Код сессии",
+			Width(220),
+			Height(40),
+			TextAlignCenter(),
+			Bg(render.RGB(10, 10, 10)),
+			BorderColor(render.RGBA(0, 0, 0, 0)),
+			FocusBorderColor(render.RGBA(0, 0, 0, 0)),
+		)
+	})
+
+	// Верхняя граница поля (y=0) не должна окраситься в Theme.BorderFocus
+	topPx := ctx.Canvas.Pixels[10*4:]
+	if topPx[2] == ctx.Theme.BorderFocus.R && topPx[1] == ctx.Theme.BorderFocus.G && topPx[0] == ctx.Theme.BorderFocus.B {
+		t.Fatal("внутренняя рамка фокуса не должна рисоваться при FocusBorderColor(transparent)")
+	}
+}
+

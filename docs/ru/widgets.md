@@ -12,7 +12,7 @@
 - **Сигнатуры:**
   - `ui.Button(id, label string, opts ...Option) bool`
   - `ui.IconButton(id, svg string, opts ...Option) bool`
-- **Опции:** `Primary()`, `Secondary()`, `Danger()`, `Ghost()`, `Icon(svg)`, `Width(dp)`, `Height(dp)`, `Radius(dp)`, `Disabled(bool)`.
+- **Опции:** `Primary()`, `Secondary()`, `Danger()`, `Ghost()`, `Bg(c)`, `TextColor(c)`, `HoverTextColor(c)`, `LetterSpacing(dp)`, `TextShadow(ox, oy, blur, c)`, `Icon(svg)`, `Width(dp)`, `Height(dp)`, `Radius(dp)`, `Disabled(bool)`. При полностью прозрачном `Bg` (`A == 0`) подложка при наведении и нажатии остаётся прозрачной.
 - **Пример:**
 ```go
 if ui.Button("save", "Сохранить", anyui.Primary(), anyui.Icon(saveSVG)) {
@@ -54,7 +54,7 @@ ui.Toggle("autostart", "Запускать при старте ОС", &autoStart
 ### `TextInput`
 - **Сигнатура:** `ui.TextInput(id string, value *string, placeholder string, opts ...Option) bool`
 - **Возможности:** точный клик курсора, выделение мышью, `Shift + Стрелки`, навигация/удаление по словам (`Ctrl + Left/Right`, `Ctrl + Shift + Left/Right`, `Ctrl + Backspace/Delete`), двойной клик (слово) и тройной клик (весь текст), `Ctrl+A / C / V / X`, история правок `Undo` / `Redo` (`Ctrl+Z` / `Ctrl+Y` / `Ctrl+Shift+Z`), встроенное контекстное меню по ПКМ.
-- **Опции:** `Password()`, `ReadOnly(bool)`, `Clearable(bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `Error(string)`, `Disabled(bool)`, `Width(dp)`.
+- **Опции:** `Password()`, `ReadOnly(bool)`, `Clearable(bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `Error(string)`, `FocusBorderColor(c)`, `TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`, `Disabled(bool)`, `Width(dp)`.
 - **Пример:**
 ```go
 ui.TextInput("pass", &password, "Введите пароль",
@@ -91,7 +91,7 @@ ui.TextArea("notes", &notes, "Комментарий...",
 
 ### `Label`, `SelectableLabel` и `Hyperlink`
 - **Сигнатуры:**
-  - `ui.Label(text string, opts ...Option)` — вывод текста с опциями `WordWrap(true)` и `Ellipsis(true)`.
+  - `ui.Label(text string, opts ...Option)` — вывод текста с опциями `WordWrap(true)`, `Ellipsis(true)`, `LetterSpacing(dp)` и `TextShadow(offsetX, offsetY, blur, col)`.
   - `ui.SelectableLabel(id, text string, opts ...Option)` — статический текст с выделением мышью (включая двойной/тройной клик), `Ctrl+C`/`Ctrl+A` и контекстным меню по ПКМ.
   - `ui.Hyperlink(id, text string, opts ...Option) bool` — кликабельная ссылка с подчёркиванием при наведении и курсором руки.
 - **Пример:**

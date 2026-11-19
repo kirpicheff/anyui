@@ -1,4 +1,4 @@
-# AnyUI (v0.7.11)
+# AnyUI (v0.7.12)
 
 Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).
 
@@ -94,6 +94,7 @@ const HitClient = platform.HitClient ...
 const MsgInfo = platform.MsgInfo ...
 const MsgOK = platform.MsgOK ...
 const ResNone = platform.ResNone ...
+const AlignTextLeft = ui.AlignTextLeft ...
 const NotifyNone = platform.NotifyNone ...
 const ScaleFit = render.ScaleFit ...
 const FontRegular = render.FontRegular ...
@@ -172,13 +173,16 @@ type Option = ui.Option
     func FillHeight() Option
     func FillWidth() Option
     func Flex(weight float32) Option
+    func FocusBorderColor(c Color) Option
     func FontSize(dp int) Option
     func Ghost() Option
     func Height(dp int) Option
+    func HoverTextColor(c Color) Option
     func Icon(svg string) Option
     func IconRight(svg string) Option
     func Indeterminate(v bool) Option
     func InputFilter(fn func(rune) bool) Option
+    func LetterSpacing(dp float32) Option
     func LineNumbers(v bool) Option
     func MaxHeight(dp int) Option
     func MaxWidth(dp int) Option
@@ -192,7 +196,11 @@ type Option = ui.Option
     func ReadOnly(v bool) Option
     func Searchable(v bool) Option
     func Secondary() Option
+    func TextAlignCenter() Option
+    func TextAlignLeft() Option
+    func TextAlignRight() Option
     func TextColor(c Color) Option
+    func TextShadow(offsetX, offsetY, blur float32, c Color) Option
     func Width(dp int) Option
     func WordWrap(v bool) Option
 type PageConfig = ui.PageConfig
@@ -213,6 +221,7 @@ type TableColumn = ui.TableColumn
 type TableEvent = ui.TableEvent
 type TableExConfig = ui.TableExConfig
 type TableSort = ui.TableSort
+type TextAlign = ui.TextAlign
 type Theme = ui.Theme
     func DarkTheme() Theme
     func DeepNavyTheme() Theme
@@ -248,6 +257,9 @@ type Config struct {
 	FollowSystemTheme   bool
 	OnSystemThemeChange func(app *App, dark bool)
 	Theme               Theme
+	FontRegular         []byte
+	FontBold            []byte
+	FontMono            []byte
 	Strings             *Strings
 	SingleInstance      *SingleInstanceConfig
 	Tray                *TrayConfig

@@ -100,11 +100,11 @@ ui.InteractiveCanvas("rdp_view", 0, 0, anyui.CanvasCallbacks{
 
 ## Font Styles and Fallback
 
-`FontManager` automatically loads `FontRegular`, `FontBold`, and `FontMono`, using 4-phase subpixel X positioning and font kerning. Use `anyui.Bold()` and `anyui.Mono()` on widgets:
+`FontManager` automatically loads system `FontRegular`, `FontBold`, and `FontMono`, using 4-phase subpixel X positioning and font kerning. To embed custom `.ttf`/`.otf` fonts (for example via `//go:embed`), pass their bytes in `anyui.Config`: `FontRegular`, `FontBold`, `FontMono` (system fallback fonts are preserved). Use `anyui.Bold()`, `anyui.Mono()`, `anyui.LetterSpacing(dp)`, and `anyui.TextShadow(offsetX, offsetY, blur, col)` on widgets:
 
 ```go
-ui.Label("Code: 000 000", anyui.Mono(), anyui.FontSize(18))
-ui.Label("Heading", anyui.Bold(), anyui.FontSize(20))
+ui.Label("Code: 000 000", anyui.Mono(), anyui.FontSize(18), anyui.LetterSpacing(1.5))
+ui.Label("Heading", anyui.Bold(), anyui.FontSize(20), anyui.TextShadow(0, 0, 8, anyui.RGBA(80, 180, 255, 160)))
 ```
 
 ## Rendering Optimization, Layers, and Caches

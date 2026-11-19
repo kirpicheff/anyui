@@ -110,3 +110,35 @@ func LineNumbers(v bool) Option { return ui.LineNumbers(v) }
 // Error задаёт текст ошибки валидации и подсвечивает рамку поля ввода.
 func Error(text string) Option { return ui.Error(text) }
 
+// TextAlign задаёт горизонтальное выравнивание текста внутри виджета.
+type TextAlign = ui.TextAlign
+
+const (
+	AlignTextLeft   = ui.AlignTextLeft
+	AlignTextCenter = ui.AlignTextCenter
+	AlignTextRight  = ui.AlignTextRight
+)
+
+// HoverTextColor переопределяет цвет текста и иконки при наведении (для Button).
+func HoverTextColor(c Color) Option { return ui.HoverTextColor(c) }
+
+// FocusBorderColor переопределяет цвет рамки при фокусе (для TextInput).
+func FocusBorderColor(c Color) Option { return ui.FocusBorderColor(c) }
+
+// TextAlignCenter выравнивает текст и placeholder по центру (для TextInput).
+func TextAlignCenter() Option { return ui.TextAlignCenter() }
+
+// TextAlignLeft выравнивает текст и placeholder по левому краю (для TextInput).
+func TextAlignLeft() Option { return ui.TextAlignLeft() }
+
+// TextAlignRight выравнивает текст и placeholder по правому краю (для TextInput).
+func TextAlignRight() Option { return ui.TextAlignRight() }
+
+// LetterSpacing задаёт межбуквенный интервал в логических пикселях (для Label и Button).
+func LetterSpacing(dp float32) Option { return ui.LetterSpacing(dp) }
+
+// TextShadow задаёт тень или мягкое свечение текста (для Label и Button).
+func TextShadow(offsetX, offsetY, blur float32, c Color) Option {
+	return ui.TextShadow(offsetX, offsetY, blur, c)
+}
+

@@ -30,6 +30,22 @@ func (c *Context) Label(text string, sizeDp int, col render.Color) {
 	c.LabelOpts(text, FontSize(sizeDp), TextColor(col))
 }
 
+func (c *Context) textRenderOpts(st WidgetStyle) render.TextRenderOptions {
+	opts := render.TextRenderOptions{
+		Style:           st.FontStyle,
+		LetterSpacingPx: c.Sf(st.LetterSpacing),
+	}
+	if st.TextShadow != nil && st.TextShadow.Color.A > 0 {
+		opts.Shadow = &render.TextShadowStyle{
+			OffsetX: c.Sf(st.TextShadow.OffsetX),
+			OffsetY: c.Sf(st.TextShadow.OffsetY),
+			Blur:    c.Sf(st.TextShadow.Blur),
+			Color:   st.TextShadow.Color,
+		}
+	}
+	return opts
+}
+
 // LabelOpts выводит строку текста с опциями стилизации, переносом строк (WordWrap) и обрезкой (Ellipsis).
 func (c *Context) LabelOpts(text string, opts ...Option) {
 	if c.Font == nil {
@@ -49,6 +65,7 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 	}
 
 	pxSize := c.S(sizeDp)
+	textOpts := c.textRenderOpts(st)
 	if st.WordWrap {
 		maxW := c.RemainingWidth()
 		if st.WidthDp != nil && *st.WidthDp > 0 {
@@ -62,9 +79,9 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 		}
 		runes := []rune(text)
 		lines := c.WrapTextLines(runes, maxW, pxSize, st.FontStyle)
-		_, lineH := c.Font.MeasureTextStyled("Аy", pxSize, st.FontStyle)
+		_, lineH := c.Font.MeasureTextWithOptions("Аy", pxSize, textOpts)
 		if lineH <= 0 {
-			_, lineH = c.Font.MeasureTextStyled(text, pxSize, st.FontStyle)
+			_, lineH = c.Font.MeasureTextWithOptions(text, pxSize, textOpts)
 		}
 		gap := c.S(3)
 		lineStep := lineH + gap
@@ -74,7 +91,7 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 		}
 		totalW := 0
 		for _, sp := range lines {
-			lw, _ := c.Font.MeasureTextStyled(string(runes[sp.start:sp.end]), pxSize, st.FontStyle)
+			lw, _ := c.Font.MeasureTextWithOptions(string(runes[sp.start:sp.end]), pxSize, textOpts)
 			if lw > totalW {
 				totalW = lw
 			}
@@ -84,13 +101,13 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 		}
 		r := c.allocRectStyled(totalW, totalH, st)
 		for i, sp := range lines {
-			c.Font.DrawTextStyled(c.Canvas, r.X, r.Y+i*lineStep, string(runes[sp.start:sp.end]), pxSize, col, st.FontStyle)
+			c.Font.DrawTextWithOptions(c.Canvas, r.X, r.Y+i*lineStep, string(runes[sp.start:sp.end]), pxSize, col, textOpts)
 		}
 		return
 	}
 
 	drawText := text
-	w, h := c.Font.MeasureTextStyled(drawText, pxSize, st.FontStyle)
+	w, h := c.Font.MeasureTextWithOptions(drawText, pxSize, textOpts)
 	if st.Ellipsis {
 		maxW := c.RemainingWidth()
 		if st.WidthDp != nil && *st.WidthDp > 0 {
@@ -104,7 +121,7 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 			cut := len(runes)
 			for cut > 0 {
 				cand := string(runes[:cut]) + "..."
-				cw, _ := c.Font.MeasureTextStyled(cand, pxSize, st.FontStyle)
+				cw, _ := c.Font.MeasureTextWithOptions(cand, pxSize, textOpts)
 				if cw <= maxW {
 					drawText = cand
 					w = cw
@@ -114,12 +131,12 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 			}
 			if cut == 0 {
 				drawText = "..."
-				w, _ = c.Font.MeasureTextStyled(drawText, pxSize, st.FontStyle)
+				w, _ = c.Font.MeasureTextWithOptions(drawText, pxSize, textOpts)
 			}
 		}
 	}
 	r := c.allocRectStyled(w, h, st)
-	c.Font.DrawTextStyled(c.Canvas, r.X, r.Y, drawText, pxSize, col, st.FontStyle)
+	c.Font.DrawTextWithOptions(c.Canvas, r.X, r.Y, drawText, pxSize, col, textOpts)
 }
 
 // StatusDot рисует цветной кружок-индикатор и подпись справа от него.
@@ -264,9 +281,10 @@ func (c *Context) ButtonOpts(id, label string, opts ...Option) bool {
 		fontSizeDp = *st.FontSizeDp
 	}
 	pxSize := c.S(fontSizeDp)
+	textOpts := c.textRenderOpts(st)
 	tw, th := 0, pxSize
 	if c.Font != nil {
-		tw, th = c.Font.MeasureText(label, pxSize)
+		tw, th = c.Font.MeasureTextWithOptions(label, pxSize, textOpts)
 	}
 
 	padX := 16
@@ -334,6 +352,9 @@ func (c *Context) ButtonOpts(id, label string, opts ...Option) bool {
 	bg, hoverBg, downBg, border, textCol := c.resolveButtonColors(st)
 	bg = render.LerpColor(bg, hoverBg, hoverAnim)
 	bg = render.LerpColor(bg, downBg, pressAnim)
+	if !st.Disabled && st.HoverTextColor != nil {
+		textCol = render.LerpColor(textCol, *st.HoverTextColor, hoverAnim)
+	}
 
 	if c.FocusID == id && !st.Disabled {
 		border = c.Theme.BorderFocus
@@ -352,7 +373,7 @@ func (c *Context) ButtonOpts(id, label string, opts ...Option) bool {
 		startX += iconSize + iconGap
 	}
 	if c.Font != nil && label != "" {
-		c.Font.DrawTextStyled(c.Canvas, startX, r.Y+(r.H-th)/2, label, pxSize, textCol, st.FontStyle)
+		c.Font.DrawTextWithOptions(c.Canvas, startX, r.Y+(r.H-th)/2, label, pxSize, textCol, textOpts)
 	}
 
 	return clicked
@@ -387,8 +408,13 @@ func (c *Context) resolveButtonColors(st WidgetStyle) (bg, hoverBg, downBg, bord
 
 	if st.Bg != nil {
 		bg = *st.Bg
-		hoverBg = render.LerpColor(bg, render.RGB(255, 255, 255), 0.08)
-		downBg = render.LerpColor(bg, render.RGB(0, 0, 0), 0.12)
+		if bg.A == 0 {
+			hoverBg = bg
+			downBg = bg
+		} else {
+			hoverBg = render.LerpColor(bg, render.RGB(255, 255, 255), 0.08)
+			downBg = render.LerpColor(bg, render.RGB(0, 0, 0), 0.12)
+		}
 	}
 	if st.BorderColor != nil {
 		border = *st.BorderColor

@@ -63,6 +63,9 @@ type Config struct {
 	FollowSystemTheme   bool
 	OnSystemThemeChange func(app *App, dark bool)
 	Theme               Theme
+	FontRegular         []byte
+	FontBold            []byte
+	FontMono            []byte
 	Strings             *Strings
 	SingleInstance      *SingleInstanceConfig
 	Tray                *TrayConfig
@@ -134,7 +137,7 @@ func (a *App) Run(drawFn func(ui *UI)) error {
 		}()
 	}
 
-	fm, err := render.LoadDefaultSystemFont()
+	fm, err := a.initFontManager()
 	if err != nil {
 		return err
 	}
@@ -164,6 +167,29 @@ func (a *App) Run(drawFn func(ui *UI)) error {
 		a.mu.Unlock()
 		return win.platWin.Open(win.handleEvent)
 	})
+}
+
+func (a *App) initFontManager() (*render.FontManager, error) {
+	fm, err := render.LoadDefaultSystemFont()
+	if err != nil {
+		return nil, err
+	}
+	if len(a.cfg.FontRegular) > 0 {
+		if err := fm.RegisterFontBytes(render.FontRegular, a.cfg.FontRegular); err != nil {
+			return nil, err
+		}
+	}
+	if len(a.cfg.FontBold) > 0 {
+		if err := fm.RegisterFontBytes(render.FontBold, a.cfg.FontBold); err != nil {
+			return nil, err
+		}
+	}
+	if len(a.cfg.FontMono) > 0 {
+		if err := fm.RegisterFontBytes(render.FontMono, a.cfg.FontMono); err != nil {
+			return nil, err
+		}
+	}
+	return fm, nil
 }
 
 // OpenWindow открывает дополнительное независимое окно в рамках уже запущенного App.

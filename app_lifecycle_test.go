@@ -367,4 +367,22 @@ func TestWindowWakeUpTargeted(t *testing.T) {
 	}
 }
 
+func TestAppInitFontManager(t *testing.T) {
+	app := NewApp(Config{})
+	fm, err := app.initFontManager()
+	if err != nil {
+		t.Skipf("системный шрифт недоступен в тестовой среде: %v", err)
+	}
+	if fm == nil {
+		t.Fatal("ожидался непустой FontManager")
+	}
+
+	appBad := NewApp(Config{
+		FontRegular: []byte("not-a-ttf-font"),
+	})
+	if _, err := appBad.initFontManager(); err == nil {
+		t.Fatal("ожидалась ошибка при передаче невалидных байтов FontRegular")
+	}
+}
+
 

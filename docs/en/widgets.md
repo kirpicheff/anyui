@@ -12,7 +12,7 @@ All widgets are invoked inside `drawFn(ui *anyui.UI)` in Immediate Mode. Use fun
 - **Signatures:**
   - `ui.Button(id, label string, opts ...Option) bool`
   - `ui.IconButton(id, svg string, opts ...Option) bool`
-- **Options:** `Primary()`, `Secondary()`, `Danger()`, `Ghost()`, `Icon(svg)`, `Width(dp)`, `Height(dp)`, `Radius(dp)`, `Disabled(bool)`.
+- **Options:** `Primary()`, `Secondary()`, `Danger()`, `Ghost()`, `Bg(c)`, `TextColor(c)`, `HoverTextColor(c)`, `LetterSpacing(dp)`, `TextShadow(ox, oy, blur, c)`, `Icon(svg)`, `Width(dp)`, `Height(dp)`, `Radius(dp)`, `Disabled(bool)`. When `Bg` is fully transparent (`A == 0`), hover and pressed backgrounds stay transparent.
 - **Example:**
 ```go
 if ui.Button("save", "Save", anyui.Primary(), anyui.Icon(saveSVG)) {
@@ -54,7 +54,7 @@ ui.Toggle("autostart", "Launch on startup", &autoStart)
 ### `TextInput`
 - **Signature:** `ui.TextInput(id string, value *string, placeholder string, opts ...Option) bool`
 - **Features:** accurate click-to-position cursor, mouse selection, `Shift + Arrows`, word navigation/deletion (`Ctrl + Left/Right`, `Ctrl + Shift + Left/Right`, `Ctrl + Backspace/Delete`), double-click (word) and triple-click (all text), `Ctrl+A / C / V / X`, `Undo` / `Redo` (`Ctrl+Z` / `Ctrl+Y` / `Ctrl+Shift+Z`), built-in right-click context menu.
-- **Options:** `Password()`, `ReadOnly(bool)`, `Clearable(bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `Error(string)`, `Disabled(bool)`, `Width(dp)`.
+- **Options:** `Password()`, `ReadOnly(bool)`, `Clearable(bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `Error(string)`, `FocusBorderColor(c)`, `TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`, `Disabled(bool)`, `Width(dp)`.
 - **Example:**
 ```go
 ui.TextInput("pass", &password, "Enter password",
@@ -91,7 +91,7 @@ ui.TextArea("notes", &notes, "Comment...",
 
 ### `Label`, `SelectableLabel`, and `Hyperlink`
 - **Signatures:**
-  - `ui.Label(text string, opts ...Option)` — static text with `WordWrap(true)` and `Ellipsis(true)` options.
+  - `ui.Label(text string, opts ...Option)` — static text with `WordWrap(true)`, `Ellipsis(true)`, `LetterSpacing(dp)`, and `TextShadow(offsetX, offsetY, blur, col)` options.
   - `ui.SelectableLabel(id, text string, opts ...Option)` — selectable static text (including double/triple-click), `Ctrl+C`/`Ctrl+A`, and right-click context menu.
   - `ui.Hyperlink(id, text string, opts ...Option) bool` — clickable link with hover underline and hand cursor.
 - **Example:**

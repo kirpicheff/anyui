@@ -13,39 +13,53 @@ const (
 	VariantGhost
 )
 
+// TextAlign задаёт горизонтальное выравнивание текста внутри виджета.
+type TextAlign uint8
+
+const (
+	AlignTextLeft TextAlign = iota
+	AlignTextCenter
+	AlignTextRight
+)
+
 // WidgetStyle хранит переопределения оформления и размеров конкретного виджета.
 type WidgetStyle struct {
-	Bg            *render.Color
-	Color         *render.Color
-	BorderColor   *render.Color
-	Radius        *float32
-	WidthDp       *int
-	HeightDp      *int
-	MinWidthDp    *int
-	MaxWidthDp    *int
-	MinHeightDp   *int
-	MaxHeightDp   *int
-	FillWidth     bool
-	FillHeight    bool
-	AutoHeight    bool
-	FlexWeight    float32
-	FontSizeDp    *int
-	PadDp         *int
-	IconSVG       string
-	IconRightSVG  string
-	FontStyle     render.FontStyle
-	Disabled      bool
-	Variant       Variant
-	Password      bool
-	ReadOnly      bool
-	Clearable     bool
-	Indeterminate bool
-	Searchable    bool
-	InputFilter   func(rune) bool
-	WordWrap      bool
-	Ellipsis      bool
-	LineNumbers   bool
-	ErrorText     string
+	Bg               *render.Color
+	Color            *render.Color
+	HoverTextColor   *render.Color
+	BorderColor      *render.Color
+	FocusBorderColor *render.Color
+	Radius           *float32
+	WidthDp          *int
+	HeightDp         *int
+	MinWidthDp       *int
+	MaxWidthDp       *int
+	MinHeightDp      *int
+	MaxHeightDp      *int
+	FillWidth        bool
+	FillHeight       bool
+	AutoHeight       bool
+	FlexWeight       float32
+	FontSizeDp       *int
+	PadDp            *int
+	IconSVG          string
+	IconRightSVG     string
+	FontStyle        render.FontStyle
+	TextAlign        TextAlign
+	LetterSpacing    float32
+	TextShadow       *render.TextShadowStyle
+	Disabled         bool
+	Variant          Variant
+	Password         bool
+	ReadOnly         bool
+	Clearable        bool
+	Indeterminate    bool
+	Searchable       bool
+	InputFilter      func(rune) bool
+	WordWrap         bool
+	Ellipsis         bool
+	LineNumbers      bool
+	ErrorText        string
 }
 
 // Option настраивает стиль или поведение отдельного виджета.
@@ -304,6 +318,60 @@ func LineNumbers(v bool) Option {
 func Error(text string) Option {
 	return func(s *WidgetStyle) {
 		s.ErrorText = text
+	}
+}
+
+// HoverTextColor переопределяет цвет текста и иконки при наведении (для Button).
+func HoverTextColor(c render.Color) Option {
+	return func(s *WidgetStyle) {
+		s.HoverTextColor = &c
+	}
+}
+
+// FocusBorderColor переопределяет цвет рамки при фокусе (для TextInput).
+func FocusBorderColor(c render.Color) Option {
+	return func(s *WidgetStyle) {
+		s.FocusBorderColor = &c
+	}
+}
+
+// TextAlignCenter выравнивает текст и placeholder по центру (для TextInput).
+func TextAlignCenter() Option {
+	return func(s *WidgetStyle) {
+		s.TextAlign = AlignTextCenter
+	}
+}
+
+// TextAlignLeft выравнивает текст и placeholder по левому краю (для TextInput).
+func TextAlignLeft() Option {
+	return func(s *WidgetStyle) {
+		s.TextAlign = AlignTextLeft
+	}
+}
+
+// TextAlignRight выравнивает текст и placeholder по правому краю (для TextInput).
+func TextAlignRight() Option {
+	return func(s *WidgetStyle) {
+		s.TextAlign = AlignTextRight
+	}
+}
+
+// LetterSpacing задаёт межбуквенный интервал в логических пикселях (для Label и Button).
+func LetterSpacing(dp float32) Option {
+	return func(s *WidgetStyle) {
+		s.LetterSpacing = dp
+	}
+}
+
+// TextShadow задаёт тень или мягкое свечение текста (для Label и Button).
+func TextShadow(offsetX, offsetY, blur float32, c render.Color) Option {
+	return func(s *WidgetStyle) {
+		s.TextShadow = &render.TextShadowStyle{
+			OffsetX: offsetX,
+			OffsetY: offsetY,
+			Blur:    blur,
+			Color:   c,
+		}
 	}
 }
 

@@ -189,7 +189,8 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 		if c.MousePressed {
 			c.ActiveID = id
 			c.FocusID = id
-			idx := c.CaretIndexAtX(displayRunes, c.MouseX-textArea.X+c.textScroll[id], pxSize, st.FontStyle)
+			alignOff := c.textAlignOffset(displayRunes, textArea.W, pxSize, c.textScroll[id], st)
+			idx := c.CaretIndexAtX(displayRunes, c.MouseX-(textArea.X+alignOff)+c.textScroll[id], pxSize, st.FontStyle)
 			cc := c.ClickCount()
 			if cc == 2 {
 				if st.Password || len(runes) == 0 {
@@ -212,7 +213,8 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 
 	// Выделение текста протяжкой мыши
 	if !st.Disabled && c.ActiveID == id && c.MouseDown && !c.MousePressed && !clearClicked {
-		idx := c.CaretIndexAtX(displayRunes, c.MouseX-textArea.X+c.textScroll[id], pxSize, st.FontStyle)
+		alignOff := c.textAlignOffset(displayRunes, textArea.W, pxSize, c.textScroll[id], st)
+		idx := c.CaretIndexAtX(displayRunes, c.MouseX-(textArea.X+alignOff)+c.textScroll[id], pxSize, st.FontStyle)
 		c.caretPos[id] = idx
 	}
 
@@ -458,7 +460,11 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 	if st.BorderColor != nil {
 		baseBorder = *st.BorderColor
 	}
-	borderCol := render.LerpColor(baseBorder, c.Theme.BorderFocus, focusAnim)
+	focusBorder := c.Theme.BorderFocus
+	if st.FocusBorderColor != nil {
+		focusBorder = *st.FocusBorderColor
+	}
+	borderCol := render.LerpColor(baseBorder, focusBorder, focusAnim)
 	if st.ErrorText != "" {
 		borderCol = c.Theme.Danger
 	}
@@ -510,13 +516,15 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 		scroll = 0
 	}
 	c.textScroll[id] = scroll
+	alignOff := c.textAlignOffset(displayRunes, textArea.W, pxSize, scroll, st)
+	baseX := textArea.X + alignOff - scroll
 
 	if focused {
 		if a, b, ok := selectionBounds(caret, selStart, len(displayRunes)); ok {
 			x1, _ := c.Font.MeasureTextStyled(string(displayRunes[:a]), pxSize, st.FontStyle)
 			x2, _ := c.Font.MeasureTextStyled(string(displayRunes[:b]), pxSize, st.FontStyle)
 			selRect := render.Rect{
-				X: textArea.X + x1 - scroll,
+				X: baseX + x1,
 				Y: textArea.Y + c.S(5),
 				W: x2 - x1,
 				H: textArea.H - c.S(10),
@@ -535,13 +543,22 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 
 	textY := textArea.Y + (textArea.H-lineH)/2
 	if len(displayRunes) == 0 && !focused && placeholder != "" {
-		c.Font.DrawTextStyled(c.Canvas, textArea.X, textY, placeholder, pxSize, c.Theme.TextMuted, st.FontStyle)
+		phX := textArea.X
+		if st.TextAlign != AlignTextLeft {
+			pw, _ := c.Font.MeasureTextStyled(placeholder, pxSize, st.FontStyle)
+			if st.TextAlign == AlignTextCenter && textArea.W > pw {
+				phX = textArea.X + (textArea.W-pw)/2
+			} else if st.TextAlign == AlignTextRight && textArea.W > pw {
+				phX = textArea.X + textArea.W - pw
+			}
+		}
+		c.Font.DrawTextStyled(c.Canvas, phX, textY, placeholder, pxSize, c.Theme.TextMuted, st.FontStyle)
 	} else {
-		c.Font.DrawTextStyled(c.Canvas, textArea.X-scroll, textY, string(displayRunes), pxSize, textCol, st.FontStyle)
+		c.Font.DrawTextStyled(c.Canvas, baseX, textY, string(displayRunes), pxSize, textCol, st.FontStyle)
 	}
 
 	if focused {
-		caretX := textArea.X + prefixW - scroll
+		caretX := baseX + prefixW
 		caretTop := textArea.Y + c.S(6)
 		caretH := textArea.H - c.S(12)
 		c.Canvas.FillRect(render.Rect{X: caretX, Y: caretTop, W: c.S(2), H: caretH}, c.Theme.Accent)
@@ -551,6 +568,20 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 	c.drawInputError(r, st.ErrorText)
 	c.textFieldContextMenu(id, r, value, st, false)
 	return changed
+}
+
+func (c *Context) textAlignOffset(displayRunes []rune, areaW, pxSize, scroll int, st WidgetStyle) int {
+	if st.TextAlign == AlignTextLeft || scroll > 0 || c.Font == nil || areaW <= 0 {
+		return 0
+	}
+	fullW, _ := c.Font.MeasureTextStyled(string(displayRunes), pxSize, st.FontStyle)
+	if fullW >= areaW {
+		return 0
+	}
+	if st.TextAlign == AlignTextCenter {
+		return (areaW - fullW) / 2
+	}
+	return areaW - fullW
 }
 
 // WrapTextLines разбивает текст на визуальные строки с учётом '\n' и максимальной ширины.

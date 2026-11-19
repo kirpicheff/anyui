@@ -2,6 +2,7 @@ package render
 
 import (
 	"image"
+	"math"
 	"os"
 	"sync"
 
@@ -25,6 +26,21 @@ const (
 	FontBold
 	FontMono
 )
+
+// TextShadowStyle задаёт параметры тени или мягкого свечения текста в физических пикселях.
+type TextShadowStyle struct {
+	OffsetX float32
+	OffsetY float32
+	Blur    float32
+	Color   Color
+}
+
+// TextRenderOptions задаёт расширенные параметры измерения и отрисовки текста.
+type TextRenderOptions struct {
+	Style           FontStyle
+	LetterSpacingPx float32
+	Shadow          *TextShadowStyle
+}
 
 type glyphKey struct {
 	r    rune
@@ -543,10 +559,15 @@ func (fm *FontManager) MeasureText(text string, sizePx int) (int, int) {
 
 // MeasureTextStyled возвращает ширину и высоту строки в пикселях для указанного начертания.
 func (fm *FontManager) MeasureTextStyled(text string, sizePx int, style FontStyle) (int, int) {
+	return fm.MeasureTextWithOptions(text, sizePx, TextRenderOptions{Style: style})
+}
+
+// MeasureTextWithOptions возвращает ширину и высоту строки в пикселях с учётом начертания и межбуквенного интервала.
+func (fm *FontManager) MeasureTextWithOptions(text string, sizePx int, opts TextRenderOptions) (int, int) {
 	if fm == nil {
 		return 0, sizePx
 	}
-	fs := fm.styleSet(style)
+	fs := fm.styleSet(opts.Style)
 	if fs == nil {
 		return 0, sizePx
 	}
@@ -563,13 +584,17 @@ func (fm *FontManager) MeasureTextStyled(text string, sizePx int, style FontStyl
 	var penX fixed.Int26_6
 	var prevR rune
 	var prevSet *fontSet
+	spacing := fixed.Int26_6(math.Round(float64(opts.LetterSpacingPx) * 64))
 	for _, r := range text {
-		curSet := fm.resolveFontSet(style, r)
+		curSet := fm.resolveFontSet(opts.Style, r)
 		if curSet == nil {
 			continue
 		}
-		if prevSet != nil && curSet == prevSet {
-			penX += curSet.kern(sizePx, prevR, r)
+		if prevSet != nil {
+			penX += spacing
+			if curSet == prevSet {
+				penX += curSet.kern(sizePx, prevR, r)
+			}
 		}
 		if g := curSet.getGlyph(r, sizePx, 0); g != nil {
 			penX += g.advance
@@ -587,9 +612,24 @@ func (fm *FontManager) DrawText(c *Canvas, x, y int, text string, sizePx int, co
 
 // DrawTextStyled рисует строку текста указанным начертанием.
 func (fm *FontManager) DrawTextStyled(c *Canvas, x, y int, text string, sizePx int, col Color, style FontStyle) {
-	if fm == nil || c == nil || text == "" || col.A == 0 {
+	fm.DrawTextWithOptions(c, x, y, text, sizePx, col, TextRenderOptions{Style: style})
+}
+
+// DrawTextWithOptions рисует строку текста с учётом начертания, межбуквенного интервала и тени.
+func (fm *FontManager) DrawTextWithOptions(c *Canvas, x, y int, text string, sizePx int, col Color, opts TextRenderOptions) {
+	if fm == nil || c == nil || text == "" {
 		return
 	}
+	if opts.Shadow != nil && opts.Shadow.Color.A > 0 {
+		fm.drawTextShadow(c, x, y, text, sizePx, opts)
+	}
+	if col.A == 0 {
+		return
+	}
+	fm.drawTextCore(c, x, y, text, sizePx, col, opts.Style, opts.LetterSpacingPx)
+}
+
+func (fm *FontManager) drawTextCore(c *Canvas, x, y int, text string, sizePx int, col Color, style FontStyle, letterSpacingPx float32) {
 	fs := fm.styleSet(style)
 	if fs == nil {
 		return
@@ -609,6 +649,7 @@ func (fm *FontManager) DrawTextStyled(c *Canvas, x, y int, text string, sizePx i
 
 	penX := fixed.I(x)
 	baselineY := y + fe.ascent
+	spacing := fixed.Int26_6(math.Round(float64(letterSpacingPx) * 64))
 	var dirty Rect
 	var prevR rune
 	var prevSet *fontSet
@@ -618,8 +659,11 @@ func (fm *FontManager) DrawTextStyled(c *Canvas, x, y int, text string, sizePx i
 		if curSet == nil {
 			continue
 		}
-		if prevSet != nil && curSet == prevSet {
-			penX += curSet.kern(sizePx, prevR, r)
+		if prevSet != nil {
+			penX += spacing
+			if curSet == prevSet {
+				penX += curSet.kern(sizePx, prevR, r)
+			}
 		}
 		subX := uint8((penX & 63) >> 4)
 		cg := fm.resolveColoredGlyphForSet(curSet, style, r, sizePx, subX, col)
@@ -691,5 +735,212 @@ func (fm *FontManager) DrawTextStyled(c *Canvas, x, y int, text string, sizePx i
 
 	if !dirty.Empty() {
 		c.AddDirtyRect(dirty)
+	}
+}
+
+func (fm *FontManager) drawTextShadow(c *Canvas, x, y int, text string, sizePx int, opts TextRenderOptions) {
+	sh := opts.Shadow
+	if sh == nil || sh.Color.A == 0 {
+		return
+	}
+	offX := int(math.Round(float64(sh.OffsetX)))
+	offY := int(math.Round(float64(sh.OffsetY)))
+	if sh.Blur <= 0.5 {
+		fm.drawTextCore(c, x+offX, y+offY, text, sizePx, sh.Color, opts.Style, opts.LetterSpacingPx)
+		return
+	}
+
+	fs := fm.styleSet(opts.Style)
+	if fs == nil {
+		return
+	}
+	fe := fs.getFace(sizePx)
+	if fe == nil {
+		return
+	}
+	if sizePx < 6 {
+		sizePx = 6
+	}
+
+	rad := int(math.Ceil(float64(sh.Blur)))
+	if rad > 48 {
+		rad = 48
+	}
+	tw, th := fm.MeasureTextWithOptions(text, sizePx, opts)
+	if tw <= 0 || th <= 0 {
+		return
+	}
+	pad := rad + 4
+	maskW := tw + pad*2
+	maskH := th + pad*2
+
+	dstX := x + offX - pad
+	dstY := y + offY - pad
+	clip := c.CurrentClip()
+	area := clip.Intersect(Rect{X: dstX, Y: dstY, W: maskW, H: maskH})
+	if area.Empty() {
+		return
+	}
+
+	mask := make([]byte, maskW*maskH)
+	penX := fixed.I(pad)
+	baselineY := pad + fe.ascent
+	spacing := fixed.Int26_6(math.Round(float64(opts.LetterSpacingPx) * 64))
+	var prevR rune
+	var prevSet *fontSet
+
+	for _, r := range text {
+		curSet := fm.resolveFontSet(opts.Style, r)
+		if curSet == nil {
+			continue
+		}
+		if prevSet != nil {
+			penX += spacing
+			if curSet == prevSet {
+				penX += curSet.kern(sizePx, prevR, r)
+			}
+		}
+		subX := uint8((penX & 63) >> 4)
+		g := curSet.getGlyph(r, sizePx, subX)
+		if g == nil {
+			prevR = r
+			prevSet = curSet
+			continue
+		}
+		if g.notEmpty && len(g.alpha) == g.w*g.h {
+			gx := int(penX>>6) + g.offX
+			gy := baselineY + g.offY
+			for py := 0; py < g.h; py++ {
+				my := gy + py
+				if my < 0 || my >= maskH {
+					continue
+				}
+				for px := 0; px < g.w; px++ {
+					mx := gx + px
+					if mx < 0 || mx >= maskW {
+						continue
+					}
+					a := g.alpha[py*g.w+px]
+					if a > mask[my*maskW+mx] {
+						mask[my*maskW+mx] = a
+					}
+				}
+			}
+		}
+		penX += g.advance
+		prevR = r
+		prevSet = curSet
+	}
+
+	// Размытие 3 проходами box blur для мягкого свечения
+	blurAlphaMask(mask, maskW, maskH, rad)
+
+	col := sh.Color
+	c.AddDirtyRect(area)
+	for py := area.Y; py < area.Y+area.H; py++ {
+		my := py - dstY
+		srcRow := my * maskW
+		dstRow := py * c.Width * 4
+		for px := area.X; px < area.X+area.W; px++ {
+			ma := uint32(mask[srcRow+(px-dstX)])
+			if ma == 0 {
+				continue
+			}
+			a := (uint32(col.A)*ma + 127) / 255
+			if a == 0 {
+				continue
+			}
+			sb := (uint32(col.B)*a + 127) / 255
+			sg := (uint32(col.G)*a + 127) / 255
+			sr := (uint32(col.R)*a + 127) / 255
+			invA := 255 - a
+			do := dstRow + px*4
+			b := sb + (uint32(c.Pixels[do+0])*invA+127)/255
+			g := sg + (uint32(c.Pixels[do+1])*invA+127)/255
+			r := sr + (uint32(c.Pixels[do+2])*invA+127)/255
+			if b > 255 {
+				b = 255
+			}
+			if g > 255 {
+				g = 255
+			}
+			if r > 255 {
+				r = 255
+			}
+			c.Pixels[do+0] = uint8(b)
+			c.Pixels[do+1] = uint8(g)
+			c.Pixels[do+2] = uint8(r)
+			c.Pixels[do+3] = 255
+		}
+	}
+}
+
+func blurAlphaMask(mask []byte, w, h, rad int) {
+	if rad <= 0 || w <= 0 || h <= 0 {
+		return
+	}
+	// Делим радиус для 3 проходов, чтобы итоговое размытие соответствовало заданному blur
+	r := maxInt(1, rad/2)
+	tmp := make([]byte, w*h)
+	for pass := 0; pass < 3; pass++ {
+		alphaBoxBlurH(mask, tmp, w, h, r)
+		alphaBoxBlurV(tmp, mask, w, h, r)
+	}
+}
+
+func alphaBoxBlurH(src, dst []byte, w, h, r int) {
+	div := r*2 + 1
+	for y := 0; y < h; y++ {
+		row := y * w
+		sum := 0
+		for i := -r; i <= r; i++ {
+			x := i
+			if x < 0 {
+				x = 0
+			} else if x >= w {
+				x = w - 1
+			}
+			sum += int(src[row+x])
+		}
+		for x := 0; x < w; x++ {
+			dst[row+x] = byte(sum / div)
+			xOut := x - r
+			if xOut < 0 {
+				xOut = 0
+			}
+			xIn := x + r + 1
+			if xIn >= w {
+				xIn = w - 1
+			}
+			sum += int(src[row+xIn]) - int(src[row+xOut])
+		}
+	}
+}
+
+func alphaBoxBlurV(src, dst []byte, w, h, r int) {
+	div := r*2 + 1
+	for x := 0; x < w; x++ {
+		sum := 0
+		for i := -r; i <= r; i++ {
+			y := i
+			if y < 0 {
+				y = 0
+			} else if y >= h {
+				y = h - 1
+			}
+			sum += int(src[y*w+x])
+		}
+		for y := 0; y < h; y++ {
+			dst[y*w+x] = byte(sum / div)
+			yOut := y - r
+			if yOut < 0 {
+				yOut = 0
+			}
+			yIn := y + r + 1
+			if yIn >= h {
+				yIn = h - 1
+			}
+			sum += int(src[yIn*w+x]) - int(src[yOut*w+x])
+		}
 	}
 }

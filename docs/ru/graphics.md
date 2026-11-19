@@ -100,11 +100,11 @@ ui.InteractiveCanvas("rdp_view", 0, 0, anyui.CanvasCallbacks{
 
 ## Начертания шрифтов и fallback
 
-`FontManager` автоматически загружает начертания `FontRegular`, `FontBold` и `FontMono`, использует субпиксельное позиционирование по X (4 фазы) и учитывает кернинг. В виджетах используйте опции `anyui.Bold()` и `anyui.Mono()`:
+`FontManager` автоматически загружает системные начертания `FontRegular`, `FontBold` и `FontMono`, использует субпиксельное позиционирование по X (4 фазы) и учитывает кернинг. Для подключения собственных `.ttf`/`.otf` шрифтов (например, через `//go:embed`) передайте их байты в `anyui.Config`: `FontRegular`, `FontBold`, `FontMono` (при этом сохраняются системные fallback-шрифты для редких символов). В виджетах используйте опции `anyui.Bold()`, `anyui.Mono()`, `anyui.LetterSpacing(dp)` и `anyui.TextShadow(offsetX, offsetY, blur, col)`:
 
 ```go
-ui.Label("Код: 000 000", anyui.Mono(), anyui.FontSize(18))
-ui.Label("Заголовок", anyui.Bold(), anyui.FontSize(20))
+ui.Label("Код: 000 000", anyui.Mono(), anyui.FontSize(18), anyui.LetterSpacing(1.5))
+ui.Label("Заголовок", anyui.Bold(), anyui.FontSize(20), anyui.TextShadow(0, 0, 8, anyui.RGBA(80, 180, 255, 160)))
 ```
 
 ## Оптимизация рендеринга, слои и кеши
