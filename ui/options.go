@@ -53,6 +53,8 @@ type WidgetStyle struct {
 	Disabled         bool
 	Variant          Variant
 	Password         bool
+	PasswordToggle   bool
+	PasswordVisible  *bool
 	ReadOnly         bool
 	Clearable        bool
 	Indeterminate    bool
@@ -201,6 +203,19 @@ func IconRight(svg string) Option {
 func Password() Option {
 	return func(s *WidgetStyle) {
 		s.Password = true
+	}
+}
+
+// PasswordToggle включает режим поля пароля со встроенной кнопкой-глазиком справа.
+// Опционально принимает указатель на bool для внешнего управления видимостью пароля.
+// Если указатель не передан, AnyUI сохраняет состояние видимости автоматически.
+func PasswordToggle(visible ...*bool) Option {
+	return func(s *WidgetStyle) {
+		s.Password = true
+		s.PasswordToggle = true
+		if len(visible) > 0 && visible[0] != nil {
+			s.PasswordVisible = visible[0]
+		}
 	}
 }
 

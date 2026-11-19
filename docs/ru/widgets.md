@@ -54,16 +54,28 @@ ui.Toggle("autostart", "Запускать при старте ОС", &autoStart
 ### `TextInput`
 - **Сигнатура:** `ui.TextInput(id string, value *string, placeholder string, opts ...Option) bool`
 - **Возможности:** точный клик курсора, выделение мышью, `Shift + Стрелки`, навигация/удаление по словам (`Ctrl + Left/Right`, `Ctrl + Shift + Left/Right`, `Ctrl + Backspace/Delete`), двойной клик (слово) и тройной клик (весь текст), `Ctrl+A / C / V / X`, история правок `Undo` / `Redo` (`Ctrl+Z` / `Ctrl+Y` / `Ctrl+Shift+Z`), встроенное контекстное меню по ПКМ.
-- **Опции:** `Password()`, `ReadOnly(bool)`, `Clearable(bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `Error(string)`, `FocusBorderColor(c)`, `TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`, `Disabled(bool)`, `Width(dp)`.
+- **Опции:** `Password()`, `PasswordToggle(visible ...*bool)`, `ReadOnly(bool)`, `Clearable(bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `Error(string)`, `FocusBorderColor(c)`, `TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`, `Disabled(bool)`, `Width(dp)`.
+- **Встроенная кнопка пароля (PasswordToggle):**
+  - `anyui.PasswordToggle()` или `anyui.PasswordToggle(&showPassword)` встраивает кликабельную иконку глазика прямо **внутрь** поля с правого края (с автоматическим резервированием внутреннего отступа `rightOffset`).
+  - По клику на глазик маскировка символов переключается (`••••••••` / открытый текст), а иконка меняется с открытого глаза на перечёркнутый.
+  - Позволяет верстать поле логина и поле пароля строго одинаковой ширины без внешних кнопок.
 - **Пример:**
 ```go
+// Поле пароля со встроенным глазиком (управление видимостью через showPassword):
 ui.TextInput("pass", &password, "Введите пароль",
-	anyui.Password(),
+	anyui.PasswordToggle(&showPassword),
 	anyui.Clearable(true),
 	anyui.Width(280),
 )
+
+// Или с автоматическим внутренним сохранением состояния:
+ui.TextInput("pass_auto", &password, "Пароль",
+	anyui.PasswordToggle(),
+	anyui.Width(280),
+)
+
 ui.TextInput("email", &email, "Email...",
-	anyui.Width(260),
+	anyui.Width(280),
 	anyui.Error(emailErr),
 )
 ```

@@ -54,16 +54,28 @@ ui.Toggle("autostart", "Launch on startup", &autoStart)
 ### `TextInput`
 - **Signature:** `ui.TextInput(id string, value *string, placeholder string, opts ...Option) bool`
 - **Features:** accurate click-to-position cursor, mouse selection, `Shift + Arrows`, word navigation/deletion (`Ctrl + Left/Right`, `Ctrl + Shift + Left/Right`, `Ctrl + Backspace/Delete`), double-click (word) and triple-click (all text), `Ctrl+A / C / V / X`, `Undo` / `Redo` (`Ctrl+Z` / `Ctrl+Y` / `Ctrl+Shift+Z`), built-in right-click context menu.
-- **Options:** `Password()`, `ReadOnly(bool)`, `Clearable(bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `Error(string)`, `FocusBorderColor(c)`, `TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`, `Disabled(bool)`, `Width(dp)`.
+- **Options:** `Password()`, `PasswordToggle(visible ...*bool)`, `ReadOnly(bool)`, `Clearable(bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `Error(string)`, `FocusBorderColor(c)`, `TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`, `Disabled(bool)`, `Width(dp)`.
+- **Built-in Password Visibility Toggle (PasswordToggle):**
+  - `anyui.PasswordToggle()` or `anyui.PasswordToggle(&showPassword)` renders a clickable eye icon **inside** the right edge of the input field (automatically reserving inner `rightOffset`).
+  - Clicking the eye toggles symbol masking (`••••••••` / plain text) and switches the icon between eye and eye-off.
+  - Allows login and password inputs to share the exact same width without external buttons.
 - **Example:**
 ```go
+// Password input with built-in eye toggle (visibility state controlled by showPassword):
 ui.TextInput("pass", &password, "Enter password",
-	anyui.Password(),
+	anyui.PasswordToggle(&showPassword),
 	anyui.Clearable(true),
 	anyui.Width(280),
 )
+
+// Or with automatic internal state management:
+ui.TextInput("pass_auto", &password, "Password",
+	anyui.PasswordToggle(),
+	anyui.Width(280),
+)
+
 ui.TextInput("email", &email, "Email...",
-	anyui.Width(260),
+	anyui.Width(280),
 	anyui.Error(emailErr),
 )
 ```

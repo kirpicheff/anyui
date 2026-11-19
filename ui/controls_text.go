@@ -8,6 +8,11 @@ import (
 	"github.com/kirpicheff/anyui/render"
 )
 
+const (
+	svgEye    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`
+	svgEyeOff = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`
+)
+
 func (c *Context) ensureTextMaps() {
 	if c.caretPos == nil {
 		c.caretPos = make(map[string]int)
@@ -17,6 +22,9 @@ func (c *Context) ensureTextMaps() {
 	}
 	if c.textScroll == nil {
 		c.textScroll = make(map[string]int)
+	}
+	if c.passwordVisible == nil {
+		c.passwordVisible = make(map[string]bool)
 	}
 }
 
@@ -118,11 +126,24 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 	if st.IconSVG != "" {
 		leftOffset += iconSize + iconGap
 	}
+	passVisible := false
+	if st.PasswordToggle {
+		if st.PasswordVisible != nil {
+			passVisible = *st.PasswordVisible
+		} else if c.passwordVisible != nil {
+			passVisible = c.passwordVisible[id]
+		}
+	}
+	isMasked := (st.Password || st.PasswordToggle) && !passVisible
+
 	rightOffset := padX
 	showClear := st.Clearable && !st.Disabled && !st.ReadOnly && len(*value) > 0
+	if st.PasswordToggle {
+		rightOffset += iconSize + iconGap
+	}
 	if showClear {
 		rightOffset += iconSize + iconGap
-	} else if st.IconRightSVG != "" {
+	} else if !st.PasswordToggle && st.IconRightSVG != "" {
 		rightOffset += iconSize + iconGap
 	}
 
@@ -141,7 +162,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 
 	runes := []rune(*value)
 	displayRunes := runes
-	if st.Password {
+	if isMasked {
 		displayRunes = maskRunes(runes)
 	}
 
@@ -153,10 +174,37 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 	if !st.Disabled {
 		c.RegisterHit(id, r, platform.CursorIBeam)
 	}
+	eyeClicked := false
+	if st.PasswordToggle && !st.Disabled {
+		eyeRect := render.Rect{
+			X: r.X + r.W - padX - iconSize,
+			Y: r.Y + (r.H-iconSize)/2,
+			W: iconSize,
+			H: iconSize,
+		}
+		c.RegisterHit(id+":eye", eyeRect, platform.CursorHand)
+		if !c.IsInputBlocked() && eyeRect.Contains(c.MouseX, c.MouseY) {
+			c.nextCursor = platform.CursorHand
+			if c.MousePressed {
+				if st.PasswordVisible != nil {
+					*st.PasswordVisible = !*st.PasswordVisible
+				} else {
+					c.passwordVisible[id] = !c.passwordVisible[id]
+				}
+				eyeClicked = true
+				c.FocusID = id
+				c.RequestRedraw()
+			}
+		}
+	}
 	clearClicked := false
 	if showClear {
+		clearX := r.X + r.W - padX - iconSize
+		if st.PasswordToggle {
+			clearX -= iconSize + iconGap
+		}
 		clearRect := render.Rect{
-			X: r.X + r.W - padX - iconSize,
+			X: clearX,
 			Y: r.Y + (r.H-iconSize)/2,
 			W: iconSize,
 			H: iconSize,
@@ -181,7 +229,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 	}
 
 	hovered := !st.Disabled && !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)
-	if hovered && !clearClicked {
+	if hovered && !clearClicked && !eyeClicked {
 		c.HotID = id
 		if textArea.Contains(c.MouseX, c.MouseY) {
 			c.nextCursor = platform.CursorIBeam
@@ -193,7 +241,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 			idx := c.CaretIndexAtX(displayRunes, c.MouseX-(textArea.X+alignOff)+c.textScroll[id], pxSize, st.FontStyle)
 			cc := c.ClickCount()
 			if cc == 2 {
-				if st.Password || len(runes) == 0 {
+				if isMasked || len(runes) == 0 {
 					c.textSelStart[id] = 0
 					c.caretPos[id] = len(runes)
 				} else {
@@ -212,14 +260,14 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 	}
 
 	// Выделение текста протяжкой мыши
-	if !st.Disabled && c.ActiveID == id && c.MouseDown && !c.MousePressed && !clearClicked {
+	if !st.Disabled && c.ActiveID == id && c.MouseDown && !c.MousePressed && !clearClicked && !eyeClicked {
 		alignOff := c.textAlignOffset(displayRunes, textArea.W, pxSize, c.textScroll[id], st)
 		idx := c.CaretIndexAtX(displayRunes, c.MouseX-(textArea.X+alignOff)+c.textScroll[id], pxSize, st.FontStyle)
 		c.caretPos[id] = idx
 	}
 
 	focused := !st.Disabled && c.FocusID == id
-	if focused && !clearClicked {
+	if focused && !clearClicked && !eyeClicked {
 		runes = []rune(*value)
 		caret := clampRuneIdx(c.caretPos[id], len(runes))
 		selStart := clampRuneIdx(c.textSelStart[id], len(runes))
@@ -233,14 +281,14 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 				case KeyC:
 					if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
 						_ = c.Win.SetClipboardText(string(runes[a:b]))
-					} else if !st.Password {
+					} else if !isMasked {
 						_ = c.Win.SetClipboardText(string(runes))
 					}
 				case KeyX:
 					if !st.ReadOnly {
 						if a, b, ok := selectionBounds(caret, selStart, len(runes)); ok {
 							c.pushTextUndo(id, string(runes), caret, selStart)
-							if !st.Password {
+							if !isMasked {
 								_ = c.Win.SetClipboardText(string(runes[a:b]))
 							}
 							runes, caret = deleteRuneRange(runes, a, b)
@@ -298,7 +346,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 						}
 					}
 				case KeyLeft:
-					if st.Password {
+					if isMasked {
 						caret = 0
 					} else {
 						caret = prevWordStart(runes, caret)
@@ -307,7 +355,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 						selStart = caret
 					}
 				case KeyRight:
-					if st.Password {
+					if isMasked {
 						caret = len(runes)
 					} else {
 						caret = nextWordEnd(runes, caret)
@@ -325,7 +373,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 						} else if caret > 0 {
 							c.pushTextUndo(id, string(runes), caret, selStart)
 							start := 0
-							if !st.Password {
+							if !isMasked {
 								start = prevWordStart(runes, caret)
 							}
 							runes, caret = deleteRuneRange(runes, start, caret)
@@ -343,7 +391,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 						} else if caret < len(runes) {
 							c.pushTextUndo(id, string(runes), caret, selStart)
 							end := len(runes)
-							if !st.Password {
+							if !isMasked {
 								end = nextWordEnd(runes, caret)
 							}
 							runes, caret = deleteRuneRange(runes, caret, end)
@@ -443,7 +491,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 		if changed {
 			*value = string(runes)
 			displayRunes = runes
-			if st.Password {
+			if isMasked {
 				displayRunes = maskRunes(runes)
 			}
 			c.RequestRedraw()
@@ -483,19 +531,39 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 	if st.IconSVG != "" {
 		c.Canvas.DrawSVG(st.IconSVG, r.X+padX, r.Y+(r.H-iconSize)/2, iconSize, c.Theme.TextMuted)
 	}
+	if st.PasswordToggle {
+		eyeX := r.X + r.W - padX - iconSize
+		eyeY := r.Y + (r.H-iconSize)/2
+		eyeSVG := svgEye
+		if passVisible {
+			eyeSVG = svgEyeOff
+		}
+		eyeCol := c.Theme.TextMuted
+		eyeRect := render.Rect{X: eyeX, Y: eyeY, W: iconSize, H: iconSize}
+		if !c.IsInputBlocked() && eyeRect.Contains(c.MouseX, c.MouseY) {
+			eyeCol = c.Theme.TextPrimary
+		}
+		c.Canvas.DrawSVG(eyeSVG, eyeX, eyeY, iconSize, eyeCol)
+	}
 	if showClear {
-		cx := float32(r.X + r.W - padX - iconSize)
+		clearX := r.X + r.W - padX - iconSize
+		if st.PasswordToggle {
+			clearX -= iconSize + iconGap
+		}
+		cx := float32(clearX)
 		cy := float32(r.Y + (r.H-iconSize)/2)
 		pad := float32(iconSize) * 0.28
 		c.Canvas.DrawLine(cx+pad, cy+pad, cx+float32(iconSize)-pad, cy+float32(iconSize)-pad, c.Sf(1.5), c.Theme.TextMuted)
 		c.Canvas.DrawLine(cx+float32(iconSize)-pad, cy+pad, cx+pad, cy+float32(iconSize)-pad, c.Sf(1.5), c.Theme.TextMuted)
-	} else if st.IconRightSVG != "" {
+	} else if !st.PasswordToggle && st.IconRightSVG != "" {
 		c.Canvas.DrawSVG(st.IconRightSVG, r.X+r.W-padX-iconSize, r.Y+(r.H-iconSize)/2, iconSize, c.Theme.TextMuted)
 	}
 
+	menuSt := st
+	menuSt.Password = isMasked
 	if textArea.W <= 0 || c.Font == nil {
 		c.drawInputError(r, st.ErrorText)
-		c.textFieldContextMenu(id, r, value, st, false)
+		c.textFieldContextMenu(id, r, value, menuSt, false)
 		return changed
 	}
 
@@ -566,7 +634,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 
 	c.Canvas.PopClip()
 	c.drawInputError(r, st.ErrorText)
-	c.textFieldContextMenu(id, r, value, st, false)
+	c.textFieldContextMenu(id, r, value, menuSt, false)
 	return changed
 }
 

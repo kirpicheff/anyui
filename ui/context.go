@@ -133,6 +133,7 @@ type Context struct {
 	textPrefX       map[string]int
 	textHistory     map[string]*textUndoState
 	textMenuChanged map[string]bool
+	passwordVisible map[string]bool
 	scrollState     map[string]*scrollInfo
 	openState      map[string]bool
 	floatPos       map[string][2]int
@@ -247,8 +248,9 @@ func NewContext(win platform.Window, fm *render.FontManager) *Context {
 		Animator:       NewAnimator(),
 		Strings:        RussianStrings(),
 		caretPos:       make(map[string]int),
-		textScroll:     make(map[string]int),
-		layers:         newLayerManager(),
+		textScroll:      make(map[string]int),
+		passwordVisible: make(map[string]bool),
+		layers:          newLayerManager(),
 		smartMouseMove: true,
 	}
 }

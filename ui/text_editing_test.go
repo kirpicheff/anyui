@@ -218,3 +218,67 @@ func TestSelectableLabelHyperlinkAndMaskedInput(t *testing.T) {
 		t.Fatalf("expected masked value '17.11.202' after Backspace, got %q", maskVal)
 	}
 }
+
+func TestTextInputPasswordToggle(t *testing.T) {
+	ctx := newTestContext(400, 200)
+	val := "secret123"
+	showExt := false
+
+	drawExt := func(c *Context) {
+		c.TextInputOpts("ti_pass_ext", &val, "Пароль", Width(200), PasswordToggle(&showExt))
+	}
+
+	ctx.Render(drawExt)
+	if showExt {
+		t.Fatal("ожидалось showExt == false")
+	}
+
+	// Координата глазика внутри поля: r.X=0, r.Y=0, W=200, padX=12, iconSize=16 -> eyeX = 172..188, eyeY = 11..27
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 175, Y: 15})
+	ctx.Render(drawExt)
+	if !showExt {
+		t.Fatal("ожидалось showExt == true после клика по глазику")
+	}
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 175, Y: 15})
+	ctx.Render(drawExt)
+	if showExt {
+		t.Fatal("ожидалось showExt == false после повторного клика")
+	}
+
+	drawInt := func(c *Context) {
+		c.TextInputOpts("ti_pass_int", &val, "Пароль", Width(200), PasswordToggle())
+	}
+	ctx.Render(drawInt)
+	if ctx.passwordVisible["ti_pass_int"] {
+		t.Fatal("ожидалось passwordVisible == false по умолчанию")
+	}
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 175, Y: 15})
+	ctx.Render(drawInt)
+	if !ctx.passwordVisible["ti_pass_int"] {
+		t.Fatal("ожидалось passwordVisible == true после клика")
+	}
+
+	// PasswordToggle + Clearable: проверяем очистку и переключение видимости
+	valBoth := "password123"
+	showBoth := false
+	drawBoth := func(c *Context) {
+		c.TextInputOpts("ti_both", &valBoth, "Пароль", Width(200), PasswordToggle(&showBoth), Clearable(true))
+	}
+	ctx.Render(drawBoth)
+
+	// Кликаем по кнопке Clear (clearX = 148..164, Y = 11..27)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 155, Y: 15})
+	ctx.Render(drawBoth)
+	if valBoth != "" {
+		t.Fatalf("ожидалась очистка поля при клике на Clear, получено %q", valBoth)
+	}
+
+	// Кликаем по глазику (eyeX = 172..188)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 175, Y: 15})
+	ctx.Render(drawBoth)
+	if !showBoth {
+		t.Fatal("ожидалось showBoth == true после клика по глазику")
+	}
+}

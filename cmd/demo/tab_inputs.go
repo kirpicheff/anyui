@@ -13,7 +13,7 @@ func (st *demoState) drawTabInputs(ui *anyui.UI) {
 		ui.Label("Однострочные поля ввода (TextInput) — Undo/Redo, слова, ПКМ-меню, валидация", anyui.FontSize(16), anyui.Bold())
 		ui.Row(14, 38, func() {
 			ui.TextInput("ti_main", &st.textVal, "Обычное поле...", anyui.Width(240), anyui.Clearable(true), anyui.Icon(svgStar))
-			ui.TextInput("ti_pass", &st.passVal, "Пароль...", anyui.Width(200), anyui.Password(), anyui.Clearable(true))
+			ui.TextInput("ti_pass", &st.passVal, "Пароль...", anyui.Width(200), anyui.PasswordToggle(), anyui.Clearable(true))
 		})
 		emailErr := ""
 		if !strings.Contains(st.emailVal, "@") || !strings.Contains(st.emailVal, ".") {

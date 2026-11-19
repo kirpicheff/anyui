@@ -59,6 +59,9 @@ func IconRight(svg string) Option { return ui.IconRight(svg) }
 // Password включает режим пароля для поля ввода.
 func Password() Option { return ui.Password() }
 
+// PasswordToggle включает режим пароля со встроенной кнопкой-глазиком справа.
+func PasswordToggle(visible ...*bool) Option { return ui.PasswordToggle(visible...) }
+
 // ReadOnly запрещает редактирование текстового поля.
 func ReadOnly(v bool) Option { return ui.ReadOnly(v) }
 
