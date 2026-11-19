@@ -12,8 +12,10 @@ type TabBarEvent = ui.TabBarEvent
 type DrawerSide = ui.DrawerSide
 
 const (
-	DrawerLeft  = ui.DrawerLeft
-	DrawerRight = ui.DrawerRight
+	DrawerLeft   = ui.DrawerLeft
+	DrawerRight  = ui.DrawerRight
+	DrawerTop    = ui.DrawerTop
+	DrawerBottom = ui.DrawerBottom
 )
 
 // ContextMenuItem описывает пункт кастомного контекстного меню.

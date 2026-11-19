@@ -24,6 +24,8 @@ type DrawerSide uint8
 const (
 	DrawerLeft DrawerSide = iota
 	DrawerRight
+	DrawerTop
+	DrawerBottom
 )
 
 // ContextMenuItem описывает пункт кастомного всплывающего меню.
@@ -532,12 +534,38 @@ func (c *Context) Drawer(id string, open *bool, side DrawerSide, fn func(), opts
 	if st.WidthDp != nil && *st.WidthDp > 0 {
 		w = c.S(*st.WidthDp)
 	}
-
-	x := -w + int(float32(w)*anim)
-	if side == DrawerRight {
-		x = c.Canvas.Width - int(float32(w)*anim)
+	h := c.S(240)
+	if st.HeightDp != nil && *st.HeightDp > 0 {
+		h = c.S(*st.HeightDp)
 	}
-	panelRect := render.Rect{X: x, Y: 0, W: w, H: c.Canvas.Height}
+
+	var panelRect render.Rect
+	switch side {
+	case DrawerLeft:
+		x := -w + int(float32(w)*anim)
+		panelRect = render.Rect{X: x, Y: 0, W: w, H: c.Canvas.Height}
+	case DrawerRight:
+		x := c.Canvas.Width - int(float32(w)*anim)
+		panelRect = render.Rect{X: x, Y: 0, W: w, H: c.Canvas.Height}
+	case DrawerTop:
+		pw := c.Canvas.Width
+		px := 0
+		if st.WidthDp != nil && *st.WidthDp > 0 {
+			pw = c.S(*st.WidthDp)
+			px = (c.Canvas.Width - pw) / 2
+		}
+		y := -h + int(float32(h)*anim)
+		panelRect = render.Rect{X: px, Y: y, W: pw, H: h}
+	case DrawerBottom:
+		pw := c.Canvas.Width
+		px := 0
+		if st.WidthDp != nil && *st.WidthDp > 0 {
+			pw = c.S(*st.WidthDp)
+			px = (c.Canvas.Width - pw) / 2
+		}
+		y := c.Canvas.Height - int(float32(h)*anim)
+		panelRect = render.Rect{X: px, Y: y, W: pw, H: h}
+	}
 	full := render.Rect{X: 0, Y: 0, W: c.Canvas.Width, H: c.Canvas.Height}
 
 	if *open && c.MousePressed && !panelRect.Contains(c.MouseX, c.MouseY) {

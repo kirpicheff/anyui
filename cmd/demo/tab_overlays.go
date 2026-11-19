@@ -38,6 +38,12 @@ func (st *demoState) drawTabOverlays(ui *anyui.UI) {
 			if ui.Button("ov_drw_r", "Drawer Справа") {
 				st.drawerRight = true
 			}
+			if ui.Button("ov_drw_t", "Drawer Сверху") {
+				st.drawerTop = true
+			}
+			if ui.Button("ov_drw_b", "Drawer Снизу") {
+				st.drawerBottom = true
+			}
 		})
 
 		ui.Separator()
@@ -118,4 +124,22 @@ func (st *demoState) drawGlobalOverlays(ui *anyui.UI) {
 			st.drawerRight = false
 		}
 	})
+
+	ui.Drawer("drw_top", &st.drawerTop, anyui.DrawerTop, func() {
+		ui.Label("Верхний Drawer (баннер)", anyui.FontSize(16), anyui.Bold())
+		ui.Separator()
+		ui.Label("Выезжающая сверху панель оповещения или быстрого действия.")
+		if ui.Button("drw_t_close", "Закрыть", anyui.Primary()) {
+			st.drawerTop = false
+		}
+	}, anyui.Height(180))
+
+	ui.Drawer("drw_bottom", &st.drawerBottom, anyui.DrawerBottom, func() {
+		ui.Label("Нижний Drawer (Bottom Sheet)", anyui.FontSize(16), anyui.Bold())
+		ui.Separator()
+		ui.Label("Выезжающая снизу панель действий или выбора.")
+		if ui.Button("drw_b_close", "Закрыть", anyui.Primary()) {
+			st.drawerBottom = false
+		}
+	}, anyui.Height(200))
 }

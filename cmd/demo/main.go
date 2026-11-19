@@ -87,6 +87,8 @@ type demoState struct {
 	floatOpen    bool
 	drawerLeft   bool
 	drawerRight  bool
+	drawerTop    bool
+	drawerBottom bool
 	contextLog   string
 
 	// Раздел графики и системы

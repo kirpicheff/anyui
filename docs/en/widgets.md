@@ -229,13 +229,17 @@ ui.Popover("pop_filters", &popoverOpen, btnArea, func() {
   - Persists dragged window coordinates between frames by `id`.
   - Options: `anyui.Width(wDp)`, `anyui.Height(hDp)`, `anyui.Pos(xDp, yDp)`.
 
-#### `Drawer` (Slide-Out Side Panel)
+#### `Drawer` (Slide-Out Panel from Any Screen Edge)
 - **Signature:** `ui.Drawer(id string, open *bool, side DrawerSide, fn func(), opts ...Option)`
-- **Use case:** side navigation menu, shopping cart, item details panel.
+- **Use case:** side navigation menus, shopping carts, item details, top banners, bottom sheets.
+- **Sides:**
+  - `anyui.DrawerLeft` — slides out from the left along full window height (default width 280 dp, option `anyui.Width(wDp)`).
+  - `anyui.DrawerRight` — slides out from the right along full window height (default width 280 dp, option `anyui.Width(wDp)`).
+  - `anyui.DrawerTop` — slides down from the top across full window width (default height 240 dp, option `anyui.Height(hDp)`). If `anyui.Width(wDp)` is set, horizontally centered.
+  - `anyui.DrawerBottom` — slides up from the bottom (bottom sheet, default height 240 dp, option `anyui.Height(hDp)`). If `anyui.Width(wDp)` is set, horizontally centered.
 - **Behavior:**
-  - Slides out along full window height from the left (`DrawerLeft`) or right (`DrawerRight`).
-  - Dims the remaining screen area and closes when clicking the dimmed backdrop or pressing `Escape`.
-  - Option: `anyui.Width(wDp)` (defaults to 320 dp).
+  - Smooth slide animation.
+  - Dims the remaining screen area and automatically closes when clicking the dimmed backdrop outside the panel or pressing `Escape`.
 
 #### `ContextMenu` (Right-Click Popup Menu)
 - **Signature:** `ui.ContextMenu(id string, anchor Rect, items []ContextMenuItem)`

@@ -290,3 +290,41 @@ func TestToastDoesNotBlockOverlayOrInput(t *testing.T) {
 	}
 }
 
+func TestDrawerSides(t *testing.T) {
+	ctx := newTestContext(800, 600)
+	open := true
+
+	// Проверяем DrawerTop
+	ctx.Render(func(c *Context) {
+		c.Drawer("drw_top", &open, DrawerTop, func() {
+			c.Label("Top content", 14, c.Theme.TextPrimary)
+		}, Height(150))
+	})
+	if !ctx.Overlays.HasActive() {
+		t.Fatalf("expected active overlay for DrawerTop")
+	}
+
+	// Проверяем DrawerBottom
+	ctx.Render(func(c *Context) {
+		c.Drawer("drw_bottom", &open, DrawerBottom, func() {
+			c.Label("Bottom content", 14, c.Theme.TextPrimary)
+		}, Height(200))
+	})
+	if !ctx.Overlays.HasActive() {
+		t.Fatalf("expected active overlay for DrawerBottom")
+	}
+
+	// Проверяем закрытие по клику вне панели DrawerTop
+	openTop := true
+	ctx.MouseX = 400
+	ctx.MouseY = 500
+	ctx.MousePressed = true
+	ctx.Render(func(c *Context) {
+		c.Drawer("drw_top_close", &openTop, DrawerTop, func() {}, Height(150))
+	})
+	if openTop {
+		t.Fatalf("expected DrawerTop to close on outside click")
+	}
+}
+
+
