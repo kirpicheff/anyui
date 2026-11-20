@@ -339,6 +339,27 @@ func (c *Context) Table(
 	if maxSc < 0 {
 		maxSc = 0
 	}
+
+	if st.ScrollToIndex != nil {
+		targetIdx := *st.ScrollToIndex
+		if targetIdx < 0 {
+			si.lastScrollIndex = -1
+		} else if targetIdx < rowCount {
+			if si.lastScrollIndex != targetIdx {
+				targetY := targetIdx * rowH
+				if targetY > maxSc {
+					targetY = maxSc
+				}
+				if targetY < 0 {
+					targetY = 0
+				}
+				si.y = targetY
+				si.lastScrollIndex = targetIdx
+			}
+		}
+	} else {
+		si.lastScrollIndex = -1
+	}
 	if si.y < 0 {
 		si.y = 0
 	}

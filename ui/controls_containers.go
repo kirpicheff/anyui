@@ -2,20 +2,29 @@ package ui
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/kirpicheff/anyui/platform"
 	"github.com/kirpicheff/anyui/render"
 )
 
+type scrollScope struct {
+	id      string
+	originX int
+	originY int
+}
+
 type scrollInfo struct {
-	x         int
-	y         int
-	contentW  int
-	contentH  int
-	dragging  bool
-	dragOffY  int
-	draggingH bool
-	dragOffX  int
+	x               int
+	y               int
+	contentW        int
+	contentH        int
+	dragging        bool
+	dragOffY        int
+	draggingH       bool
+	dragOffX        int
+	lastScrollIndex int
+	lastScrollID    string
 }
 
 // DrawerSide задаёт сторону окна, с которой выезжает Drawer.
@@ -63,10 +72,47 @@ func (c *Context) getScrollInfo(id string) *scrollInfo {
 	}
 	si, ok := c.scrollState[id]
 	if !ok {
-		si = &scrollInfo{}
+		si = &scrollInfo{lastScrollIndex: -1}
 		c.scrollState[id] = si
 	}
 	return si
+}
+
+func (c *Context) recordScrollChild(id string, rect render.Rect) {
+	if len(c.svStack) == 0 || id == "" {
+		return
+	}
+	if c.svChildOffsets == nil {
+		c.svChildOffsets = make(map[string]map[string]render.Rect)
+	}
+	scope := c.svStack[len(c.svStack)-1]
+	m, ok := c.svChildOffsets[scope.id]
+	if !ok {
+		m = make(map[string]render.Rect)
+		c.svChildOffsets[scope.id] = m
+	}
+	rel := render.Rect{
+		X: rect.X - scope.originX,
+		Y: rect.Y - scope.originY,
+		W: rect.W,
+		H: rect.H,
+	}
+	m[id] = rel
+	if colon := strings.LastIndexByte(id, ':'); colon >= 0 && colon < len(id)-1 {
+		shortID := id[colon+1:]
+		if _, exists := m[shortID]; !exists {
+			m[shortID] = rel
+		}
+	}
+}
+
+// Anchor размещает маркер якоря с заданным id для ScrollToID.
+func (c *Context) Anchor(id string) {
+	if id == "" {
+		return
+	}
+	r := c.allocRect(0, 0)
+	c.recordScrollChild(id, r)
 }
 
 // ScrollView создаёт прокручиваемую область с поддержкой колеса мыши и перетаскивания скроллбара.
@@ -198,6 +244,39 @@ func (c *Context) ScrollView(id string, wDp, hDp Dp, fn func(), opts ...Option) 
 		}
 	}
 
+	if st.ScrollToID != "" {
+		targetID := st.ScrollToID
+		if offsets, ok := c.svChildOffsets[id]; ok {
+			var targetRect render.Rect
+			found := false
+			if r0, exists := offsets[targetID]; exists {
+				targetRect = r0
+				found = true
+			} else {
+				for k, v := range offsets {
+					if k == targetID || strings.HasSuffix(k, ":"+targetID) {
+						targetRect = v
+						found = true
+						break
+					}
+				}
+			}
+			if found && si.lastScrollID != targetID {
+				targetY := targetRect.Y
+				if targetY > maxSc {
+					targetY = maxSc
+				}
+				if targetY < 0 {
+					targetY = 0
+				}
+				si.y = targetY
+				si.lastScrollID = targetID
+			}
+		}
+	} else {
+		si.lastScrollID = ""
+	}
+
 	if si.y < 0 {
 		si.y = 0
 	}
@@ -229,14 +308,17 @@ func (c *Context) ScrollView(id string, wDp, hDp Dp, fn func(), opts ...Option) 
 
 	c.Canvas.PushClip(r)
 	boxX := r.X + pad - si.x
+	boxY := r.Y + pad - si.y
 	c.pushBox(render.Rect{
 		X: boxX,
-		Y: r.Y + pad - si.y,
+		Y: boxY,
 		W: innerW,
 		H: innerH,
 	}, dirColumn, AlignStart, c.Scale(8).Int())
+	c.svStack = append(c.svStack, scrollScope{id: id, originX: boxX, originY: boxY})
 	startY := c.topLayout().cursorY
 	fn()
+	c.svStack = c.svStack[:len(c.svStack)-1]
 	top := c.topLayout()
 	si.contentH = (top.cursorY - startY) + pad*2
 	if maxScX > 0 {
@@ -252,6 +334,42 @@ func (c *Context) ScrollView(id string, wDp, hDp Dp, fn func(), opts ...Option) 
 	}
 	c.popBox()
 	c.Canvas.PopClip()
+
+	newMaxSc := si.contentH - r.H
+	if newMaxSc < 0 {
+		newMaxSc = 0
+	}
+	if st.ScrollToID != "" && si.lastScrollID != st.ScrollToID {
+		targetID := st.ScrollToID
+		if offsets, ok := c.svChildOffsets[id]; ok {
+			var targetRect render.Rect
+			found := false
+			if r0, exists := offsets[targetID]; exists {
+				targetRect = r0
+				found = true
+			} else {
+				for k, v := range offsets {
+					if k == targetID || strings.HasSuffix(k, ":"+targetID) {
+						targetRect = v
+						found = true
+						break
+					}
+				}
+			}
+			if found {
+				targetY := targetRect.Y
+				if targetY > newMaxSc {
+					targetY = newMaxSc
+				}
+				if targetY < 0 {
+					targetY = 0
+				}
+				si.y = targetY
+				si.lastScrollID = targetID
+				c.RequestRedraw()
+			}
+		}
+	}
 
 	if maxSc > 0 && si.contentH > 0 && vTrackLen > 0 {
 		thumbH := (vTrackLen * r.H) / si.contentH

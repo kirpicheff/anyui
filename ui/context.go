@@ -136,7 +136,9 @@ type Context struct {
 	textMenuChanged map[string]bool
 	passwordVisible map[string]bool
 	scrollState     map[string]*scrollInfo
-	openState      map[string]bool
+	svStack         []scrollScope
+	svChildOffsets  map[string]map[string]render.Rect
+	openState       map[string]bool
 	floatPos       map[string][2]int
 	floatCollapsed map[string]bool
 	tabScroll      map[string]int

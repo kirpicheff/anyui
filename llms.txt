@@ -19,6 +19,7 @@
 - `Card(fn, ...)` по умолчанию подбирает высоту по содержимому (`AutoHeight`); чтобы растянуть карточку на весь остаток высоты, передайте `anyui.FillHeight()`.
 - Автозаполнение контейнеров (Auto-Fill): для `ScrollView`, `ListView`, `CanvasView` передавайте `anyui.Auto()` или `-1` (либо `anyui.FillWidth()` / `anyui.FillHeight()`), чтобы занять весь доступный остаток области без ручного вычисления размеров. `ui.CurrentArea()` возвращает геометрию строго в Dp; для низкоуровневых операций с `Canvas` используйте `ui.CurrentAreaPx()`.
 - В `Table` / `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.
+- Декларативная навигация: используйте `anyui.ScrollToIndex(idx)` для программной прокрутки в `ListView` и `Table`, и `anyui.ScrollToID(id)` / `ui.Anchor(id)` для навигации в `ScrollView`.
 
 ## Минимальный пример
 
@@ -213,6 +214,8 @@ type Option = ui.Option
     func Primary(enabled ...bool) Option
     func Radius(dp float32) Option
     func ReadOnly(enabled ...bool) Option
+    func ScrollToID(id string) Option
+    func ScrollToIndex(idx int) Option
     func Searchable(v bool) Option
     func Secondary() Option
     func TextAlignCenter() Option
@@ -468,6 +471,7 @@ type UI struct {
     окне.
 
 func (u *UI) Accordion(id string, items []AccordionItem, openIDs map[string]bool, opts ...Option) bool
+func (u *UI) Anchor(id string)
 func (u *UI) App() *App
 func (u *UI) Badge(text string, opts ...Option)
 func (u *UI) BarChart(id string, labels []string, series []ChartSeries, opts ...Option)

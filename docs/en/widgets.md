@@ -445,6 +445,30 @@ if ev.RowMiddleClicked >= 0 {
 ### Keyboard Navigation (`Navigable`)
 `ListView`, `Table`, `TreeView`, and `Select`/`ComboBox` implement `ui.Navigable` for consistent keyboard navigation (`Up`, `Down`, `Left`, `Right`, `PageUp`, `PageDown`, `Home`, `End`, `Space`, `Enter`).
 
+### Declarative Programmatic Navigation (`ScrollToIndex`, `ScrollToID`, `Anchor`)
+AnyUI provides declarative scrolling directly within the frame rendering pipeline without deferred queues or async channels:
+- **`anyui.ScrollToIndex(idx int)`** for `ListView` and `Table`:
+  - Scrolls virtualized list or table so that the item at `idx` appears at the start of the visible viewport (clamped to `maxSc`).
+  - Evaluated on index changes while allowing continued manual mouse wheel scrolling without jitter. Pass `-1` to reset.
+  ```go
+  ui.ListView("files", len(files), 36, &selectedIdx, drawItem, anyui.ScrollToIndex(50))
+  ui.Table("tbl", cols, len(rows), &selectedRow, &sort, drawCell, anyui.ScrollToIndex(120))
+  ```
+- **`anyui.ScrollToID(id string)`** and **`ui.Anchor(id string)`** for `ScrollView`:
+  - `anyui.ScrollToID(id)` scrolls `ScrollView` directly to the child widget with the given identifier (e.g., `ui.Button("buy_btn", ...)` or an anchor `ui.Anchor("pricing_section")`).
+  - `ui.Anchor(id string)` creates a zero-size anchor marker anywhere in the layout for quick navigation to headings or sections.
+  ```go
+  ui.ScrollView("page", anyui.Auto(), anyui.Auto(), func() {
+      ui.Label("Page Header", anyui.FontSize(18))
+      // ...
+      ui.Anchor("pricing_section")
+      ui.Label("Pricing", anyui.FontSize(16), anyui.Bold())
+      // ...
+      ui.Button("buy_btn", "Buy Now", anyui.Primary())
+  }, anyui.ScrollToID("pricing_section"))
+  ```
+
+
 ---
 
 ## Desktop Controls, Charts & Multi-Selection

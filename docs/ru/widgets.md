@@ -451,6 +451,33 @@ if ev.RowMiddleClicked >= 0 {
 - **`TreeView`**: `Up`, `Down`, `PageUp`, `PageDown`, `Home`, `End`, `Right` (раскрыть узел или перейти к дочернему), `Left` (свернуть узел или перейти к родителю), `Space` / `Enter` (переключить `Expanded`).
 - **`Select` / `ComboBox`**: `Space` / `Enter` (открыть/закрыть список), `Up`, `Down`, `PageUp`, `PageDown`, `Home`, `End` (выбор элемента как в закрытом, так и в открытом состоянии).
 
+### Декларативная программная навигация (`ScrollToIndex`, `ScrollToID`, `Anchor`)
+AnyUI поддерживает программную прокрутку непосредственно внутри кадра отрисовки виджета без межпоточных каналов и отложенных очередей:
+- **`anyui.ScrollToIndex(idx int)`** для `ListView` и `Table`:
+  - Прокручивает список или таблицу так, чтобы строка с индексом `idx` оказалась в зоне видимости (в начале видимой области с ограничением `maxSc`).
+  - Применяется декларативно при изменении индекса, сохраняя возможность дальнейшей ручной прокрутки колесом мыши. Передача `-1` сбрасывает триггер.
+  ```go
+  // Программный переход к строке 50 в ListView:
+  ui.ListView("files", len(files), 36, &selectedIdx, drawItem, anyui.ScrollToIndex(50))
+
+  // Программный переход к строке 120 в Table:
+  ui.Table("tbl", cols, len(rows), &selectedRow, &sort, drawCell, anyui.ScrollToIndex(120))
+  ```
+- **`anyui.ScrollToID(id string)`** и **`ui.Anchor(id string)`** для `ScrollView`:
+  - `anyui.ScrollToID(id)` прокручивает контейнер `ScrollView` к дочернему элементу с указанным идентификатором (например, кнопке `ui.Button("buy_btn", ...)` или маркеру `ui.Anchor("pricing_section")`).
+  - `ui.Anchor(id string)` размещает невидимый маркер нулевого размера в произвольном месте контента для быстрой навигации к заголовкам секций или блокам текста.
+  ```go
+  ui.ScrollView("page", anyui.Auto(), anyui.Auto(), func() {
+      ui.Label("Верх страницы", anyui.FontSize(18))
+      // ...
+      ui.Anchor("pricing_section")
+      ui.Label("Тарифные планы", anyui.FontSize(16), anyui.Bold())
+      // ...
+      ui.Button("buy_btn", "Купить", anyui.Primary())
+  }, anyui.ScrollToID("pricing_section"))
+  ```
+
+
 ---
 
 ## Десктоп-контролы, графики и мультивыбор

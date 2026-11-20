@@ -475,6 +475,27 @@ func (c *Context) ListView(id string, count int, itemHeightDp Dp, selected *int,
 		maxSc = 0
 	}
 
+	if st.ScrollToIndex != nil {
+		targetIdx := *st.ScrollToIndex
+		if targetIdx < 0 {
+			si.lastScrollIndex = -1
+		} else if targetIdx < count {
+			if si.lastScrollIndex != targetIdx {
+				targetY := targetIdx * itemH
+				if targetY > maxSc {
+					targetY = maxSc
+				}
+				if targetY < 0 {
+					targetY = 0
+				}
+				si.y = targetY
+				si.lastScrollIndex = targetIdx
+			}
+		}
+	} else {
+		si.lastScrollIndex = -1
+	}
+
 	if hovered && c.WheelY != 0 {
 		si.y -= int(c.WheelY * float32(itemH) * 2)
 		c.RequestRedraw()

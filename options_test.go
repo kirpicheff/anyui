@@ -101,5 +101,16 @@ func TestBooleanOptionsUnification(t *testing.T) {
 	if stWWFalse.WordWrap {
 		t.Error("WordWrap(false): expected false")
 	}
+
+	// 10. ScrollToIndex & ScrollToID
+	stScrollIdx := ui.ApplyOptions([]ui.Option{ScrollToIndex(42)})
+	if stScrollIdx.ScrollToIndex == nil || *stScrollIdx.ScrollToIndex != 42 {
+		t.Errorf("ScrollToIndex(42): expected 42, got %v", stScrollIdx.ScrollToIndex)
+	}
+
+	stScrollID := ui.ApplyOptions([]ui.Option{ScrollToID("my_anchor")})
+	if stScrollID.ScrollToID != "my_anchor" {
+		t.Errorf("ScrollToID: expected my_anchor, got %s", stScrollID.ScrollToID)
+	}
 }
 

@@ -216,6 +216,7 @@ func (c *Context) registerHitRegion(id string, rect render.Rect, cursor platform
 	if id == "" || rect.Empty() {
 		return
 	}
+	c.recordScrollChild(id, rect)
 	if cursor != platform.CursorArrow && !c.IsInputBlocked() && rect.Contains(c.MouseX, c.MouseY) {
 		c.nextCursor = cursor
 	}

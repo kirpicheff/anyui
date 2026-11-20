@@ -130,3 +130,9 @@ func (u *UI) Tooltip(text string, anchor Rect) {
 	u.ctx.Tooltip(text, anchor)
 }
 
+// Anchor размещает маркер якоря с заданным id для ScrollToID.
+func (u *UI) Anchor(id string) {
+	u.ctx.Anchor(id)
+}
+
+

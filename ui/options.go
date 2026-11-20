@@ -64,6 +64,8 @@ type WidgetStyle struct {
 	Ellipsis         bool
 	LineNumbers      bool
 	ErrorText        string
+	ScrollToIndex    *int
+	ScrollToID       string
 }
 
 // AutoSize — константа sentinel-значения для автоматического подбора размера по остатку доступной области.
@@ -445,4 +447,19 @@ func TextShadow(offsetX, offsetY, blur float32, c render.Color) Option {
 		}
 	}
 }
+
+// ScrollToIndex задаёт индекс элемента для программной прокрутки в ListView и Table.
+func ScrollToIndex(idx int) Option {
+	return func(s *WidgetStyle) {
+		s.ScrollToIndex = &idx
+	}
+}
+
+// ScrollToID задаёт строковый идентификатор дочернего элемента или якоря для программной прокрутки в ScrollView.
+func ScrollToID(id string) Option {
+	return func(s *WidgetStyle) {
+		s.ScrollToID = id
+	}
+}
+
 

@@ -157,3 +157,10 @@ func TextShadow(offsetX, offsetY, blur float32, c Color) Option {
 	return ui.TextShadow(offsetX, offsetY, blur, c)
 }
 
+// ScrollToIndex задаёт индекс элемента для программной прокрутки в ListView и Table.
+func ScrollToIndex(idx int) Option { return ui.ScrollToIndex(idx) }
+
+// ScrollToID задаёт строковый идентификатор дочернего элемента или якоря для программной прокрутки в ScrollView.
+func ScrollToID(id string) Option { return ui.ScrollToID(id) }
+
+
