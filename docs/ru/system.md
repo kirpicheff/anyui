@@ -259,3 +259,18 @@ child, err := app.OpenWindow(anyui.Config{
   - `IsSystemDarkTheme` проверяет `gsettings` (`color-scheme` / `gtk-theme`), `GTK_THEME` и `~/.config/kdeglobals`.
   - `OpenURL` использует `xdg-open`, а `RevealInFileManager` — D-Bus `org.freedesktop.FileManager1.ShowItems` с откатом на `xdg-open`.
 
+---
+
+## macOS (AppKit / Cocoa)
+
+- Для работы GUI-окон, системного трея и цикла событий на macOS требуется сборка с CGO (`CGO_ENABLED=1`), так как используется компактный нативный Objective-C мост к Cocoa/AppKit. Режим `CGO_ENABLED=0` поддерживается только в виде заглушек для кросс-компиляции и тестов без macOS SDK.
+- **Рендеринг:** вывод пиксельного софтверного буфера через `CALayer.contents = CGImageRef` с автоматическим масштабированием под Retina (`backingScaleFactor`).
+- **Окна и цикл событий:** нативный `NSApplication` в главном потоке, поддержка `Frameless` (`mouseDownCanMoveWindow`), маршалинг `app.Dispatch(fn)` через главный `dispatch_queue`.
+- **Системная интеграция:**
+  - Системный трей (`NSStatusItem` с иконкой и нативным `NSMenu`).
+  - Системные уведомления через `UNUserNotificationCenter` с автоматическим откатом на `osascript` (`display notification`).
+  - Нативные диалоги файлов `NSOpenPanel` / `NSSavePanel` / `NSAlert`.
+  - Буфер обмена `NSPasteboard` (текст и PNG/TIFF), `SingleInstance` через UNIX-сокет.
+  - Определение темы macOS через `AppleInterfaceStyle` (`Dark` / `Light`).
+
+

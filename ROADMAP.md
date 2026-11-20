@@ -196,7 +196,7 @@ func main() {
 - [x] Ввод (`wl_seat`, `wl_pointer`, `wl_keyboard`), курсоры (`wp_cursor_shape_manager_v1`), HiDPI / fractional scaling (`wp_fractional_scale_manager_v1`, `wp_viewporter`), буфер обмена и Drag & Drop (`wl_data_device_manager`).
 - [x] Автовыбор бэкенда в рантайме (`WAYLAND_DISPLAY` -> Wayland, иначе X11; fallback на X11 и поддержка `ANYUI_BACKEND`).
 
-### Фаза 10. macOS (`platform_darwin.go` + CGO / Objective-C мост `.m`) — [ ] В процессе
+### Фаза 10. macOS (`platform_darwin.go` + CGO / Objective-C мост `.m`) — [x] Готово
 - [x] **Этап 0 (Pure Go, без CGO):** базовый слой для сборки `GOOS=darwin CGO_ENABLED=0` (`darwin_utils.go`, `darwin_theme.go`, `darwin_instance.go`, `darwin_dialogs.go`, `darwin_notify.go`, `darwin_coords.go`, `darwin_keys.go`, `darwin_nocgo.go`, `darwin_test.go`) — `OpenURL`, `RevealInFileManager`, `IsSystemDarkTheme`, `SingleInstanceGuard`, диалоги и уведомления через `osascript`, конвертация координат AppKit <-> GoUI, маппинг `kVK_*` -> `VK_*`, заглушки `!cgo`.
 - [x] Допустить CGO только для `darwin`: небольшой Objective-C мост (`.m`) к Cocoa / AppKit вместо сложного FFI без CGO.
 - [x] **Этап 1 (MVP):** минимальный `NSApplication` (`[NSApp run]` в главном потоке) + `NSWindow` + блит одного кадра через `CALayer.contents = CGImageRef` с `contentsScale = backingScaleFactor` (вместо `drawRect:` — сразу проверка run loop, главного потока и Retina).

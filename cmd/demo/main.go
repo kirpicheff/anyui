@@ -226,8 +226,21 @@ func main() {
 			OnDoubleClick: func(a *anyui.App) {
 				a.Show()
 			},
+			OnNotificationClick: func(a *anyui.App) {
+				a.Show()
+			},
 			Menu: []anyui.MenuItem{
 				{Label: "Показать окно", OnClick: func(a *anyui.App) { a.Show() }},
+				{
+					Label: "Показать уведомление",
+					OnClick: func(a *anyui.App) {
+						_ = a.ShowNotification(anyui.Notification{
+							Title:   "AnyUI Demo",
+							Message: "Уведомление из системного трея!",
+							Icon:    anyui.NotifyInfo,
+						})
+					},
+				},
 				{Separator: true},
 				{Label: "Выход", OnClick: func(a *anyui.App) { a.Quit() }},
 			},

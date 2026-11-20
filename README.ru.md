@@ -39,7 +39,8 @@
 | **Windows** (10 / 11 / Server) | Win32 + GDI + DWM | `CGO_ENABLED=0` | Поддерживается |
 | **Linux (X11)** | `xgb` + MIT-SHM / PutImage | `CGO_ENABLED=0` | Поддерживается |
 | **Linux (Wayland)** | Нативный Wayland (`wl_shm`, `xdg_shell`) | `CGO_ENABLED=0` | Поддерживается |
-| **macOS** | Cocoa / AppKit | Планируется (`CGO`) | В планах |
+| **macOS** | Cocoa / AppKit | `CGO_ENABLED=1` | Поддерживается |
+| **Android** | NDK + `NativeActivity` | `CGO_ENABLED=1` | В планах |
 
 ---
 
@@ -49,10 +50,10 @@
 
 | Фреймворк | CGO | Размер бинарника | Время старта | Процессы | Working Set (RAM) | Private Memory | Idle CPU |
 | --- | :---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| **AnyUI** | `0` | **2.94 MB** | **22.08 ms** | **1** | **38.74 MB** | **25.55 MB** | **0%** |
-| **Gio** | `0` | 6.52 MB | 151.90 ms | 1 | 55.71 MB | 39.31 MB | 0% |
-| **Fyne** | `1` | 23.29 MB | 223.11 ms | 1 | 169.45 MB | 156.94 MB | 0% |
-| **Wails** | `0` | 10.66 MB | 743.26 ms | 7 | 394.67 MB | 191.37 MB | 0% |
+| **AnyUI** | `0` | **2.95 MB** | **22.82 ms** | **1** | **38.82 MB** | **25.55 MB** | **0%** |
+| **Gio** | `0` | 6.52 MB | 170.28 ms | 1 | 55.34 MB | 39.39 MB | 0% |
+| **Fyne** | `1` | 23.29 MB | 250.43 ms | 1 | 166.21 MB | 158.45 MB | 0% |
+| **Wails** | `0` | 10.66 MB | 515.67 ms | 7 | 399.33 MB | 193.79 MB | 0% |
 
 - **WebView2 Runtime (требуется для Wails):** `878.0 MB` (`v157.0.4341.60`) на диске.
 - Воспроизвести на своей машине: см. [benchmarks/](benchmarks/README.md) (`.\run.ps1`).

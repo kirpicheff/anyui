@@ -33,6 +33,8 @@ func main() {
 		{"StatusBarSection", modulePath + ".StatusBarSection"},
 		{"CanvasCallbacks", modulePath + ".CanvasCallbacks"},
 		{"KeyEvent", modulePath + ".KeyEvent"},
+		{"DragEvent", modulePath + ".DragEvent"},
+		{"Notification", modulePath + ".Notification"},
 		{"App", modulePath + ".App"},
 		{"Window", modulePath + ".Window"},
 		{"UI (Immediate Mode API)", modulePath + ".UI"},
@@ -98,7 +100,8 @@ func writeHeader(out *bytes.Buffer, version string) {
 	out.WriteString("- `Card(fn, ...)` по умолчанию подбирает высоту по содержимому (`AutoHeight`); чтобы растянуть карточку на весь остаток высоты, передайте `anyui.FillHeight()`.\n")
 	out.WriteString("- Автозаполнение контейнеров (Auto-Fill): для `ScrollView`, `ListView`, `CanvasView` передавайте `anyui.Auto()` или `-1` (либо `anyui.FillWidth()` / `anyui.FillHeight()`), чтобы занять весь доступный остаток области без ручного вычисления размеров. `ui.CurrentArea()` возвращает геометрию строго в Dp; для низкоуровневых операций с `Canvas` используйте `ui.CurrentAreaPx()`.\n")
 	out.WriteString("- В `Table` / `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.\n")
-	out.WriteString("- Декларативная навигация: используйте `anyui.ScrollToIndex(idx)` для программной прокрутки в `ListView` и `Table`, и `anyui.ScrollToID(id)` / `ui.Anchor(id)` для навигации в `ScrollView`.\n\n")
+	out.WriteString("- Декларативная навигация: используйте `anyui.ScrollToIndex(idx)` для программной прокрутки в `ListView` и `Table`, и `anyui.ScrollToID(id)` / `ui.Anchor(id)` для навигации в `ScrollView`.\n")
+	out.WriteString("- Drag & Drop перетаскивание (Reorder): опция `anyui.OnReorder(func(ev anyui.DragEvent))` для изменения порядка строк в `Table` и узлов в `TreeView` с поддержкой `DropZone` (`DropAbove`, `DropBelow`, `DropInside`).\n\n")
 }
 
 func writeQuickStart(out *bytes.Buffer) {

@@ -39,7 +39,8 @@ Designed for desktop tools, system utilities, background services with a tray ic
 | **Windows** (10 / 11 / Server) | Win32 + GDI + DWM | `CGO_ENABLED=0` | Supported |
 | **Linux (X11)** | `xgb` + MIT-SHM / PutImage | `CGO_ENABLED=0` | Supported |
 | **Linux (Wayland)** | Native Wayland (`wl_shm`, `xdg_shell`) | `CGO_ENABLED=0` | Supported |
-| **macOS** | Cocoa / AppKit | Planned (`CGO`) | Planned |
+| **macOS** | Cocoa / AppKit | `CGO_ENABLED=1` | Supported |
+| **Android** | NDK + `NativeActivity` | `CGO_ENABLED=1` | Planned |
 
 ---
 
@@ -49,10 +50,10 @@ Minimal `480x320` window (label, text input, click counter button) measured on *
 
 | Framework | CGO | Binary Size | Startup Time | Processes | Working Set (RAM) | Private Memory | Idle CPU |
 | --- | :---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| **AnyUI** | `0` | **2.94 MB** | **22.08 ms** | **1** | **38.74 MB** | **25.55 MB** | **0%** |
-| **Gio** | `0` | 6.52 MB | 151.90 ms | 1 | 55.71 MB | 39.31 MB | 0% |
-| **Fyne** | `1` | 23.29 MB | 223.11 ms | 1 | 169.45 MB | 156.94 MB | 0% |
-| **Wails** | `0` | 10.66 MB | 743.26 ms | 7 | 394.67 MB | 191.37 MB | 0% |
+| **AnyUI** | `0` | **2.95 MB** | **22.82 ms** | **1** | **38.82 MB** | **25.55 MB** | **0%** |
+| **Gio** | `0` | 6.52 MB | 170.28 ms | 1 | 55.34 MB | 39.39 MB | 0% |
+| **Fyne** | `1` | 23.29 MB | 250.43 ms | 1 | 166.21 MB | 158.45 MB | 0% |
+| **Wails** | `0` | 10.66 MB | 515.67 ms | 7 | 399.33 MB | 193.79 MB | 0% |
 
 - **WebView2 Runtime (required by Wails):** `878.0 MB` (`v157.0.4341.60`) on disk.
 - Reproduce on your own machine: see [benchmarks/](benchmarks/README.md) (`.\run.ps1`).

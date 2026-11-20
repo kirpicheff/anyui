@@ -260,3 +260,18 @@ child, err := app.OpenWindow(anyui.Config{
   - `IsSystemDarkTheme` checks `gsettings` (`color-scheme` / `gtk-theme`), `GTK_THEME`, and `~/.config/kdeglobals`.
   - `OpenURL` uses `xdg-open`; `RevealInFileManager` uses D-Bus `org.freedesktop.FileManager1.ShowItems` with fallback to `xdg-open`.
 
+---
+
+## macOS (AppKit / Cocoa)
+
+- GUI windows, system tray, and the event loop on macOS require CGO (`CGO_ENABLED=1`) via a lightweight native Objective-C bridge to Cocoa/AppKit. Building with `CGO_ENABLED=0` is supported only as a stub fallback for cross-compilation and CI testing without the macOS SDK.
+- **Rendering:** software pixel buffer presented via `CALayer.contents = CGImageRef` with automatic Retina scaling (`backingScaleFactor`).
+- **Window & Lifecycle:** native `NSApplication` on the main thread, `Frameless` support (`mouseDownCanMoveWindow`), and thread marshaling for `app.Dispatch(fn)` via the main dispatch queue.
+- **System Integration:**
+  - System tray (`NSStatusItem` with template icon and native `NSMenu`).
+  - Native system notifications via `UNUserNotificationCenter` with automatic fallback to `osascript` (`display notification`).
+  - Native file dialogs (`NSOpenPanel` / `NSSavePanel` / `NSAlert`).
+  - Pasteboard (`NSPasteboard` for UTF-8 text and PNG/TIFF images), `SingleInstance` via domain sockets.
+  - Automatic system dark/light theme detection via `AppleInterfaceStyle`.
+
+

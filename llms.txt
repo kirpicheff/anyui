@@ -1,4 +1,4 @@
-# AnyUI (v0.7.19)
+# AnyUI (v0.8.0)
 
 Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).
 
@@ -20,6 +20,7 @@
 - Автозаполнение контейнеров (Auto-Fill): для `ScrollView`, `ListView`, `CanvasView` передавайте `anyui.Auto()` или `-1` (либо `anyui.FillWidth()` / `anyui.FillHeight()`), чтобы занять весь доступный остаток области без ручного вычисления размеров. `ui.CurrentArea()` возвращает геометрию строго в Dp; для низкоуровневых операций с `Canvas` используйте `ui.CurrentAreaPx()`.
 - В `Table` / `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.
 - Декларативная навигация: используйте `anyui.ScrollToIndex(idx)` для программной прокрутки в `ListView` и `Table`, и `anyui.ScrollToID(id)` / `ui.Anchor(id)` для навигации в `ScrollView`.
+- Drag & Drop перетаскивание (Reorder): опция `anyui.OnReorder(func(ev anyui.DragEvent))` для изменения порядка строк в `Table` и узлов в `TreeView` с поддержкой `DropZone` (`DropAbove`, `DropBelow`, `DropInside`).
 
 ## Минимальный пример
 
@@ -108,6 +109,7 @@ const CursorArrow = platform.CursorArrow ...
 const AlignStart = ui.AlignStart ...
 const JustifyStart = ui.JustifyStart ...
 const DrawerLeft = ui.DrawerLeft ...
+const DropAbove = ui.DropAbove ...
 const Horizontal = ui.Horizontal ...
 const SplitHorizontal = ui.SplitHorizontal ...
 const ToastInfo = ui.ToastInfo ...
@@ -149,7 +151,9 @@ type CornerRadii = render.CornerRadii
 type CursorType = platform.CursorType
 type Dp = ui.Dp
     func Auto() Dp
+type DragEvent = ui.DragEvent
 type DrawerSide = ui.DrawerSide
+type DropZone = ui.DropZone
 type FileDialogOptions struct{ ... }
 type FileFilter = platform.FileFilter
 type FlexItem = ui.FlexItem
@@ -208,12 +212,14 @@ type Option = ui.Option
     func MinHeight(dp Dp) Option
     func MinWidth(dp Dp) Option
     func Mono(enabled ...bool) Option
+    func OnReorder(fn func(ev DragEvent)) Option
     func Padding(dp Dp) Option
     func Password() Option
     func PasswordToggle(visible ...*bool) Option
     func Primary(enabled ...bool) Option
     func Radius(dp float32) Option
     func ReadOnly(enabled ...bool) Option
+    func Reorderable(enabled ...bool) Option
     func ScrollToID(id string) Option
     func ScrollToIndex(idx int) Option
     func Searchable(v bool) Option
@@ -388,6 +394,24 @@ package anyui // import "github.com/kirpicheff/anyui"
 type KeyEvent = ui.RawKeyEvent
     KeyEvent описывает сырое событие нажатия или отпускания клавиши для
     InteractiveCanvas.
+```
+
+## DragEvent
+
+```go
+package anyui // import "github.com/kirpicheff/anyui"
+
+type DragEvent = ui.DragEvent
+    DragEvent описывает событие завершения перетаскивания элемента (Reorder).
+```
+
+## Notification
+
+```go
+package anyui // import "github.com/kirpicheff/anyui"
+
+type Notification = platform.TrayNotification
+    Notification описывает нативное системное уведомление (Balloon / Toast).
 ```
 
 ## App

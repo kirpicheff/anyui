@@ -128,6 +128,15 @@ func (st *demoState) drawTabGraphicsSystem(ui *anyui.UI) {
 			if ui.Button("win_tray", "Скрыть в трей") {
 				ui.Window().Hide()
 			}
+			if ui.Button("win_notify", "Нативное уведомление ОС") {
+				if st.app != nil {
+					_ = st.app.ShowNotification(anyui.Notification{
+						Title:   "AnyUI Demo",
+						Message: "Нативное системное уведомление ОС работает!",
+						Icon:    anyui.NotifyInfo,
+					})
+				}
+			}
 			if ui.Button("win_child", "Открыть дочернее окно", anyui.Primary()) {
 				st.childCount++
 				num := st.childCount
