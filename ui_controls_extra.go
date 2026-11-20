@@ -19,6 +19,18 @@ type TableEvent = ui.TableEvent
 // TreeNode описывает узел дерева для TreeView.
 type TreeNode = ui.TreeNode
 
+// DropZone определяет позицию сброса перетаскиваемого элемента относительно целевого.
+type DropZone = ui.DropZone
+
+const (
+	DropAbove  = ui.DropAbove
+	DropBelow  = ui.DropBelow
+	DropInside = ui.DropInside
+)
+
+// DragEvent описывает событие завершения перетаскивания элемента (Reorder).
+type DragEvent = ui.DragEvent
+
 // Orientation задаёт направление ориентации элементов интерфейса (горизонтальное или вертикальное).
 type Orientation = ui.Orientation
 

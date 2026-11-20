@@ -28,6 +28,7 @@ type TableEvent struct {
 	RowMiddleClicked int
 	SortChanged      bool
 	ColumnResized    bool
+	Drag             *DragEvent
 }
 
 // calcTableColWidthsDp рассчитывает стартовые ширины колонок в dp.
@@ -405,6 +406,14 @@ func (c *Context) Table(
 				if c.DoubleClicked() {
 					ev.RowDoubleClicked = r
 				}
+				if st.Reorderable || st.OnReorder != nil {
+					c.reorderWidgetID = id
+					c.reorderSourceKey = strconv.Itoa(r)
+					c.reorderGhostText = "Строка #" + strconv.Itoa(r+1)
+					c.reorderStartX = c.MouseX
+					c.reorderStartY = c.MouseY
+					c.reorderActive = false
+				}
 				c.RequestRedraw()
 			} else if c.MiddleMousePressed {
 				if selected != nil {
@@ -431,6 +440,73 @@ func (c *Context) Table(
 		c.Canvas.DrawLine(float32(rowRect.X), float32(ry+rowH-1), float32(rowRect.X+rowRect.W), float32(ry+rowH-1), 1.0, c.Theme.Border.WithAlpha(80))
 	}
 	c.Canvas.PopClip()
+
+	// Обработка перетаскивания (Reorder) строк таблицы
+	if c.reorderWidgetID == id && c.MouseDown && !c.reorderActive {
+		dx := c.MouseX - c.reorderStartX
+		dy := c.MouseY - c.reorderStartY
+		if dx < 0 {
+			dx = -dx
+		}
+		if dy < 0 {
+			dy = -dy
+		}
+		if dx > c.Scale(4).Int() || dy > c.Scale(4).Int() {
+			c.reorderActive = true
+		}
+	}
+	if c.reorderActive && c.reorderWidgetID == id {
+		c.nextCursor = platform.CursorHand
+	}
+
+	if (st.Reorderable || st.OnReorder != nil) && c.reorderActive && !blocked && bodyRect.Contains(c.MouseX, c.MouseY) && c.MouseY < bodyRect.Y+viewH && c.MouseX < bodyRect.X+contentW {
+		c.nextCursor = platform.CursorHand
+		relY := c.MouseY - bodyRect.Y + si.y
+		targetRow := relY / rowH
+		if targetRow < 0 {
+			targetRow = 0
+		}
+		if targetRow >= rowCount {
+			targetRow = rowCount - 1
+		}
+		targetKey := strconv.Itoa(targetRow)
+		targetRowY := bodyRect.Y + targetRow*rowH - si.y
+		zone := DropBelow
+		if c.MouseY < targetRowY+rowH/2 {
+			zone = DropAbove
+		}
+
+		// Визуальный индикатор позиции вставки (горизонтальная черта цвета Accent)
+		lineY := targetRowY + rowH - c.Scale(1).Int()
+		if zone == DropAbove {
+			lineY = targetRowY - c.Scale(1).Int()
+		}
+		c.Canvas.FillRect(render.Rect{
+			X: bodyRect.X,
+			Y: lineY,
+			W: contentW,
+			H: c.Scale(2).Int(),
+		}, c.Theme.Accent)
+
+		if c.MouseReleased {
+			dragEv := DragEvent{
+				FromWidget: c.reorderWidgetID,
+				ToWidget:   id,
+				FromKey:    c.reorderSourceKey,
+				ToKey:      targetKey,
+				Drop:       zone,
+			}
+			ev.Drag = &dragEv
+			if st.OnReorder != nil {
+				st.OnReorder(dragEv)
+			}
+			c.reorderActive = false
+			c.reorderWidgetID = ""
+			c.reorderSourceKey = ""
+			c.reorderGhostText = ""
+			c.RequestRedraw()
+		}
+	}
 
 	// Вертикальный скроллбар
 	if hasSB {
@@ -677,6 +753,14 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 						changed = true
 						c.RequestRedraw()
 					}
+					if st.Reorderable || st.OnReorder != nil {
+						c.reorderWidgetID = id
+						c.reorderSourceKey = node.ID
+						c.reorderGhostText = node.Label
+						c.reorderStartX = c.MouseX
+						c.reorderStartY = c.MouseY
+						c.reorderActive = false
+					}
 				}
 			}
 		}
@@ -715,6 +799,111 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 		}
 	}
 	c.Canvas.PopClip()
+
+	// Обработка перетаскивания (Reorder) узлов дерева
+	if c.reorderWidgetID == id && c.MouseDown && !c.reorderActive {
+		dx := c.MouseX - c.reorderStartX
+		dy := c.MouseY - c.reorderStartY
+		if dx < 0 {
+			dx = -dx
+		}
+		if dy < 0 {
+			dy = -dy
+		}
+		if dx > c.Scale(4).Int() || dy > c.Scale(4).Int() {
+			c.reorderActive = true
+		}
+	}
+	if c.reorderActive && c.reorderWidgetID == id {
+		c.nextCursor = platform.CursorHand
+	}
+
+	if (st.Reorderable || st.OnReorder != nil) && c.reorderActive && !blocked && inner.Contains(c.MouseX, c.MouseY) && c.MouseX < inner.X+contentW {
+		c.nextCursor = platform.CursorHand
+		relY := c.MouseY - inner.Y + si.y
+		targetIdx := relY / itemH
+		if targetIdx < 0 {
+			targetIdx = 0
+		}
+		if targetIdx >= len(flat) {
+			targetIdx = len(flat) - 1
+		}
+		if targetIdx >= 0 && targetIdx < len(flat) {
+			targetNode := flat[targetIdx].Node
+			targetRowY := inner.Y + targetIdx*itemH - si.y
+			offsetY := c.MouseY - targetRowY
+
+			zone := DropInside
+			if offsetY < itemH/4 {
+				zone = DropAbove
+			} else if offsetY >= itemH*3/4 {
+				zone = DropBelow
+			}
+
+			// Визуальный индикатор позиции вставки (горизонтальная черта / подсветка строки)
+			switch zone {
+			case DropAbove:
+				c.Canvas.FillRect(render.Rect{
+					X: inner.X,
+					Y: targetRowY - c.Scale(1).Int(),
+					W: contentW,
+					H: c.Scale(2).Int(),
+				}, c.Theme.Accent)
+			case DropBelow:
+				c.Canvas.FillRect(render.Rect{
+					X: inner.X,
+					Y: targetRowY + itemH - c.Scale(1).Int(),
+					W: contentW,
+					H: c.Scale(2).Int(),
+				}, c.Theme.Accent)
+			case DropInside:
+				// Подсветка строки каталога/узла
+				targetRect := render.Rect{X: inner.X, Y: targetRowY, W: contentW, H: itemH}
+				c.Canvas.DrawRoundedBox(targetRect, c.ScaleF(4), c.Theme.Accent.WithAlpha(45), 1.5, c.Theme.Accent)
+			}
+
+			if c.MouseReleased {
+				dragEv := DragEvent{
+					FromWidget: c.reorderWidgetID,
+					ToWidget:   id,
+					FromKey:    c.reorderSourceKey,
+					ToKey:      targetNode.ID,
+					Drop:       zone,
+				}
+				if st.OnReorder != nil {
+					st.OnReorder(dragEv)
+				}
+				changed = true
+				c.reorderActive = false
+				c.reorderWidgetID = ""
+				c.reorderSourceKey = ""
+				c.reorderGhostText = ""
+				c.RequestRedraw()
+			}
+		} else if len(flat) == 0 {
+			// Сброс в пустое дерево
+			dropR := render.Rect{X: inner.X, Y: inner.Y, W: contentW, H: c.Scale(36).Int()}
+			c.Canvas.DrawRoundedBox(dropR, c.ScaleF(4), c.Theme.Accent.WithAlpha(35), 1.5, c.Theme.Accent)
+			if c.MouseReleased {
+				dragEv := DragEvent{
+					FromWidget: c.reorderWidgetID,
+					ToWidget:   id,
+					FromKey:    c.reorderSourceKey,
+					ToKey:      "",
+					Drop:       DropInside,
+				}
+				if st.OnReorder != nil {
+					st.OnReorder(dragEv)
+				}
+				changed = true
+				c.reorderActive = false
+				c.reorderWidgetID = ""
+				c.reorderSourceKey = ""
+				c.reorderGhostText = ""
+				c.RequestRedraw()
+			}
+		}
+	}
 
 	if hasSB {
 		c.drawVerticalScrollbar("tree_sb:"+id, render.Rect{

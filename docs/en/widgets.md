@@ -303,13 +303,19 @@ cols := []anyui.TableColumn{
 }
 ev := ui.Table("tbl", cols, len(rows), &selectedRow, &sortState, func(row, col int, area anyui.Rect, sel bool) {
 	ui.DrawText(area.X+ui.Scale(8).Int(), area.Y+ui.Scale(7).Int(), rows[row].Name, 12, ui.Theme().TextPrimary)
-}, anyui.Height(240))
+}, anyui.Height(240), anyui.Reorderable(), anyui.OnReorder(func(ev anyui.DragEvent) {
+	// ev.FromWidget, ev.ToWidget, ev.FromKey, ev.ToKey, ev.Drop (DropAbove / DropBelow)
+}))
 ```
 
 ### `TreeView`
-Expandable hierarchical tree with virtualization:
+Expandable hierarchical tree with virtualization. Supports node reordering (`Reorderable`), drop zones `DropAbove`, `DropBelow`, `DropInside` (nesting inside folders with row highlight), visual drop insertion indicator, translucent ghost drag preview, and cross-widget drag & drop:
 ```go
-ui.TreeView("tree", roots, &selectedNodeID, anyui.Height(220))
+ui.TreeView("tree", roots, &selectedNodeID, anyui.Height(220), anyui.Reorderable(), anyui.OnReorder(func(ev anyui.DragEvent) {
+	// ev.FromWidget, ev.ToWidget — source and target widget IDs
+	// ev.FromKey, ev.ToKey — dragged node ID and target node ID
+	// ev.Drop — anyui.DropAbove, anyui.DropBelow, or anyui.DropInside (nested inside folder)
+}))
 ```
 
 ### `SplitPane`

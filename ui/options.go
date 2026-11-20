@@ -22,6 +22,24 @@ const (
 	AlignTextRight
 )
 
+// DropZone определяет позицию сброса перетаскиваемого элемента относительно целевого.
+type DropZone uint8
+
+const (
+	DropAbove DropZone = iota // Сброс выше/перед целевым элементом
+	DropBelow                 // Сброс ниже/после целевого элемента
+	DropInside                // Сброс внутрь целевого элемента (для папок/контейнеров)
+)
+
+// DragEvent описывает событие завершения перетаскивания элемента (Reorder).
+type DragEvent struct {
+	FromWidget string
+	ToWidget   string
+	FromKey    string
+	ToKey      string
+	Drop       DropZone
+}
+
 // WidgetStyle хранит переопределения оформления и размеров конкретного виджета.
 type WidgetStyle struct {
 	Bg               *render.Color
@@ -66,6 +84,8 @@ type WidgetStyle struct {
 	ErrorText        string
 	ScrollToIndex    *int
 	ScrollToID       string
+	Reorderable      bool
+	OnReorder        func(ev DragEvent)
 }
 
 // AutoSize — константа sentinel-значения для автоматического подбора размера по остатку доступной области.
@@ -461,5 +481,25 @@ func ScrollToID(id string) Option {
 		s.ScrollToID = id
 	}
 }
+
+// Reorderable разрешает перетаскивание элементов (строк или узлов) внутри компонента для изменения порядка.
+func Reorderable(enabled ...bool) Option {
+	return func(s *WidgetStyle) {
+		if len(enabled) == 0 || enabled[0] {
+			s.Reorderable = true
+		} else {
+			s.Reorderable = false
+		}
+	}
+}
+
+// OnReorder регистрирует обработчик события завершения перетаскивания элемента.
+func OnReorder(fn func(ev DragEvent)) Option {
+	return func(s *WidgetStyle) {
+		s.Reorderable = true
+		s.OnReorder = fn
+	}
+}
+
 
 

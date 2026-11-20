@@ -112,5 +112,27 @@ func TestBooleanOptionsUnification(t *testing.T) {
 	if stScrollID.ScrollToID != "my_anchor" {
 		t.Errorf("ScrollToID: expected my_anchor, got %s", stScrollID.ScrollToID)
 	}
+
+	// 11. Reorderable & OnReorder
+	stReorderDef := ui.ApplyOptions([]ui.Option{Reorderable()})
+	if !stReorderDef.Reorderable {
+		t.Error("Reorderable(): expected true")
+	}
+	stReorderFalse := ui.ApplyOptions([]ui.Option{Reorderable(false)})
+	if stReorderFalse.Reorderable {
+		t.Error("Reorderable(false): expected false")
+	}
+
+	var calledEvent DragEvent
+	stOnReorder := ui.ApplyOptions([]ui.Option{OnReorder(func(ev DragEvent) {
+		calledEvent = ev
+	})})
+	if !stOnReorder.Reorderable || stOnReorder.OnReorder == nil {
+		t.Error("OnReorder: expected Reorderable=true and non-nil callback")
+	}
+	stOnReorder.OnReorder(DragEvent{FromKey: "k1", ToKey: "k2", Drop: DropAbove})
+	if calledEvent.FromKey != "k1" || calledEvent.ToKey != "k2" || calledEvent.Drop != DropAbove {
+		t.Errorf("OnReorder callback failed: %+v", calledEvent)
+	}
 }
 

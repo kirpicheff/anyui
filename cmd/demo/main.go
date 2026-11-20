@@ -102,6 +102,8 @@ type demoState struct {
 	tableSort       anyui.TableSort
 	treeRoots       []*anyui.TreeNode
 	treeSelected    string
+	treeFavRoots    []*anyui.TreeNode
+	treeFavSelected string
 	splitRatio      float32
 	collapsibleOpen bool
 	accordionOpen   map[string]bool
@@ -167,6 +169,11 @@ func newDemoState() *demoState {
 		tableSort:       anyui.TableSort{Column: 0, Desc: false},
 		treeRoots:       makeDemoTree(),
 		treeSelected:    "f_data",
+		treeFavRoots: []*anyui.TreeNode{
+			{ID: "fav_root", Label: "Избранное (drag сюда)", Expanded: true, Children: []*anyui.TreeNode{
+				{ID: "fav_item", Label: "Быстрый доступ.go"},
+			}},
+		},
 		splitRatio:      0.45,
 		collapsibleOpen: true,
 		accordionOpen:   map[string]bool{"sec1": true},

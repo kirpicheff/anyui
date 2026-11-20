@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/kirpicheff/anyui/platform"
+	"github.com/kirpicheff/anyui/render"
 )
 
 func TestTableSortAndSelect(t *testing.T) {
@@ -432,6 +433,359 @@ func TestKeyBasedStateControls(t *testing.T) {
 		t.Fatalf("ожидался выбор radioVal=optB, получено %q (changed=%v)", radioVal, changedRadio)
 	}
 }
+
+func TestTableReorder(t *testing.T) {
+	ctx := newTestContext(600, 400)
+	cols := []TableColumn{
+		{Title: "ID", WidthDp: 80},
+		{Title: "Title", WidthDp: 200},
+	}
+	items := []string{"Item 0", "Item 1", "Item 2", "Item 3"}
+	selected := -1
+
+	var receivedDrag *DragEvent
+	reorderCallback := func(ev DragEvent) {
+		receivedDrag = &ev
+		// Перемещение элемента в модели данных силами приложения
+		fromIdx := int(ev.FromKey[0] - '0')
+		toIdx := int(ev.ToKey[0] - '0')
+		item := items[fromIdx]
+		// Удаляем fromIdx
+		items = append(items[:fromIdx], items[fromIdx+1:]...)
+		// Если сброс DropBelow, вставляем после toIdx (с учетом смещения при удалении)
+		insertIdx := toIdx
+		if fromIdx < toIdx {
+			insertIdx = toIdx - 1
+		}
+		if ev.Drop == DropBelow {
+			insertIdx++
+		}
+		items = append(items[:insertIdx], append([]string{item}, items[insertIdx:]...)...)
+	}
+
+	renderTable := func() TableEvent {
+		var result TableEvent
+		ctx.Render(func(c *Context) {
+			ev := c.Table("reorder_tbl", cols, len(items), &selected, nil, func(row, col int, area render.Rect, isSel bool) {},
+				Width(400), Height(300), Reorderable(), OnReorder(reorderCallback))
+			if ev.Drag != nil || result.Drag == nil {
+				result = ev
+			}
+		})
+		return result
+	}
+
+	// 1. Зажатие мыши на строке 1 (y: 63..93, возьмем y=75)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 75})
+	renderTable()
+
+	// 2. Движение мыши вниз к строке 3 (y: 123..153, возьмем y=145 для DropBelow)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 50, Y: 145})
+	renderTable()
+
+	// 3. Отпускание кнопки мыши на строке 3
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 50, Y: 145})
+	ev := renderTable()
+
+	if ev.Drag == nil {
+		t.Fatal("ожидалось событие ev.Drag после завершения перетаскивания строки")
+	}
+	if ev.Drag.FromKey != "1" || ev.Drag.ToKey != "3" || ev.Drag.Drop != DropBelow {
+		t.Fatalf("неверные параметры события Drag: %+v", ev.Drag)
+	}
+	if receivedDrag == nil {
+		t.Fatal("ожидался вызов коллбека OnReorder")
+	}
+	if items[len(items)-1] != "Item 1" {
+		t.Fatalf("ожидалось перемещение Item 1 в конец списка, получено: %v", items)
+	}
+}
+
+func TestTreeViewReorder(t *testing.T) {
+	ctx := newTestContext(600, 400)
+	roots := []*TreeNode{
+		{ID: "node0", Label: "Узел 0"},
+		{ID: "node1", Label: "Узел 1"},
+		{ID: "node2", Label: "Узел 2"},
+	}
+	selectedID := ""
+
+	var receivedDrag *DragEvent
+	reorderCallback := func(ev DragEvent) {
+		receivedDrag = &ev
+		// Перемещение узла в дереве
+		var fromIdx, toIdx = -1, -1
+		for i, n := range roots {
+			if n.ID == ev.FromKey {
+				fromIdx = i
+			}
+			if n.ID == ev.ToKey {
+				toIdx = i
+			}
+		}
+		if fromIdx >= 0 && toIdx >= 0 {
+			moved := roots[fromIdx]
+			roots = append(roots[:fromIdx], roots[fromIdx+1:]...)
+			insertIdx := toIdx
+			if fromIdx < toIdx {
+				insertIdx = toIdx - 1
+			}
+			if ev.Drop == DropBelow {
+				insertIdx++
+			}
+			roots = append(roots[:insertIdx], append([]*TreeNode{moved}, roots[insertIdx:]...)...)
+		}
+	}
+
+	renderTree := func() bool {
+		var anyChanged bool
+		ctx.Render(func(c *Context) {
+			if c.TreeView("reorder_tree", roots, &selectedID, Width(300), Height(200), Reorderable(), OnReorder(reorderCallback)) {
+				anyChanged = true
+			}
+		})
+		return anyChanged
+	}
+
+	// 1. Зажатие мыши на node0 (y: 4..32, берем y=18)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 18})
+	renderTree()
+
+	// 2. Движение мыши вниз к node2 (y: 60..88, берем y=65 для DropAbove)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 50, Y: 65})
+	renderTree()
+
+	// 3. Отпускание кнопки мыши над node2
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 50, Y: 65})
+	changed := renderTree()
+
+	if !changed {
+		t.Fatal("ожидалось changed=true после успешного Reorder в TreeView")
+	}
+	if receivedDrag == nil {
+		t.Fatal("ожидался вызов OnReorder для TreeView")
+	}
+	if receivedDrag.FromKey != "node0" || receivedDrag.ToKey != "node2" || receivedDrag.Drop != DropAbove {
+		t.Fatalf("неверные параметры события Drag для TreeView: %+v", receivedDrag)
+	}
+	if roots[1].ID != "node0" {
+		t.Fatalf("ожидалось перемещение node0 перед node2 (индекс 1), текущий порядок: %s, %s, %s", roots[0].ID, roots[1].ID, roots[2].ID)
+	}
+}
+
+func TestTreeViewDropInside(t *testing.T) {
+	ctx := newTestContext(600, 400)
+	roots := []*TreeNode{
+		{ID: "node0", Label: "Узел 0"},
+		{ID: "folder1", Label: "Каталог 1", Expanded: true, Children: []*TreeNode{}},
+	}
+	selectedID := ""
+
+	var receivedDrag *DragEvent
+	reorderCallback := func(ev DragEvent) {
+		receivedDrag = &ev
+		if ev.Drop == DropInside && ev.ToKey == "folder1" {
+			// Перемещение node0 внутрь folder1
+			roots[1].Children = append(roots[1].Children, roots[0])
+			roots = roots[1:]
+		}
+	}
+
+	renderTree := func() bool {
+		var anyChanged bool
+		ctx.Render(func(c *Context) {
+			if c.TreeView("tree_nested", roots, &selectedID, Width(300), Height(200), Reorderable(), OnReorder(reorderCallback)) {
+				anyChanged = true
+			}
+		})
+		return anyChanged
+	}
+
+	// 1. Зажатие мыши на node0 (y: 4..32, берем y=18)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 18})
+	renderTree()
+
+	// 2. Движение мыши в центр строки folder1 (y: 32..60, центр y=46)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 50, Y: 46})
+	renderTree()
+
+	// Проверяем, что во время перетаскивания активно ghost-превью в оверлее
+	if !ctx.Overlays.HasActive() {
+		t.Fatal("ожидалось активное ghost-превью в оверлее во время перетаскивания")
+	}
+
+	// 3. Отпускание кнопки мыши в центре строки folder1
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 50, Y: 46})
+	changed := renderTree()
+
+	if !changed {
+		t.Fatal("ожидалось changed=true после перемещения внутрь каталога")
+	}
+	if receivedDrag == nil {
+		t.Fatal("ожидался вызов OnReorder")
+	}
+	if receivedDrag.FromKey != "node0" || receivedDrag.ToKey != "folder1" || receivedDrag.Drop != DropInside {
+		t.Fatalf("ожидался сброс DropInside в folder1, получено: %+v", receivedDrag)
+	}
+	if receivedDrag.FromWidget != "tree_nested" || receivedDrag.ToWidget != "tree_nested" {
+		t.Fatalf("неверные FromWidget/ToWidget: %+v", receivedDrag)
+	}
+	if len(roots) != 1 || len(roots[0].Children) != 1 || roots[0].Children[0].ID != "node0" {
+		t.Fatalf("ожидалось, что node0 теперь внутри folder1, структура: %+v", roots)
+	}
+}
+
+func TestCrossWidgetReorderTree(t *testing.T) {
+	ctx := newTestContext(800, 400)
+	treeA := []*TreeNode{
+		{ID: "src_0", Label: "Источник 0"},
+		{ID: "src_1", Label: "Источник 1"},
+	}
+	treeB := []*TreeNode{
+		{ID: "dst_0", Label: "Приёмник 0"},
+	}
+	selA := ""
+	selB := ""
+
+	var receivedDrag *DragEvent
+	reorderCallbackB := func(ev DragEvent) {
+		receivedDrag = &ev
+		if ev.FromWidget == "tree_a" && ev.ToWidget == "tree_b" {
+			// Переносим элемент из A в B
+			for i, n := range treeA {
+				if n.ID == ev.FromKey {
+					treeA = append(treeA[:i], treeA[i+1:]...)
+					treeB = append(treeB, n)
+					break
+				}
+			}
+		}
+	}
+
+	renderAll := func() {
+		ctx.Render(func(c *Context) {
+			c.Row(0, 200, func() {
+				c.TreeView("tree_a", treeA, &selA, Width(200), Height(200), Reorderable())
+				c.TreeView("tree_b", treeB, &selB, Width(200), Height(200), Reorderable(), OnReorder(reorderCallbackB))
+			})
+		})
+	}
+
+	// 1. Зажатие мыши на первом элементе tree_a (X=50, Y=18)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 18})
+	renderAll()
+
+	// 2. Перемещение мыши в область tree_b (X=250, Y=18)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 250, Y: 18})
+	renderAll()
+
+	// 3. Отпускание кнопки мыши над tree_b
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 250, Y: 18})
+	renderAll()
+
+	if receivedDrag == nil {
+		t.Fatal("ожидался вызов OnReorder на дереве tree_b при кросс-виджетном переносе")
+	}
+	if receivedDrag.FromWidget != "tree_a" || receivedDrag.ToWidget != "tree_b" {
+		t.Fatalf("неверные виджеты источника/приемника: %+v", receivedDrag)
+	}
+	if receivedDrag.FromKey != "src_0" || receivedDrag.ToKey != "dst_0" {
+		t.Fatalf("неверные ключи элементов: %+v", receivedDrag)
+	}
+	if len(treeA) != 1 || len(treeB) != 2 {
+		t.Fatalf("ожидалось перемещение элемента: len(treeA)=%d, len(treeB)=%d", len(treeA), len(treeB))
+	}
+}
+
+func TestToastClickAfterReorder(t *testing.T) {
+	ctx := newTestContext(800, 600)
+	roots := []*TreeNode{
+		{ID: "node0", Label: "Узел 0"},
+		{ID: "node1", Label: "Узел 1"},
+	}
+	selectedID := ""
+	reorderCalled := false
+	buttonClicked := false
+
+	reorderCallback := func(ev DragEvent) {
+		reorderCalled = true
+		ctx.ShowToast("Reorder", "Перемещено", ToastSuccess, 3*time.Second)
+	}
+
+	renderUI := func() {
+		ctx.Render(func(c *Context) {
+			c.TreeView("my_tree", roots, &selectedID, Width(300), Height(200), Reorderable(), OnReorder(reorderCallback))
+			if c.Button("test_btn", "Тестовая кнопка", false, 150) {
+				buttonClicked = true
+			}
+		})
+	}
+
+	// 1. Зажатие мыши на node0
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 18})
+	renderUI()
+
+	// 2. Движение к node1
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 50, Y: 46})
+	renderUI()
+
+	// 3. Отпускание над node1
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 50, Y: 46})
+	renderUI()
+
+	if !reorderCalled {
+		t.Fatal("reorder не вызвался")
+	}
+	if ctx.ToastsCount() == 0 {
+		t.Fatal("тост не создан")
+	}
+
+	// 4. Теперь кликаем по тестовой кнопке (она находится ниже дерева, например Y=220, X=50)
+	// Имитируем тики анимации EventWakeUp между нажатием и отпусканием
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 50, Y: 220})
+	renderUI()
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 220})
+	renderUI()
+	ctx.HandleEvent(platform.Event{Type: platform.EventWakeUp})
+	renderUI()
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 50, Y: 220})
+	renderUI()
+
+	if !buttonClicked {
+		t.Fatal("клик по кнопке не прошел пока висит тост!")
+	}
+
+	// 5. Теперь кликаем по node0 в самом TreeView
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 50, Y: 18})
+	renderUI()
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 18})
+	renderUI()
+	ctx.HandleEvent(platform.Event{Type: platform.EventWakeUp})
+	renderUI()
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 50, Y: 18})
+	renderUI()
+
+	if selectedID != "node0" {
+		t.Fatalf("клик по узлу node0 не выбрал его пока висит тост: selectedID=%s", selectedID)
+	}
+
+	// 6. Теперь пробуем снова начать drag на node0 и проверить сброс при EventCaptureLost
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 18})
+	renderUI()
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 50, Y: 46})
+	renderUI()
+	if !ctx.reorderActive {
+		t.Fatal("повторный drag не активировался!")
+	}
+	ctx.HandleEvent(platform.Event{Type: platform.EventCaptureLost})
+	renderUI()
+	if ctx.reorderActive {
+		t.Fatal("reorderActive должен быть сброшен при EventCaptureLost!")
+	}
+}
+
+
+
 
 
 

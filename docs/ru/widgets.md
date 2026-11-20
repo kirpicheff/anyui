@@ -304,13 +304,19 @@ cols := []anyui.TableColumn{
 }
 ev := ui.Table("tbl", cols, len(rows), &selectedRow, &sortState, func(row, col int, area anyui.Rect, sel bool) {
 	ui.DrawText(area.X+ui.Scale(8).Int(), area.Y+ui.Scale(7).Int(), rows[row].Name, 12, ui.Theme().TextPrimary)
-}, anyui.Height(240))
+}, anyui.Height(240), anyui.Reorderable(), anyui.OnReorder(func(ev anyui.DragEvent) {
+	// ev.FromWidget, ev.ToWidget, ev.FromKey, ev.ToKey, ev.Drop (DropAbove / DropBelow)
+}))
 ```
 
 ### `TreeView`
-Древовидный список с раскрытием узлов и виртуализацией.
+Древовидный список с раскрытием узлов и виртуализацией. Поддерживает перетаскивание узлов (`Reorderable`), зоны сброса `DropAbove`, `DropBelow`, `DropInside` (вставка внутрь каталогов с подсветкой строки), визуальный индикатор вставки, полупрозрачное ghost-превью и кросс-виджетный перенос между деревьями:
 ```go
-ui.TreeView("tree", roots, &selectedNodeID, anyui.Height(220))
+ui.TreeView("tree", roots, &selectedNodeID, anyui.Height(220), anyui.Reorderable(), anyui.OnReorder(func(ev anyui.DragEvent) {
+	// ev.FromWidget, ev.ToWidget — ID исходного и целевого виджета
+	// ev.FromKey, ev.ToKey — ID перетаскиваемого и целевого узлов
+	// ev.Drop — anyui.DropAbove, anyui.DropBelow или anyui.DropInside (внутрь каталога)
+}))
 ```
 
 ### `SplitPane`

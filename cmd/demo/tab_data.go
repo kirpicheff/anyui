@@ -92,10 +92,68 @@ func (st *demoState) sortDemoTable() {
 	})
 }
 
+func findAndRemoveNode(nodes []*anyui.TreeNode, id string) (*anyui.TreeNode, []*anyui.TreeNode) {
+	for i, n := range nodes {
+		if n.ID == id {
+			res := make([]*anyui.TreeNode, 0, len(nodes)-1)
+			res = append(res, nodes[:i]...)
+			res = append(res, nodes[i+1:]...)
+			return n, res
+		}
+		if len(n.Children) > 0 {
+			if found, rem := findAndRemoveNode(n.Children, id); found != nil {
+				n.Children = rem
+				return found, nodes
+			}
+		}
+	}
+	return nil, nodes
+}
+
+func insertNode(nodes []*anyui.TreeNode, targetID string, item *anyui.TreeNode, drop anyui.DropZone) []*anyui.TreeNode {
+	if item == nil {
+		return nodes
+	}
+	if targetID == "" {
+		res := make([]*anyui.TreeNode, len(nodes)+1)
+		copy(res, nodes)
+		res[len(nodes)] = item
+		return res
+	}
+	for i, n := range nodes {
+		if n.ID == targetID {
+			switch drop {
+			case anyui.DropAbove:
+				res := make([]*anyui.TreeNode, 0, len(nodes)+1)
+				res = append(res, nodes[:i]...)
+				res = append(res, item)
+				res = append(res, nodes[i:]...)
+				return res
+			case anyui.DropBelow:
+				res := make([]*anyui.TreeNode, 0, len(nodes)+1)
+				res = append(res, nodes[:i+1]...)
+				res = append(res, item)
+				res = append(res, nodes[i+1:]...)
+				return res
+			case anyui.DropInside:
+				if n.ID != item.ID {
+					n.Children = append(n.Children, item)
+					n.Expanded = true
+				}
+				return nodes
+			}
+		}
+		if len(n.Children) > 0 {
+			n.Children = insertNode(n.Children, targetID, item, drop)
+		}
+	}
+	return nodes
+}
+
 func (st *demoState) drawTabData(ui *anyui.UI) {
 	th := ui.Theme()
 	ui.ScrollView("sv_data", 0, 0, func() {
-		ui.Label("Table (сортировка, ресайз, горизонтальный скролл, DoubleClick/MiddleClick, навигация клавишами)", anyui.FontSize(15), anyui.Bold())
+		ui.Label("Table (Drag-Reorder строк, сортировка, ресайз, скролл, DoubleClick/MiddleClick)", anyui.FontSize(15), anyui.Bold())
 		cols := []anyui.TableColumn{
 			{Title: "ID", WidthDp: 64, MinWidthDp: 48, Sortable: true},
 			{Title: "Сервер", WidthDp: 220, MinWidthDp: 100, Sortable: true},
@@ -103,6 +161,40 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 			{Title: "Пинг (мс)", WidthDp: 110, MinWidthDp: 70, Sortable: true},
 			{Title: "Зона / Примечание", WidthDp: 240, MinWidthDp: 100, Sortable: false},
 		}
+
+		handleTableReorder := func(ev anyui.DragEvent) {
+			var fromIdx, toIdx int
+			fmt.Sscanf(ev.FromKey, "%d", &fromIdx)
+			fmt.Sscanf(ev.ToKey, "%d", &toIdx)
+			if fromIdx >= 0 && fromIdx < len(st.tableRows) && toIdx >= 0 && toIdx < len(st.tableRows) {
+				row := st.tableRows[fromIdx]
+				tmp := make([]demoTableRow, 0, len(st.tableRows)-1)
+				tmp = append(tmp, st.tableRows[:fromIdx]...)
+				tmp = append(tmp, st.tableRows[fromIdx+1:]...)
+
+				ins := toIdx
+				if fromIdx < toIdx {
+					ins--
+				}
+				if ev.Drop == anyui.DropBelow {
+					ins++
+				}
+				if ins < 0 {
+					ins = 0
+				}
+				if ins > len(tmp) {
+					ins = len(tmp)
+				}
+				res := make([]demoTableRow, 0, len(tmp)+1)
+				res = append(res, tmp[:ins]...)
+				res = append(res, row)
+				res = append(res, tmp[ins:]...)
+				st.tableRows = res
+				st.statusMsg = fmt.Sprintf("Строка перенесена: %s -> %s", ev.FromKey, ev.ToKey)
+				ui.ShowToast("Таблица: Reorder", st.statusMsg, anyui.ToastInfo)
+			}
+		}
+
 		tev := ui.Table("tbl_servers", cols, len(st.tableRows), &st.tableSelected, &st.tableSort, func(row, col int, area anyui.Rect, sel bool) {
 			r := st.tableRows[row]
 			var txt string
@@ -129,7 +221,7 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 				txtCol = th.TextMuted
 			}
 			ui.DrawText(area.X+ui.Scale(8).Int(), area.Y+ui.Scale(7).Int(), txt, 12, txtCol)
-		}, anyui.Height(210))
+		}, anyui.Height(210), anyui.Reorderable(), anyui.OnReorder(handleTableReorder))
 		if tev.SortChanged {
 			st.sortDemoTable()
 			st.statusMsg = fmt.Sprintf("Таблица отсортирована по колонке %d", st.tableSort.Column)
@@ -148,16 +240,46 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 			ui.ShowToast("Средняя кнопка", st.statusMsg, anyui.ToastSuccess)
 		}
 
+		handleTreeDrop := func(ev anyui.DragEvent) {
+			var moved *anyui.TreeNode
+			if ev.FromWidget == "tree_proj" {
+				moved, st.treeRoots = findAndRemoveNode(st.treeRoots, ev.FromKey)
+			} else if ev.FromWidget == "tree_fav" {
+				moved, st.treeFavRoots = findAndRemoveNode(st.treeFavRoots, ev.FromKey)
+			}
+			if moved != nil {
+				if ev.ToWidget == "tree_proj" {
+					st.treeRoots = insertNode(st.treeRoots, ev.ToKey, moved, ev.Drop)
+				} else if ev.ToWidget == "tree_fav" {
+					st.treeFavRoots = insertNode(st.treeFavRoots, ev.ToKey, moved, ev.Drop)
+				}
+				zoneName := "внутрь"
+				if ev.Drop == anyui.DropAbove {
+					zoneName = "выше"
+				} else if ev.Drop == anyui.DropBelow {
+					zoneName = "ниже"
+				}
+				st.statusMsg = fmt.Sprintf("Drag&Drop: %s (%s -> %s, %s)", moved.Label, ev.FromWidget, ev.ToWidget, zoneName)
+				ui.ShowToast("Drag & Drop", st.statusMsg, anyui.ToastSuccess)
+			}
+		}
+
 		ui.Spacer(12)
-		ui.Label("SplitPane + TreeView + Collapsible & Accordion", anyui.FontSize(16), anyui.Bold())
+		ui.Label("SplitPane + TreeView (вложенность DropInside, кросс-виджетный перенос) + Collapsible & Accordion", anyui.FontSize(16), anyui.Bold())
 		ui.SplitPane("split_main", anyui.SplitHorizontal, &st.splitRatio, func() {
-			ui.Label("TreeView (двойной клик и стрелки ←/→/↑/↓/Space)", anyui.FontSize(13), anyui.Bold())
-			if ui.TreeView("tree_proj", st.treeRoots, &st.treeSelected, anyui.Height(220)) {
+			ui.Label("TreeView Проект (drag узлов, вложенность в папки)", anyui.FontSize(13), anyui.Bold())
+			if ui.TreeView("tree_proj", st.treeRoots, &st.treeSelected, anyui.Height(170), anyui.Reorderable(), anyui.OnReorder(handleTreeDrop)) {
 				st.statusMsg = fmt.Sprintf("TreeView: %s", st.treeSelected)
+			}
+			ui.Spacer(6)
+			ui.Label("TreeView Избранное (кросс-виджетный перенос между деревьями)", anyui.FontSize(12), anyui.Bold())
+			if ui.TreeView("tree_fav", st.treeFavRoots, &st.treeFavSelected, anyui.Height(100), anyui.Reorderable(), anyui.OnReorder(handleTreeDrop)) {
+				st.statusMsg = fmt.Sprintf("TreeView Избранное: %s", st.treeFavSelected)
 			}
 		}, func() {
 			ui.Collapsible("coll_info", "Collapsible: Свойства узла", &st.collapsibleOpen, func() {
-				ui.Label(fmt.Sprintf("Выбран: %s", st.treeSelected), anyui.FontSize(12), anyui.TextColor(th.TextMuted))
+				ui.Label(fmt.Sprintf("Выбран в проекте: %s", st.treeSelected), anyui.FontSize(12), anyui.TextColor(th.TextMuted))
+				ui.Label(fmt.Sprintf("Выбран в избранном: %s", st.treeFavSelected), anyui.FontSize(12), anyui.TextColor(th.TextMuted))
 				ui.Label(fmt.Sprintf("Split ratio: %.0f%%", st.splitRatio*100), anyui.FontSize(12), anyui.TextColor(th.TextMuted))
 			})
 			ui.Spacer(6)
@@ -177,6 +299,6 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 					},
 				},
 			}, st.accordionOpen)
-		}, anyui.Height(280))
+		}, anyui.Height(330))
 	})
 }

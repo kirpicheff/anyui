@@ -153,6 +153,12 @@ type Context struct {
 	tabDragStartX     int
 	tabDragStartY     int
 	tabDragging       bool
+	reorderWidgetID   string
+	reorderSourceKey  string
+	reorderGhostText  string
+	reorderStartX     int
+	reorderStartY     int
+	reorderActive     bool
 	numEditText       map[string]string
 	colorHexText      map[string]string
 	colorHSV          map[string][3]float32
@@ -718,6 +724,10 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 		c.RightMouseDown = false
 		c.MiddleMouseDown = false
 		c.ActiveID = ""
+		c.reorderActive = false
+		c.reorderWidgetID = ""
+		c.reorderSourceKey = ""
+		c.reorderGhostText = ""
 		redraw = true
 	case platform.EventFocusLost:
 		c.FocusID = ""
@@ -725,6 +735,10 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 		c.RightMouseDown = false
 		c.MiddleMouseDown = false
 		c.ActiveID = ""
+		c.reorderActive = false
+		c.reorderWidgetID = ""
+		c.reorderSourceKey = ""
+		c.reorderGhostText = ""
 		redraw = true
 	case platform.EventKeyDown:
 		c.KeyEvents = append(c.KeyEvents, KeyPress{Code: ev.KeyCode, Mods: ev.Mods})
@@ -984,6 +998,12 @@ func (c *Context) stopAnimTimer() {
 }
 
 func (c *Context) beginFrame() {
+	if !c.MouseDown && !c.MouseReleased {
+		c.reorderActive = false
+		c.reorderWidgetID = ""
+		c.reorderSourceKey = ""
+		c.reorderGhostText = ""
+	}
 	c.HotID = ""
 	c.nextCursor = platform.CursorArrow
 	c.needsRedraw = false
@@ -1020,7 +1040,43 @@ func (c *Context) beginFrame() {
 	})
 }
 
+// drawReorderGhost отрисовывает полупрозрачное превью перетаскиваемой строки или узла.
+func (c *Context) drawReorderGhost() {
+	if !c.reorderActive {
+		return
+	}
+	txt := c.reorderGhostText
+	if txt == "" {
+		txt = c.reorderSourceKey
+	}
+	if txt == "" {
+		return
+	}
+	pxSize := c.Scale(12).Int()
+	tw := c.Scale(100).Int()
+	th := c.Scale(14).Int()
+	if c.Font != nil {
+		tw, th = c.Font.MeasureText(txt, pxSize)
+	}
+	ghostW := tw + c.Scale(24).Int()
+	ghostH := c.Scale(26).Int()
+	ghostR := render.Rect{
+		X: c.MouseX + c.Scale(12).Int(),
+		Y: c.MouseY + c.Scale(12).Int(),
+		W: ghostW,
+		H: ghostH,
+	}
+	c.PushOverlay(render.Rect{}, func() {
+		c.Canvas.FillRoundedRect(ghostR, c.ScaleF(4), c.Theme.Surface.WithAlpha(210))
+		c.Canvas.DrawRoundedBox(ghostR, c.ScaleF(4), c.Theme.Surface.WithAlpha(0), 1.0, c.Theme.Accent.WithAlpha(180))
+		if c.Font != nil {
+			c.Font.DrawText(c.Canvas, ghostR.X+c.Scale(10).Int(), ghostR.Y+(ghostR.H-th)/2, txt, pxSize, c.Theme.TextPrimary.WithAlpha(240))
+		}
+	})
+}
+
 func (c *Context) endFrame() {
+	c.drawReorderGhost()
 	ovIdx := 0
 	c.Overlays.FlushWithHook(func(bounds render.Rect) {
 		if !bounds.Empty() {
@@ -1042,6 +1098,12 @@ func (c *Context) endFrame() {
 	if (c.MouseReleased || c.RightMouseReleased || c.MiddleMouseReleased) &&
 		!c.MouseDown && !c.RightMouseDown && !c.MiddleMouseDown {
 		c.ActiveID = ""
+	}
+	if c.MouseReleased || !c.MouseDown {
+		c.reorderActive = false
+		c.reorderWidgetID = ""
+		c.reorderSourceKey = ""
+		c.reorderGhostText = ""
 	}
 	if c.nextCursor != c.lastCursor {
 		c.Win.SetCursor(c.nextCursor)

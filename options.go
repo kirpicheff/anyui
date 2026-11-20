@@ -163,4 +163,11 @@ func ScrollToIndex(idx int) Option { return ui.ScrollToIndex(idx) }
 // ScrollToID задаёт строковый идентификатор дочернего элемента или якоря для программной прокрутки в ScrollView.
 func ScrollToID(id string) Option { return ui.ScrollToID(id) }
 
+// Reorderable разрешает перетаскивание элементов (строк или узлов) внутри компонента для изменения порядка.
+func Reorderable(enabled ...bool) Option { return ui.Reorderable(enabled...) }
+
+// OnReorder регистрирует обработчик события завершения перетаскивания элемента.
+func OnReorder(fn func(ev DragEvent)) Option { return ui.OnReorder(fn) }
+
+
 
