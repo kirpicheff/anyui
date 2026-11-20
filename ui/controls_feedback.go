@@ -54,7 +54,7 @@ func (c *Context) ShowToast(title, text string, kind ToastKind, duration ...time
 		Text:      text,
 		Kind:      kind,
 		Duration:  dur,
-		CreatedAt: time.Now(),
+		CreatedAt: c.Now(),
 	})
 	// Ограничим максимум 5 одновременных тостов
 	if len(c.toasts) > 5 {
@@ -95,7 +95,7 @@ func (c *Context) drawToasts() {
 		return
 	}
 
-	now := time.Now()
+	now := c.Now()
 	alive := c.toasts[:0]
 	for _, t := range c.toasts {
 		if now.Sub(t.CreatedAt) < t.Duration {

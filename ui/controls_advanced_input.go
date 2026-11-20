@@ -644,7 +644,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 	}
 	id = c.ResolveID("date", id)
 	if date.IsZero() {
-		*date = time.Now()
+		*date = c.Now()
 	}
 	if c.openState == nil {
 		c.openState = make(map[string]bool)
@@ -987,7 +987,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 				}
 				offset := firstWD - 1
 				daysInMonth := time.Date(vm.Year(), vm.Month()+1, 0, 0, 0, 0, 0, vm.Location()).Day()
-				now := time.Now()
+				now := c.Now()
 
 				for d := 1; d <= daysInMonth; d++ {
 					slot := offset + d - 1
@@ -1040,7 +1040,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 				c.nextCursor = platform.CursorHand
 				todayBg = c.Theme.Accent.WithAlpha(40)
 				if c.MousePressed {
-					now := time.Now()
+					now := c.Now()
 					*date = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, date.Location())
 					c.dateViewMonth[id] = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, date.Location())
 					dpModeStore[id] = dpModeDays

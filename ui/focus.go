@@ -37,6 +37,16 @@ func (c *Context) registerFocusable(id string) {
 	c.nextFocusOrder = append(c.nextFocusOrder, id)
 }
 
+// FocusOrder возвращает срез идентификаторов фокусируемых виджетов в порядке обхода по Tab.
+func (c *Context) FocusOrder() []string {
+	if len(c.focusOrder) == 0 {
+		return nil
+	}
+	res := make([]string, len(c.focusOrder))
+	copy(res, c.focusOrder)
+	return res
+}
+
 // processFocusAndShortcuts обрабатывает Tab / Shift+Tab, Escape и зарегистрированные горячие клавиши.
 func (c *Context) processFocusAndShortcuts() {
 	if len(c.KeyEvents) == 0 {

@@ -14,6 +14,32 @@ type Modifiers = platform.Modifiers
 // KeyEvent описывает сырое событие нажатия или отпускания клавиши для InteractiveCanvas.
 type KeyEvent = ui.RawKeyEvent
 
+// Key задаёт виртуальный код клавиши клавиатуры.
+type Key = uint32
+
+const (
+	KeyBackspace Key = ui.KeyBackspace
+	KeyTab       Key = ui.KeyTab
+	KeyEnter     Key = ui.KeyEnter
+	KeyEscape    Key = ui.KeyEscape
+	KeySpace     Key = ui.KeySpace
+	KeyPageUp    Key = ui.KeyPageUp
+	KeyPageDown  Key = ui.KeyPageDown
+	KeyEnd       Key = ui.KeyEnd
+	KeyHome      Key = ui.KeyHome
+	KeyLeft      Key = ui.KeyLeft
+	KeyUp        Key = ui.KeyUp
+	KeyRight     Key = ui.KeyRight
+	KeyDown      Key = ui.KeyDown
+	KeyDelete    Key = ui.KeyDelete
+	KeyA         Key = ui.KeyA
+	KeyC         Key = ui.KeyC
+	KeyV         Key = ui.KeyV
+	KeyX         Key = ui.KeyX
+	KeyY         Key = ui.KeyY
+	KeyZ         Key = ui.KeyZ
+)
+
 // MouseButton задаёт кнопку мыши для событий InteractiveCanvas.
 type MouseButton = platform.MouseButton
 

@@ -31,7 +31,7 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 	}
 	id = c.ResolveID("tp", id)
 	if t.IsZero() {
-		*t = time.Now()
+		*t = c.Now()
 	}
 	if c.openState == nil {
 		c.openState = make(map[string]bool)
@@ -177,7 +177,7 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 				c.nextCursor = platform.CursorHand
 				nowBg = c.Theme.Accent.WithAlpha(40)
 				if c.MousePressed {
-					now := time.Now()
+					now := c.Now()
 					*t = time.Date(t.Year(), t.Month(), t.Day(), now.Hour(), now.Minute(), now.Second(), 0, t.Location())
 					changed = true
 					c.RequestRedraw()
@@ -201,7 +201,7 @@ func (c *Context) DateTimePicker(id string, dt *time.Time, opts ...Option) bool 
 	}
 	id = c.nextLocalID("dtp", id)
 	if dt.IsZero() {
-		*dt = time.Now()
+		*dt = c.Now()
 	}
 	changed := false
 	dCopy := *dt

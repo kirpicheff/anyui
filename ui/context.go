@@ -91,6 +91,7 @@ type Context struct {
 	Scale    float32
 	Animator *Animator
 	Overlays OverlayLayer
+	Clock    func() time.Time // Виртуальный или пользовательский источник системного времени
 
 	// Состояние указателя мыши (в физических пикселях)
 	MouseX            int
@@ -273,6 +274,14 @@ func (c *Context) S(dp int) int {
 // Sf переводит дробные логические пиксели (dp) в физические.
 func (c *Context) Sf(dp float32) float32 {
 	return dp * c.Scale
+}
+
+// Now возвращает текущее виртуальное или системное время контекста.
+func (c *Context) Now() time.Time {
+	if c.Clock != nil {
+		return c.Clock()
+	}
+	return time.Now()
 }
 
 // DrawText рисует строку текста в произвольных физических координатах (для кастомного рисования и ListView).
@@ -561,7 +570,7 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 		}
 	case platform.EventMouseDown:
 		if ev.Button == platform.MouseLeft {
-			now := time.Now()
+			now := c.Now()
 			dist := c.S(5)
 			if dist < 5 {
 				dist = 5
@@ -970,7 +979,7 @@ func (c *Context) beginFrame() {
 	}
 
 	if c.Animator != nil {
-		c.Animator.BeginFrame(time.Now())
+		c.Animator.BeginFrame(c.Now())
 	}
 	c.Overlays.BeginFrame()
 	c.processFocusAndShortcuts()
