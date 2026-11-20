@@ -111,4 +111,15 @@ win, _ := app.OpenWindow(anyui.Config{
 
 To wake up and redraw only a specific window from a background goroutine (for example, when streaming frames to an `InteractiveCanvas` with `Streaming: true`), call `win.WakeUp()` instead of `app.Dispatch(...)` — this avoids waking other windows and preserves the `EventWakeUp` fast-path: `Canvas.Clear` and full widget tree reconstruction are skipped (only the streaming canvas `OnDraw` and `PresentRect` run, rendering directly into the Windows `DIBSection` + `BitBlt`). When surrounding UI elements (such as a status-bar FPS counter once per second) need updating, call `ctx.RequestRedraw()` (or `win.Invalidate()`).
 
+---
+
+## Documentation Guides
+
+- [Widgets & Layout](widgets.md)
+- [Graphics & 2D Rendering](graphics.md)
+- [Themes & Styling](theming.md)
+- [System Integration (Windows, Tray, Dialogs, Linux)](system.md)
+- [Testing & Headless Runtime](testing.md)
+
+
 

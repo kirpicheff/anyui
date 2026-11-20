@@ -118,6 +118,7 @@ go run ./cmd/demo
 - [Graphics & 2D Rendering](docs/en/graphics.md)
 - [Themes & Styling](docs/en/theming.md)
 - [System Integration (Windows, Tray, Dialogs, Linux)](docs/en/system.md)
+- [Testing & Headless Runtime](docs/en/testing.md)
 
 You can also inspect the Go API directly from the terminal:
 

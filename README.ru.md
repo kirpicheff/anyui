@@ -118,6 +118,7 @@ go run ./cmd/demo
 - [Графика и 2D-рендеринг](docs/ru/graphics.md)
 - [Темы и стилизация](docs/ru/theming.md)
 - [Системная интеграция (окна, трей, диалоги, Linux)](docs/ru/system.md)
+- [Тестирование и Headless-рантайм](docs/ru/testing.md)
 
 Для просмотра справочника API из терминала:
 
