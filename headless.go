@@ -471,7 +471,27 @@ func AssertGolden(t testing.TB, h *Headless, goldenName string) {
 			c2 := actualImg.At(x+actBounds.Min.X, y+actBounds.Min.Y)
 			r1, g1, b1, a1 := c1.RGBA()
 			r2, g2, b2, a2 := c2.RGBA()
-			if r1 != r2 || g1 != g2 || b1 != b2 || a1 != a2 {
+
+			// Приводим из 16-битного диапазона [0..65535] к 8-битному [0..255]
+			dr := int(r1>>8) - int(r2>>8)
+			if dr < 0 {
+				dr = -dr
+			}
+			dg := int(g1>>8) - int(g2>>8)
+			if dg < 0 {
+				dg = -dg
+			}
+			db := int(b1>>8) - int(b2>>8)
+			if db < 0 {
+				db = -db
+			}
+			da := int(a1>>8) - int(a2>>8)
+			if da < 0 {
+				da = -da
+			}
+
+			// Допускаем погрешность не более 1 кванта цвета (1/255) из-за кроссплатформенных различий FPU/FMA (ARM64 vs x86)
+			if dr > 1 || dg > 1 || db > 1 || da > 1 {
 				if diffCount == 0 {
 					firstX, firstY = x, y
 					firstExp = c1
