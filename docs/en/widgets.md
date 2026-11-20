@@ -169,6 +169,11 @@ if ev.Closed >= 0 {
 ### `ScrollView`
 - **Signature:** `ui.ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)`
 - **Features:** vertical and horizontal scrolling via mouse wheel and draggable scrollbars.
+- **Auto-Fill:** passing `anyui.Auto()`, `-1`, or `<= 0` (or using `anyui.FillWidth()`, `anyui.FillHeight()`, `anyui.Width(anyui.Auto())`, `anyui.Height(anyui.Auto())`) automatically fills the remaining container space without manual size calculations.
+
+### Container Coordinates (`CurrentArea` vs `CurrentAreaPx`)
+- **`ui.CurrentArea() Rect`:** returns the container's rectangle strictly in logical pixels (`Dp`).
+- **`ui.CurrentAreaPx() Rect`:** returns the container's rectangle in physical pixels (`Px`), used for low-level `ui.Canvas()` operations.
 
 ### Modal Dialogs, Overlays, and Floating Panels
 

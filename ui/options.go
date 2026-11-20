@@ -66,6 +66,14 @@ type WidgetStyle struct {
 	ErrorText        string
 }
 
+// AutoSize — константа sentinel-значения для автоматического подбора размера по остатку доступной области.
+const AutoSize = -1
+
+// Auto возвращает sentinel-значение (-1) для автоматического занятия доступного остатка области контейнера.
+func Auto() int {
+	return AutoSize
+}
+
 // Option настраивает стиль или поведение отдельного виджета.
 type Option func(*WidgetStyle)
 

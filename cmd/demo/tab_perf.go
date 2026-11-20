@@ -134,7 +134,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 			})
 
 			if perfTab.showOverlayTest {
-				area := ui.CurrentArea()
+				area := ui.CurrentAreaPx()
 				ovRect := anyui.Rect{
 					X: area.X + ui.S(24),
 					Y: area.Y + ui.S(90),

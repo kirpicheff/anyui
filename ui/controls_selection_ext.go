@@ -35,11 +35,16 @@ func (c *Context) ListViewEx(
 	if st.WidthDp != nil && *st.WidthDp > 0 {
 		w = c.S(*st.WidthDp)
 	}
-	h := c.S(220)
+	h := c.RemainingHeight()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
 		h = c.S(*st.HeightDp)
+	} else if h <= 0 || h >= c.S(50000) {
+		h = c.S(220)
 	}
 	r := c.allocRectStyled(w, h, st)
+	if r.W <= 0 || r.H <= 0 {
+		return false
+	}
 	c.registerFocusable(id)
 
 	c.Canvas.DrawRoundedBox(r, c.Sf(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)

@@ -17,6 +17,7 @@
 - `PushOverlay(bounds, fn)` предназначен только для всплывающих контролов (кастомных выпадающих списков, меню, тултипов), которым нужно отрисоваться поверх родительских контейнеров без обрезания клипом.
 - Горячие клавиши: `ui.Shortcut` регистрирует глобальный шорткат окна; не вызывайте его повторно на каждом кадре внутри циклических веток UI.
 - `Card(fn, ...)` по умолчанию подбирает высоту по содержимому (`AutoHeight`); чтобы растянуть карточку на весь остаток высоты, передайте `anyui.FillHeight()`.
+- Автозаполнение контейнеров (Auto-Fill): для `ScrollView`, `ListView`, `CanvasView` передавайте `anyui.Auto()` или `-1` (либо `anyui.FillWidth()` / `anyui.FillHeight()`), чтобы занять весь доступный остаток области без ручного вычисления размеров. `ui.CurrentArea()` возвращает геометрию строго в Dp; для низкоуровневых операций с `Canvas` используйте `ui.CurrentAreaPx()`.
 - В `Table` / `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.
 
 ## Минимальный пример
@@ -111,8 +112,11 @@ const SplitHorizontal = ui.SplitHorizontal ...
 const ToastInfo = ui.ToastInfo ...
 const ToastBottomRight = ui.ToastBottomRight ...
 const LogInfo = ui.LogInfo ...
+const AutoSize = ui.AutoSize
 var ErrAlreadyRunning = errors.New("приложение уже запущено")
+var SelectItems = ui.SelectItems
 func AssertGolden(t testing.TB, h *Headless, goldenName string)
+func Auto() int
 func DefaultTestFonts() (regular, bold, mono []byte)
 func IsSystemDarkTheme() bool
 func OpenFileDialog(opts FileDialogOptions) (string, bool, error)
@@ -222,6 +226,7 @@ type PageConfig = ui.PageConfig
 type PointF = render.PointF
 type RadialGradient = render.RadialGradient
 type Rect = render.Rect
+type SelectItem = ui.SelectItem
 type SingleInstanceConfig struct{ ... }
 type SingleInstanceGuard = platform.SingleInstanceGuard
     func AcquireSingleInstance(appID string, args []string) (*SingleInstanceGuard, bool, error)
@@ -460,7 +465,7 @@ type UI struct {
     UI предоставляет публичный Immediate Mode API для построения интерфейса в
     окне.
 
-func (u *UI) Accordion(id string, items []AccordionItem, openIndex *int, opts ...Option) bool
+func (u *UI) Accordion(id string, items []AccordionItem, openIDs map[string]bool, opts ...Option) bool
 func (u *UI) App() *App
 func (u *UI) Badge(text string, opts ...Option)
 func (u *UI) BarChart(id string, labels []string, series []ChartSeries, opts ...Option)
@@ -469,7 +474,7 @@ func (u *UI) Button(id, label string, opts ...Option) bool
 func (u *UI) Canvas() *render.Canvas
 func (u *UI) CanvasView(wDp, hDp int, drawFn func(canvas *render.Canvas, area Rect))
 func (u *UI) Card(fn func(), opts ...Option)
-func (u *UI) CheckComboBox(id string, items []string, selected *[]bool, opts ...Option) bool
+func (u *UI) CheckComboBox(id string, items []SelectItem, selectedIDs map[string]bool, opts ...Option) bool
 func (u *UI) Checkbox(id, label string, checked *bool, opts ...Option) bool
 func (u *UI) ClearGlyphCache()
 func (u *UI) ClearRemember()
@@ -481,9 +486,10 @@ func (u *UI) Column(gapDp int, fn func())
 func (u *UI) ColumnCentered(gapDp int, fn func())
 func (u *UI) ColumnFlex(gapDp int, items ...FlexItem)
 func (u *UI) ColumnWith(align Align, justify Justify, gapDp int, items ...func())
-func (u *UI) ComboBox(id string, items []string, selected *int, opts ...Option) bool
+func (u *UI) ComboBox(id string, items []SelectItem, selected *string, opts ...Option) bool
 func (u *UI) ContextMenu(id string, anchor Rect, items []ContextMenuItem)
 func (u *UI) CurrentArea() Rect
+func (u *UI) CurrentAreaPx() Rect
 func (u *UI) DatePicker(id string, date *time.Time, opts ...Option) bool
 func (u *UI) DateTimePicker(id string, dt *time.Time, opts ...Option) bool
 func (u *UI) DockBottom(gapDp, bottomDp int, bodyFn, bottomFn func())
@@ -524,7 +530,7 @@ func (u *UI) MouseDown() bool
 func (u *UI) MousePosDp() (int, int)
 func (u *UI) MousePosPx() (int, int)
 func (u *UI) MousePressed() bool
-func (u *UI) MultiSelect(id string, items []string, selected *[]bool, opts ...Option) bool
+func (u *UI) MultiSelect(id string, items []SelectItem, selectedIDs map[string]bool, opts ...Option) bool
 func (u *UI) NumberInput(id string, value *float64, minVal, maxVal, step float64, decimals int, ...) bool
 func (u *UI) Padding(padDp int, fn func())
 func (u *UI) PaddingXY(pxDp, pyDp int, fn func())
@@ -535,7 +541,7 @@ func (u *UI) Popover(id string, open *bool, anchor Rect, fn func(), opts ...Opti
 func (u *UI) ProgressBar(progress float32, opts ...Option)
 func (u *UI) PushID(key any)
 func (u *UI) PushOverlay(bounds Rect, drawFn func())
-func (u *UI) RadioButton(id, label string, selected bool, opts ...Option) bool
+func (u *UI) RadioButton(id, label string, selected *string, value string, opts ...Option) bool
 func (u *UI) RadioGroup(id string, options []string, selected *int, opts ...Option) bool
 func (u *UI) RangeSlider(id string, low, high *float32, minVal, maxVal float32, opts ...Option) bool
 func (u *UI) RegisterHoverArea(id string, rect Rect, cursor CursorType, trackMove bool)
@@ -547,7 +553,7 @@ func (u *UI) RowWith(align Align, justify Justify, gapDp, heightDp int, items ..
 func (u *UI) S(dp int) int
 func (u *UI) ScaledImageCacheStats() (entries int, bytes int64)
 func (u *UI) ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)
-func (u *UI) Select(id string, items []string, selected *int, opts ...Option) bool
+func (u *UI) Select(id string, items []SelectItem, selected *string, opts ...Option) bool
 func (u *UI) SelectableLabel(id, text string, opts ...Option)
 func (u *UI) Separator(opts ...Option)
 func (u *UI) SetClipboardText(text string) error

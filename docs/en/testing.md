@@ -302,3 +302,20 @@ go test -bench BenchmarkFrameBudget -benchmem -run ^$
 ```
 This ensures your frame budget remains under 16.6 ms (60 FPS) and memory allocations stay predictable.
 
+---
+
+## Testing DPI Scaling (`SetScale`)
+
+The headless runtime allows emulating displays with different pixel densities (100% — `1.0`, 150% — `1.5`, 200% — `2.0`, etc.):
+
+```go
+h.SetScale(1.5) // Emulate 150% system DPI scale
+h.Step()
+```
+
+This verifies layout and coordinate contracts across DPI targets:
+- `ui.CurrentArea()` returns container dimensions strictly in `Dp`.
+- `ui.CurrentAreaPx()` returns physical pixels `Px`.
+- `ui.MousePosDp()` converts physical mouse cursor coordinates into logical `Dp`.
+
+

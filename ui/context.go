@@ -276,6 +276,30 @@ func (c *Context) Sf(dp float32) float32 {
 	return dp * c.Scale
 }
 
+// PxToDp переводит физические пиксели (px) в логические (dp) с округлением до ближайшего целого.
+func (c *Context) PxToDp(px int) int {
+	if px == 0 {
+		return 0
+	}
+	scale := c.Scale
+	if scale <= 0 {
+		scale = 1.0
+	}
+	if px > 0 {
+		return int(float32(px)/scale + 0.5)
+	}
+	return int(float32(px)/scale - 0.5)
+}
+
+// PxToDpf переводит физические пиксели (px) в дробные логические пиксели (dp).
+func (c *Context) PxToDpf(px float32) float32 {
+	scale := c.Scale
+	if scale <= 0 {
+		scale = 1.0
+	}
+	return px / scale
+}
+
 // Now возвращает текущее виртуальное или системное время контекста.
 func (c *Context) Now() time.Time {
 	if c.Clock != nil {

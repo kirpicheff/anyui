@@ -27,6 +27,7 @@ func DefaultTestFonts() (regular, bold, mono []byte) {
 
 type headlessWindow struct {
 	w, h       int
+	scale      float32
 	cursor     platform.CursorType
 	clipboard  string
 	clipImg    image.Image
@@ -57,7 +58,12 @@ func (m *headlessWindow) Close()                                  {}
 func (m *headlessWindow) SetTitle(string)                         {}
 func (m *headlessWindow) SetCursor(c platform.CursorType)         { m.cursor = c }
 func (m *headlessWindow) Size() (int, int)                        { return m.w, m.h }
-func (m *headlessWindow) Scale() float32                          { return 1.0 }
+func (m *headlessWindow) Scale() float32 {
+	if m.scale > 0 {
+		return m.scale
+	}
+	return 1.0
+}
 func (m *headlessWindow) ClipboardText() (string, error)          { return m.clipboard, nil }
 func (m *headlessWindow) SetClipboardText(text string) error     { m.clipboard = text; return nil }
 func (m *headlessWindow) ClipboardImage() (image.Image, error)    { return m.clipImg, nil }
@@ -205,6 +211,20 @@ func (h *Headless) AdvanceTime(d time.Duration) {
 	h.mu.Lock()
 	h.virtualTime = h.virtualTime.Add(d)
 	h.mu.Unlock()
+}
+
+// SetScale устанавливает системный масштаб DPI (например, 1.0, 1.5, 2.0) и пересчитывает Scale контекста.
+func (h *Headless) SetScale(scale float32) {
+	if scale <= 0 {
+		scale = 1.0
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.platWin.scale = scale
+	h.pendingEvs = append(h.pendingEvs, platform.Event{
+		Type:  platform.EventDPIChange,
+		Scale: scale,
+	})
 }
 
 // Step выполняет синхронную отрисовку ровно одного кадра с обработкой ввода и очереди Dispatch.

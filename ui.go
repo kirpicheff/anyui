@@ -170,8 +170,19 @@ func (u *UI) Sf(dp float32) float32 {
 	return u.ctx.Sf(dp)
 }
 
-// CurrentArea возвращает прямоугольник текущего контейнера в физических пикселях.
+// CurrentArea возвращает прямоугольник текущего контейнера в логических пикселях (Dp).
 func (u *UI) CurrentArea() Rect {
+	if u.ctx == nil {
+		return Rect{}
+	}
+	return u.ctx.CurrentAreaDp()
+}
+
+// CurrentAreaPx возвращает прямоугольник текущего контейнера в физических пикселях (Px).
+func (u *UI) CurrentAreaPx() Rect {
+	if u.ctx == nil {
+		return Rect{}
+	}
 	return u.ctx.CurrentArea()
 }
 
@@ -471,17 +482,7 @@ func (u *UI) MousePosDp() (int, int) {
 	if u.ctx == nil {
 		return 0, 0
 	}
-	scale := u.ctx.Scale
-	if scale <= 0 {
-		scale = 1.0
-	}
-	pxToDp := func(px int) int {
-		if px >= 0 {
-			return int(float32(px)/scale + 0.5)
-		}
-		return int(float32(px)/scale - 0.5)
-	}
-	return pxToDp(u.ctx.MouseX), pxToDp(u.ctx.MouseY)
+	return u.ctx.PxToDp(u.ctx.MouseX), u.ctx.PxToDp(u.ctx.MouseY)
 }
 
 // MousePressed возвращает true, если в текущем кадре нажата левая кнопка мыши.

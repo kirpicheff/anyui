@@ -5,6 +5,12 @@ import "github.com/kirpicheff/anyui/ui"
 // Option настраивает стиль, размеры или поведение отдельного виджета.
 type Option = ui.Option
 
+// AutoSize — константа sentinel-значения для автоматического подбора размера по остатку доступной области.
+const AutoSize = ui.AutoSize
+
+// Auto возвращает sentinel-значение (-1) для автоматического занятия доступного остатка области контейнера.
+func Auto() int { return ui.Auto() }
+
 // Bg переопределяет цвет фона виджета.
 func Bg(c Color) Option { return ui.Bg(c) }
 

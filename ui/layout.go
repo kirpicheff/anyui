@@ -75,9 +75,20 @@ func (c *Context) topLayout() *layoutBox {
 	return &c.layoutStack[len(c.layoutStack)-1]
 }
 
-// CurrentArea возвращает прямоугольник текущего контейнера в физических пикселях.
+// CurrentArea возвращает прямоугольник текущего контейнера в физических пикселях (Px).
 func (c *Context) CurrentArea() render.Rect {
 	return c.topLayout().rect
+}
+
+// CurrentAreaDp возвращает прямоугольник текущего контейнера в логических пикселях (Dp).
+func (c *Context) CurrentAreaDp() render.Rect {
+	r := c.topLayout().rect
+	return render.Rect{
+		X: c.PxToDp(r.X),
+		Y: c.PxToDp(r.Y),
+		W: c.PxToDp(r.W),
+		H: c.PxToDp(r.H),
+	}
 }
 
 // RemainingWidth возвращает оставшуюся ширину в текущем Row (в физических пикселях).
@@ -102,10 +113,10 @@ func (c *Context) RemainingHeight() int {
 
 // applySizeConstraints применяет ограничения размеров из WidgetStyle к базовым (w, h) в физических пикселях.
 func (c *Context) applySizeConstraints(w, h int, st WidgetStyle) (int, int) {
-	if st.FillWidth {
+	if st.FillWidth || (st.WidthDp != nil && *st.WidthDp <= 0) {
 		w = c.RemainingWidth()
 	}
-	if st.FillHeight {
+	if st.FillHeight || (st.HeightDp != nil && *st.HeightDp <= 0) {
 		h = c.RemainingHeight()
 	}
 	if st.MinWidthDp != nil {

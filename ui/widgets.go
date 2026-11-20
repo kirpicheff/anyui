@@ -647,17 +647,21 @@ type CanvasCallbacks struct {
 // захвата мыши при перетаскивании и передачи сырых событий клавиатуры (включая ScanCode/Extended) и мыши.
 func (c *Context) InteractiveCanvas(id string, wDp, hDp int, cb CanvasCallbacks, opts ...Option) {
 	id = c.ResolveID("canvas", id)
-	_ = ApplyOptions(opts)
+	st := ApplyOptions(opts)
 
 	w := c.S(wDp)
-	if wDp <= 0 {
+	if wDp <= 0 || st.FillWidth || (st.WidthDp != nil && *st.WidthDp <= 0) {
 		w = c.RemainingWidth()
+	} else if st.WidthDp != nil && *st.WidthDp > 0 {
+		w = c.S(*st.WidthDp)
 	}
 	h := c.S(hDp)
-	if hDp <= 0 {
+	if hDp <= 0 || st.FillHeight || (st.HeightDp != nil && *st.HeightDp <= 0) {
 		h = c.RemainingHeight()
+	} else if st.HeightDp != nil && *st.HeightDp > 0 {
+		h = c.S(*st.HeightDp)
 	}
-	r := c.allocRect(w, h)
+	r := c.allocRectStyled(w, h, st)
 	if r.Empty() {
 		if c.prevFocusID == id && c.FocusID != id && cb.OnFocusLost != nil {
 			cb.OnFocusLost()

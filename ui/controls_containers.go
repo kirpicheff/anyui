@@ -77,21 +77,22 @@ func (c *Context) ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)
 	id = c.ResolveID("sv", id)
 	st := ApplyOptions(opts)
 	w := c.S(wDp)
-	if wDp <= 0 {
+	if wDp <= 0 || st.FillWidth || (st.WidthDp != nil && *st.WidthDp <= 0) {
 		w = c.RemainingWidth()
-	}
-	if st.WidthDp != nil && *st.WidthDp > 0 {
+	} else if st.WidthDp != nil && *st.WidthDp > 0 {
 		w = c.S(*st.WidthDp)
 	}
 	h := c.S(hDp)
-	if hDp <= 0 {
+	if hDp <= 0 || st.FillHeight || (st.HeightDp != nil && *st.HeightDp <= 0) {
 		h = c.RemainingHeight()
-	}
-	if st.HeightDp != nil && *st.HeightDp > 0 {
+	} else if st.HeightDp != nil && *st.HeightDp > 0 {
 		h = c.S(*st.HeightDp)
 	}
 
 	r := c.allocRectStyled(w, h, st)
+	if r.W <= 0 || r.H <= 0 {
+		return
+	}
 	si := c.getScrollInfo("sv:" + id)
 
 	maxSc := si.contentH - r.H
@@ -218,6 +219,13 @@ func (c *Context) ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)
 	if maxSc > 0 {
 		innerW -= barW + c.S(4)
 	}
+	if innerW < 0 {
+		innerW = 0
+	}
+	innerH := r.H - pad*2
+	if innerH < 0 {
+		innerH = 0
+	}
 
 	c.Canvas.PushClip(r)
 	boxX := r.X + pad - si.x
@@ -225,7 +233,7 @@ func (c *Context) ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)
 		X: boxX,
 		Y: r.Y + pad - si.y,
 		W: innerW,
-		H: 1000000,
+		H: innerH,
 	}, dirColumn, AlignStart, c.S(8))
 	startY := c.topLayout().cursorY
 	fn()

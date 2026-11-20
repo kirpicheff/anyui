@@ -46,15 +46,17 @@ func (c *Context) SplitPane(id string, orient Orientation, ratio *float32, first
 	if st.WidthDp != nil && *st.WidthDp > 0 {
 		w = c.S(*st.WidthDp)
 	}
-	h := c.S(260)
+	h := c.RemainingHeight()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
 		h = c.S(*st.HeightDp)
-	}
-	if w <= 0 || h <= 0 {
-		return
+	} else if h <= 0 || (!st.FillHeight && st.HeightDp == nil && h >= c.S(50000)) {
+		h = c.S(260)
 	}
 
-	rect := c.allocRect(w, h)
+	rect := c.allocRectStyled(w, h, st)
+	if rect.W <= 0 || rect.H <= 0 {
+		return
+	}
 	radius := c.Sf(c.Theme.RadiusSm)
 	if st.Radius != nil {
 		radius = c.Sf(*st.Radius)

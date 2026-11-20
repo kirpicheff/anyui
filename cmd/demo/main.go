@@ -334,11 +334,11 @@ func main() {
 		// Основная рабочая область: слева Tabs, справа контент выбранного раздела
 		ui.PaddingXY(16, 12, func() {
 			area := ui.CurrentArea()
-			contentH := area.H - ui.S(36)
-			if contentH < ui.S(200) {
-				contentH = ui.S(200)
+			contentH := area.H - 36
+			if contentH < 200 {
+				contentH = 200
 			}
-			ui.Row(16, int(float32(contentH)/ui.Sf(1)), func() {
+			ui.Row(16, contentH, func() {
 				ui.Card(func() {
 					ui.Column(6, func() {
 						ui.StaticLayer("demo_nav_title", func() {
@@ -379,7 +379,7 @@ func main() {
 
 		// Нижний статус-бар
 		ui.FlexSpacer(32)
-		barArea := ui.CurrentArea()
+		barArea := ui.CurrentAreaPx()
 		barRect := anyui.Rect{
 			X: barArea.X,
 			Y: barArea.Y + barArea.H - ui.S(32),

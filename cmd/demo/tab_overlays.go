@@ -18,7 +18,7 @@ func (st *demoState) drawTabOverlays(ui *anyui.UI) {
 			if ui.Button("ov_pop", "Открыть Popover") {
 				st.popoverOpen = !st.popoverOpen
 			}
-			popAnchor := ui.CurrentArea()
+			popAnchor := ui.CurrentAreaPx()
 			popAnchor.W = ui.S(160)
 			popAnchor.H = ui.S(38)
 			ui.Popover("pop_demo", &st.popoverOpen, popAnchor, func() {
@@ -49,7 +49,7 @@ func (st *demoState) drawTabOverlays(ui *anyui.UI) {
 		ui.Separator()
 		ui.Label("ContextMenu (ПКМ) и Tooltip (наведение)", anyui.FontSize(16), anyui.Bold())
 
-		area := ui.CurrentArea()
+		area := ui.CurrentAreaPx()
 		box := anyui.Rect{X: area.X, Y: area.Y + ui.S(120), W: ui.S(460), H: ui.S(74)}
 		ui.CanvasView(460, 74, func(canvas *render.Canvas, r anyui.Rect) {
 			box = r
