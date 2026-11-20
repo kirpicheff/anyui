@@ -49,12 +49,12 @@ Minimal `480x320` window (label, text input, click counter button) measured on *
 
 | Framework | CGO | Binary Size | Startup Time | Processes | Working Set (RAM) | Private Memory | Idle CPU |
 | --- | :---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| **AnyUI** | `0` | **2.7 MB** | **17.56 ms** | **1** | **38.49 MB** | **28.64 MB** | **0%** |
-| **Gio** | `0` | 6.52 MB | 117.93 ms | 1 | 52.74 MB | 38.75 MB | 0% |
-| **Fyne** | `1` | 23.29 MB | 229.49 ms | 1 | 128.1 MB | 159.79 MB | 0% |
-| **Wails** | `0` | 10.66 MB | 364.00 ms | 7 | 339.62 MB | 188.65 MB | 0% |
+| **AnyUI** | `0` | **2.94 MB** | **22.08 ms** | **1** | **38.74 MB** | **25.55 MB** | **0%** |
+| **Gio** | `0` | 6.52 MB | 151.90 ms | 1 | 55.71 MB | 39.31 MB | 0% |
+| **Fyne** | `1` | 23.29 MB | 223.11 ms | 1 | 169.45 MB | 156.94 MB | 0% |
+| **Wails** | `0` | 10.66 MB | 743.26 ms | 7 | 394.67 MB | 191.37 MB | 0% |
 
-- **WebView2 Runtime (required by Wails):** `878.2 MB` (`v157.0.4341.46`) on disk.
+- **WebView2 Runtime (required by Wails):** `878.0 MB` (`v157.0.4341.60`) on disk.
 - Reproduce on your own machine: see [benchmarks/](benchmarks/README.md) (`.\run.ps1`).
 
 ---
