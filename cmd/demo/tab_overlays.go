@@ -19,8 +19,8 @@ func (st *demoState) drawTabOverlays(ui *anyui.UI) {
 				st.popoverOpen = !st.popoverOpen
 			}
 			popAnchor := ui.CurrentAreaPx()
-			popAnchor.W = ui.S(160)
-			popAnchor.H = ui.S(38)
+			popAnchor.W = ui.Scale(160).Int()
+			popAnchor.H = ui.Scale(38).Int()
 			ui.Popover("pop_demo", &st.popoverOpen, popAnchor, func() {
 				ui.Label("Это Popover!", anyui.Bold())
 				ui.Toggle("pop_tgl", "Опция внутри", &st.toggleVal)
@@ -50,10 +50,10 @@ func (st *demoState) drawTabOverlays(ui *anyui.UI) {
 		ui.Label("ContextMenu (ПКМ) и Tooltip (наведение)", anyui.FontSize(16), anyui.Bold())
 
 		area := ui.CurrentAreaPx()
-		box := anyui.Rect{X: area.X, Y: area.Y + ui.S(120), W: ui.S(460), H: ui.S(74)}
+		box := anyui.Rect{X: area.X, Y: area.Y + ui.Scale(120).Int(), W: ui.Scale(460).Int(), H: ui.Scale(74).Int()}
 		ui.CanvasView(460, 74, func(canvas *render.Canvas, r anyui.Rect) {
 			box = r
-			canvas.DrawRoundedBox(r, ui.Sf(8), th.Surface, 1.0, th.Border)
+			canvas.DrawRoundedBox(r, ui.ScaleF(8), th.Surface, 1.0, th.Border)
 		})
 		ui.Label(st.contextLog, anyui.FontSize(13), anyui.TextColor(th.TextMuted))
 

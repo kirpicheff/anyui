@@ -37,19 +37,19 @@ func (c *Context) NumberInput(id string, value *float64, minVal, maxVal, step fl
 	}
 
 	st := ApplyOptions(opts)
-	w := c.S(160)
+	w := c.Scale(160).Int()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(34)
+	h := c.Scale(34).Int()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
+		h = c.Scale(*st.HeightDp).Int()
 	}
 
 	rect := c.allocRect(w, h)
-	radius := c.Sf(c.Theme.RadiusSm)
+	radius := c.ScaleF(c.Theme.RadiusSm)
 	if st.Radius != nil {
-		radius = c.Sf(*st.Radius)
+		radius = c.ScaleF(*st.Radius)
 	}
 
 	btnW := h
@@ -86,7 +86,7 @@ func (c *Context) NumberInput(id string, value *float64, minVal, maxVal, step fl
 	c.Canvas.DrawLine(float32(minusR.X+minusR.W), float32(rect.Y+2), float32(minusR.X+minusR.W), float32(rect.Y+rect.H-2), 1.0, c.Theme.Border)
 	mx := float32(minusR.X + minusR.W/2)
 	my := float32(minusR.Y + minusR.H/2)
-	c.Canvas.DrawLine(mx-c.Sf(5), my, mx+c.Sf(5), my, c.Sf(1.8), c.Theme.TextPrimary)
+	c.Canvas.DrawLine(mx-c.ScaleF(5), my, mx+c.ScaleF(5), my, c.ScaleF(1.8), c.Theme.TextPrimary)
 
 	// Кнопка '+'
 	plusHover := !blocked && !st.Disabled && plusR.Contains(c.MouseX, c.MouseY)
@@ -105,8 +105,8 @@ func (c *Context) NumberInput(id string, value *float64, minVal, maxVal, step fl
 	c.Canvas.DrawLine(float32(plusR.X), float32(rect.Y+2), float32(plusR.X), float32(rect.Y+rect.H-2), 1.0, c.Theme.Border)
 	px := float32(plusR.X + plusR.W/2)
 	py := float32(plusR.Y + plusR.H/2)
-	c.Canvas.DrawLine(px-c.Sf(5), py, px+c.Sf(5), py, c.Sf(1.8), c.Theme.TextPrimary)
-	c.Canvas.DrawLine(px, py-c.Sf(5), px, py+c.Sf(5), c.Sf(1.8), c.Theme.TextPrimary)
+	c.Canvas.DrawLine(px-c.ScaleF(5), py, px+c.ScaleF(5), py, c.ScaleF(1.8), c.Theme.TextPrimary)
+	c.Canvas.DrawLine(px, py-c.ScaleF(5), px, py+c.ScaleF(5), c.ScaleF(1.8), c.Theme.TextPrimary)
 
 	// Колесо мыши над полем
 	if !blocked && !st.Disabled && midR.Contains(c.MouseX, c.MouseY) && c.WheelY != 0 {
@@ -123,9 +123,9 @@ func (c *Context) NumberInput(id string, value *float64, minVal, maxVal, step fl
 	}
 
 	// Отображение значения
-	if c.Font != nil && midR.W > c.S(8) {
+	if c.Font != nil && midR.W > c.Scale(8).Int() {
 		txt := strconv.FormatFloat(*value, 'f', decimals, 64)
-		pxSize := c.S(13)
+		pxSize := c.Scale(13).Int()
 		tw, th := c.Font.MeasureText(txt, pxSize)
 		col := c.Theme.TextPrimary
 		if st.Disabled {
@@ -152,17 +152,17 @@ func (c *Context) Slider(id string, value *float32, minVal, maxVal float32, opts
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(28)
+	h := c.Scale(28).Int()
 	rect := c.allocRect(w, h)
 
-	pad := c.S(10)
+	pad := c.Scale(10).Int()
 	trackW := rect.W - pad*2
 	if trackW <= 0 {
 		return false
 	}
-	trackH := c.S(6)
+	trackH := c.Scale(6).Int()
 	trackY := rect.Y + (rect.H-trackH)/2
 	trackR := render.Rect{X: rect.X + pad, Y: trackY, W: trackW, H: trackH}
 
@@ -208,12 +208,12 @@ func (c *Context) Slider(id string, value *float32, minVal, maxVal float32, opts
 
 	kx := float32(trackR.X) + float32(trackW)*norm
 	ky := float32(rect.Y + rect.H/2)
-	kr := c.Sf(8)
+	kr := c.ScaleF(8)
 	if hover || c.ActiveID == id {
-		kr = c.Sf(9.5)
+		kr = c.ScaleF(9.5)
 	}
 	c.Canvas.FillCircle(kx, ky, kr, c.Theme.TextPrimary)
-	c.Canvas.FillCircle(kx, ky, kr-c.Sf(2.5), c.Theme.Accent)
+	c.Canvas.FillCircle(kx, ky, kr-c.ScaleF(2.5), c.Theme.Accent)
 
 	return changed
 }
@@ -234,17 +234,17 @@ func (c *Context) RangeSlider(id string, low, high *float32, minVal, maxVal floa
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(28)
+	h := c.Scale(28).Int()
 	rect := c.allocRect(w, h)
 
-	pad := c.S(10)
+	pad := c.Scale(10).Int()
 	trackW := rect.W - pad*2
 	if trackW <= 0 {
 		return false
 	}
-	trackH := c.S(6)
+	trackH := c.Scale(6).Int()
 	trackY := rect.Y + (rect.H-trackH)/2
 	trackR := render.Rect{X: rect.X + pad, Y: trackY, W: trackW, H: trackH}
 
@@ -330,12 +330,12 @@ func (c *Context) RangeSlider(id string, low, high *float32, minVal, maxVal floa
 		{lx, c.ActiveID == lowID},
 		{hx, c.ActiveID == highID},
 	} {
-		kr := c.Sf(8)
+		kr := c.ScaleF(8)
 		if info.active {
-			kr = c.Sf(9.5)
+			kr = c.ScaleF(9.5)
 		}
 		c.Canvas.FillCircle(info.x, ky, kr, c.Theme.TextPrimary)
-		c.Canvas.FillCircle(info.x, ky, kr-c.Sf(2.5), c.Theme.Accent)
+		c.Canvas.FillCircle(info.x, ky, kr-c.ScaleF(2.5), c.Theme.Accent)
 	}
 
 	return changed
@@ -444,13 +444,13 @@ func (c *Context) ColorPicker(id string, col *render.Color, opts ...Option) bool
 	}
 
 	st := ApplyOptions(opts)
-	w := c.S(160)
+	w := c.Scale(160).Int()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(34)
+	h := c.Scale(34).Int()
 	rect := c.allocRect(w, h)
-	radius := c.Sf(c.Theme.RadiusSm)
+	radius := c.ScaleF(c.Theme.RadiusSm)
 
 	isOpen := c.openState[id]
 	if !st.Disabled {
@@ -477,27 +477,27 @@ func (c *Context) ColorPicker(id string, col *render.Color, opts ...Option) bool
 	}
 	c.Canvas.DrawRoundedBox(rect, radius, c.Theme.SurfaceDark, 1.0, borderCol)
 
-	swatchR := render.Rect{X: rect.X + c.S(6), Y: rect.Y + c.S(6), W: rect.H - c.S(12), H: rect.H - c.S(12)}
-	c.Canvas.DrawRoundedBox(swatchR, c.Sf(4), *col, 1.0, c.Theme.Border)
+	swatchR := render.Rect{X: rect.X + c.Scale(6).Int(), Y: rect.Y + c.Scale(6).Int(), W: rect.H - c.Scale(12).Int(), H: rect.H - c.Scale(12).Int()}
+	c.Canvas.DrawRoundedBox(swatchR, c.ScaleF(4), *col, 1.0, c.Theme.Border)
 
 	if c.Font != nil {
 		hexStr := FormatHexColor(*col)
-		pxSize := c.S(13)
+		pxSize := c.Scale(13).Int()
 		_, th := c.Font.MeasureText(hexStr, pxSize)
-		c.Font.DrawText(c.Canvas, swatchR.X+swatchR.W+c.S(10), rect.Y+(rect.H-th)/2, hexStr, pxSize, c.Theme.TextPrimary)
+		c.Font.DrawText(c.Canvas, swatchR.X+swatchR.W+c.Scale(10).Int(), rect.Y+(rect.H-th)/2, hexStr, pxSize, c.Theme.TextPrimary)
 	}
 
 	changed := false
 	if isOpen {
-		popW := c.S(236)
-		popH := c.S(250)
+		popW := c.Scale(236).Int()
+		popH := c.Scale(250).Int()
 		popX := rect.X
-		popY := rect.Y + rect.H + c.S(4)
-		if popX+popW > c.Canvas.Width-c.S(8) {
-			popX = c.Canvas.Width - popW - c.S(8)
+		popY := rect.Y + rect.H + c.Scale(4).Int()
+		if popX+popW > c.Canvas.Width-c.Scale(8).Int() {
+			popX = c.Canvas.Width - popW - c.Scale(8).Int()
 		}
-		if popY+popH > c.Canvas.Height-c.S(8) {
-			popY = rect.Y - popH - c.S(4)
+		if popY+popH > c.Canvas.Height-c.Scale(8).Int() {
+			popY = rect.Y - popH - c.Scale(4).Int()
 		}
 		popR := render.Rect{X: popX, Y: popY, W: popW, H: popH}
 
@@ -509,15 +509,15 @@ func (c *Context) ColorPicker(id string, col *render.Color, opts ...Option) bool
 
 		c.PushOverlay(popR, func() {
 			c.Canvas.DrawBoxShadow(popR, render.BoxShadow{
-				OffsetY: c.Sf(4),
-				Blur:    c.Sf(14),
+				OffsetY: c.ScaleF(4),
+				Blur:    c.ScaleF(14),
 				Color:   render.RGBA(0, 0, 0, 120),
-				Radii:   render.UniformRadii(c.Sf(10)),
+				Radii:   render.UniformRadii(c.ScaleF(10)),
 			})
-			c.Canvas.DrawRoundedBox(popR, c.Sf(10), c.Theme.Card, 1.0, c.Theme.Border)
+			c.Canvas.DrawRoundedBox(popR, c.ScaleF(10), c.Theme.Card, 1.0, c.Theme.Border)
 
 			hsv := c.colorHSV[id]
-			svR := render.Rect{X: popR.X + c.S(12), Y: popR.Y + c.S(12), W: popR.W - c.S(24), H: c.S(130)}
+			svR := render.Rect{X: popR.X + c.Scale(12).Int(), Y: popR.Y + c.Scale(12).Int(), W: popR.W - c.Scale(24).Int(), H: c.Scale(130).Int()}
 
 			// Отрисовка SV-квадрата (шагом 2px для скорости)
 			stepPx := 2
@@ -559,11 +559,11 @@ func (c *Context) ColorPicker(id string, col *render.Color, opts ...Option) bool
 			// Маркер на SV-квадрате
 			mx := float32(svR.X) + hsv[1]*float32(svR.W)
 			my := float32(svR.Y) + (1.0-hsv[2])*float32(svR.H)
-			c.Canvas.FillCircle(mx, my, c.Sf(5), render.RGBA(255, 255, 255, 240))
-			c.Canvas.FillCircle(mx, my, c.Sf(3), *col)
+			c.Canvas.FillCircle(mx, my, c.ScaleF(5), render.RGBA(255, 255, 255, 240))
+			c.Canvas.FillCircle(mx, my, c.ScaleF(3), *col)
 
 			// Полоса оттенка Hue
-			hueR := render.Rect{X: svR.X, Y: svR.Y + svR.H + c.S(10), W: svR.W, H: c.S(16)}
+			hueR := render.Rect{X: svR.X, Y: svR.Y + svR.H + c.Scale(10).Int(), W: svR.W, H: c.Scale(16).Int()}
 			for px := 0; px < hueR.W; px += 2 {
 				hh := (float32(px) / float32(hueR.W)) * 360.0
 				c.Canvas.FillRect(render.Rect{X: hueR.X + px, Y: hueR.Y, W: 2, H: hueR.H}, hsvToRGB(hh, 1, 1))
@@ -590,20 +590,20 @@ func (c *Context) ColorPicker(id string, col *render.Color, opts ...Option) bool
 			}
 
 			hx := float32(hueR.X) + (hsv[0]/360.0)*float32(hueR.W)
-			c.Canvas.FillRect(render.Rect{X: int(hx) - c.S(2), Y: hueR.Y - c.S(2), W: c.S(4), H: hueR.H + c.S(4)}, render.RGBA(255, 255, 255, 255))
+			c.Canvas.FillRect(render.Rect{X: int(hx) - c.Scale(2).Int(), Y: hueR.Y - c.Scale(2).Int(), W: c.Scale(4).Int(), H: hueR.H + c.Scale(4).Int()}, render.RGBA(255, 255, 255, 255))
 
 			// Быстрые свотчи
 			swatches := []render.Color{
 				render.Hex(0x3B82F6), render.Hex(0x22C55E), render.Hex(0xF59E0B), render.Hex(0xEF4444),
 				render.Hex(0x8B5CF6), render.Hex(0xEC4899), render.Hex(0x06B6D4), render.Hex(0xF8FAFC),
 			}
-			swY := hueR.Y + hueR.H + c.S(10)
-			swSize := c.S(20)
-			swGap := c.S(6)
+			swY := hueR.Y + hueR.H + c.Scale(10).Int()
+			swSize := c.Scale(20).Int()
+			swGap := c.Scale(6).Int()
 			for i, swCol := range swatches {
 				sr := render.Rect{X: svR.X + i*(swSize+swGap), Y: swY, W: swSize, H: swSize}
 				c.RegisterHit(id+":sw:"+strconv.Itoa(i), sr, platform.CursorHand)
-				c.Canvas.DrawRoundedBox(sr, c.Sf(4), swCol, 1.0, c.Theme.Border)
+				c.Canvas.DrawRoundedBox(sr, c.ScaleF(4), swCol, 1.0, c.Theme.Border)
 				if sr.Contains(c.MouseX, c.MouseY) {
 					c.nextCursor = platform.CursorHand
 					if c.MousePressed {
@@ -618,10 +618,10 @@ func (c *Context) ColorPicker(id string, col *render.Color, opts ...Option) bool
 			}
 
 			// HEX-поле ввода внутри оверлея
-			hexBox := render.Rect{X: svR.X, Y: swY + swSize + c.S(10), W: svR.W, H: c.S(30)}
+			hexBox := render.Rect{X: svR.X, Y: swY + swSize + c.Scale(10).Int(), W: svR.W, H: c.Scale(30).Int()}
 			c.pushBox(hexBox, dirColumn, AlignStart, 0)
 			hexStr := c.colorHexText[id]
-			if c.TextInput(id+":hex", &hexStr, "#RRGGBB", int(float32(svR.W)/c.Scale)) {
+			if c.TextInput(id+":hex", &hexStr, "#RRGGBB", Dp(float32(svR.W)/c.DpiScale)) {
 				c.colorHexText[id] = hexStr
 				if parsed, ok := ParseHexColor(hexStr); ok {
 					*col = parsed
@@ -654,20 +654,20 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 	}
 
 	st := ApplyOptions(opts)
-	w := c.S(180)
+	w := c.Scale(180).Int()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(34)
+	h := c.Scale(34).Int()
 	rect := c.allocRect(w, h)
-	radius := c.Sf(c.Theme.RadiusSm)
+	radius := c.ScaleF(c.Theme.RadiusSm)
 
 	isOpen := c.openState[id]
 	changed := false
 
 	// Клик по полю открывает/закрывает выпадающий календарь; двойной клик по текстовой части включает ручной ввод
-	calZone := render.Rect{X: rect.X + rect.W - c.S(30), Y: rect.Y, W: c.S(30), H: rect.H}
-	textZone := render.Rect{X: rect.X, Y: rect.Y, W: rect.W - c.S(30), H: rect.H}
+	calZone := render.Rect{X: rect.X + rect.W - c.Scale(30).Int(), Y: rect.Y, W: c.Scale(30).Int(), H: rect.H}
+	textZone := render.Rect{X: rect.X, Y: rect.Y, W: rect.W - c.Scale(30).Int(), H: rect.H}
 	if !st.Disabled {
 		c.RegisterHit(id, rect, platform.CursorHand)
 	}
@@ -744,38 +744,38 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 	c.Canvas.DrawRoundedBox(rect, radius, c.Theme.SurfaceDark, 1.0, borderCol)
 
 	if c.Font != nil {
-		pxSize := c.S(13)
+		pxSize := c.Scale(13).Int()
 		label := date.Format("2006-01-02")
 		if dpEditActive[id] {
 			label = dpEditText[id]
 		}
 		_, th := c.Font.MeasureText(label, pxSize)
-		tx := rect.X + c.S(10)
+		tx := rect.X + c.Scale(10).Int()
 		ty := rect.Y + (rect.H-th)/2
 		c.Font.DrawText(c.Canvas, tx, ty, label, pxSize, c.Theme.TextPrimary)
 		if dpEditActive[id] && c.FocusID == id+":edit" {
 			tw, _ := c.Font.MeasureText(label, pxSize)
-			c.Canvas.FillRect(render.Rect{X: tx + tw + 1, Y: rect.Y + c.S(7), W: 1, H: rect.H - c.S(14)}, c.Theme.Accent)
+			c.Canvas.FillRect(render.Rect{X: tx + tw + 1, Y: rect.Y + c.Scale(7).Int(), W: 1, H: rect.H - c.Scale(14).Int()}, c.Theme.Accent)
 		}
 	}
 
 	// Иконка календаря справа
-	calX := rect.X + rect.W - c.S(24)
-	calY := rect.Y + (rect.H-c.S(14))/2
-	calR := render.Rect{X: calX, Y: calY, W: c.S(14), H: c.S(14)}
-	c.Canvas.DrawRoundedBox(calR, c.Sf(2), render.RGBA(0, 0, 0, 0), 1.2, c.Theme.TextMuted)
-	c.Canvas.DrawLine(float32(calR.X), float32(calR.Y+c.S(4)), float32(calR.X+calR.W), float32(calR.Y+c.S(4)), 1.2, c.Theme.TextMuted)
+	calX := rect.X + rect.W - c.Scale(24).Int()
+	calY := rect.Y + (rect.H-c.Scale(14).Int())/2
+	calR := render.Rect{X: calX, Y: calY, W: c.Scale(14).Int(), H: c.Scale(14).Int()}
+	c.Canvas.DrawRoundedBox(calR, c.ScaleF(2), render.RGBA(0, 0, 0, 0), 1.2, c.Theme.TextMuted)
+	c.Canvas.DrawLine(float32(calR.X), float32(calR.Y+c.Scale(4).Int()), float32(calR.X+calR.W), float32(calR.Y+c.Scale(4).Int()), 1.2, c.Theme.TextMuted)
 
 	if isOpen {
-		popW := c.S(246)
-		popH := c.S(284)
+		popW := c.Scale(246).Int()
+		popH := c.Scale(284).Int()
 		popX := rect.X
-		popY := rect.Y + rect.H + c.S(4)
-		if popX+popW > c.Canvas.Width-c.S(8) {
-			popX = c.Canvas.Width - popW - c.S(8)
+		popY := rect.Y + rect.H + c.Scale(4).Int()
+		if popX+popW > c.Canvas.Width-c.Scale(8).Int() {
+			popX = c.Canvas.Width - popW - c.Scale(8).Int()
 		}
-		if popY+popH > c.Canvas.Height-c.S(8) {
-			popY = rect.Y - popH - c.S(4)
+		if popY+popH > c.Canvas.Height-c.Scale(8).Int() {
+			popY = rect.Y - popH - c.Scale(4).Int()
 		}
 		popR := render.Rect{X: popX, Y: popY, W: popW, H: popH}
 
@@ -787,12 +787,12 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 
 		c.PushOverlay(popR, func() {
 			c.Canvas.DrawBoxShadow(popR, render.BoxShadow{
-				OffsetY: c.Sf(4),
-				Blur:    c.Sf(14),
+				OffsetY: c.ScaleF(4),
+				Blur:    c.ScaleF(14),
 				Color:   render.RGBA(0, 0, 0, 120),
-				Radii:   render.UniformRadii(c.Sf(10)),
+				Radii:   render.UniformRadii(c.ScaleF(10)),
 			})
-			c.Canvas.DrawRoundedBox(popR, c.Sf(10), c.Theme.Card, 1.0, c.Theme.Border)
+			c.Canvas.DrawRoundedBox(popR, c.ScaleF(10), c.Theme.Card, 1.0, c.Theme.Border)
 
 			vm := c.dateViewMonth[id]
 			if vm.IsZero() {
@@ -803,15 +803,15 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 			mode := dpModeStore[id]
 
 			// Шапка месяца/года с кнопками < и >
-			hdrR := render.Rect{X: popR.X + c.S(10), Y: popR.Y + c.S(10), W: popR.W - c.S(20), H: c.S(28)}
-			prevR := render.Rect{X: hdrR.X, Y: hdrR.Y, W: c.S(28), H: hdrR.H}
-			nextR := render.Rect{X: hdrR.X + hdrR.W - c.S(28), Y: hdrR.Y, W: c.S(28), H: hdrR.H}
+			hdrR := render.Rect{X: popR.X + c.Scale(10).Int(), Y: popR.Y + c.Scale(10).Int(), W: popR.W - c.Scale(20).Int(), H: c.Scale(28).Int()}
+			prevR := render.Rect{X: hdrR.X, Y: hdrR.Y, W: c.Scale(28).Int(), H: hdrR.H}
+			nextR := render.Rect{X: hdrR.X + hdrR.W - c.Scale(28).Int(), Y: hdrR.Y, W: c.Scale(28).Int(), H: hdrR.H}
 			c.RegisterHit(id+":prev", prevR, platform.CursorHand)
 			c.RegisterHit(id+":next", nextR, platform.CursorHand)
 
 			if prevR.Contains(c.MouseX, c.MouseY) {
 				c.nextCursor = platform.CursorHand
-				c.Canvas.FillRoundedRect(prevR, c.Sf(6), c.Theme.Surface)
+				c.Canvas.FillRoundedRect(prevR, c.ScaleF(6), c.Theme.Surface)
 				if c.MousePressed {
 					if mode == dpModeYears {
 						c.dateViewMonth[id] = vm.AddDate(-12, 0, 0)
@@ -825,7 +825,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 			}
 			if nextR.Contains(c.MouseX, c.MouseY) {
 				c.nextCursor = platform.CursorHand
-				c.Canvas.FillRoundedRect(nextR, c.Sf(6), c.Theme.Surface)
+				c.Canvas.FillRoundedRect(nextR, c.ScaleF(6), c.Theme.Surface)
 				if c.MousePressed {
 					if mode == dpModeYears {
 						c.dateViewMonth[id] = vm.AddDate(12, 0, 0)
@@ -840,7 +840,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 
 			if c.Font != nil {
 				loc := c.str()
-				px := c.S(13)
+				px := c.Scale(13).Int()
 				months := loc.Months
 				if mode == dpModeYears {
 					title := formatYearRangeTitle(vm.Year())
@@ -851,18 +851,18 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 					yName := strconv.Itoa(vm.Year())
 					mw, mh := c.Font.MeasureText(mName, px)
 					yw, yh := c.Font.MeasureText(yName, px)
-					gap := c.S(6)
+					gap := c.Scale(6).Int()
 					totalW := mw + gap + yw
 					startX := hdrR.X + (hdrR.W-totalW)/2
-					mRect := render.Rect{X: startX - c.S(4), Y: hdrR.Y, W: mw + c.S(8), H: hdrR.H}
-					yRect := render.Rect{X: startX + mw + gap - c.S(4), Y: hdrR.Y, W: yw + c.S(8), H: hdrR.H}
+					mRect := render.Rect{X: startX - c.Scale(4).Int(), Y: hdrR.Y, W: mw + c.Scale(8).Int(), H: hdrR.H}
+					yRect := render.Rect{X: startX + mw + gap - c.Scale(4).Int(), Y: hdrR.Y, W: yw + c.Scale(8).Int(), H: hdrR.H}
 					c.RegisterHit(id+":month", mRect, platform.CursorHand)
 					c.RegisterHit(id+":year", yRect, platform.CursorHand)
 
 					mCol := c.Theme.TextPrimary
 					if mRect.Contains(c.MouseX, c.MouseY) {
 						c.nextCursor = platform.CursorHand
-						c.Canvas.FillRoundedRect(mRect, c.Sf(6), c.Theme.Surface)
+						c.Canvas.FillRoundedRect(mRect, c.ScaleF(6), c.Theme.Surface)
 						mCol = c.Theme.Accent
 						if c.MousePressed {
 							if mode == dpModeMonths {
@@ -876,7 +876,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 					yCol := c.Theme.TextPrimary
 					if yRect.Contains(c.MouseX, c.MouseY) {
 						c.nextCursor = platform.CursorHand
-						c.Canvas.FillRoundedRect(yRect, c.Sf(6), c.Theme.Surface)
+						c.Canvas.FillRoundedRect(yRect, c.ScaleF(6), c.Theme.Surface)
 						yCol = c.Theme.Accent
 						if c.MousePressed {
 							dpModeStore[id] = dpModeYears
@@ -893,24 +893,24 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 				c.Font.DrawText(c.Canvas, nextR.X+(nextR.W-nw)/2, nextR.Y+(nextR.H-nh)/2, ">", px, c.Theme.TextPrimary)
 			}
 
-			gridX := popR.X + c.S(10)
-			gridY := hdrR.Y + hdrR.H + c.S(8)
+			gridX := popR.X + c.Scale(10).Int()
+			gridY := hdrR.Y + hdrR.H + c.Scale(8).Int()
 
 			if mode == dpModeMonths {
 				shortMonths := c.str().ShortMonths
-				mW := (popR.W - c.S(20)) / 3
-				mH := c.S(42)
+				mW := (popR.W - c.Scale(20).Int()) / 3
+				mH := c.Scale(42).Int()
 				for mi := 0; mi < 12; mi++ {
 					colIdx := mi % 3
 					rowIdx := mi / 3
-					mr := render.Rect{X: gridX + colIdx*mW + c.S(2), Y: gridY + rowIdx*mH + c.S(2), W: mW - c.S(4), H: mH - c.S(4)}
+					mr := render.Rect{X: gridX + colIdx*mW + c.Scale(2).Int(), Y: gridY + rowIdx*mH + c.Scale(2).Int(), W: mW - c.Scale(4).Int(), H: mH - c.Scale(4).Int()}
 					c.RegisterHit(id+":m:"+strconv.Itoa(mi), mr, platform.CursorHand)
 					isCur := int(vm.Month())-1 == mi
 					hov := mr.Contains(c.MouseX, c.MouseY)
 					if isCur {
-						c.Canvas.FillRoundedRect(mr, c.Sf(6), c.Theme.Accent)
+						c.Canvas.FillRoundedRect(mr, c.ScaleF(6), c.Theme.Accent)
 					} else if hov {
-						c.Canvas.FillRoundedRect(mr, c.Sf(6), c.Theme.Surface)
+						c.Canvas.FillRoundedRect(mr, c.ScaleF(6), c.Theme.Surface)
 					}
 					if hov {
 						c.nextCursor = platform.CursorHand
@@ -925,26 +925,26 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 						if isCur {
 							tc = render.RGBA(255, 255, 255, 255)
 						}
-						tw, th := c.Font.MeasureText(shortMonths[mi], c.S(12))
-						c.Font.DrawText(c.Canvas, mr.X+(mr.W-tw)/2, mr.Y+(mr.H-th)/2, shortMonths[mi], c.S(12), tc)
+						tw, th := c.Font.MeasureText(shortMonths[mi], c.Scale(12).Int())
+						c.Font.DrawText(c.Canvas, mr.X+(mr.W-tw)/2, mr.Y+(mr.H-th)/2, shortMonths[mi], c.Scale(12).Int(), tc)
 					}
 				}
 			} else if mode == dpModeYears {
 				startYear := (vm.Year() / 12) * 12
-				yW := (popR.W - c.S(20)) / 3
-				yH := c.S(42)
+				yW := (popR.W - c.Scale(20).Int()) / 3
+				yH := c.Scale(42).Int()
 				for yi := 0; yi < 12; yi++ {
 					yr := startYear + yi
 					colIdx := yi % 3
 					rowIdx := yi / 3
-					yrRect := render.Rect{X: gridX + colIdx*yW + c.S(2), Y: gridY + rowIdx*yH + c.S(2), W: yW - c.S(4), H: yH - c.S(4)}
+					yrRect := render.Rect{X: gridX + colIdx*yW + c.Scale(2).Int(), Y: gridY + rowIdx*yH + c.Scale(2).Int(), W: yW - c.Scale(4).Int(), H: yH - c.Scale(4).Int()}
 					c.RegisterHit(id+":y:"+strconv.Itoa(yr), yrRect, platform.CursorHand)
 					isCur := vm.Year() == yr
 					hov := yrRect.Contains(c.MouseX, c.MouseY)
 					if isCur {
-						c.Canvas.FillRoundedRect(yrRect, c.Sf(6), c.Theme.Accent)
+						c.Canvas.FillRoundedRect(yrRect, c.ScaleF(6), c.Theme.Accent)
 					} else if hov {
-						c.Canvas.FillRoundedRect(yrRect, c.Sf(6), c.Theme.Surface)
+						c.Canvas.FillRoundedRect(yrRect, c.ScaleF(6), c.Theme.Surface)
 					}
 					if hov {
 						c.nextCursor = platform.CursorHand
@@ -960,27 +960,27 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 							tc = render.RGBA(255, 255, 255, 255)
 						}
 						ys := strconv.Itoa(yr)
-						tw, th := c.Font.MeasureText(ys, c.S(12))
-						c.Font.DrawText(c.Canvas, yrRect.X+(yrRect.W-tw)/2, yrRect.Y+(yrRect.H-th)/2, ys, c.S(12), tc)
+						tw, th := c.Font.MeasureText(ys, c.Scale(12).Int())
+						c.Font.DrawText(c.Canvas, yrRect.X+(yrRect.W-tw)/2, yrRect.Y+(yrRect.H-th)/2, ys, c.Scale(12).Int(), tc)
 					}
 				}
 			} else {
 				// Дни недели (Пн..Вс)
-				cellW := (popR.W - c.S(20)) / 7
-				cellH := c.S(28)
+				cellW := (popR.W - c.Scale(20).Int()) / 7
+				cellH := c.Scale(28).Int()
 
 				wdNames := c.str().Weekdays
 				if c.Font != nil {
-					pxSmall := c.S(11)
+					pxSmall := c.Scale(11).Int()
 					for i, wd := range wdNames {
 						tw, th := c.Font.MeasureText(wd, pxSmall)
 						cx := gridX + i*cellW + (cellW-tw)/2
-						c.Font.DrawText(c.Canvas, cx, gridY+(c.S(20)-th)/2, wd, pxSmall, c.Theme.TextMuted)
+						c.Font.DrawText(c.Canvas, cx, gridY+(c.Scale(20).Int()-th)/2, wd, pxSmall, c.Theme.TextMuted)
 					}
 				}
 
 				// Сетка чисел месяца
-				daysY := gridY + c.S(22)
+				daysY := gridY + c.Scale(22).Int()
 				firstWD := int(vm.Weekday())
 				if firstWD == 0 {
 					firstWD = 7 // Воскресенье -> 7
@@ -993,7 +993,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 					slot := offset + d - 1
 					colIdx := slot % 7
 					rowIdx := slot / 7
-					dr := render.Rect{X: gridX + colIdx*cellW + c.S(1), Y: daysY + rowIdx*cellH + c.S(1), W: cellW - c.S(2), H: cellH - c.S(2)}
+					dr := render.Rect{X: gridX + colIdx*cellW + c.Scale(1).Int(), Y: daysY + rowIdx*cellH + c.Scale(1).Int(), W: cellW - c.Scale(2).Int(), H: cellH - c.Scale(2).Int()}
 					c.RegisterHit(id+":d:"+strconv.Itoa(d), dr, platform.CursorHand)
 
 					isSel := date.Year() == vm.Year() && date.Month() == vm.Month() && date.Day() == d
@@ -1001,11 +1001,11 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 					dHover := dr.Contains(c.MouseX, c.MouseY)
 
 					if isSel {
-						c.Canvas.FillRoundedRect(dr, c.Sf(6), c.Theme.Accent)
+						c.Canvas.FillRoundedRect(dr, c.ScaleF(6), c.Theme.Accent)
 					} else if dHover {
-						c.Canvas.FillRoundedRect(dr, c.Sf(6), c.Theme.Surface)
+						c.Canvas.FillRoundedRect(dr, c.ScaleF(6), c.Theme.Surface)
 					} else if isToday {
-						c.Canvas.DrawRoundedBox(dr, c.Sf(6), render.RGBA(0, 0, 0, 0), 1.0, c.Theme.Accent)
+						c.Canvas.DrawRoundedBox(dr, c.ScaleF(6), render.RGBA(0, 0, 0, 0), 1.0, c.Theme.Accent)
 					}
 
 					if dHover {
@@ -1019,7 +1019,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 					}
 
 					if c.Font != nil {
-						px := c.S(12)
+						px := c.Scale(12).Int()
 						ds := strconv.Itoa(d)
 						tw, th := c.Font.MeasureText(ds, px)
 						tc := c.Theme.TextPrimary
@@ -1032,7 +1032,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 			}
 
 			// Кнопка "Сегодня" внизу календаря
-			todayR := render.Rect{X: popR.X + c.S(10), Y: popR.Y + popR.H - c.S(34), W: popR.W - c.S(20), H: c.S(24)}
+			todayR := render.Rect{X: popR.X + c.Scale(10).Int(), Y: popR.Y + popR.H - c.Scale(34).Int(), W: popR.W - c.Scale(20).Int(), H: c.Scale(24).Int()}
 			c.RegisterHit(id+":today", todayR, platform.CursorHand)
 			hovToday := todayR.Contains(c.MouseX, c.MouseY)
 			todayBg := c.Theme.Surface
@@ -1049,11 +1049,11 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 					c.RequestRedraw()
 				}
 			}
-			c.Canvas.DrawRoundedBox(todayR, c.Sf(6), todayBg, 1.0, c.Theme.Border)
+			c.Canvas.DrawRoundedBox(todayR, c.ScaleF(6), todayBg, 1.0, c.Theme.Border)
 			if c.Font != nil {
 				todayLbl := c.str().Today
-				tw, th := c.Font.MeasureText(todayLbl, c.S(11))
-				c.Font.DrawText(c.Canvas, todayR.X+(todayR.W-tw)/2, todayR.Y+(todayR.H-th)/2, todayLbl, c.S(11), c.Theme.Accent)
+				tw, th := c.Font.MeasureText(todayLbl, c.Scale(11).Int())
+				c.Font.DrawText(c.Canvas, todayR.X+(todayR.W-tw)/2, todayR.Y+(todayR.H-th)/2, todayLbl, c.Scale(11).Int(), c.Theme.Accent)
 			}
 		})
 	}

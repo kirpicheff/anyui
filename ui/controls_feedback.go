@@ -77,7 +77,7 @@ func (c *Context) SetToastPosition(pos ToastPosition) {
 }
 
 // SetToastOffset задаёт отступы всплывающих уведомлений от краёв окна в логических пикселях (по умолчанию 16, 16).
-func (c *Context) SetToastOffset(xDp, yDp int) {
+func (c *Context) SetToastOffset(xDp, yDp Dp) {
 	if xDp < 0 {
 		xDp = 0
 	}
@@ -111,16 +111,16 @@ func (c *Context) drawToasts() {
 		c.Animator.MarkActive()
 	}
 
-	toastW := c.S(300)
-	toastH := c.S(64)
-	gap := c.S(10)
-	offX := c.S(16)
-	offY := c.S(16)
+	toastW := c.Scale(300).Int()
+	toastH := c.Scale(64).Int()
+	gap := c.Scale(10).Int()
+	offX := c.Scale(16).Int()
+	offY := c.Scale(16).Int()
 	if c.toastHasOffset {
-		offX = c.S(c.toastOffsetXDp)
-		offY = c.S(c.toastOffsetYDp)
+		offX = c.Scale(c.toastOffsetXDp).Int()
+		offY = c.Scale(c.toastOffsetYDp).Int()
 	}
-	minPad := c.S(8)
+	minPad := c.Scale(8).Int()
 
 	for i := len(c.toasts) - 1; i >= 0; i-- {
 		t := c.toasts[i]
@@ -148,55 +148,55 @@ func (c *Context) drawToasts() {
 		}
 
 		c.Canvas.DrawBoxShadow(tr, render.BoxShadow{
-			OffsetY: c.Sf(4),
-			Blur:    c.Sf(12),
+			OffsetY: c.ScaleF(4),
+			Blur:    c.ScaleF(12),
 			Color:   render.RGBA(0, 0, 0, 120),
-			Radii:   render.UniformRadii(c.Sf(10)),
+			Radii:   render.UniformRadii(c.ScaleF(10)),
 		})
-		c.Canvas.DrawRoundedBox(tr, c.Sf(10), c.Theme.Card, 1.0, c.Theme.Border)
+		c.Canvas.DrawRoundedBox(tr, c.ScaleF(10), c.Theme.Card, 1.0, c.Theme.Border)
 
 		// Левая цветная полоса типа уведомления
-		barR := render.Rect{X: tr.X + c.S(4), Y: tr.Y + c.S(8), W: c.S(4), H: tr.H - c.S(16)}
-		c.Canvas.FillRoundedRect(barR, c.Sf(2), accent)
+		barR := render.Rect{X: tr.X + c.Scale(4).Int(), Y: tr.Y + c.Scale(8).Int(), W: c.Scale(4).Int(), H: tr.H - c.Scale(16).Int()}
+		c.Canvas.FillRoundedRect(barR, c.ScaleF(2), accent)
 
 		// Кнопка закрытия '×'
-		closeR := render.Rect{X: tr.X + tr.W - c.S(26), Y: tr.Y + c.S(8), W: c.S(18), H: c.S(18)}
+		closeR := render.Rect{X: tr.X + tr.W - c.Scale(26).Int(), Y: tr.Y + c.Scale(8).Int(), W: c.Scale(18).Int(), H: c.Scale(18).Int()}
 		c.RegisterHit("toast:close:"+t.Title, closeR, platform.CursorHand)
 		if closeR.Contains(c.MouseX, c.MouseY) {
 			c.nextCursor = platform.CursorHand
-			c.Canvas.FillRoundedRect(closeR, c.Sf(4), c.Theme.Surface)
+			c.Canvas.FillRoundedRect(closeR, c.ScaleF(4), c.Theme.Surface)
 			if c.MousePressed {
 				t.Duration = 0
 				c.RequestRedraw()
 			}
 		}
-		p := c.Sf(4)
-		c.Canvas.DrawLine(float32(closeR.X)+p, float32(closeR.Y)+p, float32(closeR.X+closeR.W)-p, float32(closeR.Y+closeR.H)-p, c.Sf(1.4), c.Theme.TextMuted)
-		c.Canvas.DrawLine(float32(closeR.X+closeR.W)-p, float32(closeR.Y)+p, float32(closeR.X)+p, float32(closeR.Y+closeR.H)-p, c.Sf(1.4), c.Theme.TextMuted)
+		p := c.ScaleF(4)
+		c.Canvas.DrawLine(float32(closeR.X)+p, float32(closeR.Y)+p, float32(closeR.X+closeR.W)-p, float32(closeR.Y+closeR.H)-p, c.ScaleF(1.4), c.Theme.TextMuted)
+		c.Canvas.DrawLine(float32(closeR.X+closeR.W)-p, float32(closeR.Y)+p, float32(closeR.X)+p, float32(closeR.Y+closeR.H)-p, c.ScaleF(1.4), c.Theme.TextMuted)
 
 		if c.Font != nil {
-			textX := tr.X + c.S(16)
-			textW := tr.W - c.S(46)
+			textX := tr.X + c.Scale(16).Int()
+			textW := tr.W - c.Scale(46).Int()
 			c.Canvas.PushClip(render.Rect{X: textX, Y: tr.Y, W: textW, H: tr.H})
 			if t.Title != "" {
-				c.Font.DrawTextStyled(c.Canvas, textX, tr.Y+c.S(10), t.Title, c.S(13), c.Theme.TextPrimary, render.FontBold)
+				c.Font.DrawTextStyled(c.Canvas, textX, tr.Y+c.Scale(10).Int(), t.Title, c.Scale(13).Int(), c.Theme.TextPrimary, render.FontBold)
 			}
 			if t.Text != "" {
-				c.Font.DrawText(c.Canvas, textX, tr.Y+c.S(32), t.Text, c.S(12), c.Theme.TextMuted)
+				c.Font.DrawText(c.Canvas, textX, tr.Y+c.Scale(32).Int(), t.Text, c.Scale(12).Int(), c.Theme.TextMuted)
 			}
 			c.Canvas.PopClip()
 		}
 
 		// Индикатор оставшегося времени внизу
-		progW := int(float32(tr.W-c.S(16)) * remainRatio)
+		progW := int(float32(tr.W-c.Scale(16).Int()) * remainRatio)
 		if progW > 0 {
-			c.Canvas.FillRoundedRect(render.Rect{X: tr.X + c.S(8), Y: tr.Y + tr.H - c.S(4), W: progW, H: c.S(2)}, c.Sf(1), accent.WithAlpha(180))
+			c.Canvas.FillRoundedRect(render.Rect{X: tr.X + c.Scale(8).Int(), Y: tr.Y + tr.H - c.Scale(4).Int(), W: progW, H: c.Scale(2).Int()}, c.ScaleF(1), accent.WithAlpha(180))
 		}
 	}
 }
 
 // Spinner рисует анимированный индикатор загрузки.
-func (c *Context) Spinner(id string, sizeDp int, opts ...Option) {
+func (c *Context) Spinner(id string, sizeDp Dp, opts ...Option) {
 	id = c.ResolveID("spin", id)
 	if sizeDp <= 0 {
 		sizeDp = 24
@@ -205,7 +205,7 @@ func (c *Context) Spinner(id string, sizeDp int, opts ...Option) {
 		c.spinnerAngle = make(map[string]float32)
 	}
 	st := ApplyOptions(opts)
-	sz := c.S(sizeDp)
+	sz := c.Scale(sizeDp).Int()
 	rect := c.allocRect(sz, sz)
 
 	dt := float32(1.0 / 60.0)
@@ -224,13 +224,13 @@ func (c *Context) Spinner(id string, sizeDp int, opts ...Option) {
 
 	cx := float32(rect.X) + float32(rect.W)*0.5
 	cy := float32(rect.Y) + float32(rect.H)*0.5
-	rad := float32(sz)*0.5 - c.Sf(3)
+	rad := float32(sz)*0.5 - c.ScaleF(3)
 	if rad < 2 {
 		rad = 2
 	}
-	thick := c.Sf(2.8)
-	if sz >= c.S(36) {
-		thick = c.Sf(3.5)
+	thick := c.ScaleF(2.8)
+	if sz >= c.Scale(36).Int() {
+		thick = c.ScaleF(3.5)
 	}
 
 	col := c.Theme.Accent

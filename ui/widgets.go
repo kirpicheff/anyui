@@ -27,20 +27,20 @@ func (c *Context) consumeEnter() bool {
 }
 
 // Label выводит строку текста.
-func (c *Context) Label(text string, sizeDp int, col render.Color) {
+func (c *Context) Label(text string, sizeDp Dp, col render.Color) {
 	c.LabelOpts(text, FontSize(sizeDp), TextColor(col))
 }
 
 func (c *Context) textRenderOpts(st WidgetStyle) render.TextRenderOptions {
 	opts := render.TextRenderOptions{
 		Style:           st.FontStyle,
-		LetterSpacingPx: c.Sf(st.LetterSpacing),
+		LetterSpacingPx: c.ScaleF(st.LetterSpacing),
 	}
 	if st.TextShadow != nil && st.TextShadow.Color.A > 0 {
 		opts.Shadow = &render.TextShadowStyle{
-			OffsetX: c.Sf(st.TextShadow.OffsetX),
-			OffsetY: c.Sf(st.TextShadow.OffsetY),
-			Blur:    c.Sf(st.TextShadow.Blur),
+			OffsetX: c.ScaleF(st.TextShadow.OffsetX),
+			OffsetY: c.ScaleF(st.TextShadow.OffsetY),
+			Blur:    c.ScaleF(st.TextShadow.Blur),
 			Color:   st.TextShadow.Color,
 		}
 	}
@@ -53,7 +53,7 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 		return
 	}
 	st := ApplyOptions(opts)
-	sizeDp := 14
+	sizeDp := Dp(14)
 	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
 		sizeDp = *st.FontSizeDp
 	}
@@ -65,18 +65,18 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 		col = c.Theme.TextMuted
 	}
 
-	pxSize := c.S(sizeDp)
+	pxSize := c.Scale(sizeDp).Int()
 	textOpts := c.textRenderOpts(st)
 	if st.WordWrap {
 		maxW := c.RemainingWidth()
 		if st.WidthDp != nil && *st.WidthDp > 0 {
-			maxW = c.S(*st.WidthDp)
+			maxW = c.Scale(*st.WidthDp).Int()
 		}
-		if st.MaxWidthDp != nil && *st.MaxWidthDp > 0 && c.S(*st.MaxWidthDp) < maxW {
-			maxW = c.S(*st.MaxWidthDp)
+		if st.MaxWidthDp != nil && *st.MaxWidthDp > 0 && c.Scale(*st.MaxWidthDp).Int() < maxW {
+			maxW = c.Scale(*st.MaxWidthDp).Int()
 		}
 		if maxW <= 0 {
-			maxW = c.S(200)
+			maxW = c.Scale(200).Int()
 		}
 		runes := []rune(text)
 		lines := c.WrapTextLines(runes, maxW, pxSize, st.FontStyle)
@@ -84,7 +84,7 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 		if lineH <= 0 {
 			_, lineH = c.Font.MeasureTextWithOptions(text, pxSize, textOpts)
 		}
-		gap := c.S(3)
+		gap := c.Scale(3).Int()
 		lineStep := lineH + gap
 		totalH := lineH
 		if len(lines) > 1 {
@@ -98,7 +98,7 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 			}
 		}
 		if st.WidthDp != nil && *st.WidthDp > 0 {
-			totalW = c.S(*st.WidthDp)
+			totalW = c.Scale(*st.WidthDp).Int()
 		}
 		r := c.allocRectStyled(totalW, totalH, st)
 		for i, sp := range lines {
@@ -122,10 +122,10 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 	if st.Ellipsis {
 		maxW := c.RemainingWidth()
 		if st.WidthDp != nil && *st.WidthDp > 0 {
-			maxW = c.S(*st.WidthDp)
+			maxW = c.Scale(*st.WidthDp).Int()
 		}
-		if st.MaxWidthDp != nil && *st.MaxWidthDp > 0 && c.S(*st.MaxWidthDp) < maxW {
-			maxW = c.S(*st.MaxWidthDp)
+		if st.MaxWidthDp != nil && *st.MaxWidthDp > 0 && c.Scale(*st.MaxWidthDp).Int() < maxW {
+			maxW = c.Scale(*st.MaxWidthDp).Int()
 		}
 		if maxW > 0 && w > maxW {
 			runes := []rune(drawText)
@@ -163,10 +163,10 @@ func (c *Context) StatusDot(dotColor render.Color, label string) {
 	if c.Font == nil {
 		return
 	}
-	pxSize := c.S(12)
+	pxSize := c.Scale(12).Int()
 	tw, th := c.Font.MeasureText(label, pxSize)
-	dotR := c.Sf(4)
-	gap := c.S(8)
+	dotR := c.ScaleF(4)
+	gap := c.Scale(8).Int()
 	totalW := int(dotR*2) + gap + tw
 	h := th
 	if int(dotR*2) > h {
@@ -179,31 +179,31 @@ func (c *Context) StatusDot(dotColor render.Color, label string) {
 }
 
 // Card рисует скруглённую карточку с 1px-обводкой и размещает внутри неё дочерние виджеты.
-func (c *Context) Card(wDp, hDp, padDp int, fn func()) {
+func (c *Context) Card(wDp, hDp, padDp Dp, fn func()) {
 	c.CardOpts(fn, Width(wDp), Height(hDp), Padding(padDp))
 }
 
 // CardOpts рисует скруглённую карточку с опциями стилизации.
 func (c *Context) CardOpts(fn func(), opts ...Option) {
 	st := ApplyOptions(opts)
-	wDp := 0
+	wDp := Dp(0)
 	if st.WidthDp != nil {
 		wDp = *st.WidthDp
 	}
-	hDp := 0
+	hDp := Dp(0)
 	if st.HeightDp != nil {
 		hDp = *st.HeightDp
 	}
-	padDp := 16
+	padDp := Dp(16)
 	if st.PadDp != nil {
 		padDp = *st.PadDp
 	}
 
-	w := c.S(wDp)
+	w := c.Scale(wDp).Int()
 	if wDp <= 0 {
 		w = c.RemainingWidth()
 	}
-	h := c.S(hDp)
+	h := c.Scale(hDp).Int()
 	useAutoHeight := st.AutoHeight || ((st.HeightDp == nil || *st.HeightDp <= 0) && !st.FillHeight)
 	autoKey := ""
 	if useAutoHeight {
@@ -234,9 +234,9 @@ func (c *Context) CardOpts(fn func(), opts ...Option) {
 	}
 
 	r := c.allocRectStyled(w, h, st)
-	c.Canvas.DrawRoundedBox(r, c.Sf(rad), bg, 1.0, border)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), bg, 1.0, border)
 
-	pad := c.S(padDp)
+	pad := c.Scale(padDp).Int()
 	inner := render.Rect{
 		X: r.X + pad,
 		Y: r.Y + pad,
@@ -251,7 +251,7 @@ func (c *Context) CardOpts(fn func(), opts ...Option) {
 	}
 
 	c.Canvas.PushClip(inner)
-	c.pushBox(inner, dirColumn, AlignStart, c.S(8))
+	c.pushBox(inner, dirColumn, AlignStart, c.Scale(8).Int())
 	if fn != nil {
 		fn()
 	}
@@ -277,7 +277,7 @@ func (c *Context) CardOpts(fn func(), opts ...Option) {
 
 // Button рисует кнопку и возвращает true в кадре нажатия.
 // Если widthDp <= 0, ширина подбирается автоматически по тексту.
-func (c *Context) Button(id, label string, primary bool, widthDp int) bool {
+func (c *Context) Button(id, label string, primary bool, widthDp Dp) bool {
 	var opts []Option
 	if primary {
 		opts = append(opts, Primary())
@@ -295,40 +295,40 @@ func (c *Context) ButtonOpts(id, label string, opts ...Option) bool {
 	id = c.ResolveID("btn", id)
 	st := ApplyOptions(opts)
 
-	fontSizeDp := 14
+	fontSizeDp := Dp(14)
 	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
 		fontSizeDp = *st.FontSizeDp
 	}
-	pxSize := c.S(fontSizeDp)
+	pxSize := c.Scale(fontSizeDp).Int()
 	textOpts := c.textRenderOpts(st)
 	tw, th := 0, pxSize
 	if c.Font != nil {
 		tw, th = c.Font.MeasureTextWithOptions(label, pxSize, textOpts)
 	}
 
-	padX := 16
+	padX := Dp(16)
 	if st.PadDp != nil && *st.PadDp >= 0 {
 		padX = *st.PadDp
 	}
 
 	hasIcon := st.IconSVG != ""
-	iconSize := c.S(16)
+	iconSize := c.Scale(16).Int()
 	iconGap := 0
 	if hasIcon && label != "" {
-		iconGap = c.S(8)
+		iconGap = c.Scale(8).Int()
 	}
 	contentW := tw
 	if hasIcon {
 		contentW += iconSize + iconGap
 	}
 
-	w := contentW + c.S(padX*2)
+	w := contentW + c.Scale(padX*2).Int()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(38)
+	h := c.Scale(38).Int()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
+		h = c.Scale(*st.HeightDp).Int()
 	}
 
 	r := c.allocRectStyled(w, h, st)
@@ -387,7 +387,7 @@ func (c *Context) ButtonOpts(id, label string, opts ...Option) bool {
 		rad = *st.Radius
 	}
 
-	c.Canvas.DrawRoundedBox(r, c.Sf(rad), bg, 1.0, border)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), bg, 1.0, border)
 	startX := r.X + (r.W-contentW)/2
 	if hasIcon {
 		iconY := r.Y + (r.H-iconSize)/2
@@ -470,21 +470,21 @@ func (c *Context) ToggleOpts(id, label string, value *bool, opts ...Option) bool
 	id = c.ResolveID("tgl", id)
 	st := ApplyOptions(opts)
 
-	fontSizeDp := 14
+	fontSizeDp := Dp(14)
 	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
 		fontSizeDp = *st.FontSizeDp
 	}
-	pxSize := c.S(fontSizeDp)
+	pxSize := c.Scale(fontSizeDp).Int()
 	tw, th := 0, pxSize
 	if c.Font != nil && label != "" {
 		tw, th = c.Font.MeasureText(label, pxSize)
 	}
 
-	swW := c.S(42)
-	swH := c.S(24)
+	swW := c.Scale(42).Int()
+	swH := c.Scale(24).Int()
 	gap := 0
 	if label != "" {
-		gap = c.S(12)
+		gap = c.Scale(12).Int()
 	}
 
 	totalW := swW + gap + tw
@@ -550,7 +550,7 @@ func (c *Context) ToggleOpts(id, label string, value *bool, opts ...Option) bool
 
 	c.Canvas.DrawRoundedBox(swRect, float32(swH)*0.5, trackCol, 1.0, borderCol)
 
-	knobR := float32(swH)*0.5 - c.Sf(3)
+	knobR := float32(swH)*0.5 - c.ScaleF(3)
 	minX := float32(swRect.X) + float32(swH)*0.5
 	maxX := float32(swRect.X+swRect.W) - float32(swH)*0.5
 	knobX := minX + (maxX-minX)*anim
@@ -579,12 +579,12 @@ func (c *Context) ToggleOpts(id, label string, value *bool, opts ...Option) bool
 }
 
 // Image отображает image.Image в области размером wDp x hDp с заданным режимом масштабирования.
-func (c *Context) Image(img image.Image, wDp, hDp int, mode render.ImageScaleMode) {
-	w := c.S(wDp)
+func (c *Context) Image(img image.Image, wDp, hDp Dp, mode render.ImageScaleMode) {
+	w := c.Scale(wDp).Int()
 	if wDp <= 0 {
 		w = c.RemainingWidth()
 	}
-	h := c.S(hDp)
+	h := c.Scale(hDp).Int()
 	if hDp <= 0 {
 		h = c.RemainingHeight()
 	}
@@ -593,12 +593,12 @@ func (c *Context) Image(img image.Image, wDp, hDp int, mode render.ImageScaleMod
 }
 
 // CanvasView выделяет область wDp x hDp в раскладке и вызывает drawFn для кастомного рисования с клиппингом.
-func (c *Context) CanvasView(wDp, hDp int, drawFn func(canvas *render.Canvas, area render.Rect)) {
-	w := c.S(wDp)
+func (c *Context) CanvasView(wDp, hDp Dp, drawFn func(canvas *render.Canvas, area render.Rect)) {
+	w := c.Scale(wDp).Int()
 	if wDp <= 0 {
 		w = c.RemainingWidth()
 	}
-	h := c.S(hDp)
+	h := c.Scale(hDp).Int()
 	if hDp <= 0 {
 		h = c.RemainingHeight()
 	}
@@ -645,21 +645,21 @@ type CanvasCallbacks struct {
 
 // InteractiveCanvas выделяет интерактивную область wDp x hDp с поддержкой фокуса,
 // захвата мыши при перетаскивании и передачи сырых событий клавиатуры (включая ScanCode/Extended) и мыши.
-func (c *Context) InteractiveCanvas(id string, wDp, hDp int, cb CanvasCallbacks, opts ...Option) {
+func (c *Context) InteractiveCanvas(id string, wDp, hDp Dp, cb CanvasCallbacks, opts ...Option) {
 	id = c.ResolveID("canvas", id)
 	st := ApplyOptions(opts)
 
-	w := c.S(wDp)
+	w := c.Scale(wDp).Int()
 	if wDp <= 0 || st.FillWidth || (st.WidthDp != nil && *st.WidthDp <= 0) {
 		w = c.RemainingWidth()
 	} else if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(hDp)
+	h := c.Scale(hDp).Int()
 	if hDp <= 0 || st.FillHeight || (st.HeightDp != nil && *st.HeightDp <= 0) {
 		h = c.RemainingHeight()
 	} else if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
+		h = c.Scale(*st.HeightDp).Int()
 	}
 	r := c.allocRectStyled(w, h, st)
 	if r.Empty() {
@@ -750,4 +750,3 @@ func (c *Context) InteractiveCanvas(id string, wDp, hDp int, cb CanvasCallbacks,
 		c.Canvas.PopClip()
 	}
 }
-

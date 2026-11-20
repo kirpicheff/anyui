@@ -302,7 +302,7 @@ cols := []anyui.TableColumn{
 	{Title: "Name", WidthDp: 200, Sortable: true},
 }
 ev := ui.Table("tbl", cols, len(rows), &selectedRow, &sortState, func(row, col int, area anyui.Rect, sel bool) {
-	ui.DrawText(area.X+ui.S(8), area.Y+ui.S(7), rows[row].Name, 12, ui.Theme().TextPrimary)
+	ui.DrawText(area.X+ui.Scale(8).Int(), area.Y+ui.Scale(7).Int(), rows[row].Name, 12, ui.Theme().TextPrimary)
 }, anyui.Height(240))
 ```
 

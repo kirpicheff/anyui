@@ -83,7 +83,7 @@ func maskRunes(runes []rune) []rune {
 }
 
 // TextInput рисует однострочное поле ввода текста и возвращает true при изменении значения.
-func (c *Context) TextInput(id string, value *string, placeholder string, widthDp int) bool {
+func (c *Context) TextInput(id string, value *string, placeholder string, widthDp Dp) bool {
 	if widthDp > 0 {
 		return c.TextInputOpts(id, value, placeholder, Width(widthDp))
 	}
@@ -102,11 +102,11 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(38)
+	h := c.Scale(38).Int()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
+		h = c.Scale(*st.HeightDp).Int()
 	}
 	errH := c.inputErrorExtraH(st.ErrorText)
 	r := c.allocRect(w, h+errH)
@@ -115,12 +115,12 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 		c.registerFocusable(id)
 	}
 
-	padX := c.S(12)
+	padX := c.Scale(12).Int()
 	if st.PadDp != nil && *st.PadDp >= 0 {
-		padX = c.S(*st.PadDp)
+		padX = c.Scale(*st.PadDp).Int()
 	}
-	iconSize := c.S(16)
-	iconGap := c.S(8)
+	iconSize := c.Scale(16).Int()
+	iconGap := c.Scale(8).Int()
 
 	leftOffset := padX
 	if st.IconSVG != "" {
@@ -149,16 +149,16 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 
 	textArea := render.Rect{
 		X: r.X + leftOffset,
-		Y: r.Y + c.S(2),
+		Y: r.Y + c.Scale(2).Int(),
 		W: r.W - leftOffset - rightOffset,
-		H: r.H - c.S(4),
+		H: r.H - c.Scale(4).Int(),
 	}
 
-	fontSizeDp := 14
+	fontSizeDp := Dp(14)
 	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
 		fontSizeDp = *st.FontSizeDp
 	}
-	pxSize := c.S(fontSizeDp)
+	pxSize := c.Scale(fontSizeDp).Int()
 
 	runes := []rune(*value)
 	displayRunes := runes
@@ -526,7 +526,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 		rad = *st.Radius
 	}
 
-	c.Canvas.DrawRoundedBox(r, c.Sf(rad), bg, 1.0, borderCol)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), bg, 1.0, borderCol)
 
 	if st.IconSVG != "" {
 		c.Canvas.DrawSVG(st.IconSVG, r.X+padX, r.Y+(r.H-iconSize)/2, iconSize, c.Theme.TextMuted)
@@ -553,8 +553,8 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 		cx := float32(clearX)
 		cy := float32(r.Y + (r.H-iconSize)/2)
 		pad := float32(iconSize) * 0.28
-		c.Canvas.DrawLine(cx+pad, cy+pad, cx+float32(iconSize)-pad, cy+float32(iconSize)-pad, c.Sf(1.5), c.Theme.TextMuted)
-		c.Canvas.DrawLine(cx+float32(iconSize)-pad, cy+pad, cx+pad, cy+float32(iconSize)-pad, c.Sf(1.5), c.Theme.TextMuted)
+		c.Canvas.DrawLine(cx+pad, cy+pad, cx+float32(iconSize)-pad, cy+float32(iconSize)-pad, c.ScaleF(1.5), c.Theme.TextMuted)
+		c.Canvas.DrawLine(cx+float32(iconSize)-pad, cy+pad, cx+pad, cy+float32(iconSize)-pad, c.ScaleF(1.5), c.Theme.TextMuted)
 	} else if !st.PasswordToggle && st.IconRightSVG != "" {
 		c.Canvas.DrawSVG(st.IconRightSVG, r.X+r.W-padX-iconSize, r.Y+(r.H-iconSize)/2, iconSize, c.Theme.TextMuted)
 	}
@@ -574,8 +574,8 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 
 	prefixW, lineH := c.Font.MeasureTextStyled(string(displayRunes[:caret]), pxSize, st.FontStyle)
 	scroll := c.textScroll[id]
-	if prefixW-scroll > textArea.W-c.S(4) {
-		scroll = prefixW - (textArea.W - c.S(4))
+	if prefixW-scroll > textArea.W-c.Scale(4).Int() {
+		scroll = prefixW - (textArea.W - c.Scale(4).Int())
 	}
 	if prefixW-scroll < 0 {
 		scroll = prefixW
@@ -593,9 +593,9 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 			x2, _ := c.Font.MeasureTextStyled(string(displayRunes[:b]), pxSize, st.FontStyle)
 			selRect := render.Rect{
 				X: baseX + x1,
-				Y: textArea.Y + c.S(5),
+				Y: textArea.Y + c.Scale(5).Int(),
 				W: x2 - x1,
-				H: textArea.H - c.S(10),
+				H: textArea.H - c.Scale(10).Int(),
 			}
 			c.Canvas.FillRect(selRect, c.Theme.Accent.WithAlpha(90))
 		}
@@ -627,9 +627,9 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 
 	if focused {
 		caretX := baseX + prefixW
-		caretTop := textArea.Y + c.S(6)
-		caretH := textArea.H - c.S(12)
-		c.Canvas.FillRect(render.Rect{X: caretX, Y: caretTop, W: c.S(2), H: caretH}, c.Theme.Accent)
+		caretTop := textArea.Y + c.Scale(6).Int()
+		caretH := textArea.H - c.Scale(12).Int()
+		c.Canvas.FillRect(render.Rect{X: caretX, Y: caretTop, W: c.Scale(2).Int(), H: caretH}, c.Theme.Accent)
 	}
 
 	c.Canvas.PopClip()
@@ -738,11 +738,11 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(120)
+	h := c.Scale(120).Int()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
+		h = c.Scale(*st.HeightDp).Int()
 	}
 	errH := c.inputErrorExtraH(st.ErrorText)
 	r := c.allocRect(w, h+errH)
@@ -751,24 +751,24 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 		c.registerFocusable(id)
 	}
 
-	pad := c.S(10)
+	pad := c.Scale(10).Int()
 	if st.PadDp != nil && *st.PadDp >= 0 {
-		pad = c.S(*st.PadDp)
+		pad = c.Scale(*st.PadDp).Int()
 	}
 
-	fontSizeDp := 14
+	fontSizeDp := Dp(14)
 	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
 		fontSizeDp = *st.FontSizeDp
 	}
-	pxSize := c.S(fontSizeDp)
-	_, lineH := 0, c.S(18)
+	pxSize := c.Scale(fontSizeDp).Int()
+	_, lineH := 0, c.Scale(18).Int()
 	if c.Font != nil {
 		_, lineH = c.Font.MeasureTextStyled("Аy", pxSize, st.FontStyle)
 		if lineH <= 0 {
-			lineH = c.S(18)
+			lineH = c.Scale(18).Int()
 		}
 	}
-	lineStep := lineH + c.S(4)
+	lineStep := lineH + c.Scale(4).Int()
 
 	runes := []rune(*value)
 	gutterW := 0
@@ -783,12 +783,12 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 		if logicalCount >= 100 {
 			sample = fmt.Sprintf("%d", logicalCount)
 		}
-		numW := c.S(24)
+		numW := c.Scale(24).Int()
 		if c.Font != nil {
-			mw, _ := c.Font.MeasureTextStyled(sample, c.S(fontSizeDp-1), st.FontStyle)
+			mw, _ := c.Font.MeasureTextStyled(sample, c.Scale(fontSizeDp-1).Int(), st.FontStyle)
 			numW = mw
 		}
-		gutterW = numW + c.S(16)
+		gutterW = numW + c.Scale(16).Int()
 	}
 
 	textArea := render.Rect{
@@ -798,7 +798,7 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 		H: r.H - pad*2,
 	}
 
-	lines := c.WrapTextLines(runes, textArea.W-c.S(6), pxSize, st.FontStyle)
+	lines := c.WrapTextLines(runes, textArea.W-c.Scale(6).Int(), pxSize, st.FontStyle)
 
 	caretFromPoint := func(mx, my int) int {
 		lineIdx := (my - textArea.Y + c.textScroll[id]) / lineStep
@@ -1075,7 +1075,7 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 			case KeyUp, KeyDown:
 				curLines := lines
 				if changed {
-					curLines = c.WrapTextLines(runes, textArea.W-c.S(6), pxSize, st.FontStyle)
+					curLines = c.WrapTextLines(runes, textArea.W-c.Scale(6).Int(), pxSize, st.FontStyle)
 				}
 				li := findVisualLine(curLines, runes, caret)
 				prefX := c.textPrefX[id]
@@ -1099,7 +1099,7 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 			case KeyHome:
 				curLines := lines
 				if changed {
-					curLines = c.WrapTextLines(runes, textArea.W-c.S(6), pxSize, st.FontStyle)
+					curLines = c.WrapTextLines(runes, textArea.W-c.Scale(6).Int(), pxSize, st.FontStyle)
 				}
 				li := findVisualLine(curLines, runes, caret)
 				caret = curLines[li].start
@@ -1110,7 +1110,7 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 			case KeyEnd:
 				curLines := lines
 				if changed {
-					curLines = c.WrapTextLines(runes, textArea.W-c.S(6), pxSize, st.FontStyle)
+					curLines = c.WrapTextLines(runes, textArea.W-c.Scale(6).Int(), pxSize, st.FontStyle)
 				}
 				li := findVisualLine(curLines, runes, caret)
 				caret = curLines[li].end
@@ -1152,7 +1152,7 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 		c.textSelStart[id] = selStart
 		if changed {
 			*value = string(runes)
-			lines = c.WrapTextLines(runes, textArea.W-c.S(6), pxSize, st.FontStyle)
+			lines = c.WrapTextLines(runes, textArea.W-c.Scale(6).Int(), pxSize, st.FontStyle)
 			c.RequestRedraw()
 		}
 
@@ -1198,7 +1198,7 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 	if st.Radius != nil {
 		rad = *st.Radius
 	}
-	c.Canvas.DrawRoundedBox(r, c.Sf(rad), bg, 1.0, borderCol)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), bg, 1.0, borderCol)
 
 	if textArea.W <= 0 || textArea.H <= 0 || c.Font == nil {
 		c.drawInputError(r, st.ErrorText)
@@ -1208,13 +1208,13 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 
 	scroll := c.textScroll[id]
 	if st.LineNumbers && gutterW > 0 {
-		gutterRect := render.Rect{X: r.X + 1, Y: r.Y + 1, W: gutterW + pad - c.S(4), H: r.H - 2}
+		gutterRect := render.Rect{X: r.X + 1, Y: r.Y + 1, W: gutterW + pad - c.Scale(4).Int(), H: r.H - 2}
 		c.Canvas.PushClip(gutterRect)
 		c.Canvas.FillRect(gutterRect, c.Theme.Surface.WithAlpha(120))
 		c.Canvas.FillRect(render.Rect{X: gutterRect.X + gutterRect.W - 1, Y: gutterRect.Y, W: 1, H: gutterRect.H}, c.Theme.Border)
-		numPx := c.S(fontSizeDp - 1)
-		if numPx < c.S(10) {
-			numPx = c.S(10)
+		numPx := c.Scale(fontSizeDp - 1).Int()
+		if numPx < c.Scale(10).Int() {
+			numPx = c.Scale(10).Int()
 		}
 		logicalNum := 0
 		for li, sp := range lines {
@@ -1228,7 +1228,7 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 			}
 			numStr := fmt.Sprintf("%d", logicalNum)
 			nw, _ := c.Font.MeasureTextStyled(numStr, numPx, st.FontStyle)
-			c.Font.DrawTextStyled(c.Canvas, gutterRect.X+gutterRect.W-nw-c.S(6), y+c.S(1), numStr, numPx, c.Theme.TextMuted, st.FontStyle)
+			c.Font.DrawTextStyled(c.Canvas, gutterRect.X+gutterRect.W-nw-c.Scale(6).Int(), y+c.Scale(1).Int(), numStr, numPx, c.Theme.TextMuted, st.FontStyle)
 		}
 		c.Canvas.PopClip()
 	}
@@ -1279,7 +1279,7 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 				c.Canvas.FillRect(render.Rect{
 					X: textArea.X,
 					Y: y,
-					W: c.S(6),
+					W: c.Scale(6).Int(),
 					H: lineH,
 				}, c.Theme.Accent.WithAlpha(90))
 			}
@@ -1292,7 +1292,7 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 				c.Canvas.FillRect(render.Rect{
 					X: textArea.X + cxOff,
 					Y: y,
-					W: c.S(2),
+					W: c.Scale(2).Int(),
 					H: lineH,
 				}, c.Theme.Accent)
 			}
@@ -1304,4 +1304,3 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 	c.textFieldContextMenu(id, r, value, st, true)
 	return changed
 }
-

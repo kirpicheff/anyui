@@ -44,33 +44,33 @@ func (c *Context) SplitPane(id string, orient Orientation, ratio *float32, first
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
 	h := c.RemainingHeight()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
-	} else if h <= 0 || (!st.FillHeight && st.HeightDp == nil && h >= c.S(50000)) {
-		h = c.S(260)
+		h = c.Scale(*st.HeightDp).Int()
+	} else if h <= 0 || (!st.FillHeight && st.HeightDp == nil && h >= c.Scale(50000).Int()) {
+		h = c.Scale(260).Int()
 	}
 
 	rect := c.allocRectStyled(w, h, st)
 	if rect.W <= 0 || rect.H <= 0 {
 		return
 	}
-	radius := c.Sf(c.Theme.RadiusSm)
+	radius := c.ScaleF(c.Theme.RadiusSm)
 	if st.Radius != nil {
-		radius = c.Sf(*st.Radius)
+		radius = c.ScaleF(*st.Radius)
 	}
 	c.Canvas.DrawRoundedBox(rect, radius, c.Theme.SurfaceDark, 1.0, c.Theme.Border)
 
-	splitterThick := c.S(8)
+	splitterThick := c.Scale(8).Int()
 	blocked := c.IsInputBlocked()
 	var firstR, splitR, secondR render.Rect
 
 	if orient == SplitHorizontal {
 		availW := rect.W - splitterThick - 2
-		if availW < c.S(40) {
-			availW = c.S(40)
+		if availW < c.Scale(40).Int() {
+			availW = c.Scale(40).Int()
 		}
 		firstW := int(float32(availW) * (*ratio))
 		firstR = render.Rect{X: rect.X + 1, Y: rect.Y + 1, W: firstW, H: rect.H - 2}
@@ -96,8 +96,8 @@ func (c *Context) SplitPane(id string, orient Orientation, ratio *float32, first
 		}
 	} else {
 		availH := rect.H - splitterThick - 2
-		if availH < c.S(40) {
-			availH = c.S(40)
+		if availH < c.Scale(40).Int() {
+			availH = c.Scale(40).Int()
 		}
 		firstH := int(float32(availH) * (*ratio))
 		firstR = render.Rect{X: rect.X + 1, Y: rect.Y + 1, W: rect.W - 2, H: firstH}
@@ -125,11 +125,11 @@ func (c *Context) SplitPane(id string, orient Orientation, ratio *float32, first
 
 	// Отрисовка первой панели
 	if firstFn != nil && firstR.W > 0 && firstR.H > 0 {
-		pad := c.S(8)
+		pad := c.Scale(8).Int()
 		inner := render.Rect{X: firstR.X + pad, Y: firstR.Y + pad, W: firstR.W - pad*2, H: firstR.H - pad*2}
 		if inner.W > 0 && inner.H > 0 {
 			c.Canvas.PushClip(firstR)
-			c.pushBox(inner, dirColumn, AlignStart, c.S(6))
+			c.pushBox(inner, dirColumn, AlignStart, c.Scale(6).Int())
 			firstFn()
 			c.popBox()
 			c.Canvas.PopClip()
@@ -152,20 +152,20 @@ func (c *Context) SplitPane(id string, orient Orientation, ratio *float32, first
 	if orient == SplitHorizontal {
 		cx := float32(splitR.X + splitR.W/2)
 		cy := float32(splitR.Y + splitR.H/2)
-		c.Canvas.DrawLine(cx, cy-c.Sf(14), cx, cy+c.Sf(14), c.Sf(2), gripCol)
+		c.Canvas.DrawLine(cx, cy-c.ScaleF(14), cx, cy+c.ScaleF(14), c.ScaleF(2), gripCol)
 	} else {
 		cx := float32(splitR.X + splitR.W/2)
 		cy := float32(splitR.Y + splitR.H/2)
-		c.Canvas.DrawLine(cx-c.Sf(14), cy, cx+c.Sf(14), cy, c.Sf(2), gripCol)
+		c.Canvas.DrawLine(cx-c.ScaleF(14), cy, cx+c.ScaleF(14), cy, c.ScaleF(2), gripCol)
 	}
 
 	// Отрисовка второй панели
 	if secondFn != nil && secondR.W > 0 && secondR.H > 0 {
-		pad := c.S(8)
+		pad := c.Scale(8).Int()
 		inner := render.Rect{X: secondR.X + pad, Y: secondR.Y + pad, W: secondR.W - pad*2, H: secondR.H - pad*2}
 		if inner.W > 0 && inner.H > 0 {
 			c.Canvas.PushClip(secondR)
-			c.pushBox(inner, dirColumn, AlignStart, c.S(6))
+			c.pushBox(inner, dirColumn, AlignStart, c.Scale(6).Int())
 			secondFn()
 			c.popBox()
 			c.Canvas.PopClip()
@@ -183,9 +183,9 @@ func (c *Context) Collapsible(id, title string, expanded *bool, fn func(), opts 
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	headerH := c.S(34)
+	headerH := c.Scale(34).Int()
 	headerR := c.allocRect(w, headerH)
 	c.RegisterHit(id, headerR, platform.CursorHand)
 
@@ -204,25 +204,25 @@ func (c *Context) Collapsible(id, title string, expanded *bool, fn func(), opts 
 	if hovered {
 		bg = c.Theme.BtnSecondaryHover
 	}
-	radius := c.Sf(c.Theme.RadiusSm)
+	radius := c.ScaleF(c.Theme.RadiusSm)
 	c.Canvas.DrawRoundedBox(headerR, radius, bg, 1.0, c.Theme.Border)
 
 	// Стрелка раскрытия
-	cx := float32(headerR.X + c.S(14))
+	cx := float32(headerR.X + c.Scale(14).Int())
 	cy := float32(headerR.Y + headerR.H/2)
-	arm := c.Sf(4)
+	arm := c.ScaleF(4)
 	if *expanded {
-		c.Canvas.DrawLine(cx-arm, cy-arm*0.5, cx, cy+arm*0.5, c.Sf(1.6), c.Theme.Accent)
-		c.Canvas.DrawLine(cx, cy+arm*0.5, cx+arm, cy-arm*0.5, c.Sf(1.6), c.Theme.Accent)
+		c.Canvas.DrawLine(cx-arm, cy-arm*0.5, cx, cy+arm*0.5, c.ScaleF(1.6), c.Theme.Accent)
+		c.Canvas.DrawLine(cx, cy+arm*0.5, cx+arm, cy-arm*0.5, c.ScaleF(1.6), c.Theme.Accent)
 	} else {
-		c.Canvas.DrawLine(cx-arm*0.5, cy-arm, cx+arm*0.5, cy, c.Sf(1.6), c.Theme.TextMuted)
-		c.Canvas.DrawLine(cx+arm*0.5, cy, cx-arm*0.5, cy+arm, c.Sf(1.6), c.Theme.TextMuted)
+		c.Canvas.DrawLine(cx-arm*0.5, cy-arm, cx+arm*0.5, cy, c.ScaleF(1.6), c.Theme.TextMuted)
+		c.Canvas.DrawLine(cx+arm*0.5, cy, cx-arm*0.5, cy+arm, c.ScaleF(1.6), c.Theme.TextMuted)
 	}
 
 	if c.Font != nil {
-		pxSize := c.S(13)
+		pxSize := c.Scale(13).Int()
 		_, th := c.Font.MeasureText(title, pxSize)
-		c.Font.DrawText(c.Canvas, headerR.X+c.S(26), headerR.Y+(headerR.H-th)/2, title, pxSize, c.Theme.TextPrimary)
+		c.Font.DrawText(c.Canvas, headerR.X+c.Scale(26).Int(), headerR.Y+(headerR.H-th)/2, title, pxSize, c.Theme.TextPrimary)
 	}
 
 	if *expanded && fn != nil {
@@ -233,7 +233,7 @@ func (c *Context) Collapsible(id, title string, expanded *bool, fn func(), opts 
 		})
 		endY := b.cursorY
 		if endY > startY {
-			c.Canvas.DrawLine(float32(headerR.X+c.S(6)), float32(startY+c.S(4)), float32(headerR.X+c.S(6)), float32(endY-c.S(4)), c.Sf(2), c.Theme.Accent.WithAlpha(140))
+			c.Canvas.DrawLine(float32(headerR.X+c.Scale(6).Int()), float32(startY+c.Scale(4).Int()), float32(headerR.X+c.Scale(6).Int()), float32(endY-c.Scale(4).Int()), c.ScaleF(2), c.Theme.Accent.WithAlpha(140))
 		}
 	}
 

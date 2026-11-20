@@ -62,13 +62,13 @@ type demoState struct {
 	droppedInfo string
 
 	// Раздел контролов
-	chk1          bool
-	chk2          bool
-	chkIndet      bool
-	radioIdx      int
-	toggleVal     bool
-	progressVal   float32
-	clickCount    int
+	chk1        bool
+	chk2        bool
+	chkIndet    bool
+	radioIdx    int
+	toggleVal   bool
+	progressVal float32
+	clickCount  int
 
 	// Раздел ввода и списков
 	textVal      string
@@ -141,24 +141,24 @@ func newDemoState() *demoState {
 			{ID: "t2", Title: "Логи системы", StatusColor: &warnCol, Closable: true},
 			{ID: "t3", Title: "Настройки", IconSVG: svgGear, Closable: true},
 		},
-		nextTabNum:  4,
-		statusMsg:   "Готово к работе",
-		droppedInfo: "Перетащите файлы из проводника в окно",
-		chk1:        true,
-		chkIndet:    true,
-		toggleVal:   true,
-		progressVal: 0.65,
-		textVal:     "Привет, AnyUI!",
-		digitsVal:   "12345",
-		readOnlyVal: "Только чтение (можно выделить и скопировать)",
-		notesVal:    "Многострочный редактор TextArea с нумерацией строк.\nПоддерживает перенос строк, скролл колесом мыши,\nнавигацию Up/Down, Undo/Redo (Ctrl+Z/Ctrl+Y),\nвыделение по словам (Ctrl+Left/Right) и ПКМ-меню.",
-		emailVal:     "bad-email",
-		phoneMaskVal: "+7 (999) 123-45-67",
-		dateMaskVal:  "17.11.2026",
-		ipMaskVal:    "192.168.001.010",
-		selectKey:   "win11",
-		comboKey:    "win10",
-		listItems:   listItems,
+		nextTabNum:      4,
+		statusMsg:       "Готово к работе",
+		droppedInfo:     "Перетащите файлы из проводника в окно",
+		chk1:            true,
+		chkIndet:        true,
+		toggleVal:       true,
+		progressVal:     0.65,
+		textVal:         "Привет, AnyUI!",
+		digitsVal:       "12345",
+		readOnlyVal:     "Только чтение (можно выделить и скопировать)",
+		notesVal:        "Многострочный редактор TextArea с нумерацией строк.\nПоддерживает перенос строк, скролл колесом мыши,\nнавигацию Up/Down, Undo/Redo (Ctrl+Z/Ctrl+Y),\nвыделение по словам (Ctrl+Left/Right) и ПКМ-меню.",
+		emailVal:        "bad-email",
+		phoneMaskVal:    "+7 (999) 123-45-67",
+		dateMaskVal:     "17.11.2026",
+		ipMaskVal:       "192.168.001.010",
+		selectKey:       "win11",
+		comboKey:        "win10",
+		listItems:       listItems,
 		sampleImg:       makeSampleImage(96, 96),
 		contextLog:      "Нажмите ПКМ по области ниже для ContextMenu",
 		dialogLog:       "Нажмите любую кнопку диалога",
@@ -338,7 +338,7 @@ func main() {
 			if contentH < 200 {
 				contentH = 200
 			}
-			ui.Row(16, contentH, func() {
+			ui.Row(16, anyui.Dp(contentH), func() {
 				ui.Card(func() {
 					ui.Column(6, func() {
 						ui.StaticLayer("demo_nav_title", func() {
@@ -382,9 +382,9 @@ func main() {
 		barArea := ui.CurrentAreaPx()
 		barRect := anyui.Rect{
 			X: barArea.X,
-			Y: barArea.Y + barArea.H - ui.S(32),
+			Y: barArea.Y + barArea.H - ui.Scale(32).Int(),
 			W: barArea.W,
-			H: ui.S(32),
+			H: ui.Scale(32).Int(),
 		}
 		ui.Canvas().FillRect(barRect, th.SurfaceDark)
 		ui.Canvas().FillRect(anyui.Rect{X: barRect.X, Y: barRect.Y, W: barRect.W, H: 1}, th.Border)

@@ -81,7 +81,7 @@ func (u *UI) ComboBox(id string, items []SelectItem, selected *string, opts ...O
 }
 
 // ListView рисует виртуализированный прокручиваемый список.
-func (u *UI) ListView(id string, count int, itemHeightDp int, selected *int, drawItem func(index int, area Rect, selected bool), opts ...Option) bool {
+func (u *UI) ListView(id string, count int, itemHeightDp Dp, selected *int, drawItem func(index int, area Rect, selected bool), opts ...Option) bool {
 	return u.ctx.ListView(id, count, itemHeightDp, selected, drawItem, opts...)
 }
 
@@ -96,7 +96,7 @@ func (u *UI) TabBar(id string, tabs []TabItem, active *int, opts ...Option) TabB
 }
 
 // ScrollView создаёт прокручиваемую область с поддержкой колеса мыши и скроллбара.
-func (u *UI) ScrollView(id string, wDp, hDp int, fn func(), opts ...Option) {
+func (u *UI) ScrollView(id string, wDp, hDp Dp, fn func(), opts ...Option) {
 	u.ctx.ScrollView(id, wDp, hDp, fn, opts...)
 }
 

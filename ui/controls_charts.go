@@ -71,7 +71,7 @@ func formatChartVal(v float64) string {
 func (c *Context) Sparkline(id string, values []float64, opts ...Option) {
 	id = c.ResolveID("spark", id)
 	st := ApplyOptions(opts)
-	hDp := 44
+	hDp := Dp(44)
 	if st.HeightDp != nil && *st.HeightDp > 0 {
 		hDp = *st.HeightDp
 	}
@@ -81,7 +81,7 @@ func (c *Context) Sparkline(id string, values []float64, opts ...Option) {
 	if st.Bg != nil {
 		bg = *st.Bg
 	}
-	c.Canvas.DrawRoundedBox(r, c.Sf(c.Theme.RadiusSm), bg, 1.0, c.Theme.Border)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(c.Theme.RadiusSm), bg, 1.0, c.Theme.Border)
 
 	if len(values) < 2 {
 		return
@@ -89,8 +89,8 @@ func (c *Context) Sparkline(id string, values []float64, opts ...Option) {
 	c.RegisterHitTrack(id, r, platform.CursorArrow)
 
 	minV, maxV := calcMinMax([]ChartSeries{{Values: values}})
-	padX := c.S(8)
-	padY := c.S(6)
+	padX := c.Scale(8).Int()
+	padY := c.Scale(6).Int()
 	plot := render.Rect{X: r.X + padX, Y: r.Y + padY, W: r.W - padX*2, H: r.H - padY*2}
 	if plot.W <= 0 || plot.H <= 0 {
 		return
@@ -112,7 +112,7 @@ func (c *Context) Sparkline(id string, values []float64, opts ...Option) {
 	}
 
 	for i := 0; i < len(pts)-1; i++ {
-		c.Canvas.DrawLine(pts[i].X, pts[i].Y, pts[i+1].X, pts[i+1].Y, c.Sf(2.0), col)
+		c.Canvas.DrawLine(pts[i].X, pts[i].Y, pts[i+1].X, pts[i+1].Y, c.ScaleF(2.0), col)
 	}
 
 	// Подсветка ближайшей точки и тултип при наведении
@@ -127,7 +127,7 @@ func (c *Context) Sparkline(id string, values []float64, opts ...Option) {
 			}
 		}
 		bp := pts[bestIdx]
-		c.Canvas.FillCircle(bp.X, bp.Y, c.Sf(3.5), col)
+		c.Canvas.FillCircle(bp.X, bp.Y, c.ScaleF(3.5), col)
 		c.Tooltip(formatChartVal(values[bestIdx]), r)
 	}
 }
@@ -136,7 +136,7 @@ func (c *Context) Sparkline(id string, values []float64, opts ...Option) {
 func (c *Context) LineChart(id string, labels []string, series []ChartSeries, opts ...Option) {
 	id = c.ResolveID("lchart", id)
 	st := ApplyOptions(opts)
-	hDp := 220
+	hDp := Dp(220)
 	if st.HeightDp != nil && *st.HeightDp > 0 {
 		hDp = *st.HeightDp
 	}
@@ -146,18 +146,18 @@ func (c *Context) LineChart(id string, labels []string, series []ChartSeries, op
 	if st.Bg != nil {
 		bg = *st.Bg
 	}
-	c.Canvas.DrawRoundedBox(r, c.Sf(c.Theme.RadiusMd), bg, 1.0, c.Theme.Border)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(c.Theme.RadiusMd), bg, 1.0, c.Theme.Border)
 
 	if len(series) == 0 {
 		return
 	}
 	c.RegisterHitTrack(id, r, platform.CursorArrow)
 
-	legendH := c.drawChartLegend(render.Rect{X: r.X + c.S(12), Y: r.Y + c.S(8), W: r.W - c.S(24), H: c.S(20)}, series)
-	padLeft := c.S(48)
-	padRight := c.S(16)
-	padTop := c.S(12) + legendH
-	padBottom := c.S(28)
+	legendH := c.drawChartLegend(render.Rect{X: r.X + c.Scale(12).Int(), Y: r.Y + c.Scale(8).Int(), W: r.W - c.Scale(24).Int(), H: c.Scale(20).Int()}, series)
+	padLeft := c.Scale(48).Int()
+	padRight := c.Scale(16).Int()
+	padTop := c.Scale(12).Int() + legendH
+	padBottom := c.Scale(28).Int()
 
 	plot := render.Rect{
 		X: r.X + padLeft,
@@ -198,7 +198,7 @@ func (c *Context) LineChart(id string, labels []string, series []ChartSeries, op
 		col   render.Color
 	}
 	var best *hoverCand
-	bestDistX := float32(c.S(18))
+	bestDistX := float32(c.Scale(18).Int())
 
 	for si, s := range series {
 		if len(s.Values) == 0 {
@@ -226,10 +226,10 @@ func (c *Context) LineChart(id string, labels []string, series []ChartSeries, op
 		}
 
 		for i := 0; i < len(pts)-1; i++ {
-			c.Canvas.DrawLine(pts[i].X, pts[i].Y, pts[i+1].X, pts[i+1].Y, c.Sf(2.0), col)
+			c.Canvas.DrawLine(pts[i].X, pts[i].Y, pts[i+1].X, pts[i+1].Y, c.ScaleF(2.0), col)
 		}
 		for i, p := range pts {
-			c.Canvas.FillCircle(p.X, p.Y, c.Sf(3.0), col)
+			c.Canvas.FillCircle(p.X, p.Y, c.ScaleF(3.0), col)
 			if !c.IsInputBlocked() && plot.Contains(c.MouseX, c.MouseY) {
 				dx := float32(math.Abs(float64(float32(c.MouseX) - p.X)))
 				dy := float32(math.Abs(float64(float32(c.MouseY) - p.Y)))
@@ -248,7 +248,7 @@ func (c *Context) LineChart(id string, labels []string, series []ChartSeries, op
 
 	if best != nil {
 		c.Canvas.DrawLine(best.pt.X, float32(plot.Y), best.pt.X, float32(plot.Y+plot.H), 1.0, c.Theme.Border)
-		c.Canvas.FillCircle(best.pt.X, best.pt.Y, c.Sf(5.0), best.col)
+		c.Canvas.FillCircle(best.pt.X, best.pt.Y, c.ScaleF(5.0), best.col)
 		tip := fmt.Sprintf("%s: %s", best.label, formatChartVal(best.val))
 		if best.name != "" {
 			tip = fmt.Sprintf("%s (%s): %s", best.name, best.label, formatChartVal(best.val))
@@ -261,7 +261,7 @@ func (c *Context) LineChart(id string, labels []string, series []ChartSeries, op
 func (c *Context) BarChart(id string, labels []string, series []ChartSeries, opts ...Option) {
 	id = c.ResolveID("bchart", id)
 	st := ApplyOptions(opts)
-	hDp := 220
+	hDp := Dp(220)
 	if st.HeightDp != nil && *st.HeightDp > 0 {
 		hDp = *st.HeightDp
 	}
@@ -271,18 +271,18 @@ func (c *Context) BarChart(id string, labels []string, series []ChartSeries, opt
 	if st.Bg != nil {
 		bg = *st.Bg
 	}
-	c.Canvas.DrawRoundedBox(r, c.Sf(c.Theme.RadiusMd), bg, 1.0, c.Theme.Border)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(c.Theme.RadiusMd), bg, 1.0, c.Theme.Border)
 
 	if len(series) == 0 {
 		return
 	}
 	c.RegisterHitTrack(id, r, platform.CursorArrow)
 
-	legendH := c.drawChartLegend(render.Rect{X: r.X + c.S(12), Y: r.Y + c.S(8), W: r.W - c.S(24), H: c.S(20)}, series)
-	padLeft := c.S(48)
-	padRight := c.S(16)
-	padTop := c.S(12) + legendH
-	padBottom := c.S(28)
+	legendH := c.drawChartLegend(render.Rect{X: r.X + c.Scale(12).Int(), Y: r.Y + c.Scale(8).Int(), W: r.W - c.Scale(24).Int(), H: c.Scale(20).Int()}, series)
+	padLeft := c.Scale(48).Int()
+	padRight := c.Scale(16).Int()
+	padTop := c.Scale(12).Int() + legendH
+	padBottom := c.Scale(28).Int()
 
 	plot := render.Rect{
 		X: r.X + padLeft,
@@ -325,7 +325,7 @@ func (c *Context) BarChart(id string, labels []string, series []ChartSeries, opt
 	if availGroupW < 2 {
 		availGroupW = 2
 	}
-	barGap := float32(c.S(2))
+	barGap := float32(c.Scale(2).Int())
 	barW := (availGroupW - barGap*float32(len(series)-1)) / float32(len(series))
 	if barW < 2 {
 		barW = 2
@@ -369,7 +369,7 @@ func (c *Context) BarChart(id string, labels []string, series []ChartSeries, opt
 				}
 				hovRect = br
 			}
-			c.Canvas.FillRoundedRect(br, c.Sf(3), col)
+			c.Canvas.FillRoundedRect(br, c.ScaleF(3), col)
 		}
 	}
 
@@ -394,8 +394,8 @@ func (c *Context) drawChartLegend(area render.Rect, series []ChartSeries) int {
 	}
 
 	curX := area.X
-	px := c.S(11)
-	boxSize := c.S(10)
+	px := c.Scale(11).Int()
+	boxSize := c.Scale(10).Int()
 	for i, s := range series {
 		if s.Name == "" {
 			continue
@@ -405,18 +405,18 @@ func (c *Context) drawChartLegend(area render.Rect, series []ChartSeries) int {
 			col = *s.Color
 		}
 		c.Canvas.FillRoundedRect(render.Rect{X: curX, Y: area.Y + (area.H-boxSize)/2, W: boxSize, H: boxSize}, 2, col)
-		curX += boxSize + c.S(5)
+		curX += boxSize + c.Scale(5).Int()
 		if c.Font != nil {
 			tw, th := c.Font.MeasureText(s.Name, px)
 			c.Font.DrawText(c.Canvas, curX, area.Y+(area.H-th)/2, s.Name, px, c.Theme.TextMuted)
-			curX += tw + c.S(14)
+			curX += tw + c.Scale(14).Int()
 		}
 	}
-	return area.H + c.S(4)
+	return area.H + c.Scale(4).Int()
 }
 
 func (c *Context) drawChartGridAndYAxis(plot render.Rect, minV, maxV float64, steps int) {
-	px := c.S(10)
+	px := c.Scale(10).Int()
 	for i := 0; i <= steps; i++ {
 		t := float32(i) / float32(steps)
 		y := plot.Y + plot.H - int(t*float32(plot.H))
@@ -430,7 +430,7 @@ func (c *Context) drawChartGridAndYAxis(plot render.Rect, minV, maxV float64, st
 			val := minV + float64(t)*(maxV-minV)
 			lbl := formatChartVal(val)
 			tw, th := c.Font.MeasureText(lbl, px)
-			c.Font.DrawText(c.Canvas, plot.X-tw-c.S(6), y-th/2, lbl, px, c.Theme.TextMuted)
+			c.Font.DrawText(c.Canvas, plot.X-tw-c.Scale(6).Int(), y-th/2, lbl, px, c.Theme.TextMuted)
 		}
 	}
 	c.Canvas.FillRect(render.Rect{X: plot.X, Y: plot.Y, W: 1, H: plot.H}, c.Theme.Border)
@@ -440,7 +440,7 @@ func (c *Context) drawChartXAxisLabels(plot render.Rect, labels []string, maxLen
 	if c.Font == nil || len(labels) == 0 {
 		return
 	}
-	px := c.S(10)
+	px := c.Scale(10).Int()
 	step := 1
 	if maxLen > 8 {
 		step = (maxLen + 7) / 8
@@ -466,6 +466,6 @@ func (c *Context) drawChartXAxisLabels(plot render.Rect, labels []string, maxLen
 			cx = plot.X + int(t*float32(plot.W))
 		}
 		tw, _ := c.Font.MeasureText(lbl, px)
-		c.Font.DrawText(c.Canvas, cx-tw/2, plot.Y+plot.H+c.S(6), lbl, px, c.Theme.TextMuted)
+		c.Font.DrawText(c.Canvas, cx-tw/2, plot.Y+plot.H+c.Scale(6).Int(), lbl, px, c.Theme.TextMuted)
 	}
 }

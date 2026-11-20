@@ -15,27 +15,27 @@ func (c *Context) SelectableLabel(id, text string, opts ...Option) {
 	c.ensureTextEditingMaps()
 	st := ApplyOptions(opts)
 
-	sizeDp := 14
+	sizeDp := Dp(14)
 	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
 		sizeDp = *st.FontSizeDp
 	}
-	pxSize := c.S(sizeDp)
-	lineH := c.S(18)
+	pxSize := c.Scale(sizeDp).Int()
+	lineH := c.Scale(18).Int()
 	if c.Font != nil {
 		if _, mh := c.Font.MeasureTextStyled("Аy", pxSize, st.FontStyle); mh > 0 {
 			lineH = mh
 		}
 	}
-	gap := c.S(3)
+	gap := c.Scale(3).Int()
 	lineStep := lineH + gap
 
 	runes := []rune(text)
 	maxW := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		maxW = c.S(*st.WidthDp)
+		maxW = c.Scale(*st.WidthDp).Int()
 	}
-	if st.MaxWidthDp != nil && *st.MaxWidthDp > 0 && c.S(*st.MaxWidthDp) < maxW {
-		maxW = c.S(*st.MaxWidthDp)
+	if st.MaxWidthDp != nil && *st.MaxWidthDp > 0 && c.Scale(*st.MaxWidthDp).Int() < maxW {
+		maxW = c.Scale(*st.MaxWidthDp).Int()
 	}
 
 	var lines []textLineSpan
@@ -47,7 +47,7 @@ func (c *Context) SelectableLabel(id, text string, opts ...Option) {
 
 	totalW := 0
 	for _, sp := range lines {
-		lw := (sp.end - sp.start) * c.S(8)
+		lw := (sp.end - sp.start) * c.Scale(8).Int()
 		if c.Font != nil {
 			lw, _ = c.Font.MeasureTextStyled(string(runes[sp.start:sp.end]), pxSize, st.FontStyle)
 		}
@@ -56,7 +56,7 @@ func (c *Context) SelectableLabel(id, text string, opts ...Option) {
 		}
 	}
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		totalW = c.S(*st.WidthDp)
+		totalW = c.Scale(*st.WidthDp).Int()
 	}
 	totalH := lineH
 	if len(lines) > 1 {
@@ -218,16 +218,16 @@ func (c *Context) SelectableLabel(id, text string, opts ...Option) {
 func (c *Context) Hyperlink(id, text string, opts ...Option) bool {
 	id = c.ResolveID("link", id)
 	st := ApplyOptions(opts)
-	sizeDp := 14
+	sizeDp := Dp(14)
 	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
 		sizeDp = *st.FontSizeDp
 	}
-	pxSize := c.S(sizeDp)
-	w, h := len([]rune(text))*c.S(8), c.S(18)
+	pxSize := c.Scale(sizeDp).Int()
+	w, h := len([]rune(text))*c.Scale(8).Int(), c.Scale(18).Int()
 	if c.Font != nil {
 		w, h = c.Font.MeasureTextStyled(text, pxSize, st.FontStyle)
 	}
-	r := c.allocRectStyled(w, h+c.S(2), st)
+	r := c.allocRectStyled(w, h+c.Scale(2).Int(), st)
 	if !st.Disabled {
 		c.registerFocusable(id)
 		c.RegisterHit(id, r, platform.CursorHand)
@@ -269,7 +269,7 @@ func (c *Context) Hyperlink(id, text string, opts ...Option) bool {
 	}
 	if !st.Disabled && (hovered || focused) {
 		lineY := float32(r.Y + h)
-		c.Canvas.DrawLine(float32(r.X), lineY, float32(r.X+w), lineY, c.Sf(1), col)
+		c.Canvas.DrawLine(float32(r.X), lineY, float32(r.X+w), lineY, c.ScaleF(1), col)
 	}
 	return clicked
 }
@@ -381,11 +381,11 @@ func (c *Context) MaskedInput(id string, value *string, mask string, opts ...Opt
 
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(38)
+	h := c.Scale(38).Int()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
+		h = c.Scale(*st.HeightDp).Int()
 	}
 	errH := c.inputErrorExtraH(st.ErrorText)
 	r := c.allocRect(w, h+errH)
@@ -394,22 +394,22 @@ func (c *Context) MaskedInput(id string, value *string, mask string, opts ...Opt
 		c.registerFocusable(id)
 	}
 
-	padX := c.S(12)
+	padX := c.Scale(12).Int()
 	if st.PadDp != nil && *st.PadDp >= 0 {
-		padX = c.S(*st.PadDp)
+		padX = c.Scale(*st.PadDp).Int()
 	}
 	textArea := render.Rect{
 		X: r.X + padX,
-		Y: r.Y + c.S(2),
+		Y: r.Y + c.Scale(2).Int(),
 		W: r.W - padX*2,
-		H: r.H - c.S(4),
+		H: r.H - c.Scale(4).Int(),
 	}
 
-	fontSizeDp := 14
+	fontSizeDp := Dp(14)
 	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
 		fontSizeDp = *st.FontSizeDp
 	}
-	pxSize := c.S(fontSizeDp)
+	pxSize := c.Scale(fontSizeDp).Int()
 
 	slots := parseMaskedSlots(*value, maskRunes)
 	displayRunes := make([]rune, len(maskRunes))
@@ -659,7 +659,7 @@ func (c *Context) MaskedInput(id string, value *string, mask string, opts ...Opt
 	if st.Radius != nil {
 		rad = *st.Radius
 	}
-	c.Canvas.DrawRoundedBox(r, c.Sf(rad), bg, 1.0, borderCol)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), bg, 1.0, borderCol)
 
 	if textArea.W > 0 && c.Font != nil {
 		c.Canvas.PushClip(textArea)
@@ -667,8 +667,8 @@ func (c *Context) MaskedInput(id string, value *string, mask string, opts ...Opt
 		selStart := clampRuneIdx(c.textSelStart[id], len(displayRunes))
 		prefixW, lineH := c.Font.MeasureTextStyled(string(displayRunes[:caret]), pxSize, st.FontStyle)
 		scroll := c.textScroll[id]
-		if prefixW-scroll > textArea.W-c.S(4) {
-			scroll = prefixW - (textArea.W - c.S(4))
+		if prefixW-scroll > textArea.W-c.Scale(4).Int() {
+			scroll = prefixW - (textArea.W - c.Scale(4).Int())
 		}
 		if prefixW-scroll < 0 {
 			scroll = prefixW
@@ -684,9 +684,9 @@ func (c *Context) MaskedInput(id string, value *string, mask string, opts ...Opt
 				x2, _ := c.Font.MeasureTextStyled(string(displayRunes[:b]), pxSize, st.FontStyle)
 				c.Canvas.FillRect(render.Rect{
 					X: textArea.X + x1 - scroll,
-					Y: textArea.Y + c.S(5),
+					Y: textArea.Y + c.Scale(5).Int(),
 					W: x2 - x1,
-					H: textArea.H - c.S(10),
+					H: textArea.H - c.Scale(10).Int(),
 				}, c.Theme.Accent.WithAlpha(90))
 			}
 		}
@@ -707,7 +707,7 @@ func (c *Context) MaskedInput(id string, value *string, mask string, opts ...Opt
 
 		if focused {
 			caretX := textArea.X + prefixW - scroll
-			c.Canvas.FillRect(render.Rect{X: caretX, Y: textArea.Y + c.S(6), W: c.S(2), H: textArea.H - c.S(12)}, c.Theme.Accent)
+			c.Canvas.FillRect(render.Rect{X: caretX, Y: textArea.Y + c.Scale(6).Int(), W: c.Scale(2).Int(), H: textArea.H - c.Scale(12).Int()}, c.Theme.Accent)
 		}
 		c.Canvas.PopClip()
 	}

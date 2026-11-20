@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	listAnchorStore = make(map[string]int)
-	treeAnchorStore = make(map[string]int)
+	listAnchorStore  = make(map[string]int)
+	treeAnchorStore  = make(map[string]int)
 	tableAnchorStore = make(map[string]int)
 	tableEditRow     = make(map[string]int)
 	tableEditCol     = make(map[string]int)
@@ -21,7 +21,7 @@ var (
 func (c *Context) ListViewEx(
 	id string,
 	count int,
-	itemHeightDp int,
+	itemHeightDp Dp,
 	selected map[int]bool,
 	checked []bool,
 	drawItem func(index int, area render.Rect, isSelected bool),
@@ -33,13 +33,13 @@ func (c *Context) ListViewEx(
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
 	h := c.RemainingHeight()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
-	} else if h <= 0 || h >= c.S(50000) {
-		h = c.S(220)
+		h = c.Scale(*st.HeightDp).Int()
+	} else if h <= 0 || h >= c.Scale(50000).Int() {
+		h = c.Scale(220).Int()
 	}
 	r := c.allocRectStyled(w, h, st)
 	if r.W <= 0 || r.H <= 0 {
@@ -47,10 +47,10 @@ func (c *Context) ListViewEx(
 	}
 	c.registerFocusable(id)
 
-	c.Canvas.DrawRoundedBox(r, c.Sf(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
 
-	rowH := c.S(itemHeightDp)
-	sbW := c.S(8)
+	rowH := c.Scale(itemHeightDp).Int()
+	sbW := c.Scale(8).Int()
 	viewRect := render.Rect{X: r.X + 1, Y: r.Y + 1, W: r.W - 2, H: r.H - 2}
 	contentW := viewRect.W
 	totalH := count * rowH
@@ -117,8 +117,8 @@ func (c *Context) ListViewEx(
 
 		itemArea := ir
 		if showCheck {
-			cbSize := c.S(16)
-			cbR := render.Rect{X: ir.X + c.S(8), Y: ir.Y + (ir.H-cbSize)/2, W: cbSize, H: cbSize}
+			cbSize := c.Scale(16).Int()
+			cbR := render.Rect{X: ir.X + c.Scale(8).Int(), Y: ir.Y + (ir.H-cbSize)/2, W: cbSize, H: cbSize}
 			c.RegisterHit(id+":cb:"+strconv.Itoa(i), contentRect.Intersect(cbR), platform.CursorHand)
 			c.drawMiniCheckbox(cbR, checked[i], false)
 
@@ -131,7 +131,7 @@ func (c *Context) ListViewEx(
 					hov = false
 				}
 			}
-			itemArea = render.Rect{X: cbR.X + cbR.W + c.S(6), Y: ir.Y, W: ir.W - (cbR.X + cbR.W + c.S(6) - ir.X), H: ir.H}
+			itemArea = render.Rect{X: cbR.X + cbR.W + c.Scale(6).Int(), Y: ir.Y, W: ir.W - (cbR.X + cbR.W + c.Scale(6).Int() - ir.X), H: ir.H}
 		}
 
 		if hov && c.MousePressed && selected != nil {
@@ -237,20 +237,20 @@ func (c *Context) TreeViewEx(
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(240)
+	h := c.Scale(240).Int()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
+		h = c.Scale(*st.HeightDp).Int()
 	}
 	r := c.allocRectStyled(w, h, st)
 	c.registerFocusable(id)
 
-	c.Canvas.DrawRoundedBox(r, c.Sf(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
 
 	flat := FlattenTree(roots)
-	rowH := c.S(28)
-	sbW := c.S(8)
+	rowH := c.Scale(28).Int()
+	sbW := c.Scale(8).Int()
 	viewRect := render.Rect{X: r.X + 1, Y: r.Y + 1, W: r.W - 2, H: r.H - 2}
 	contentW := viewRect.W
 	totalH := len(flat) * rowH
@@ -293,7 +293,7 @@ func (c *Context) TreeViewEx(
 	c.Canvas.PushClip(contentRect)
 
 	startIdx, endIdx := ComputeVisibleRange(si.y, viewRect.H, rowH, len(flat))
-	pxSize := c.S(13)
+	pxSize := c.Scale(13).Int()
 
 	for i := startIdx; i < endIdx; i++ {
 		item := flat[i]
@@ -310,20 +310,20 @@ func (c *Context) TreeViewEx(
 			c.Canvas.FillRect(ir, c.Theme.Surface)
 		}
 
-		curX := ir.X + c.S(8) + item.Depth*c.S(18)
+		curX := ir.X + c.Scale(8).Int() + item.Depth*c.Scale(18).Int()
 
 		// Стрелка раскрытия/сворачивания
-		arrowR := render.Rect{X: curX, Y: ir.Y + (ir.H-c.S(16))/2, W: c.S(16), H: c.S(16)}
+		arrowR := render.Rect{X: curX, Y: ir.Y + (ir.H-c.Scale(16).Int())/2, W: c.Scale(16).Int(), H: c.Scale(16).Int()}
 		if len(n.Children) > 0 {
 			c.RegisterHit(id+":arrow:"+n.ID, contentRect.Intersect(arrowR), platform.CursorHand)
 			cx := float32(arrowR.X + arrowR.W/2)
 			cy := float32(arrowR.Y + arrowR.H/2)
 			if n.Expanded {
-				c.Canvas.DrawLine(cx-c.Sf(4), cy-c.Sf(2), cx, cy+c.Sf(2), 1.5, c.Theme.TextMuted)
-				c.Canvas.DrawLine(cx, cy+c.Sf(2), cx+c.Sf(4), cy-c.Sf(2), 1.5, c.Theme.TextMuted)
+				c.Canvas.DrawLine(cx-c.ScaleF(4), cy-c.ScaleF(2), cx, cy+c.ScaleF(2), 1.5, c.Theme.TextMuted)
+				c.Canvas.DrawLine(cx, cy+c.ScaleF(2), cx+c.ScaleF(4), cy-c.ScaleF(2), 1.5, c.Theme.TextMuted)
 			} else {
-				c.Canvas.DrawLine(cx-c.Sf(2), cy-c.Sf(4), cx+c.Sf(2), cy, 1.5, c.Theme.TextMuted)
-				c.Canvas.DrawLine(cx+c.Sf(2), cy, cx-c.Sf(2), cy+c.Sf(4), 1.5, c.Theme.TextMuted)
+				c.Canvas.DrawLine(cx-c.ScaleF(2), cy-c.ScaleF(4), cx+c.ScaleF(2), cy, 1.5, c.Theme.TextMuted)
+				c.Canvas.DrawLine(cx+c.ScaleF(2), cy, cx-c.ScaleF(2), cy+c.ScaleF(4), 1.5, c.Theme.TextMuted)
 			}
 			if hov && arrowR.Contains(c.MouseX, c.MouseY) {
 				c.nextCursor = platform.CursorHand
@@ -335,11 +335,11 @@ func (c *Context) TreeViewEx(
 				}
 			}
 		}
-		curX += c.S(18)
+		curX += c.Scale(18).Int()
 
 		// Чекбокс узла
 		if showCheckboxes {
-			cbSize := c.S(15)
+			cbSize := c.Scale(15).Int()
 			cbR := render.Rect{X: curX, Y: ir.Y + (ir.H-cbSize)/2, W: cbSize, H: cbSize}
 			c.RegisterHit(id+":tcb:"+n.ID, contentRect.Intersect(cbR), platform.CursorHand)
 			c.drawMiniCheckbox(cbR, n.Checked, n.Indeterminate)
@@ -354,13 +354,13 @@ func (c *Context) TreeViewEx(
 					hov = false
 				}
 			}
-			curX += cbSize + c.S(6)
+			curX += cbSize + c.Scale(6).Int()
 		}
 
 		if n.IconSVG != "" {
-			icSize := c.S(14)
+			icSize := c.Scale(14).Int()
 			c.Canvas.DrawSVG(n.IconSVG, curX, ir.Y+(ir.H-icSize)/2, icSize, c.Theme.TextMuted)
-			curX += icSize + c.S(6)
+			curX += icSize + c.Scale(6).Int()
 		}
 
 		if c.Font != nil {
@@ -447,16 +447,16 @@ func (c *Context) TableEx(
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(260)
+	h := c.Scale(260).Int()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
+		h = c.Scale(*st.HeightDp).Int()
 	}
 	r := c.allocRectStyled(w, h, st)
 	c.registerFocusable(id)
 
-	c.Canvas.DrawRoundedBox(r, c.Sf(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
 
 	// Инициализация ширин колонок
 	if c.tableColWidths == nil {
@@ -474,20 +474,20 @@ func (c *Context) TableEx(
 
 	checkColW := 0
 	if cfg.ShowCheckboxes {
-		checkColW = c.S(34)
+		checkColW = c.Scale(34).Int()
 	}
 
 	colWidths := c.tableColWidths[id]
 	if len(colWidths) != len(cols) {
-		scale := c.Scale
+		scale := c.DpiScale
 		if scale <= 0 {
 			scale = 1
 		}
-		availDp := int(float32(r.W-checkColW) / scale)
+		availDp := Dp(float32(r.W-checkColW) / scale)
 		widthsDp := calcTableColWidthsDp(cols, availDp)
 		colWidths = make([]int, len(cols))
 		for i, wdp := range widthsDp {
-			colWidths[i] = c.S(wdp)
+			colWidths[i] = c.Scale(Dp(wdp)).Int()
 		}
 		c.tableColWidths[id] = colWidths
 	}
@@ -510,9 +510,9 @@ func (c *Context) TableEx(
 		totalColsW += cw
 	}
 
-	hdrH := c.S(32)
-	rowH := c.S(30)
-	sbSize := c.S(8)
+	hdrH := c.Scale(32).Int()
+	rowH := c.Scale(30).Int()
+	sbSize := c.Scale(8).Int()
 
 	viewRect := render.Rect{X: r.X + 1, Y: r.Y + 1, W: r.W - 2, H: r.H - 2}
 	needVScroll := rowCount*rowH > (viewRect.H - hdrH)
@@ -552,7 +552,7 @@ func (c *Context) TableEx(
 			c.RequestRedraw()
 		}
 		if c.WheelX != 0 {
-			si.x += int(c.WheelX * float32(c.S(30)))
+			si.x += int(c.WheelX * float32(c.Scale(30).Int()))
 			if si.x < 0 {
 				si.x = 0
 			}
@@ -618,9 +618,9 @@ func (c *Context) TableEx(
 		if c.MouseDown {
 			delta := c.MouseX - c.tableResizeStartX[id]
 			nw := c.tableResizeStartW[id] + delta
-			minW := c.S(40)
+			minW := c.Scale(40).Int()
 			if cols[resCol].MinWidthDp > 0 {
-				minW = c.S(cols[resCol].MinWidthDp)
+				minW = c.Scale(cols[resCol].MinWidthDp).Int()
 			}
 			if nw < minW {
 				nw = minW
@@ -658,7 +658,7 @@ func (c *Context) TableEx(
 		cx := colStartX(ci)
 		cw := colWidths[ci]
 		cr := render.Rect{X: cx, Y: hdrRect.Y, W: cw, H: hdrH}
-		resZone := render.Rect{X: cr.X + cr.W - c.S(4), Y: cr.Y, W: c.S(8), H: cr.H}
+		resZone := render.Rect{X: cr.X + cr.W - c.Scale(4).Int(), Y: cr.Y, W: c.Scale(8).Int(), H: cr.H}
 		if cols[ci].Sortable && sort != nil {
 			c.RegisterHit(id+":hdr:"+strconv.Itoa(ci), hdrRect.Intersect(cr), platform.CursorHand)
 		}
@@ -667,18 +667,18 @@ func (c *Context) TableEx(
 		if !c.IsInputBlocked() && resZone.Contains(c.MouseX, c.MouseY) {
 			c.nextCursor = platform.CursorResizeH
 			if c.DoubleClicked() && cfg.AutoFitOnDoubleClick && cfg.GetCellText != nil && c.Font != nil {
-				maxTw, _ := c.Font.MeasureText(cols[ci].Title, c.S(12))
+				maxTw, _ := c.Font.MeasureText(cols[ci].Title, c.Scale(12).Int())
 				limit := rowCount
 				if limit > 200 {
 					limit = 200
 				}
 				for ri := 0; ri < limit; ri++ {
-					tw, _ := c.Font.MeasureText(cfg.GetCellText(ri, ci), c.S(12))
+					tw, _ := c.Font.MeasureText(cfg.GetCellText(ri, ci), c.Scale(12).Int())
 					if tw > maxTw {
 						maxTw = tw
 					}
 				}
-				colWidths[ci] = maxTw + c.S(24)
+				colWidths[ci] = maxTw + c.Scale(24).Int()
 				ev.ColumnResized = true
 				c.RequestRedraw()
 			} else if c.MousePressed {
@@ -710,11 +710,11 @@ func (c *Context) TableEx(
 					title += " ^"
 				}
 			}
-			_, th := c.Font.MeasureText(title, c.S(12))
-			c.Font.DrawText(c.Canvas, cr.X+c.S(8), cr.Y+(cr.H-th)/2, title, c.S(12), c.Theme.TextMuted)
+			_, th := c.Font.MeasureText(title, c.Scale(12).Int())
+			c.Font.DrawText(c.Canvas, cr.X+c.Scale(8).Int(), cr.Y+(cr.H-th)/2, title, c.Scale(12).Int(), c.Theme.TextMuted)
 		}
 		c.Canvas.PopClip()
-		c.Canvas.FillRect(render.Rect{X: cr.X + cr.W - 1, Y: cr.Y + c.S(6), W: 1, H: cr.H - c.S(12)}, c.Theme.Border)
+		c.Canvas.FillRect(render.Rect{X: cr.X + cr.W - 1, Y: cr.Y + c.Scale(6).Int(), W: 1, H: cr.H - c.Scale(12).Int()}, c.Theme.Border)
 	}
 
 	// Сначала прокручиваемые колонки шапки (в клипе правее frozenW)
@@ -742,7 +742,7 @@ func (c *Context) TableEx(
 					allChecked = false
 				}
 			}
-			cbSize := c.S(15)
+			cbSize := c.Scale(15).Int()
 			cbR := render.Rect{X: viewRect.X + (checkColW-cbSize)/2, Y: hdrRect.Y + (hdrH-cbSize)/2, W: cbSize, H: cbSize}
 			c.RegisterHit(id+":allcb", cbR, platform.CursorHand)
 			c.drawMiniCheckbox(cbR, allChecked, anyChecked && !allChecked)
@@ -789,7 +789,7 @@ func (c *Context) TableEx(
 			}
 
 			if colStart == 0 && cfg.ShowCheckboxes && cfg.CheckedRows != nil && len(cfg.CheckedRows) >= rowCount {
-				cbSize := c.S(15)
+				cbSize := c.Scale(15).Int()
 				cbR := render.Rect{X: viewRect.X + (checkColW-cbSize)/2, Y: ry + (rowH-cbSize)/2, W: cbSize, H: cbSize}
 				c.RegisterHit(id+":rcb:"+strconv.Itoa(ri), clipR.Intersect(cbR), platform.CursorHand)
 				c.drawMiniCheckbox(cbR, cfg.CheckedRows[ri], false)
@@ -823,8 +823,8 @@ func (c *Context) TableEx(
 					c.Canvas.DrawRoundedBox(render.Rect{X: cellR.X + 2, Y: cellR.Y + 2, W: cellR.W - 4, H: cellR.H - 4}, 3, c.Theme.Bg, 1.5, c.Theme.Accent)
 					if c.Font != nil {
 						txt := tableEditBuf[id]
-						_, th := c.Font.MeasureText(txt, c.S(12))
-						c.Font.DrawText(c.Canvas, cellR.X+c.S(6), cellR.Y+(cellR.H-th)/2, txt, c.S(12), c.Theme.TextPrimary)
+						_, th := c.Font.MeasureText(txt, c.Scale(12).Int())
+						c.Font.DrawText(c.Canvas, cellR.X+c.Scale(6).Int(), cellR.Y+(cellR.H-th)/2, txt, c.Scale(12).Int(), c.Theme.TextPrimary)
 					}
 				} else if drawCell != nil {
 					c.Canvas.PushClip(cellR)
@@ -892,17 +892,17 @@ func (c *Context) TableEx(
 
 func (c *Context) drawMiniCheckbox(r render.Rect, checked, indeterminate bool) {
 	if checked || indeterminate {
-		c.Canvas.FillRoundedRect(r, c.Sf(3), c.Theme.Accent)
+		c.Canvas.FillRoundedRect(r, c.ScaleF(3), c.Theme.Accent)
 		cx := float32(r.X + r.W/2)
 		cy := float32(r.Y + r.H/2)
 		white := render.RGBA(255, 255, 255, 255)
 		if indeterminate {
-			c.Canvas.DrawLine(cx-c.Sf(4), cy, cx+c.Sf(4), cy, 2.0, white)
+			c.Canvas.DrawLine(cx-c.ScaleF(4), cy, cx+c.ScaleF(4), cy, 2.0, white)
 		} else {
-			c.Canvas.DrawLine(cx-c.Sf(3.5), cy, cx-c.Sf(0.5), cy+c.Sf(3), 1.8, white)
-			c.Canvas.DrawLine(cx-c.Sf(0.5), cy+c.Sf(3), cx+c.Sf(4), cy-c.Sf(3), 1.8, white)
+			c.Canvas.DrawLine(cx-c.ScaleF(3.5), cy, cx-c.ScaleF(0.5), cy+c.ScaleF(3), 1.8, white)
+			c.Canvas.DrawLine(cx-c.ScaleF(0.5), cy+c.ScaleF(3), cx+c.ScaleF(4), cy-c.ScaleF(3), 1.8, white)
 		}
 	} else {
-		c.Canvas.DrawRoundedBox(r, c.Sf(3), c.Theme.Bg, 1.0, c.Theme.Border)
+		c.Canvas.DrawRoundedBox(r, c.ScaleF(3), c.Theme.Bg, 1.0, c.Theme.Border)
 	}
 }

@@ -120,6 +120,7 @@ win, _ := app.OpenWindow(anyui.Config{
 - [Темы оформления и стилизация](theming.md)
 - [Системная интеграция (окна, трей, диалоги, Linux)](system.md)
 - [Тестирование и Headless-рантайм](testing.md)
+- [Единицы измерения и типизация (Dp / Px)](units.md)
 
 
 

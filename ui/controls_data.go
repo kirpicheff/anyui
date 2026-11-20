@@ -10,8 +10,8 @@ import (
 // TableColumn описывает одну колонку таблицы.
 type TableColumn struct {
 	Title      string
-	WidthDp    int
-	MinWidthDp int
+	WidthDp    Dp
+	MinWidthDp Dp
 	Sortable   bool
 }
 
@@ -32,14 +32,14 @@ type TableEvent struct {
 
 // calcTableColWidthsDp рассчитывает стартовые ширины колонок в dp.
 // Колонки с WidthDp <= 0 равномерно делят оставшуюся ширину таблицы.
-func calcTableColWidthsDp(cols []TableColumn, totalWidthDp int) []int {
+func calcTableColWidthsDp(cols []TableColumn, totalWidthDp Dp) []int {
 	widths := make([]int, len(cols))
 	fixedSum := 0
 	flexCount := 0
 	for i, col := range cols {
 		if col.WidthDp > 0 {
-			widths[i] = col.WidthDp
-			fixedSum += col.WidthDp
+			widths[i] = col.WidthDp.Int()
+			fixedSum += col.WidthDp.Int()
 		} else {
 			flexCount++
 		}
@@ -47,7 +47,7 @@ func calcTableColWidthsDp(cols []TableColumn, totalWidthDp int) []int {
 	if flexCount == 0 {
 		return widths
 	}
-	rem := totalWidthDp - fixedSum
+	rem := totalWidthDp.Int() - fixedSum
 	flexW := 120
 	if totalWidthDp > 0 {
 		flexW = rem / flexCount
@@ -56,7 +56,7 @@ func calcTableColWidthsDp(cols []TableColumn, totalWidthDp int) []int {
 		if col.WidthDp > 0 {
 			continue
 		}
-		minW := col.MinWidthDp
+		minW := col.MinWidthDp.Int()
 		if minW <= 0 {
 			minW = 60
 		}
@@ -88,11 +88,11 @@ func (c *Context) Table(
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(260)
+	h := c.Scale(260).Int()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
+		h = c.Scale(*st.HeightDp).Int()
 	}
 	if w <= 0 || h <= 0 {
 		return ev
@@ -106,9 +106,9 @@ func (c *Context) Table(
 		c.FocusID = id
 		c.RequestRedraw()
 	}
-	radius := c.Sf(c.Theme.RadiusSm)
+	radius := c.ScaleF(c.Theme.RadiusSm)
 	if st.Radius != nil {
-		radius = c.Sf(*st.Radius)
+		radius = c.ScaleF(*st.Radius)
 	}
 	borderCol := c.Theme.Border
 	if c.FocusID == id {
@@ -132,17 +132,17 @@ func (c *Context) Table(
 
 	widthsDp, ok := c.tableColWidths[id]
 	if !ok || len(widthsDp) != len(cols) {
-		scale := c.Scale
+		scale := c.DpiScale
 		if scale <= 0 {
 			scale = 1
 		}
-		totalDp := int(float32(rect.W) / scale)
+		totalDp := Dp(float32(rect.W) / scale)
 		widthsDp = calcTableColWidthsDp(cols, totalDp)
 		c.tableColWidths[id] = widthsDp
 		c.tableResizeCol[id] = -1
 	}
 
-	headerH := c.S(32)
+	headerH := c.Scale(32).Int()
 	if headerH > rect.H {
 		headerH = rect.H
 	}
@@ -155,12 +155,12 @@ func (c *Context) Table(
 		colIdx := c.tableResizeCol[id]
 		if colIdx >= 0 && colIdx < len(widthsDp) {
 			deltaPx := c.MouseX - c.tableResizeStartX[id]
-			scale := c.Scale
+			scale := c.DpiScale
 			if scale <= 0 {
 				scale = 1
 			}
 			newW := c.tableResizeStartW[id] + int(float32(deltaPx)/scale)
-			minW := cols[colIdx].MinWidthDp
+			minW := cols[colIdx].MinWidthDp.Int()
 			if minW <= 0 {
 				minW = 48
 			}
@@ -180,7 +180,7 @@ func (c *Context) Table(
 	si := c.getScrollInfo("tbl:" + id)
 	totalW := 0
 	for i := range cols {
-		totalW += c.S(widthsDp[i])
+		totalW += c.Scale(Dp(widthsDp[i])).Int()
 	}
 
 	// Отрисовка заголовка таблицы
@@ -188,13 +188,13 @@ func (c *Context) Table(
 	c.Canvas.FillRect(headerRect, c.Theme.Surface)
 	c.Canvas.DrawLine(float32(headerRect.X), float32(headerRect.Y+headerRect.H-1), float32(headerRect.X+headerRect.W), float32(headerRect.Y+headerRect.H-1), 1.0, c.Theme.Border)
 
-	pxSize := c.S(12)
+	pxSize := c.Scale(12).Int()
 	curX := headerRect.X - si.x
 	blocked := c.IsInputBlocked()
 	for i, col := range cols {
-		cw := c.S(widthsDp[i])
+		cw := c.Scale(Dp(widthsDp[i])).Int()
 		colRect := render.Rect{X: curX, Y: headerRect.Y, W: cw, H: headerRect.H}
-		resizeZone := render.Rect{X: curX + cw - c.S(4), Y: headerRect.Y, W: c.S(8), H: headerRect.H}
+		resizeZone := render.Rect{X: curX + cw - c.Scale(4).Int(), Y: headerRect.Y, W: c.Scale(8).Int(), H: headerRect.H}
 		if col.Sortable && sort != nil {
 			c.RegisterHit(id+":hdr:"+strconv.Itoa(i), headerRect.Intersect(colRect), platform.CursorHand)
 		}
@@ -227,26 +227,26 @@ func (c *Context) Table(
 		}
 
 		// Вертикальный разделитель колонки
-		c.Canvas.DrawLine(float32(curX+cw-1), float32(headerRect.Y+c.S(6)), float32(curX+cw-1), float32(headerRect.Y+headerRect.H-c.S(6)), 1.0, c.Theme.Border)
+		c.Canvas.DrawLine(float32(curX+cw-1), float32(headerRect.Y+c.Scale(6).Int()), float32(curX+cw-1), float32(headerRect.Y+headerRect.H-c.Scale(6).Int()), 1.0, c.Theme.Border)
 
-		if c.Font != nil && cw > c.S(16) {
-			c.Canvas.PushClip(render.Rect{X: colRect.X + c.S(8), Y: colRect.Y, W: colRect.W - c.S(22), H: colRect.H})
+		if c.Font != nil && cw > c.Scale(16).Int() {
+			c.Canvas.PushClip(render.Rect{X: colRect.X + c.Scale(8).Int(), Y: colRect.Y, W: colRect.W - c.Scale(22).Int(), H: colRect.H})
 			_, th := c.Font.MeasureText(col.Title, pxSize)
-			c.Font.DrawText(c.Canvas, colRect.X+c.S(8), colRect.Y+(colRect.H-th)/2, col.Title, pxSize, c.Theme.TextPrimary)
+			c.Font.DrawText(c.Canvas, colRect.X+c.Scale(8).Int(), colRect.Y+(colRect.H-th)/2, col.Title, pxSize, c.Theme.TextPrimary)
 			c.Canvas.PopClip()
 		}
 
 		// Индикатор сортировки
-		if sort != nil && sort.Column == i && cw > c.S(24) {
-			ax := float32(colRect.X + colRect.W - c.S(14))
+		if sort != nil && sort.Column == i && cw > c.Scale(24).Int() {
+			ax := float32(colRect.X + colRect.W - c.Scale(14).Int())
 			ay := float32(colRect.Y + colRect.H/2)
-			sz := c.Sf(3.5)
+			sz := c.ScaleF(3.5)
 			if sort.Desc {
-				c.Canvas.DrawLine(ax-sz, ay-sz*0.5, ax, ay+sz*0.5, c.Sf(1.5), c.Theme.Accent)
-				c.Canvas.DrawLine(ax, ay+sz*0.5, ax+sz, ay-sz*0.5, c.Sf(1.5), c.Theme.Accent)
+				c.Canvas.DrawLine(ax-sz, ay-sz*0.5, ax, ay+sz*0.5, c.ScaleF(1.5), c.Theme.Accent)
+				c.Canvas.DrawLine(ax, ay+sz*0.5, ax+sz, ay-sz*0.5, c.ScaleF(1.5), c.Theme.Accent)
 			} else {
-				c.Canvas.DrawLine(ax-sz, ay+sz*0.5, ax, ay-sz*0.5, c.Sf(1.5), c.Theme.Accent)
-				c.Canvas.DrawLine(ax, ay-sz*0.5, ax+sz, ay+sz*0.5, c.Sf(1.5), c.Theme.Accent)
+				c.Canvas.DrawLine(ax-sz, ay+sz*0.5, ax, ay-sz*0.5, c.ScaleF(1.5), c.Theme.Accent)
+				c.Canvas.DrawLine(ax, ay-sz*0.5, ax+sz, ay+sz*0.5, c.ScaleF(1.5), c.Theme.Accent)
 			}
 		}
 
@@ -258,15 +258,15 @@ func (c *Context) Table(
 	if bodyRect.H <= 0 {
 		return ev
 	}
-	rowH := c.S(30)
+	rowH := c.Scale(30).Int()
 	totalH := rowCount * rowH
 
-	sbW := c.S(8)
-	sbH := c.S(8)
+	sbW := c.Scale(8).Int()
+	sbH := c.Scale(8).Int()
 	hasHSB := totalW > bodyRect.W
 	viewH := bodyRect.H
 	if hasHSB {
-		viewH -= sbH + c.S(2)
+		viewH -= sbH + c.Scale(2).Int()
 		if viewH < 0 {
 			viewH = 0
 		}
@@ -274,12 +274,12 @@ func (c *Context) Table(
 	hasSB := totalH > viewH
 	contentW := bodyRect.W
 	if hasSB {
-		contentW -= sbW + c.S(2)
+		contentW -= sbW + c.Scale(2).Int()
 	}
 	// Пересчитываем hasHSB с учётом возможного вертикального скроллбара
 	hasHSB = totalW > contentW
 	if hasHSB {
-		viewH = bodyRect.H - sbH - c.S(2)
+		viewH = bodyRect.H - sbH - c.Scale(2).Int()
 		if viewH < 0 {
 			viewH = 0
 		}
@@ -291,7 +291,7 @@ func (c *Context) Table(
 			c.RequestRedraw()
 		}
 		if c.WheelX != 0 && totalW > contentW {
-			si.x += int(c.WheelX * float32(c.S(36)))
+			si.x += int(c.WheelX * float32(c.Scale(36).Int()))
 			c.RequestRedraw()
 		}
 	}
@@ -318,12 +318,12 @@ func (c *Context) Table(
 			switch kp.Code {
 			case KeyLeft:
 				if hasHSB {
-					si.x -= c.S(40)
+					si.x -= c.Scale(40).Int()
 					c.RequestRedraw()
 				}
 			case KeyRight:
 				if hasHSB {
-					si.x += c.S(40)
+					si.x += c.Scale(40).Int()
 					c.RequestRedraw()
 				}
 			case KeyEnter:
@@ -397,7 +397,7 @@ func (c *Context) Table(
 		// Отрисовка ячеек с учётом горизонтальной прокрутки
 		cellX := bodyRect.X - si.x
 		for ci := range cols {
-			cw := c.S(widthsDp[ci])
+			cw := c.Scale(Dp(widthsDp[ci])).Int()
 			cellRect := render.Rect{X: cellX, Y: ry, W: cw, H: rowH}
 			if drawCell != nil && cellRect.X+cellRect.W > bodyRect.X && cellRect.X < bodyRect.X+contentW {
 				c.Canvas.PushClip(cellRect)
@@ -414,19 +414,19 @@ func (c *Context) Table(
 	// Вертикальный скроллбар
 	if hasSB {
 		c.drawVerticalScrollbar("tbl_sb:"+id, render.Rect{
-			X: bodyRect.X + contentW + c.S(1),
-			Y: bodyRect.Y + c.S(2),
-			W: sbW - c.S(2),
-			H: viewH - c.S(4),
+			X: bodyRect.X + contentW + c.Scale(1).Int(),
+			Y: bodyRect.Y + c.Scale(2).Int(),
+			W: sbW - c.Scale(2).Int(),
+			H: viewH - c.Scale(4).Int(),
 		}, si, totalH, viewH)
 	}
 	// Горизонтальный скроллбар
 	if hasHSB {
 		c.drawHorizontalScrollbar("tbl_hsb:"+id, render.Rect{
-			X: bodyRect.X + c.S(2),
-			Y: bodyRect.Y + viewH + c.S(1),
-			W: contentW - c.S(4),
-			H: sbH - c.S(2),
+			X: bodyRect.X + c.Scale(2).Int(),
+			Y: bodyRect.Y + viewH + c.Scale(1).Int(),
+			W: contentW - c.Scale(4).Int(),
+			H: sbH - c.Scale(2).Int(),
 		}, si, totalW, contentW)
 	}
 
@@ -475,11 +475,11 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(240)
+	h := c.Scale(240).Int()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
+		h = c.Scale(*st.HeightDp).Int()
 	}
 	if w <= 0 || h <= 0 {
 		return false
@@ -493,9 +493,9 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 		c.FocusID = id
 		c.RequestRedraw()
 	}
-	radius := c.Sf(c.Theme.RadiusSm)
+	radius := c.ScaleF(c.Theme.RadiusSm)
 	if st.Radius != nil {
-		radius = c.Sf(*st.Radius)
+		radius = c.ScaleF(*st.Radius)
 	}
 	borderCol := c.Theme.Border
 	if c.FocusID == id {
@@ -504,8 +504,8 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 	c.Canvas.DrawRoundedBox(rect, radius, c.Theme.SurfaceDark, 1.0, borderCol)
 
 	flat := FlattenTree(roots)
-	itemH := c.S(28)
-	inner := render.Rect{X: rect.X + c.S(4), Y: rect.Y + c.S(4), W: rect.W - c.S(8), H: rect.H - c.S(8)}
+	itemH := c.Scale(28).Int()
+	inner := render.Rect{X: rect.X + c.Scale(4).Int(), Y: rect.Y + c.Scale(4).Int(), W: rect.W - c.Scale(8).Int(), H: rect.H - c.Scale(8).Int()}
 	si := c.getScrollInfo("tree:" + id)
 	totalH := len(flat) * itemH
 
@@ -608,14 +608,14 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 	}
 
 	hasSB := maxSc > 0
-	sbW := c.S(8)
+	sbW := c.Scale(8).Int()
 	contentW := inner.W
 	if hasSB {
-		contentW -= sbW + c.S(2)
+		contentW -= sbW + c.Scale(2).Int()
 	}
 
 	startIdx, endIdx := ComputeVisibleRange(si.y, inner.H, itemH, len(flat))
-	pxSize := c.S(13)
+	pxSize := c.Scale(13).Int()
 
 	c.Canvas.PushClip(render.Rect{X: inner.X, Y: inner.Y, W: contentW, H: inner.H})
 	for i := startIdx; i < endIdx; i++ {
@@ -629,13 +629,13 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 		rowHover := !blocked && inner.Contains(c.MouseX, c.MouseY) && rowR.Contains(c.MouseX, c.MouseY) && c.MouseX < inner.X+contentW
 
 		if isSel {
-			c.Canvas.FillRoundedRect(rowR, c.Sf(4), c.Theme.Accent.WithAlpha(45))
+			c.Canvas.FillRoundedRect(rowR, c.ScaleF(4), c.Theme.Accent.WithAlpha(45))
 		} else if rowHover {
-			c.Canvas.FillRoundedRect(rowR, c.Sf(4), c.Theme.Surface)
+			c.Canvas.FillRoundedRect(rowR, c.ScaleF(4), c.Theme.Surface)
 		}
 
-		indent := item.Depth * c.S(18)
-		toggleR := render.Rect{X: rowR.X + indent + c.S(4), Y: rowR.Y + (rowR.H-c.S(18))/2, W: c.S(18), H: c.S(18)}
+		indent := item.Depth * c.Scale(18).Int()
+		toggleR := render.Rect{X: rowR.X + indent + c.Scale(4).Int(), Y: rowR.Y + (rowR.H-c.Scale(18).Int())/2, W: c.Scale(18).Int(), H: c.Scale(18).Int()}
 		hasChildren := len(node.Children) > 0
 
 		if rowHover {
@@ -663,25 +663,25 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 		if hasChildren {
 			cx := float32(toggleR.X + toggleR.W/2)
 			cy := float32(toggleR.Y + toggleR.H/2)
-			arm := c.Sf(3.5)
+			arm := c.ScaleF(3.5)
 			if node.Expanded {
-				c.Canvas.DrawLine(cx-arm, cy-arm*0.5, cx, cy+arm*0.5, c.Sf(1.5), c.Theme.TextMuted)
-				c.Canvas.DrawLine(cx, cy+arm*0.5, cx+arm, cy-arm*0.5, c.Sf(1.5), c.Theme.TextMuted)
+				c.Canvas.DrawLine(cx-arm, cy-arm*0.5, cx, cy+arm*0.5, c.ScaleF(1.5), c.Theme.TextMuted)
+				c.Canvas.DrawLine(cx, cy+arm*0.5, cx+arm, cy-arm*0.5, c.ScaleF(1.5), c.Theme.TextMuted)
 			} else {
-				c.Canvas.DrawLine(cx-arm*0.5, cy-arm, cx+arm*0.5, cy, c.Sf(1.5), c.Theme.TextMuted)
-				c.Canvas.DrawLine(cx+arm*0.5, cy, cx-arm*0.5, cy+arm, c.Sf(1.5), c.Theme.TextMuted)
+				c.Canvas.DrawLine(cx-arm*0.5, cy-arm, cx+arm*0.5, cy, c.ScaleF(1.5), c.Theme.TextMuted)
+				c.Canvas.DrawLine(cx+arm*0.5, cy, cx-arm*0.5, cy+arm, c.ScaleF(1.5), c.Theme.TextMuted)
 			}
 		}
 
-		curX := toggleR.X + toggleR.W + c.S(4)
+		curX := toggleR.X + toggleR.W + c.Scale(4).Int()
 		if node.IconSVG != "" {
-			icSz := c.S(14)
+			icSz := c.Scale(14).Int()
 			icCol := c.Theme.TextMuted
 			if isSel {
 				icCol = c.Theme.Accent
 			}
 			c.Canvas.DrawSVG(node.IconSVG, curX, rowR.Y+(rowR.H-icSz)/2, icSz, icCol)
-			curX += icSz + c.S(6)
+			curX += icSz + c.Scale(6).Int()
 		}
 
 		if c.Font != nil {
@@ -697,9 +697,9 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 
 	if hasSB {
 		c.drawVerticalScrollbar("tree_sb:"+id, render.Rect{
-			X: inner.X + contentW + c.S(1),
+			X: inner.X + contentW + c.Scale(1).Int(),
 			Y: inner.Y,
-			W: sbW - c.S(2),
+			W: sbW - c.Scale(2).Int(),
 			H: inner.H,
 		}, si, totalH, inner.H)
 	}
@@ -714,8 +714,8 @@ func (c *Context) drawVerticalScrollbar(sbID string, track render.Rect, si *scro
 	}
 	c.Canvas.FillRoundedRect(track, float32(track.W)/2, c.Theme.Surface)
 	thumbH := (track.H * viewH) / totalH
-	if thumbH < c.S(24) {
-		thumbH = c.S(24)
+	if thumbH < c.Scale(24).Int() {
+		thumbH = c.Scale(24).Int()
 	}
 	maxSc := totalH - viewH
 	thumbRange := track.H - thumbH
@@ -755,8 +755,8 @@ func (c *Context) drawHorizontalScrollbar(sbID string, track render.Rect, si *sc
 	}
 	c.Canvas.FillRoundedRect(track, float32(track.H)/2, c.Theme.Surface)
 	thumbW := (track.W * viewW) / totalW
-	if thumbW < c.S(24) {
-		thumbW = c.S(24)
+	if thumbW < c.Scale(24).Int() {
+		thumbW = c.Scale(24).Int()
 	}
 	if thumbW > track.W {
 		thumbW = track.W

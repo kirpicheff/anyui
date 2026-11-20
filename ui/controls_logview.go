@@ -57,7 +57,7 @@ func getLogViewState(id string) *logViewState {
 func (c *Context) LogView(id string, entries []LogEntry, followTail *bool, opts ...Option) {
 	id = c.ResolveID("log", id)
 	st := ApplyOptions(opts)
-	hDp := 260
+	hDp := Dp(260)
 	if st.HeightDp != nil && *st.HeightDp > 0 {
 		hDp = *st.HeightDp
 	}
@@ -74,24 +74,26 @@ func (c *Context) LogView(id string, entries []LogEntry, followTail *bool, opts 
 	if st.Bg != nil {
 		bg = *st.Bg
 	}
-	c.Canvas.DrawRoundedBox(r, c.Sf(c.Theme.RadiusSm), bg, 1.0, c.Theme.Border)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(c.Theme.RadiusSm), bg, 1.0, c.Theme.Border)
 
 	// Верхняя мини-панель инструментов LogView (поиск + кнопка Follow tail + Копировать)
-	barH := c.S(30)
+	barH := c.Scale(30).Int()
 	barRect := render.Rect{X: r.X + 1, Y: r.Y + 1, W: r.W - 2, H: barH}
 	c.Canvas.FillRect(barRect, c.Theme.Surface)
 	c.Canvas.FillRect(render.Rect{X: barRect.X, Y: barRect.Y + barRect.H - 1, W: barRect.W, H: 1}, c.Theme.Border)
 
-	pxSmall := c.S(11)
-	curX := barRect.X + c.S(8)
+	pxSmall := c.Scale(11).Int()
+	curX := barRect.X + c.Scale(8).Int(
 
 	// Поле быстрого поиска прямо в шапке LogView
-	searchW := c.S(180)
+	)
+
+	searchW := c.Scale(180).Int()
 	if searchW > barRect.W/2 {
 		searchW = barRect.W / 2
 	}
-	searchRect := render.Rect{X: curX, Y: barRect.Y + c.S(4), W: searchW, H: barRect.H - c.S(8)}
-	curX += searchW + c.S(8)
+	searchRect := render.Rect{X: curX, Y: barRect.Y + c.Scale(4).Int(), W: searchW, H: barRect.H - c.Scale(8).Int()}
+	curX += searchW + c.Scale(8).Int()
 
 	loc := c.str()
 	c.drawInlineSearchBox(id+":search", searchRect, &lvs.searchText, loc.LogFilterPlaceholder)
@@ -109,16 +111,18 @@ func (c *Context) LogView(id string, entries []LogEntry, followTail *bool, opts 
 
 	// Кнопка "Follow tail" справа
 	tailLabel := loc.LogTail
-	tailW := c.S(48)
+	tailW := c.Scale(48).Int()
 	copyLabel := loc.LogCopy
-	copyW := c.S(76)
-	rightX := barRect.X + barRect.W - c.S(6)
+	copyW := c.Scale(76).Int()
+	rightX := barRect.X + barRect.W - c.Scale(6).Int()
 
-	tailRect := render.Rect{X: rightX - tailW, Y: barRect.Y + c.S(4), W: tailW, H: barRect.H - c.S(8)}
-	rightX -= tailW + c.S(6)
-	copyRect := render.Rect{X: rightX - copyW, Y: barRect.Y + c.S(4), W: copyW, H: barRect.H - c.S(8)}
+	tailRect := render.Rect{X: rightX - tailW, Y: barRect.Y + c.Scale(4).Int(), W: tailW, H: barRect.H - c.Scale(8).Int()}
+	rightX -= tailW + c.Scale(6).Int()
+	copyRect := render.Rect{X: rightX - copyW, Y: barRect.Y + c.Scale(4).Int(), W: copyW, H: barRect.H - c.Scale(8).Int(
 
 	// Отрисовка кнопки Tail
+	)}
+
 	c.RegisterHit(id+":tail", tailRect, platform.CursorHand)
 	hovTail := !c.IsInputBlocked() && tailRect.Contains(c.MouseX, c.MouseY)
 	tailBg := c.Theme.Card
@@ -134,7 +138,7 @@ func (c *Context) LogView(id string, entries []LogEntry, followTail *bool, opts 
 	if hovTail {
 		c.nextCursor = platform.CursorHand
 	}
-	c.Canvas.DrawRoundedBox(tailRect, c.Sf(4), tailBg, 1.0, tailBorder)
+	c.Canvas.DrawRoundedBox(tailRect, c.ScaleF(4), tailBg, 1.0, tailBorder)
 	if c.Font != nil {
 		tw, th := c.Font.MeasureText(tailLabel, pxSmall)
 		c.Font.DrawText(c.Canvas, tailRect.X+(tailRect.W-tw)/2, tailRect.Y+(tailRect.H-th)/2, tailLabel, pxSmall, tailFg)
@@ -158,7 +162,7 @@ func (c *Context) LogView(id string, entries []LogEntry, followTail *bool, opts 
 	if !hasSel {
 		copyFg = c.Theme.TextMuted
 	}
-	c.Canvas.DrawRoundedBox(copyRect, c.Sf(4), c.Theme.Card, 1.0, c.Theme.Border)
+	c.Canvas.DrawRoundedBox(copyRect, c.ScaleF(4), c.Theme.Card, 1.0, c.Theme.Border)
 	if c.Font != nil {
 		cw, ch := c.Font.MeasureText(copyLabel, pxSmall)
 		c.Font.DrawText(c.Canvas, copyRect.X+(copyRect.W-cw)/2, copyRect.Y+(copyRect.H-ch)/2, copyLabel, pxSmall, copyFg)
@@ -168,7 +172,7 @@ func (c *Context) LogView(id string, entries []LogEntry, followTail *bool, opts 
 	}
 
 	// Счётчик строк
-	if c.Font != nil && curX+c.S(60) < copyRect.X {
+	if c.Font != nil && curX+c.Scale(60).Int() < copyRect.X {
 		cntText := fmt.Sprintf("%d/%d", len(visibleIndices), len(entries))
 		_, ch := c.Font.MeasureText(cntText, pxSmall)
 		c.Font.DrawText(c.Canvas, curX, barRect.Y+(barRect.H-ch)/2, cntText, pxSmall, c.Theme.TextMuted)
@@ -180,8 +184,8 @@ func (c *Context) LogView(id string, entries []LogEntry, followTail *bool, opts 
 		return
 	}
 
-	rowH := c.S(20)
-	sbW := c.S(8)
+	rowH := c.Scale(20).Int()
+	sbW := c.Scale(8).Int()
 	totalH := len(visibleIndices) * rowH
 	si := c.getScrollInfo(id)
 	maxScroll := totalH - viewRect.H
@@ -239,7 +243,7 @@ func (c *Context) LogView(id string, entries []LogEntry, followTail *bool, opts 
 	c.Canvas.PushClip(contentRect)
 
 	startIdx, endIdx := ComputeVisibleRange(si.y, viewRect.H, rowH, len(visibleIndices))
-	pxLog := c.S(12)
+	pxLog := c.Scale(12).Int()
 	mods := c.currentMods()
 
 	for vi := startIdx; vi < endIdx; vi++ {
@@ -288,17 +292,17 @@ func (c *Context) LogView(id string, entries []LogEntry, followTail *bool, opts 
 		}
 
 		if c.Font != nil {
-			tx := rowRect.X + c.S(8)
+			tx := rowRect.X + c.Scale(8).Int()
 			if entry.Timestamp != "" {
 				tw, th := c.Font.MeasureTextStyled(entry.Timestamp, pxLog, render.FontMono)
 				c.Font.DrawTextStyled(c.Canvas, tx, rowRect.Y+(rowRect.H-th)/2, entry.Timestamp, pxLog, c.Theme.TextMuted, render.FontMono)
-				tx += tw + c.S(8)
+				tx += tw + c.Scale(8).Int()
 			}
 
 			lvlTag, lvlCol := c.logLevelBadge(entry.Level)
 			lw, lh := c.Font.MeasureTextStyled(lvlTag, pxLog, render.FontMono)
 			c.Font.DrawTextStyled(c.Canvas, tx, rowRect.Y+(rowRect.H-lh)/2, lvlTag, pxLog, lvlCol, render.FontMono)
-			tx += lw + c.S(8)
+			tx += lw + c.Scale(8).Int()
 
 			textCol := c.Theme.TextPrimary
 			if entry.Level == LogError {
@@ -379,7 +383,7 @@ func (c *Context) drawInlineSearchBox(id string, r render.Rect, value *string, p
 	if focused {
 		border = c.Theme.Accent
 	}
-	c.Canvas.DrawRoundedBox(r, c.Sf(4), c.Theme.Bg, 1.0, border)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(4), c.Theme.Bg, 1.0, border)
 	c.RegisterHit(id, r, platform.CursorIBeam)
 	if !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY) {
 		c.nextCursor = platform.CursorIBeam
@@ -419,7 +423,7 @@ func (c *Context) drawInlineSearchBox(id string, r render.Rect, value *string, p
 
 	if c.Font != nil {
 		c.Canvas.PushClip(r)
-		px := c.S(11)
+		px := c.Scale(11).Int()
 		txt := *value
 		col := c.Theme.TextPrimary
 		if txt == "" {
@@ -427,7 +431,7 @@ func (c *Context) drawInlineSearchBox(id string, r render.Rect, value *string, p
 			col = c.Theme.TextMuted
 		}
 		_, th := c.Font.MeasureText(txt, px)
-		c.Font.DrawText(c.Canvas, r.X+c.S(6), r.Y+(r.H-th)/2, txt, px, col)
+		c.Font.DrawText(c.Canvas, r.X+c.Scale(6).Int(), r.Y+(r.H-th)/2, txt, px, col)
 		c.Canvas.PopClip()
 	}
 }

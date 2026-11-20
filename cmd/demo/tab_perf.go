@@ -16,7 +16,7 @@ type perfTabState struct {
 	showOverlayTest bool
 	highlightDirty  bool
 	lastDirty       anyui.Rect
-	imgSizeDp       int
+	imgSizeDp       anyui.Dp
 	imgScaleMode    anyui.ImageScaleMode
 	vtvAltSet       bool
 	vtvLinesA       []string
@@ -74,22 +74,22 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 							ui.Label(fmt.Sprintf("Static Layer (перерисовок: #%d)", perfTab.staticDraws), anyui.FontSize(13), anyui.Bold(), anyui.TextColor(th.Accent))
 							ui.Label("Этот блок с градиентом и SVG кешируется в отдельный буфер.", anyui.FontSize(11), anyui.TextColor(th.TextMuted))
 							ui.CanvasView(320, 74, func(c *render.Canvas, r anyui.Rect) {
-								c.FillLinearGradient(r, render.UniformRadii(ui.Sf(8)), render.LinearGradient{
+								c.FillLinearGradient(r, render.UniformRadii(ui.ScaleF(8)), render.LinearGradient{
 									StartX: 0, StartY: 0, EndX: 1, EndY: 1,
 									Stops: []render.GradientStop{
 										{Pos: 0, Color: th.SurfaceDark},
 										{Pos: 1, Color: th.Accent.WithAlpha(90)},
 									},
 								})
-								c.DrawSVG(svgStar, r.X+ui.S(12), r.Y+ui.S(18), ui.S(36), th.Warning)
-								c.DrawSVG(svgGear, r.X+ui.S(58), r.Y+ui.S(18), ui.S(36), th.Success)
+								c.DrawSVG(svgStar, r.X+ui.Scale(12).Int(), r.Y+ui.Scale(18).Int(), ui.Scale(36).Int(), th.Warning)
+								c.DrawSVG(svgGear, r.X+ui.Scale(58).Int(), r.Y+ui.Scale(18).Int(), ui.Scale(36).Int(), th.Success)
 								pts := make([]render.PointF, 0, 12)
 								for k := 0; k < 12; k++ {
-									px := float32(r.X+ui.S(115)) + float32(k)*ui.Sf(16)
-									py := float32(r.Y+ui.S(38)) + float32(math.Sin(float64(k)*0.8))*ui.Sf(18)
+									px := float32(r.X+ui.Scale(115).Int()) + float32(k)*ui.ScaleF(16)
+									py := float32(r.Y+ui.Scale(38).Int()) + float32(math.Sin(float64(k)*0.8))*ui.ScaleF(18)
 									pts = append(pts, render.PointF{X: px, Y: py})
 								}
-								c.DrawPolyline(pts, ui.Sf(2), th.Accent, false)
+								c.DrawPolyline(pts, ui.ScaleF(2), th.Accent, false)
 							})
 						})
 					}, anyui.Width(370), anyui.Height(176), anyui.Padding(12))
@@ -136,18 +136,18 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 			if perfTab.showOverlayTest {
 				area := ui.CurrentAreaPx()
 				ovRect := anyui.Rect{
-					X: area.X + ui.S(24),
-					Y: area.Y + ui.S(90),
-					W: ui.S(260),
-					H: ui.S(64),
+					X: area.X + ui.Scale(24).Int(),
+					Y: area.Y + ui.Scale(90).Int(),
+					W: ui.Scale(260).Int(),
+					H: ui.Scale(64).Int(),
 				}
 				ui.PushOverlay(ovRect, func() {
 					ui.Canvas().DrawBoxShadow(ovRect, render.BoxShadow{
-						OffsetY: ui.Sf(4), Blur: ui.Sf(12), Color: render.RGBA(0, 0, 0, 130), Radii: render.UniformRadii(ui.Sf(8)),
+						OffsetY: ui.ScaleF(4), Blur: ui.ScaleF(12), Color: render.RGBA(0, 0, 0, 130), Radii: render.UniformRadii(ui.ScaleF(8)),
 					})
-					ui.Canvas().DrawRoundedBox(ovRect, ui.Sf(8), th.Card, 1.5, th.Accent)
-					ui.DrawText(ovRect.X+ui.S(12), ovRect.Y+ui.S(12), "Overlay Layer поверх Static", 12, th.TextPrimary)
-					ui.DrawText(ovRect.X+ui.S(12), ovRect.Y+ui.S(34), "Static Layer под ним не перерисовывался", 11, th.TextMuted)
+					ui.Canvas().DrawRoundedBox(ovRect, ui.ScaleF(8), th.Card, 1.5, th.Accent)
+					ui.DrawText(ovRect.X+ui.Scale(12).Int(), ovRect.Y+ui.Scale(12).Int(), "Overlay Layer поверх Static", 12, th.TextPrimary)
+					ui.DrawText(ovRect.X+ui.Scale(12).Int(), ovRect.Y+ui.Scale(34).Int(), "Static Layer под ним не перерисовывался", 11, th.TextMuted)
 				})
 			}
 
@@ -171,9 +171,9 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 					if hov {
 						bg = th.BtnSecondaryHover
 					}
-					c.DrawRoundedBox(r, ui.Sf(8), bg, 1.0, th.Border)
-					ui.DrawText(r.X+ui.S(12), r.Y+ui.S(10), "Зона без перерисовки внутри (trackMove=false)", 12, th.TextPrimary)
-					ui.DrawText(r.X+ui.S(12), r.Y+ui.S(28), "Водите мышью здесь — Render не вызывается", 11, th.TextMuted)
+					c.DrawRoundedBox(r, ui.ScaleF(8), bg, 1.0, th.Border)
+					ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(10).Int(), "Зона без перерисовки внутри (trackMove=false)", 12, th.TextPrimary)
+					ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(28).Int(), "Водите мышью здесь — Render не вызывается", 11, th.TextMuted)
 				})
 				ui.CanvasView(340, 50, func(c *render.Canvas, r anyui.Rect) {
 					ui.RegisterHoverArea("perf_hover_track", r, anyui.CursorCrosshair, true)
@@ -183,12 +183,12 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 					if hov {
 						bg = th.Accent.WithAlpha(45)
 					}
-					c.DrawRoundedBox(r, ui.Sf(8), bg, 1.0, th.BorderFocus)
-					ui.DrawText(r.X+ui.S(12), r.Y+ui.S(10), "Зона с трекингом (trackMove=true)", 12, th.TextPrimary)
+					c.DrawRoundedBox(r, ui.ScaleF(8), bg, 1.0, th.BorderFocus)
+					ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(10).Int(), "Зона с трекингом (trackMove=true)", 12, th.TextPrimary)
 					if hov {
-						ui.DrawText(r.X+ui.S(12), r.Y+ui.S(28), fmt.Sprintf("Курсор внутри: (%d, %d)", mx-r.X, my-r.Y), 11, th.Accent)
+						ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(28).Int(), fmt.Sprintf("Курсор внутри: (%d, %d)", mx-r.X, my-r.Y), 11, th.Accent)
 					} else {
-						ui.DrawText(r.X+ui.S(12), r.Y+ui.S(28), "Наведите для трекинга координат и Crosshair", 11, th.TextMuted)
+						ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(28).Int(), "Наведите для трекинга координат и Crosshair", 11, th.TextMuted)
 					}
 				})
 			})
@@ -227,8 +227,8 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 							bg = th.Accent.WithAlpha(40)
 							border = th.Accent
 						}
-						c.DrawRoundedBox(r, ui.Sf(6), bg, 1.0, border)
-						ui.DrawText(r.X+ui.S(10), r.Y+ui.S(10), item.label, 12, th.TextPrimary)
+						c.DrawRoundedBox(r, ui.ScaleF(6), bg, 1.0, border)
+						ui.DrawText(r.X+ui.Scale(10).Int(), r.Y+ui.Scale(10).Int(), item.label, 12, th.TextPrimary)
 					})
 				}
 			})
@@ -296,4 +296,3 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 		})
 	})
 }
-

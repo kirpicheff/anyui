@@ -39,7 +39,7 @@ const (
 // FlexItem описывает элемент для пропорционального деления пространства в RowFlex / ColumnFlex.
 type FlexItem struct {
 	Weight  float32 // Пропорциональный вес (используется, если FixedDp <= 0)
-	FixedDp int     // Фиксированный размер вдоль главной оси в dp (если > 0)
+	FixedDp Dp      // Фиксированный размер вдоль главной оси в dp (если > 0)
 	Fn      func()  // Функция отрисовки содержимого слота
 }
 
@@ -84,10 +84,10 @@ func (c *Context) CurrentArea() render.Rect {
 func (c *Context) CurrentAreaDp() render.Rect {
 	r := c.topLayout().rect
 	return render.Rect{
-		X: c.PxToDp(r.X),
-		Y: c.PxToDp(r.Y),
-		W: c.PxToDp(r.W),
-		H: c.PxToDp(r.H),
+		X: c.PxToDp(Px(r.X)).Int(),
+		Y: c.PxToDp(Px(r.Y)).Int(),
+		W: c.PxToDp(Px(r.W)).Int(),
+		H: c.PxToDp(Px(r.H)).Int(),
 	}
 }
 
@@ -120,25 +120,25 @@ func (c *Context) applySizeConstraints(w, h int, st WidgetStyle) (int, int) {
 		h = c.RemainingHeight()
 	}
 	if st.MinWidthDp != nil {
-		minW := c.S(*st.MinWidthDp)
+		minW := c.Scale(*st.MinWidthDp).Int()
 		if w < minW {
 			w = minW
 		}
 	}
 	if st.MaxWidthDp != nil {
-		maxW := c.S(*st.MaxWidthDp)
+		maxW := c.Scale(*st.MaxWidthDp).Int()
 		if maxW > 0 && w > maxW {
 			w = maxW
 		}
 	}
 	if st.MinHeightDp != nil {
-		minH := c.S(*st.MinHeightDp)
+		minH := c.Scale(*st.MinHeightDp).Int()
 		if h < minH {
 			h = minH
 		}
 	}
 	if st.MaxHeightDp != nil {
-		maxH := c.S(*st.MaxHeightDp)
+		maxH := c.Scale(*st.MaxHeightDp).Int()
 		if maxH > 0 && h > maxH {
 			h = maxH
 		}
@@ -279,7 +279,7 @@ func advanceParent(b *layoutBox, usedW, usedH int) {
 }
 
 // Column располагает дочерние элементы вертикально с отступом gapDp.
-func (c *Context) Column(gapDp int, fn func()) {
+func (c *Context) Column(gapDp Dp, fn func()) {
 	b := c.topLayout()
 	r := render.Rect{
 		X: b.cursorX,
@@ -287,7 +287,7 @@ func (c *Context) Column(gapDp int, fn func()) {
 		W: c.RemainingWidth(),
 		H: c.RemainingHeight(),
 	}
-	c.pushBox(r, dirColumn, AlignStart, c.S(gapDp))
+	c.pushBox(r, dirColumn, AlignStart, c.Scale(gapDp).Int())
 	fn()
 	inner := c.topLayout()
 	usedW := inner.maxUsedX - r.X
@@ -297,7 +297,7 @@ func (c *Context) Column(gapDp int, fn func()) {
 }
 
 // ColumnCentered располагает дочерние элементы вертикально и центрирует их по горизонтали.
-func (c *Context) ColumnCentered(gapDp int, fn func()) {
+func (c *Context) ColumnCentered(gapDp Dp, fn func()) {
 	b := c.topLayout()
 	r := render.Rect{
 		X: b.rect.X,
@@ -305,7 +305,7 @@ func (c *Context) ColumnCentered(gapDp int, fn func()) {
 		W: b.rect.W,
 		H: c.RemainingHeight(),
 	}
-	c.pushBox(r, dirColumn, AlignCenter, c.S(gapDp))
+	c.pushBox(r, dirColumn, AlignCenter, c.Scale(gapDp).Int())
 	fn()
 	inner := c.topLayout()
 	usedW := inner.maxUsedX - r.X
@@ -315,38 +315,38 @@ func (c *Context) ColumnCentered(gapDp int, fn func()) {
 }
 
 // Row располагает дочерние элементы горизонтально с отступом gapDp.
-func (c *Context) Row(gapDp int, heightDp int, fn func()) {
-	h := c.S(heightDp)
+func (c *Context) Row(gapDp, heightDp Dp, fn func()) {
+	h := c.Scale(heightDp).Int()
 	if heightDp <= 0 {
 		h = c.RemainingHeight()
 	}
 	r := c.allocRect(c.RemainingWidth(), h)
-	c.pushBox(r, dirRow, AlignStart, c.S(gapDp))
+	c.pushBox(r, dirRow, AlignStart, c.Scale(gapDp).Int())
 	fn()
 	c.popBox()
 }
 
 // RowCentered располагает дочерние элементы горизонтально и выравнивает их по вертикальному центру.
-func (c *Context) RowCentered(gapDp int, heightDp int, fn func()) {
-	h := c.S(heightDp)
+func (c *Context) RowCentered(gapDp, heightDp Dp, fn func()) {
+	h := c.Scale(heightDp).Int()
 	if heightDp <= 0 {
 		h = c.RemainingHeight()
 	}
 	r := c.allocRect(c.RemainingWidth(), h)
-	c.pushBox(r, dirRow, AlignCenter, c.S(gapDp))
+	c.pushBox(r, dirRow, AlignCenter, c.Scale(gapDp).Int())
 	fn()
 	c.popBox()
 }
 
 // Padding добавляет внутренние отступы со всех сторон.
-func (c *Context) Padding(padDp int, fn func()) {
+func (c *Context) Padding(padDp Dp, fn func()) {
 	c.PaddingXY(padDp, padDp, fn)
 }
 
 // PaddingXY добавляет горизонтальный и вертикальный внутренние отступы.
-func (c *Context) PaddingXY(pxDp, pyDp int, fn func()) {
-	px := c.S(pxDp)
-	py := c.S(pyDp)
+func (c *Context) PaddingXY(pxDp, pyDp Dp, fn func()) {
+	px := c.Scale(pxDp).Int()
+	py := c.Scale(pyDp).Int()
 	b := c.topLayout()
 	r := render.Rect{
 		X: b.cursorX + px,
@@ -382,8 +382,8 @@ func (c *Context) PaddingXY(pxDp, pyDp int, fn func()) {
 }
 
 // Spacer сдвигает курсор на указанное количество логических пикселей.
-func (c *Context) Spacer(dp int) {
-	px := c.S(dp)
+func (c *Context) Spacer(dp Dp) {
+	px := c.Scale(dp).Int()
 	b := c.topLayout()
 	if b.dir == dirColumn {
 		b.cursorY += px
@@ -393,8 +393,8 @@ func (c *Context) Spacer(dp int) {
 }
 
 // FlexSpacer заполняет оставшееся пространство (например, чтобы прижать статус-бар вниз).
-func (c *Context) FlexSpacer(reserveDp int) {
-	res := c.S(reserveDp)
+func (c *Context) FlexSpacer(reserveDp Dp) {
+	res := c.Scale(reserveDp).Int()
 	b := c.topLayout()
 	if b.dir == dirColumn {
 		rem := (b.rect.Y + b.rect.H) - b.cursorY - res
@@ -422,7 +422,7 @@ func (c *Context) Expand(fn func()) {
 }
 
 // calcFlexSegments делит totalSize между элементами с фиксированными размерами и пропорциональными весами.
-func calcFlexSegments(totalSize, gapPx int, items []FlexItem, scale func(int) int) []int {
+func calcFlexSegments(totalSize, gapPx int, items []FlexItem, scale func(Dp) Px) []int {
 	n := len(items)
 	sizes := make([]int, n)
 	if n == 0 {
@@ -436,7 +436,7 @@ func calcFlexSegments(totalSize, gapPx int, items []FlexItem, scale func(int) in
 	var totalWeight float32
 	for i, it := range items {
 		if it.FixedDp > 0 {
-			sz := scale(it.FixedDp)
+			sz := scale(it.FixedDp).Int()
 			if sz > avail {
 				sz = avail
 			}
@@ -483,15 +483,15 @@ func calcFlexSegments(totalSize, gapPx int, items []FlexItem, scale func(int) in
 }
 
 // RowFlex располагает элементы горизонтально, деля ширину пропорционально весам FlexItem.
-func (c *Context) RowFlex(gapDp, heightDp int, items ...FlexItem) {
-	h := c.S(heightDp)
+func (c *Context) RowFlex(gapDp, heightDp Dp, items ...FlexItem) {
+	h := c.Scale(heightDp).Int()
 	if heightDp <= 0 {
 		h = c.RemainingHeight()
 	}
-	gapPx := c.S(gapDp)
+	gapPx := c.Scale(gapDp).Int()
 	totalW := c.RemainingWidth()
 	rowRect := c.allocRect(totalW, h)
-	segs := calcFlexSegments(totalW, gapPx, items, c.S)
+	segs := calcFlexSegments(totalW, gapPx, items, c.Scale)
 
 	x := rowRect.X
 	for i, it := range items {
@@ -506,13 +506,13 @@ func (c *Context) RowFlex(gapDp, heightDp int, items ...FlexItem) {
 }
 
 // ColumnFlex располагает элементы вертикально, деля высоту пропорционально весам FlexItem.
-func (c *Context) ColumnFlex(gapDp int, items ...FlexItem) {
+func (c *Context) ColumnFlex(gapDp Dp, items ...FlexItem) {
 	b := c.topLayout()
-	gapPx := c.S(gapDp)
+	gapPx := c.Scale(gapDp).Int()
 	totalW := c.RemainingWidth()
 	totalH := c.RemainingHeight()
 	colRect := render.Rect{X: b.cursorX, Y: b.cursorY, W: totalW, H: totalH}
-	segs := calcFlexSegments(totalH, gapPx, items, c.S)
+	segs := calcFlexSegments(totalH, gapPx, items, c.Scale)
 
 	y := colRect.Y
 	for i, it := range items {
@@ -529,7 +529,7 @@ func (c *Context) ColumnFlex(gapDp int, items ...FlexItem) {
 
 // DockBottom резервирует bottomDp снизу для bottomFn (кнопки, статус-бар и т.д.),
 // а всю оставшуюся высоту сверху отдаёт bodyFn.
-func (c *Context) DockBottom(gapDp, bottomDp int, bodyFn, bottomFn func()) {
+func (c *Context) DockBottom(gapDp, bottomDp Dp, bodyFn, bottomFn func()) {
 	c.ColumnFlex(gapDp,
 		FlexItem{Weight: 1, Fn: bodyFn},
 		FlexItem{FixedDp: bottomDp, Fn: bottomFn},
@@ -538,7 +538,7 @@ func (c *Context) DockBottom(gapDp, bottomDp int, bodyFn, bottomFn func()) {
 
 // DockTop резервирует topDp сверху для topFn (шапка, тулбар, поиск),
 // а всю оставшуюся высоту снизу отдаёт bodyFn.
-func (c *Context) DockTop(gapDp, topDp int, topFn, bodyFn func()) {
+func (c *Context) DockTop(gapDp, topDp Dp, topFn, bodyFn func()) {
 	c.ColumnFlex(gapDp,
 		FlexItem{FixedDp: topDp, Fn: topFn},
 		FlexItem{Weight: 1, Fn: bodyFn},
@@ -548,9 +548,9 @@ func (c *Context) DockTop(gapDp, topDp int, topFn, bodyFn func()) {
 // PageConfig задаёт параметры типовой разметки страницы с шапкой, прокручиваемым телом и футером.
 type PageConfig struct {
 	ID       string // Идентификатор ScrollView тела (по умолчанию "page_body")
-	GapDp    int    // Отступ между секциями в dp (по умолчанию 8)
-	HeaderDp int    // Высота шапки в dp (по умолчанию 48, если headerFn != nil)
-	FooterDp int    // Высота футера в dp (по умолчанию 44, если footerFn != nil)
+	GapDp    Dp     // Отступ между секциями в dp (по умолчанию 8)
+	HeaderDp Dp     // Высота шапки в dp (по умолчанию 48, если headerFn != nil)
+	FooterDp Dp     // Высота футера в dp (по умолчанию 44, если footerFn != nil)
 	NoScroll bool   // Отключает автоматическую обёртку bodyFn в ScrollView
 }
 
@@ -677,12 +677,12 @@ func (c *Context) nextJustifyKey(prefix string) string {
 }
 
 // RowWith располагает элементы горизонтально с заданным выравниванием Align и распределением Justify.
-func (c *Context) RowWith(align Align, justify Justify, gapDp, heightDp int, items ...func()) {
-	h := c.S(heightDp)
+func (c *Context) RowWith(align Align, justify Justify, gapDp, heightDp Dp, items ...func()) {
+	h := c.Scale(heightDp).Int()
 	if heightDp <= 0 {
 		h = c.RemainingHeight()
 	}
-	gapPx := c.S(gapDp)
+	gapPx := c.Scale(gapDp).Int()
 	r := c.allocRect(c.RemainingWidth(), h)
 
 	if justify == JustifyStart || len(items) == 0 {
@@ -745,9 +745,9 @@ func (c *Context) RowWith(align Align, justify Justify, gapDp, heightDp int, ite
 }
 
 // ColumnWith располагает элементы вертикально с заданным выравниванием Align и распределением Justify.
-func (c *Context) ColumnWith(align Align, justify Justify, gapDp int, items ...func()) {
+func (c *Context) ColumnWith(align Align, justify Justify, gapDp Dp, items ...func()) {
 	b := c.topLayout()
-	gapPx := c.S(gapDp)
+	gapPx := c.Scale(gapDp).Int()
 	r := render.Rect{
 		X: b.cursorX,
 		Y: b.cursorY,
@@ -824,7 +824,7 @@ func (c *Context) ColumnWith(align Align, justify Justify, gapDp int, items ...f
 }
 
 // Grid располагает дочерние элементы в виде сетки из cols колонок с отступами gapXDp, gapYDp и высотой строки rowHeightDp (0 = по содержимому).
-func (c *Context) Grid(cols, gapXDp, gapYDp, rowHeightDp int, fn func()) {
+func (c *Context) Grid(cols int, gapXDp, gapYDp, rowHeightDp Dp, fn func()) {
 	if cols < 1 {
 		cols = 1
 	}
@@ -844,9 +844,9 @@ func (c *Context) Grid(cols, gapXDp, gapYDp, rowHeightDp int, fn func()) {
 		maxUsedX: r.X,
 		maxUsedY: r.Y,
 		gridCols: cols,
-		gridGapX: c.S(gapXDp),
-		gridGapY: c.S(gapYDp),
-		gridRowH: c.S(rowHeightDp),
+		gridGapX: c.Scale(gapXDp).Int(),
+		gridGapY: c.Scale(gapYDp).Int(),
+		gridRowH: c.Scale(rowHeightDp).Int(),
 	})
 	if fn != nil {
 		fn()
@@ -859,7 +859,7 @@ func (c *Context) Grid(cols, gapXDp, gapYDp, rowHeightDp int, fn func()) {
 }
 
 // FormLayout создаёт табличную вёрстку формы «Подпись — Поле» с единой шириной колонки меток labelWidthDp.
-func (c *Context) FormLayout(labelWidthDp, gapXDp, gapYDp int, fn func()) {
+func (c *Context) FormLayout(labelWidthDp, gapXDp, gapYDp Dp, fn func()) {
 	b := c.topLayout()
 	r := render.Rect{
 		X: b.cursorX,
@@ -871,14 +871,14 @@ func (c *Context) FormLayout(labelWidthDp, gapXDp, gapYDp int, fn func()) {
 		rect:       r,
 		dir:        dirColumn,
 		align:      AlignStart,
-		gap:        c.S(gapYDp),
+		gap:        c.Scale(gapYDp).Int(),
 		cursorX:    r.X,
 		cursorY:    r.Y,
 		maxUsedX:   r.X,
 		maxUsedY:   r.Y,
-		formLabelW: c.S(labelWidthDp),
-		formGapX:   c.S(gapXDp),
-		formGapY:   c.S(gapYDp),
+		formLabelW: c.Scale(labelWidthDp).Int(),
+		formGapX:   c.Scale(gapXDp).Int(),
+		formGapY:   c.Scale(gapYDp).Int(),
 	})
 	if fn != nil {
 		fn()
@@ -895,18 +895,18 @@ func (c *Context) FormRow(label string, fn func()) {
 	b := c.topLayout()
 	labelW := b.formLabelW
 	if labelW <= 0 {
-		labelW = c.S(140)
+		labelW = c.Scale(140).Int()
 	}
 	gapX := b.formGapX
 	if gapX <= 0 {
-		gapX = c.S(12)
+		gapX = c.Scale(12).Int()
 	}
 
 	rowW := c.RemainingWidth()
-	rowRect := c.allocRect(rowW, c.S(36))
+	rowRect := c.allocRect(rowW, c.Scale(36).Int())
 
 	if c.Font != nil && label != "" {
-		pxSize := c.S(14)
+		pxSize := c.Scale(14).Int()
 		_, th := c.Font.MeasureText(label, pxSize)
 		ly := rowRect.Y + (rowRect.H-th)/2
 		c.Font.DrawText(c.Canvas, rowRect.X, ly, label, pxSize, c.Theme.TextMuted)
@@ -918,7 +918,7 @@ func (c *Context) FormRow(label string, fn func()) {
 		fieldW = 0
 	}
 	fieldRect := render.Rect{X: fieldX, Y: rowRect.Y, W: fieldW, H: rowRect.H}
-	c.pushBox(fieldRect, dirRow, AlignCenter, c.S(8))
+	c.pushBox(fieldRect, dirRow, AlignCenter, c.Scale(8).Int())
 	if fn != nil {
 		fn()
 	}
@@ -941,7 +941,7 @@ func (c *Context) FormRow(label string, fn func()) {
 }
 
 // Flow располагает дочерние элементы слева направо с автоматическим переносом на новую строку при нехватке ширины.
-func (c *Context) Flow(gapXDp, gapYDp int, fn func()) {
+func (c *Context) Flow(gapXDp, gapYDp Dp, fn func()) {
 	b := c.topLayout()
 	r := render.Rect{
 		X: b.cursorX,
@@ -957,8 +957,8 @@ func (c *Context) Flow(gapXDp, gapYDp int, fn func()) {
 		cursorY:  r.Y,
 		maxUsedX: r.X,
 		maxUsedY: r.Y,
-		flowGapX: c.S(gapXDp),
-		flowGapY: c.S(gapYDp),
+		flowGapX: c.Scale(gapXDp).Int(),
+		flowGapY: c.Scale(gapYDp).Int(),
 	})
 	if fn != nil {
 		fn()

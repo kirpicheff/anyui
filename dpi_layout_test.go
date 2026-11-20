@@ -29,7 +29,7 @@ func TestCurrentAreaAndMousePosDPI(t *testing.T) {
 
 		var capturedAreaDp Rect
 		var capturedAreaPx Rect
-		var mouseDpX, mouseDpY int
+		var mouseDpX, mouseDpY Dp
 		var mousePxX, mousePxY int
 
 		h.SetDraw(func(ui *UI) {
@@ -73,8 +73,8 @@ func TestCurrentAreaAndMousePosDPI(t *testing.T) {
 		if mousePxX != 300 || mousePxY != 150 {
 			t.Errorf("scale %.1f: MousePosPx() неверен: got (%d, %d), want (300, 150)", sc, mousePxX, mousePxY)
 		}
-		expectedMouseDpX := int(float32(300)/sc + 0.5)
-		expectedMouseDpY := int(float32(150)/sc + 0.5)
+		expectedMouseDpX := Dp(float32(300)/sc + 0.5)
+		expectedMouseDpY := Dp(float32(150)/sc + 0.5)
 		if mouseDpX != expectedMouseDpX || mouseDpY != expectedMouseDpY {
 			t.Errorf("scale %.1f: MousePosDp() неверен: got (%d, %d), want (%d, %d)",
 				sc, mouseDpX, mouseDpY, expectedMouseDpX, expectedMouseDpY)

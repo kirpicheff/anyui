@@ -160,14 +160,28 @@ func (u *UI) MiddleClicked() bool {
 	return u.ctx.MiddleMousePressed
 }
 
-// S переводит логические пиксели (dp) в физические с учётом DPI-масштаба.
-func (u *UI) S(dp int) int {
-	return u.ctx.S(dp)
+// Scale переводит логические пиксели (Dp) в физические (Px) с учётом DPI-масштаба.
+func (u *UI) Scale(dp Dp) Px {
+	if u.ctx == nil {
+		return 0
+	}
+	return u.ctx.Scale(dp)
 }
 
-// Sf переводит дробные логические пиксели (dp) в физические.
-func (u *UI) Sf(dp float32) float32 {
-	return u.ctx.Sf(dp)
+// ScaleF переводит дробные логические пиксели (dp) в физические.
+func (u *UI) ScaleF(dp float32) float32 {
+	if u.ctx == nil {
+		return 0
+	}
+	return u.ctx.ScaleF(dp)
+}
+
+// PxToDp переводит физические пиксели (Px) в логические (Dp) с округлением до ближайшего целого.
+func (u *UI) PxToDp(px Px) Dp {
+	if u.ctx == nil {
+		return 0
+	}
+	return u.ctx.PxToDp(px)
 }
 
 // CurrentArea возвращает прямоугольник текущего контейнера в логических пикселях (Dp).
@@ -217,63 +231,63 @@ func (u *UI) TextInput(id string, value *string, placeholder string, opts ...Opt
 }
 
 // Image выводит изображение image.Image в области wDp x hDp.
-func (u *UI) Image(img image.Image, wDp, hDp int, mode ImageScaleMode) {
+func (u *UI) Image(img image.Image, wDp, hDp Dp, mode ImageScaleMode) {
 	u.ctx.Image(img, wDp, hDp, mode)
 }
 
 // CanvasView выделяет область wDp x hDp для кастомного рисования (графики, видеокадры, градиенты).
-func (u *UI) CanvasView(wDp, hDp int, drawFn func(canvas *render.Canvas, area Rect)) {
+func (u *UI) CanvasView(wDp, hDp Dp, drawFn func(canvas *render.Canvas, area Rect)) {
 	u.ctx.CanvasView(wDp, hDp, drawFn)
 }
 
 // InteractiveCanvas выделяет интерактивную область wDp x hDp с поддержкой фокуса,
 // захвата перетаскивания мыши и передачи сырых событий клавиатуры (со ScanCode/Extended) и мыши/колеса.
-func (u *UI) InteractiveCanvas(id string, wDp, hDp int, cb CanvasCallbacks, opts ...Option) {
+func (u *UI) InteractiveCanvas(id string, wDp, hDp Dp, cb CanvasCallbacks, opts ...Option) {
 	u.ctx.InteractiveCanvas(id, wDp, hDp, cb, opts...)
 }
 
 // DrawSVG рисует SVG-иконку по координатам (x, y) с размером sizeDp и цветом tint.
-func (u *UI) DrawSVG(svgData string, x, y, sizeDp int, tint Color) {
-	u.ctx.Canvas.DrawSVG(svgData, x, y, u.ctx.S(sizeDp), tint)
+func (u *UI) DrawSVG(svgData string, x, y int, sizeDp Dp, tint Color) {
+	u.ctx.Canvas.DrawSVG(svgData, x, y, u.ctx.Scale(sizeDp).Int(), tint)
 }
 
 // Column располагает дочерние элементы вертикально с отступом gapDp.
-func (u *UI) Column(gapDp int, fn func()) {
+func (u *UI) Column(gapDp Dp, fn func()) {
 	u.ctx.Column(gapDp, fn)
 }
 
 // ColumnCentered располагает дочерние элементы вертикально и центрирует их по горизонтали.
-func (u *UI) ColumnCentered(gapDp int, fn func()) {
+func (u *UI) ColumnCentered(gapDp Dp, fn func()) {
 	u.ctx.ColumnCentered(gapDp, fn)
 }
 
 // Row располагает дочерние элементы горизонтально с отступом gapDp и высотой heightDp.
-func (u *UI) Row(gapDp, heightDp int, fn func()) {
+func (u *UI) Row(gapDp, heightDp Dp, fn func()) {
 	u.ctx.Row(gapDp, heightDp, fn)
 }
 
 // RowCentered располагает дочерние элементы горизонтально с выравниванием по вертикальному центру.
-func (u *UI) RowCentered(gapDp, heightDp int, fn func()) {
+func (u *UI) RowCentered(gapDp, heightDp Dp, fn func()) {
 	u.ctx.RowCentered(gapDp, heightDp, fn)
 }
 
 // Padding добавляет внутренние отступы со всех сторон.
-func (u *UI) Padding(padDp int, fn func()) {
+func (u *UI) Padding(padDp Dp, fn func()) {
 	u.ctx.Padding(padDp, fn)
 }
 
 // PaddingXY добавляет горизонтальный и вертикальный внутренние отступы.
-func (u *UI) PaddingXY(pxDp, pyDp int, fn func()) {
+func (u *UI) PaddingXY(pxDp, pyDp Dp, fn func()) {
 	u.ctx.PaddingXY(pxDp, pyDp, fn)
 }
 
 // Spacer сдвигает курсор раскладки на указанное количество логических пикселей.
-func (u *UI) Spacer(dp int) {
+func (u *UI) Spacer(dp Dp) {
 	u.ctx.Spacer(dp)
 }
 
 // FlexSpacer заполняет оставшееся пространство с резервом reserveDp.
-func (u *UI) FlexSpacer(reserveDp int) {
+func (u *UI) FlexSpacer(reserveDp Dp) {
 	u.ctx.FlexSpacer(reserveDp)
 }
 
@@ -307,22 +321,22 @@ func (u *UI) Expand(fn func()) {
 }
 
 // RowFlex располагает элементы горизонтально, деля ширину пропорционально весам FlexItem.
-func (u *UI) RowFlex(gapDp, heightDp int, items ...FlexItem) {
+func (u *UI) RowFlex(gapDp, heightDp Dp, items ...FlexItem) {
 	u.ctx.RowFlex(gapDp, heightDp, items...)
 }
 
 // ColumnFlex располагает элементы вертикально, деля высоту пропорционально весам FlexItem.
-func (u *UI) ColumnFlex(gapDp int, items ...FlexItem) {
+func (u *UI) ColumnFlex(gapDp Dp, items ...FlexItem) {
 	u.ctx.ColumnFlex(gapDp, items...)
 }
 
 // DockBottom резервирует bottomDp снизу для bottomFn, а всю оставшуюся высоту сверху отдаёт bodyFn.
-func (u *UI) DockBottom(gapDp, bottomDp int, bodyFn, bottomFn func()) {
+func (u *UI) DockBottom(gapDp, bottomDp Dp, bodyFn, bottomFn func()) {
 	u.ctx.DockBottom(gapDp, bottomDp, bodyFn, bottomFn)
 }
 
 // DockTop резервирует topDp сверху для topFn, а всю оставшуюся высоту снизу отдаёт bodyFn.
-func (u *UI) DockTop(gapDp, topDp int, topFn, bodyFn func()) {
+func (u *UI) DockTop(gapDp, topDp Dp, topFn, bodyFn func()) {
 	u.ctx.DockTop(gapDp, topDp, topFn, bodyFn)
 }
 
@@ -350,22 +364,22 @@ func (u *UI) IDScope(key any, fn func()) {
 }
 
 // RowWith располагает элементы горизонтально с заданным выравниванием Align и распределением Justify.
-func (u *UI) RowWith(align Align, justify Justify, gapDp, heightDp int, items ...func()) {
+func (u *UI) RowWith(align Align, justify Justify, gapDp, heightDp Dp, items ...func()) {
 	u.ctx.RowWith(align, justify, gapDp, heightDp, items...)
 }
 
 // ColumnWith располагает элементы вертикально с заданным выравниванием Align и распределением Justify.
-func (u *UI) ColumnWith(align Align, justify Justify, gapDp int, items ...func()) {
+func (u *UI) ColumnWith(align Align, justify Justify, gapDp Dp, items ...func()) {
 	u.ctx.ColumnWith(align, justify, gapDp, items...)
 }
 
 // Grid располагает дочерние элементы в виде сетки из cols колонок.
-func (u *UI) Grid(cols, gapXDp, gapYDp, rowHeightDp int, fn func()) {
+func (u *UI) Grid(cols int, gapXDp, gapYDp, rowHeightDp Dp, fn func()) {
 	u.ctx.Grid(cols, gapXDp, gapYDp, rowHeightDp, fn)
 }
 
 // FormLayout создаёт табличную вёрстку формы «Подпись — Поле» с единой шириной колонки меток.
-func (u *UI) FormLayout(labelWidthDp, gapXDp, gapYDp int, fn func()) {
+func (u *UI) FormLayout(labelWidthDp, gapXDp, gapYDp Dp, fn func()) {
 	u.ctx.FormLayout(labelWidthDp, gapXDp, gapYDp, fn)
 }
 
@@ -375,7 +389,7 @@ func (u *UI) FormRow(label string, fn func()) {
 }
 
 // Flow располагает дочерние элементы слева направо с автоматическим переносом на новую строку.
-func (u *UI) Flow(gapXDp, gapYDp int, fn func()) {
+func (u *UI) Flow(gapXDp, gapYDp Dp, fn func()) {
 	u.ctx.Flow(gapXDp, gapYDp, fn)
 }
 
@@ -408,7 +422,7 @@ func (u *UI) Shortcut(keyCode uint32, mods Modifiers, fn func()) {
 }
 
 // DrawText рисует строку текста в произвольных физических координатах (для ListView и CanvasView).
-func (u *UI) DrawText(x, y int, text string, sizeDp int, col Color) {
+func (u *UI) DrawText(x, y int, text string, sizeDp Dp, col Color) {
 	u.ctx.DrawText(x, y, text, sizeDp, col)
 }
 
@@ -478,11 +492,11 @@ func (u *UI) MousePosPx() (int, int) {
 }
 
 // MousePosDp возвращает текущие логические координаты курсора мыши в окне (в dp).
-func (u *UI) MousePosDp() (int, int) {
+func (u *UI) MousePosDp() (Dp, Dp) {
 	if u.ctx == nil {
 		return 0, 0
 	}
-	return u.ctx.PxToDp(u.ctx.MouseX), u.ctx.PxToDp(u.ctx.MouseY)
+	return u.ctx.PxToDp(Px(u.ctx.MouseX)), u.ctx.PxToDp(Px(u.ctx.MouseY))
 }
 
 // MousePressed возвращает true, если в текущем кадре нажата левая кнопка мыши.

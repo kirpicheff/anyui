@@ -244,7 +244,7 @@ func TestToastPositionAndOffset(t *testing.T) {
 	if !ctx.toastHasOffset || ctx.toastOffsetXDp != 24 || ctx.toastOffsetYDp != 56 {
 		t.Fatalf("отступы тоста не сохранились: %+v %d %d", ctx.toastHasOffset, ctx.toastOffsetXDp, ctx.toastOffsetYDp)
 	}
-	rx, ry, ok = ctx.calcToastRectPos(300, 64, 10, ctx.toastOffsetXDp, ctx.toastOffsetYDp, 8, 0)
+	rx, ry, ok = ctx.calcToastRectPos(300, 64, 10, ctx.toastOffsetXDp.Int(), ctx.toastOffsetYDp.Int(), 8, 0)
 	if !ok || rx != (800-300)/2 || ry != 56 {
 		t.Fatalf("неожиданная позиция ToastTopCenter: rx=%d ry=%d ok=%v", rx, ry, ok)
 	}

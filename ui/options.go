@@ -32,18 +32,18 @@ type WidgetStyle struct {
 	HoverBorderColor *render.Color
 	FocusBorderColor *render.Color
 	Radius           *float32
-	WidthDp          *int
-	HeightDp         *int
-	MinWidthDp       *int
-	MaxWidthDp       *int
-	MinHeightDp      *int
-	MaxHeightDp      *int
+	WidthDp          *Dp
+	HeightDp         *Dp
+	MinWidthDp       *Dp
+	MaxWidthDp       *Dp
+	MinHeightDp      *Dp
+	MaxHeightDp      *Dp
 	FillWidth        bool
 	FillHeight       bool
 	AutoHeight       bool
 	FlexWeight       float32
-	FontSizeDp       *int
-	PadDp            *int
+	FontSizeDp       *Dp
+	PadDp            *Dp
 	IconSVG          string
 	IconRightSVG     string
 	FontStyle        render.FontStyle
@@ -67,10 +67,10 @@ type WidgetStyle struct {
 }
 
 // AutoSize — константа sentinel-значения для автоматического подбора размера по остатку доступной области.
-const AutoSize = -1
+const AutoSize Dp = -1
 
 // Auto возвращает sentinel-значение (-1) для автоматического занятия доступного остатка области контейнера.
-func Auto() int {
+func Auto() Dp {
 	return AutoSize
 }
 
@@ -117,28 +117,28 @@ func Radius(dp float32) Option {
 }
 
 // Width задаёт фиксированную ширину виджета в логических пикселях.
-func Width(dp int) Option {
+func Width(dp Dp) Option {
 	return func(s *WidgetStyle) {
 		s.WidthDp = &dp
 	}
 }
 
 // Height задаёт фиксированную высоту виджета в логических пикселях.
-func Height(dp int) Option {
+func Height(dp Dp) Option {
 	return func(s *WidgetStyle) {
 		s.HeightDp = &dp
 	}
 }
 
 // FontSize переопределяет размер шрифта виджета в логических пикселях.
-func FontSize(dp int) Option {
+func FontSize(dp Dp) Option {
 	return func(s *WidgetStyle) {
 		s.FontSizeDp = &dp
 	}
 }
 
 // Padding задаёт внутренний отступ виджета в логических пикселях.
-func Padding(dp int) Option {
+func Padding(dp Dp) Option {
 	return func(s *WidgetStyle) {
 		s.PadDp = &dp
 	}
@@ -294,28 +294,28 @@ func InputFilter(fn func(rune) bool) Option {
 }
 
 // MinWidth задаёт минимальную ширину виджета в логических пикселях.
-func MinWidth(dp int) Option {
+func MinWidth(dp Dp) Option {
 	return func(s *WidgetStyle) {
 		s.MinWidthDp = &dp
 	}
 }
 
 // MaxWidth задаёт максимальную ширину виджета в логических пикселях.
-func MaxWidth(dp int) Option {
+func MaxWidth(dp Dp) Option {
 	return func(s *WidgetStyle) {
 		s.MaxWidthDp = &dp
 	}
 }
 
 // MinHeight задаёт минимальную высоту виджета в логических пикселях.
-func MinHeight(dp int) Option {
+func MinHeight(dp Dp) Option {
 	return func(s *WidgetStyle) {
 		s.MinHeightDp = &dp
 	}
 }
 
 // MaxHeight задаёт максимальную высоту виджета в логических пикселях.
-func MaxHeight(dp int) Option {
+func MaxHeight(dp Dp) Option {
 	return func(s *WidgetStyle) {
 		s.MaxHeightDp = &dp
 	}

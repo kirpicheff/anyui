@@ -18,10 +18,10 @@ const (
 )
 
 var (
-	dpModeStore    = make(map[string]datePickerMode)
-	dpEditText     = make(map[string]string)
-	dpEditActive   = make(map[string]bool)
-	tpActiveField  = make(map[string]int) // 0=час, 1=мин, 2=сек
+	dpModeStore   = make(map[string]datePickerMode)
+	dpEditText    = make(map[string]string)
+	dpEditActive  = make(map[string]bool)
+	tpActiveField = make(map[string]int) // 0=час, 1=мин, 2=сек
 )
 
 // TimePicker отрисовывает выбор времени (ЧЧ:ММ:СС) с кнопками +/- и вводом с клавиатуры.
@@ -38,13 +38,13 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 	}
 
 	st := ApplyOptions(opts)
-	w := c.S(140)
+	w := c.Scale(140).Int()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(34)
+	h := c.Scale(34).Int()
 	rect := c.allocRect(w, h)
-	radius := c.Sf(c.Theme.RadiusSm)
+	radius := c.ScaleF(c.Theme.RadiusSm)
 
 	isOpen := c.openState[id]
 	if !st.Disabled {
@@ -67,31 +67,31 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 	c.Canvas.DrawRoundedBox(rect, radius, c.Theme.SurfaceDark, 1.0, borderCol)
 
 	if c.Font != nil {
-		pxSize := c.S(13)
+		pxSize := c.Scale(13).Int()
 		label := t.Format("15:04:05")
 		_, th := c.Font.MeasureText(label, pxSize)
-		c.Font.DrawText(c.Canvas, rect.X+c.S(10), rect.Y+(rect.H-th)/2, label, pxSize, c.Theme.TextPrimary)
+		c.Font.DrawText(c.Canvas, rect.X+c.Scale(10).Int(), rect.Y+(rect.H-th)/2, label, pxSize, c.Theme.TextPrimary)
 	}
 
 	// Иконка часов справа
-	cx := float32(rect.X + rect.W - c.S(16))
+	cx := float32(rect.X + rect.W - c.Scale(16).Int())
 	cy := float32(rect.Y + rect.H/2)
-	cr := render.Rect{X: rect.X + rect.W - c.S(23), Y: rect.Y + (rect.H-c.S(14))/2, W: c.S(14), H: c.S(14)}
-	c.Canvas.DrawRoundedBox(cr, c.Sf(7), render.RGBA(0, 0, 0, 0), 1.2, c.Theme.TextMuted)
-	c.Canvas.DrawLine(cx, cy, cx, cy-c.Sf(3.5), 1.2, c.Theme.TextMuted)
-	c.Canvas.DrawLine(cx, cy, cx+c.Sf(3), cy+c.Sf(1), 1.2, c.Theme.TextMuted)
+	cr := render.Rect{X: rect.X + rect.W - c.Scale(23).Int(), Y: rect.Y + (rect.H-c.Scale(14).Int())/2, W: c.Scale(14).Int(), H: c.Scale(14).Int()}
+	c.Canvas.DrawRoundedBox(cr, c.ScaleF(7), render.RGBA(0, 0, 0, 0), 1.2, c.Theme.TextMuted)
+	c.Canvas.DrawLine(cx, cy, cx, cy-c.ScaleF(3.5), 1.2, c.Theme.TextMuted)
+	c.Canvas.DrawLine(cx, cy, cx+c.ScaleF(3), cy+c.ScaleF(1), 1.2, c.Theme.TextMuted)
 
 	changed := false
 	if isOpen {
-		popW := c.S(210)
-		popH := c.S(146)
+		popW := c.Scale(210).Int()
+		popH := c.Scale(146).Int()
 		popX := rect.X
-		popY := rect.Y + rect.H + c.S(4)
-		if popX+popW > c.Canvas.Width-c.S(8) {
-			popX = c.Canvas.Width - popW - c.S(8)
+		popY := rect.Y + rect.H + c.Scale(4).Int()
+		if popX+popW > c.Canvas.Width-c.Scale(8).Int() {
+			popX = c.Canvas.Width - popW - c.Scale(8).Int()
 		}
-		if popY+popH > c.Canvas.Height-c.S(8) {
-			popY = rect.Y - popH - c.S(4)
+		if popY+popH > c.Canvas.Height-c.Scale(8).Int() {
+			popY = rect.Y - popH - c.Scale(4).Int()
 		}
 		popR := render.Rect{X: popX, Y: popY, W: popW, H: popH}
 
@@ -103,18 +103,18 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 
 		c.PushOverlay(popR, func() {
 			c.drawDropShadow(popR, 10, 14, 120)
-			c.Canvas.DrawRoundedBox(popR, c.Sf(10), c.Theme.Card, 1.0, c.Theme.Border)
+			c.Canvas.DrawRoundedBox(popR, c.ScaleF(10), c.Theme.Card, 1.0, c.Theme.Border)
 
 			hr, mn, sc := t.Hour(), t.Minute(), t.Second()
-			colW := (popR.W - c.S(24)) / 3
-			baseX := popR.X + c.S(12)
-			topY := popR.Y + c.S(12)
+			colW := (popR.W - c.Scale(24).Int()) / 3
+			baseX := popR.X + c.Scale(12).Int()
+			topY := popR.Y + c.Scale(12).Int()
 
 			stepCol := func(idx int, label string, val int, maxVal int, setFn func(int)) {
 				cxR := baseX + idx*colW
-				upR := render.Rect{X: cxR + c.S(6), Y: topY, W: colW - c.S(12), H: c.S(26)}
-				valR := render.Rect{X: cxR + c.S(6), Y: topY + c.S(30), W: colW - c.S(12), H: c.S(32)}
-				dnR := render.Rect{X: cxR + c.S(6), Y: topY + c.S(66), W: colW - c.S(12), H: c.S(26)}
+				upR := render.Rect{X: cxR + c.Scale(6).Int(), Y: topY, W: colW - c.Scale(12).Int(), H: c.Scale(26).Int()}
+				valR := render.Rect{X: cxR + c.Scale(6).Int(), Y: topY + c.Scale(30).Int(), W: colW - c.Scale(12).Int(), H: c.Scale(32).Int()}
+				dnR := render.Rect{X: cxR + c.Scale(6).Int(), Y: topY + c.Scale(66).Int(), W: colW - c.Scale(12).Int(), H: c.Scale(26).Int()}
 
 				drawStepBtn := func(br render.Rect, txt string, delta int) {
 					c.RegisterHit(id+":tp:"+label+":"+txt, br, platform.CursorHand)
@@ -130,17 +130,17 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 							c.RequestRedraw()
 						}
 					}
-					c.Canvas.FillRoundedRect(br, c.Sf(4), bg)
+					c.Canvas.FillRoundedRect(br, c.ScaleF(4), bg)
 					if c.Font != nil {
-						tw, th := c.Font.MeasureText(txt, c.S(12))
-						c.Font.DrawText(c.Canvas, br.X+(br.W-tw)/2, br.Y+(br.H-th)/2, txt, c.S(12), c.Theme.TextPrimary)
+						tw, th := c.Font.MeasureText(txt, c.Scale(12).Int())
+						c.Font.DrawText(c.Canvas, br.X+(br.W-tw)/2, br.Y+(br.H-th)/2, txt, c.Scale(12).Int(), c.Theme.TextPrimary)
 					}
 				}
 
 				drawStepBtn(upR, "+", 1)
 				drawStepBtn(dnR, "-", -1)
 
-				c.Canvas.DrawRoundedBox(valR, c.Sf(4), c.Theme.Bg, 1.0, c.Theme.Border)
+				c.Canvas.DrawRoundedBox(valR, c.ScaleF(4), c.Theme.Bg, 1.0, c.Theme.Border)
 				if valR.Contains(c.MouseX, c.MouseY) && c.WheelY != 0 {
 					d := 1
 					if c.WheelY < 0 {
@@ -153,8 +153,8 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 				}
 				if c.Font != nil {
 					vs := fmt.Sprintf("%02d", val)
-					tw, th := c.Font.MeasureText(vs, c.S(15))
-					c.Font.DrawText(c.Canvas, valR.X+(valR.W-tw)/2, valR.Y+(valR.H-th)/2, vs, c.S(15), c.Theme.TextPrimary)
+					tw, th := c.Font.MeasureText(vs, c.Scale(15).Int())
+					c.Font.DrawText(c.Canvas, valR.X+(valR.W-tw)/2, valR.Y+(valR.H-th)/2, vs, c.Scale(15).Int(), c.Theme.TextPrimary)
 				}
 			}
 
@@ -169,7 +169,7 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 			})
 
 			// Кнопка "Сейчас" внизу
-			nowR := render.Rect{X: popR.X + c.S(12), Y: popR.Y + popR.H - c.S(34), W: popR.W - c.S(24), H: c.S(24)}
+			nowR := render.Rect{X: popR.X + c.Scale(12).Int(), Y: popR.Y + popR.H - c.Scale(34).Int(), W: popR.W - c.Scale(24).Int(), H: c.Scale(24).Int()}
 			c.RegisterHit(id+":now", nowR, platform.CursorHand)
 			hovNow := nowR.Contains(c.MouseX, c.MouseY)
 			nowBg := c.Theme.Surface
@@ -183,11 +183,11 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 					c.RequestRedraw()
 				}
 			}
-			c.Canvas.DrawRoundedBox(nowR, c.Sf(4), nowBg, 1.0, c.Theme.Border)
+			c.Canvas.DrawRoundedBox(nowR, c.ScaleF(4), nowBg, 1.0, c.Theme.Border)
 			if c.Font != nil {
 				nowLbl := c.str().Now
-				tw, th := c.Font.MeasureText(nowLbl, c.S(11))
-				c.Font.DrawText(c.Canvas, nowR.X+(nowR.W-tw)/2, nowR.Y+(nowR.H-th)/2, nowLbl, c.S(11), c.Theme.Accent)
+				tw, th := c.Font.MeasureText(nowLbl, c.Scale(11).Int())
+				c.Font.DrawText(c.Canvas, nowR.X+(nowR.W-tw)/2, nowR.Y+(nowR.H-th)/2, nowLbl, c.Scale(11).Int(), c.Theme.Accent)
 			}
 		})
 	}

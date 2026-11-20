@@ -129,7 +129,7 @@ func (u *UI) TagInput(id string, tags *[]string, placeholder string, opts ...Opt
 }
 
 // ListViewEx отрисовывает список с мультивыбором и опциональными чекбоксами.
-func (u *UI) ListViewEx(id string, count int, itemHeightDp int, selected map[int]bool, checked []bool, drawItem func(index int, area Rect, isSelected bool), opts ...Option) bool {
+func (u *UI) ListViewEx(id string, count int, itemHeightDp Dp, selected map[int]bool, checked []bool, drawItem func(index int, area Rect, isSelected bool), opts ...Option) bool {
 	return u.ctx.ListViewEx(id, count, itemHeightDp, selected, checked, drawItem, opts...)
 }
 

@@ -23,16 +23,16 @@ func (c *Context) Checkbox(id, label string, checked *bool, opts ...Option) bool
 	id = c.ResolveID("chk", id)
 	st := ApplyOptions(opts)
 
-	sizeDp := 18
+	sizeDp := Dp(18)
 	if st.HeightDp != nil && *st.HeightDp > 0 {
 		sizeDp = *st.HeightDp
 	}
-	boxPx := c.S(sizeDp)
-	gap := c.S(8)
+	boxPx := c.Scale(sizeDp).Int()
+	gap := c.Scale(8).Int()
 
-	pxSize := c.S(14)
+	pxSize := c.Scale(14).Int()
 	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
-		pxSize = c.S(*st.FontSizeDp)
+		pxSize = c.Scale(*st.FontSizeDp).Int()
 	}
 	tw, th := 0, boxPx
 	if c.Font != nil && label != "" {
@@ -110,7 +110,7 @@ func (c *Context) Checkbox(id, label string, checked *bool, opts ...Option) bool
 	if st.Radius != nil {
 		rad = *st.Radius
 	}
-	c.Canvas.DrawRoundedBox(boxRect, c.Sf(rad), bg, 1.0, border)
+	c.Canvas.DrawRoundedBox(boxRect, c.ScaleF(rad), bg, 1.0, border)
 
 	if anim > 0.05 {
 		markCol := render.RGBA(255, 255, 255, uint8(255*anim))
@@ -122,7 +122,7 @@ func (c *Context) Checkbox(id, label string, checked *bool, opts ...Option) bool
 			x1 := float32(boxRect.X) + float32(boxPx)*0.24
 			x2 := float32(boxRect.X) + float32(boxPx)*0.76
 			ym := float32(boxRect.Y) + float32(boxPx)*0.5
-			c.Canvas.DrawLine(x1, ym, x2, ym, c.Sf(2), markCol)
+			c.Canvas.DrawLine(x1, ym, x2, ym, c.ScaleF(2), markCol)
 		} else {
 			// Галочка двумя сегментами
 			x1 := float32(boxRect.X) + float32(boxPx)*0.24
@@ -131,8 +131,8 @@ func (c *Context) Checkbox(id, label string, checked *bool, opts ...Option) bool
 			y2 := float32(boxRect.Y) + float32(boxPx)*0.72
 			x3 := float32(boxRect.X) + float32(boxPx)*0.76
 			y3 := float32(boxRect.Y) + float32(boxPx)*0.30
-			c.Canvas.DrawLine(x1, y1, x2, y2, c.Sf(2), markCol)
-			c.Canvas.DrawLine(x2, y2, x3, y3, c.Sf(2), markCol)
+			c.Canvas.DrawLine(x1, y1, x2, y2, c.ScaleF(2), markCol)
+			c.Canvas.DrawLine(x2, y2, x3, y3, c.ScaleF(2), markCol)
 		}
 	}
 
@@ -150,12 +150,12 @@ func (c *Context) Checkbox(id, label string, checked *bool, opts ...Option) bool
 func (c *Context) RadioButton(id, label string, selected *string, value string, opts ...Option) bool {
 	id = c.ResolveID("rad", id)
 	st := ApplyOptions(opts)
-	circlePx := c.S(18)
-	gap := c.S(8)
+	circlePx := c.Scale(18).Int()
+	gap := c.Scale(8).Int()
 
-	pxSize := c.S(14)
+	pxSize := c.Scale(14).Int()
 	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
-		pxSize = c.S(*st.FontSizeDp)
+		pxSize = c.Scale(*st.FontSizeDp).Int()
 	}
 	tw, th := 0, circlePx
 	if c.Font != nil && label != "" {
@@ -222,7 +222,7 @@ func (c *Context) RadioButton(id, label string, selected *string, value string, 
 	}
 
 	c.Canvas.FillCircle(cx, cy, outerR, borderCol)
-	c.Canvas.FillCircle(cx, cy, outerR-c.Sf(1.5), c.Theme.Surface)
+	c.Canvas.FillCircle(cx, cy, outerR-c.ScaleF(1.5), c.Theme.Surface)
 
 	if anim > 0.05 {
 		dotCol := c.Theme.Accent
@@ -268,11 +268,11 @@ func (c *Context) Separator(opts ...Option) {
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(1)
+	h := c.Scale(1).Int()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
+		h = c.Scale(*st.HeightDp).Int()
 	}
 	col := c.Theme.Border
 	if st.Color != nil {
@@ -291,25 +291,25 @@ func (c *Context) Badge(text string, opts ...Option) {
 		return
 	}
 	st := ApplyOptions(opts)
-	sizeDp := 11
+	sizeDp := Dp(11)
 	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
 		sizeDp = *st.FontSizeDp
 	}
-	pxSize := c.S(sizeDp)
+	pxSize := c.Scale(sizeDp).Int()
 	tw, th := c.Font.MeasureTextStyled(text, pxSize, st.FontStyle)
-	padX := c.S(8)
-	padY := c.S(3)
+	padX := c.Scale(8).Int()
+	padY := c.Scale(3).Int()
 	if st.PadDp != nil && *st.PadDp >= 0 {
-		padX = c.S(*st.PadDp)
+		padX = c.Scale(*st.PadDp).Int()
 	}
 
 	w := tw + padX*2
 	h := th + padY*2
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
+		h = c.Scale(*st.HeightDp).Int()
 	}
 
 	bg := c.Theme.Accent.WithAlpha(45)
@@ -332,13 +332,13 @@ func (c *Context) Badge(text string, opts ...Option) {
 		textCol = *st.Color
 	}
 
-	rad := float32(h) / (2.0 * c.Scale)
+	rad := float32(h) / (2.0 * c.DpiScale)
 	if st.Radius != nil {
 		rad = *st.Radius
 	}
 
 	r := c.allocRect(w, h)
-	c.Canvas.FillRoundedRect(r, c.Sf(rad), bg)
+	c.Canvas.FillRoundedRect(r, c.ScaleF(rad), bg)
 	c.Font.DrawTextStyled(c.Canvas, r.X+(r.W-tw)/2, r.Y+(r.H-th)/2, text, pxSize, textCol, st.FontStyle)
 }
 
@@ -353,11 +353,11 @@ func (c *Context) ProgressBar(progress float32, opts ...Option) {
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(8)
+	h := c.Scale(8).Int()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
+		h = c.Scale(*st.HeightDp).Int()
 	}
 
 	bg := c.Theme.Surface
@@ -377,13 +377,12 @@ func (c *Context) ProgressBar(progress float32, opts ...Option) {
 	}
 
 	r := c.allocRect(w, h)
-	c.Canvas.FillRoundedRect(r, c.Sf(rad), bg)
+	c.Canvas.FillRoundedRect(r, c.ScaleF(rad), bg)
 	if progress > 0 {
 		fillW := int(float32(r.W)*progress + 0.5)
 		if fillW > 0 {
 			fillR := render.Rect{X: r.X, Y: r.Y, W: fillW, H: r.H}
-			c.Canvas.FillRoundedRect(fillR, c.Sf(rad), fillCol)
+			c.Canvas.FillRoundedRect(fillR, c.ScaleF(rad), fillCol)
 		}
 	}
 }
-

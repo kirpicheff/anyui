@@ -121,12 +121,12 @@ func (u *UI) SetToastPosition(pos ToastPosition) {
 }
 
 // SetToastOffset задаёт отступы всплывающих уведомлений от краёв окна в логических пикселях (по умолчанию 16, 16).
-func (u *UI) SetToastOffset(xDp, yDp int) {
+func (u *UI) SetToastOffset(xDp, yDp Dp) {
 	u.ctx.SetToastOffset(xDp, yDp)
 }
 
 // Spinner рисует анимированный индикатор загрузки.
-func (u *UI) Spinner(id string, sizeDp int, opts ...Option) {
+func (u *UI) Spinner(id string, sizeDp Dp, opts ...Option) {
 	u.ctx.Spinner(id, sizeDp, opts...)
 }
 

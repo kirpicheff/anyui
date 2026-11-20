@@ -128,7 +128,7 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 				txt = "msk-dc1 / основной кластер"
 				txtCol = th.TextMuted
 			}
-			ui.DrawText(area.X+ui.S(8), area.Y+ui.S(7), txt, 12, txtCol)
+			ui.DrawText(area.X+ui.Scale(8).Int(), area.Y+ui.Scale(7).Int(), txt, 12, txtCol)
 		}, anyui.Height(210))
 		if tev.SortChanged {
 			st.sortDemoTable()
@@ -180,4 +180,3 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 		}, anyui.Height(280))
 	})
 }
-

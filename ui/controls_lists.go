@@ -79,11 +79,11 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(38)
+	h := c.Scale(38).Int()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
+		h = c.Scale(*st.HeightDp).Int()
 	}
 	r := c.allocRect(w, h)
 	if !st.Disabled {
@@ -116,7 +116,7 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 	if st.Radius != nil {
 		rad = *st.Radius
 	}
-	c.Canvas.DrawRoundedBox(r, c.Sf(rad), bg, 1.0, borderCol)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), bg, 1.0, borderCol)
 
 	var selectedItem *SelectItem
 	selectedIdx := -1
@@ -142,27 +142,27 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 		textCol = c.Theme.TextMuted
 	}
 
-	contentX := r.X + c.S(12)
+	contentX := r.X + c.Scale(12).Int()
 	if iconSVG != "" {
-		iconSz := c.S(16)
+		iconSz := c.Scale(16).Int()
 		c.Canvas.DrawSVG(iconSVG, contentX, r.Y+(r.H-iconSz)/2, iconSz, textCol)
-		contentX += iconSz + c.S(6)
+		contentX += iconSz + c.Scale(6).Int()
 	}
 
 	if c.Font != nil {
-		pxSize := c.S(14)
+		pxSize := c.Scale(14).Int()
 		_, th := c.Font.MeasureTextStyled(label, pxSize, st.FontStyle)
-		c.Canvas.PushClip(render.Rect{X: r.X + c.S(10), Y: r.Y, W: r.W - c.S(32), H: r.H})
+		c.Canvas.PushClip(render.Rect{X: r.X + c.Scale(10).Int(), Y: r.Y, W: r.W - c.Scale(32).Int(), H: r.H})
 		c.Font.DrawTextStyled(c.Canvas, contentX, r.Y+(r.H-th)/2, label, pxSize, textCol, st.FontStyle)
 		c.Canvas.PopClip()
 	}
 
 	// Стрелка раскрытия справа
-	ax := float32(r.X + r.W - c.S(18))
+	ax := float32(r.X + r.W - c.Scale(18).Int())
 	ay := float32(r.Y + r.H/2)
-	aw := c.Sf(5)
-	c.Canvas.DrawLine(ax-aw, ay-aw*0.5, ax, ay+aw*0.5, c.Sf(1.6), c.Theme.TextMuted)
-	c.Canvas.DrawLine(ax, ay+aw*0.5, ax+aw, ay-aw*0.5, c.Sf(1.6), c.Theme.TextMuted)
+	aw := c.ScaleF(5)
+	c.Canvas.DrawLine(ax-aw, ay-aw*0.5, ax, ay+aw*0.5, c.ScaleF(1.6), c.Theme.TextMuted)
+	c.Canvas.DrawLine(ax, ay+aw*0.5, ax+aw, ay-aw*0.5, c.ScaleF(1.6), c.Theme.TextMuted)
 
 	changed := false
 	if c.FocusID == id && !st.Disabled && len(items) > 0 && !isOpen {
@@ -226,23 +226,23 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 	}
 
 	if isOpen {
-		itemH := c.S(32)
+		itemH := c.Scale(32).Int()
 		searchH := 0
 		if st.Searchable {
-			searchH = c.S(38)
+			searchH = c.Scale(38).Int()
 		}
 		maxVisible := 6
-		dropH := len(items)*itemH + searchH + c.S(8)
+		dropH := len(items)*itemH + searchH + c.Scale(8).Int()
 		if len(items) > maxVisible {
-			dropH = maxVisible*itemH + searchH + c.S(8)
+			dropH = maxVisible*itemH + searchH + c.Scale(8).Int()
 		}
-		if dropH < c.S(40) {
-			dropH = c.S(40)
+		if dropH < c.Scale(40).Int() {
+			dropH = c.Scale(40).Int()
 		}
 
 		dropRect := render.Rect{
 			X: r.X,
-			Y: r.Y + r.H + c.S(4),
+			Y: r.Y + r.H + c.Scale(4).Int(),
 			W: r.W,
 			H: dropH,
 		}
@@ -263,9 +263,9 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 
 		c.PushOverlay(dropRect, func() {
 			c.drawDropShadow(dropRect, rad, 12, 110)
-			c.Canvas.DrawRoundedBox(dropRect, c.Sf(rad), c.Theme.Card, 1.0, c.Theme.Border)
+			c.Canvas.DrawRoundedBox(dropRect, c.ScaleF(rad), c.Theme.Card, 1.0, c.Theme.Border)
 
-			listY := dropRect.Y + c.S(4)
+			listY := dropRect.Y + c.Scale(4).Int()
 			filterText := ""
 			if st.Searchable {
 				c.ensureTextMaps()
@@ -274,7 +274,7 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 					c.openState[searchKey+"_init"] = true
 				}
 				// Простой инлайн-фильтр через локальный буфер в layout
-				c.pushBox(render.Rect{X: dropRect.X + c.S(6), Y: listY, W: dropRect.W - c.S(12), H: searchH}, dirColumn, AlignStart, 0)
+				c.pushBox(render.Rect{X: dropRect.X + c.Scale(6).Int(), Y: listY, W: dropRect.W - c.Scale(12).Int(), H: searchH}, dirColumn, AlignStart, 0)
 				q := c.searchQuery(searchKey)
 				if c.TextInputOpts(searchKey, &q, c.str().SearchPlaceholder, Height(32)) {
 					c.setSearchQuery(searchKey, q)
@@ -292,10 +292,10 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 			}
 
 			listRect := render.Rect{
-				X: dropRect.X + c.S(4),
+				X: dropRect.X + c.Scale(4).Int(),
 				Y: listY,
-				W: dropRect.W - c.S(8),
-				H: dropRect.Y + dropRect.H - listY - c.S(4),
+				W: dropRect.W - c.Scale(8).Int(),
+				H: dropRect.Y + dropRect.H - listY - c.Scale(4).Int(),
 			}
 
 			si := c.getScrollInfo("sel_sc:" + id)
@@ -373,7 +373,7 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 			}
 
 			c.Canvas.PushClip(listRect)
-			pxSize := c.S(13)
+			pxSize := c.Scale(13).Int()
 			for pos, origIdx := range filtered {
 				iy := listRect.Y + pos*itemH - si.y
 				if iy+itemH < listRect.Y || iy > listRect.Y+listRect.H {
@@ -385,7 +385,7 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 				isSelectedItem := *selected == items[origIdx].Key
 				if itemHover {
 					c.nextCursor = platform.CursorHand
-					c.Canvas.FillRoundedRect(ir, c.Sf(4), c.Theme.Surface)
+					c.Canvas.FillRoundedRect(ir, c.ScaleF(4), c.Theme.Surface)
 					if c.MousePressed {
 						if *selected != items[origIdx].Key {
 							*selected = items[origIdx].Key
@@ -395,14 +395,14 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 						c.RequestRedraw()
 					}
 				} else if isSelectedItem {
-					c.Canvas.FillRoundedRect(ir, c.Sf(4), c.Theme.Accent.WithAlpha(45))
+					c.Canvas.FillRoundedRect(ir, c.ScaleF(4), c.Theme.Accent.WithAlpha(45))
 				}
 
-				rowX := ir.X + c.S(10)
+				rowX := ir.X + c.Scale(10).Int()
 				if items[origIdx].Icon != "" {
-					icSz := c.S(14)
+					icSz := c.Scale(14).Int()
 					c.Canvas.DrawSVG(items[origIdx].Icon, rowX, ir.Y+(ir.H-icSz)/2, icSz, c.Theme.TextMuted)
-					rowX += icSz + c.S(6)
+					rowX += icSz + c.Scale(6).Int()
 				}
 				if c.Font != nil {
 					_, th := c.Font.MeasureText(items[origIdx].Label, pxSize)
@@ -421,7 +421,7 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 }
 
 // ListView рисует виртуализированный прокручиваемый список элементов.
-func (c *Context) ListView(id string, count int, itemHeightDp int, selected *int, drawItem func(index int, area render.Rect, isSelected bool), opts ...Option) bool {
+func (c *Context) ListView(id string, count int, itemHeightDp Dp, selected *int, drawItem func(index int, area render.Rect, isSelected bool), opts ...Option) bool {
 	id = c.ResolveID("list", id)
 	if itemHeightDp <= 0 {
 		itemHeightDp = 36
@@ -429,13 +429,13 @@ func (c *Context) ListView(id string, count int, itemHeightDp int, selected *int
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
 	h := c.RemainingHeight()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
-	} else if h <= 0 || h >= c.S(50000) {
-		h = c.S(200)
+		h = c.Scale(*st.HeightDp).Int()
+	} else if h <= 0 || h >= c.Scale(50000).Int() {
+		h = c.Scale(200).Int()
 	}
 
 	r := c.allocRectStyled(w, h, st)
@@ -465,9 +465,9 @@ func (c *Context) ListView(id string, count int, itemHeightDp int, selected *int
 	if c.FocusID == id {
 		borderCol = c.Theme.BorderFocus
 	}
-	c.Canvas.DrawRoundedBox(r, c.Sf(rad), bg, 1.0, borderCol)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), bg, 1.0, borderCol)
 
-	itemH := c.S(itemHeightDp)
+	itemH := c.Scale(itemHeightDp).Int()
 	si := c.getScrollInfo("lv:" + id)
 	totalH := count * itemH
 	maxSc := totalH - r.H
@@ -510,7 +510,7 @@ func (c *Context) ListView(id string, count int, itemHeightDp int, selected *int
 	start, end := ComputeVisibleRange(si.y, r.H, itemH, count)
 	for i := start; i < end; i++ {
 		iy := r.Y + i*itemH - si.y
-		ir := render.Rect{X: r.X + c.S(2), Y: iy, W: r.W - c.S(4), H: itemH}
+		ir := render.Rect{X: r.X + c.Scale(2).Int(), Y: iy, W: r.W - c.Scale(4).Int(), H: itemH}
 		c.RegisterHit(id+":row:"+strconv.Itoa(i), ir, platform.CursorHand)
 		isSel := selected != nil && *selected == i
 		itemHover := hovered && ir.Contains(c.MouseX, c.MouseY)
@@ -525,9 +525,9 @@ func (c *Context) ListView(id string, count int, itemHeightDp int, selected *int
 			}
 		}
 		if isSel {
-			c.Canvas.FillRoundedRect(ir, c.Sf(4), c.Theme.Accent.WithAlpha(55))
+			c.Canvas.FillRoundedRect(ir, c.ScaleF(4), c.Theme.Accent.WithAlpha(55))
 		} else if itemHover {
-			c.Canvas.FillRoundedRect(ir, c.Sf(4), c.Theme.Surface)
+			c.Canvas.FillRoundedRect(ir, c.ScaleF(4), c.Theme.Surface)
 		}
 		if drawItem != nil {
 			drawItem(i, ir, isSel)
@@ -537,18 +537,18 @@ func (c *Context) ListView(id string, count int, itemHeightDp int, selected *int
 
 	// Вертикальный скроллбар при переполнении
 	if maxSc > 0 {
-		barW := c.S(6)
+		barW := c.Scale(6).Int()
 		thumbH := (r.H * r.H) / totalH
-		if thumbH < c.S(20) {
-			thumbH = c.S(20)
+		if thumbH < c.Scale(20).Int() {
+			thumbH = c.Scale(20).Int()
 		}
 		thumbY := r.Y + ((r.H - thumbH) * si.y / maxSc)
 		c.Canvas.FillRoundedRect(render.Rect{
-			X: r.X + r.W - barW - c.S(2),
+			X: r.X + r.W - barW - c.Scale(2).Int(),
 			Y: thumbY,
 			W: barW,
 			H: thumbH,
-		}, c.Sf(3), c.Theme.TextMuted.WithAlpha(120))
+		}, c.ScaleF(3), c.Theme.TextMuted.WithAlpha(120))
 	}
 
 	return changed
@@ -563,25 +563,25 @@ func (c *Context) Tabs(id string, items []string, active *int, orient Orientatio
 	id = c.ResolveID("tabs", id)
 	st := ApplyOptions(opts)
 	changed := false
-	pxSize := c.S(14)
+	pxSize := c.Scale(14).Int()
 	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
-		pxSize = c.S(*st.FontSizeDp)
+		pxSize = c.Scale(*st.FontSizeDp).Int()
 	}
 
 	drawOne := func(i int, label string) {
 		isAct := *active == i
-		tw, th := 60, c.S(18)
+		tw, th := 60, c.Scale(18).Int()
 		if c.Font != nil {
 			tw, th = c.Font.MeasureTextStyled(label, pxSize, st.FontStyle)
 		}
-		w := tw + c.S(24)
+		w := tw + c.Scale(24).Int()
 		if vertical {
 			w = c.RemainingWidth()
 			if st.WidthDp != nil && *st.WidthDp > 0 {
-				w = c.S(*st.WidthDp)
+				w = c.Scale(*st.WidthDp).Int()
 			}
 		}
-		h := th + c.S(14)
+		h := th + c.Scale(14).Int()
 		r := c.allocRect(w, h)
 		if !st.Disabled {
 			c.RegisterHit(id+":tab:"+strconv.Itoa(i), r, platform.CursorHand)
@@ -605,18 +605,18 @@ func (c *Context) Tabs(id string, items []string, active *int, orient Orientatio
 			bg = c.Theme.Surface.WithAlpha(120)
 			textCol = c.Theme.TextPrimary
 		}
-		c.Canvas.FillRoundedRect(r, c.Sf(c.Theme.RadiusSm), bg)
+		c.Canvas.FillRoundedRect(r, c.ScaleF(c.Theme.RadiusSm), bg)
 		if isAct {
 			if vertical {
-				c.Canvas.FillRect(render.Rect{X: r.X, Y: r.Y + c.S(6), W: c.S(3), H: r.H - c.S(12)}, c.Theme.Accent)
+				c.Canvas.FillRect(render.Rect{X: r.X, Y: r.Y + c.Scale(6).Int(), W: c.Scale(3).Int(), H: r.H - c.Scale(12).Int()}, c.Theme.Accent)
 			} else {
-				c.Canvas.FillRect(render.Rect{X: r.X + c.S(8), Y: r.Y + r.H - c.S(3), W: r.W - c.S(16), H: c.S(3)}, c.Theme.Accent)
+				c.Canvas.FillRect(render.Rect{X: r.X + c.Scale(8).Int(), Y: r.Y + r.H - c.Scale(3).Int(), W: r.W - c.Scale(16).Int(), H: c.Scale(3).Int()}, c.Theme.Accent)
 			}
 		}
 		if c.Font != nil {
 			tx := r.X + (r.W-tw)/2
 			if vertical {
-				tx = r.X + c.S(14)
+				tx = r.X + c.Scale(14).Int()
 			}
 			c.Font.DrawTextStyled(c.Canvas, tx, r.Y+(r.H-th)/2, label, pxSize, textCol, st.FontStyle)
 		}
@@ -653,30 +653,30 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(36)
+	h := c.Scale(36).Int()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
+		h = c.Scale(*st.HeightDp).Int()
 	}
 	barRect := c.allocRect(w, h)
 
-	addBtnW := c.S(32)
-	tabsArea := render.Rect{X: barRect.X, Y: barRect.Y, W: barRect.W - addBtnW - c.S(4), H: barRect.H}
-	tabW := c.S(160)
+	addBtnW := c.Scale(32).Int()
+	tabsArea := render.Rect{X: barRect.X, Y: barRect.Y, W: barRect.W - addBtnW - c.Scale(4).Int(), H: barRect.H}
+	tabW := c.Scale(160).Int()
 	if len(tabs) > 0 && len(tabs)*tabW > tabsArea.W {
 		// Минимальная ширина вкладки до включения скролла
-		if tabsArea.W/len(tabs) >= c.S(96) {
+		if tabsArea.W/len(tabs) >= c.Scale(96).Int() {
 			tabW = tabsArea.W / len(tabs)
 		}
 	}
-	totalW := len(tabs) * (tabW + c.S(2))
+	totalW := len(tabs) * (tabW + c.Scale(2).Int())
 	maxSc := totalW - tabsArea.W
 	if maxSc < 0 {
 		maxSc = 0
 	}
 	if tabsArea.Contains(c.MouseX, c.MouseY) && (c.WheelY != 0 || c.WheelX != 0) {
-		c.tabScroll[id] += int(c.WheelX*float32(c.S(40))) - int(c.WheelY*float32(c.S(40)))
+		c.tabScroll[id] += int(c.WheelX*float32(c.Scale(40).Int())) - int(c.WheelY*float32(c.Scale(40).Int()))
 		c.RequestRedraw()
 	}
 	if c.tabScroll[id] < 0 {
@@ -688,9 +688,9 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 	scrollX := c.tabScroll[id]
 
 	c.Canvas.PushClip(tabsArea)
-	pxSize := c.S(12)
+	pxSize := c.Scale(12).Int()
 	for i, tab := range tabs {
-		tx := tabsArea.X + i*(tabW+c.S(2)) - scrollX
+		tx := tabsArea.X + i*(tabW+c.Scale(2).Int()) - scrollX
 		tr := render.Rect{X: tx, Y: tabsArea.Y, W: tabW, H: tabsArea.H}
 		if tr.X+tr.W < tabsArea.X || tr.X > tabsArea.X+tabsArea.W {
 			continue
@@ -701,7 +701,7 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 		c.RegisterHit(id+":tab:"+strconv.Itoa(i), visTab, platform.CursorHand)
 		hovered := !c.IsInputBlocked() && tabsArea.Contains(c.MouseX, c.MouseY) && tr.Contains(c.MouseX, c.MouseY)
 
-		closeR := render.Rect{X: tr.X + tr.W - c.S(22), Y: tr.Y + (tr.H-c.S(16))/2, W: c.S(16), H: c.S(16)}
+		closeR := render.Rect{X: tr.X + tr.W - c.Scale(22).Int(), Y: tr.Y + (tr.H-c.Scale(16).Int())/2, W: c.Scale(16).Int(), H: c.Scale(16).Int()}
 		if tab.Closable {
 			c.RegisterHit(id+":close:"+strconv.Itoa(i), tabsArea.Intersect(closeR), platform.CursorHand)
 		}
@@ -740,22 +740,22 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 		} else if hovered {
 			bg = c.Theme.Surface
 		}
-		c.Canvas.DrawRoundedBoxCorners(tr, render.CornerRadii{TL: c.Sf(6), TR: c.Sf(6)}, bg, 1.0, c.Theme.Border)
+		c.Canvas.DrawRoundedBoxCorners(tr, render.CornerRadii{TL: c.ScaleF(6), TR: c.ScaleF(6)}, bg, 1.0, c.Theme.Border)
 
-		curX := tr.X + c.S(10)
+		curX := tr.X + c.Scale(10).Int()
 		if tab.StatusColor != nil {
-			c.Canvas.FillCircle(float32(curX+c.S(4)), float32(tr.Y+tr.H/2), c.Sf(4), *tab.StatusColor)
-			curX += c.S(12)
+			c.Canvas.FillCircle(float32(curX+c.Scale(4).Int()), float32(tr.Y+tr.H/2), c.ScaleF(4), *tab.StatusColor)
+			curX += c.Scale(12).Int()
 		} else if tab.IconSVG != "" {
-			icSz := c.S(14)
+			icSz := c.Scale(14).Int()
 			c.Canvas.DrawSVG(tab.IconSVG, curX, tr.Y+(tr.H-icSz)/2, icSz, c.Theme.TextPrimary)
-			curX += icSz + c.S(6)
+			curX += icSz + c.Scale(6).Int()
 		}
 
 		if c.Font != nil {
-			textMaxW := (tr.X + tr.W - c.S(8)) - curX
+			textMaxW := (tr.X + tr.W - c.Scale(8).Int()) - curX
 			if tab.Closable {
-				textMaxW -= c.S(20)
+				textMaxW -= c.Scale(20).Int()
 			}
 			if textMaxW > 0 {
 				c.Canvas.PushClip(render.Rect{X: curX, Y: tr.Y, W: textMaxW, H: tr.H})
@@ -774,9 +774,9 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 			if closeHover {
 				xCol = c.Theme.Danger
 			}
-			p := float32(c.S(4))
-			c.Canvas.DrawLine(float32(closeR.X)+p, float32(closeR.Y)+p, float32(closeR.X+closeR.W)-p, float32(closeR.Y+closeR.H)-p, c.Sf(1.4), xCol)
-			c.Canvas.DrawLine(float32(closeR.X+closeR.W)-p, float32(closeR.Y)+p, float32(closeR.X)+p, float32(closeR.Y+closeR.H)-p, c.Sf(1.4), xCol)
+			p := float32(c.Scale(4).Int())
+			c.Canvas.DrawLine(float32(closeR.X)+p, float32(closeR.Y)+p, float32(closeR.X+closeR.W)-p, float32(closeR.Y+closeR.H)-p, c.ScaleF(1.4), xCol)
+			c.Canvas.DrawLine(float32(closeR.X+closeR.W)-p, float32(closeR.Y)+p, float32(closeR.X)+p, float32(closeR.Y+closeR.H)-p, c.ScaleF(1.4), xCol)
 		}
 	}
 	c.Canvas.PopClip()
@@ -796,12 +796,12 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 			if dyStart < 0 {
 				dyStart = -dyStart
 			}
-			if dxStart > c.S(6) || dyStart > c.S(6) {
+			if dxStart > c.Scale(6).Int() || dyStart > c.Scale(6).Int() {
 				c.tabDragging = true
 			}
 			if c.tabDragging {
-				if dy <= c.S(48) && len(tabs) > 1 {
-					step := tabW + c.S(2)
+				if dy <= c.Scale(48).Int() && len(tabs) > 1 {
+					step := tabW + c.Scale(2).Int()
 					if step > 0 {
 						targetIdx := (c.MouseX - tabsArea.X + scrollX) / step
 						if targetIdx < 0 {
@@ -818,21 +818,21 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 							c.RequestRedraw()
 						}
 					}
-				} else if dy > c.S(48) {
+				} else if dy > c.Scale(48).Int() {
 					// Визуальная подсказка открепления вкладки в отдельное окно
 					dragTitle := tabs[c.tabDragIndex].Title
-					ghostR := render.Rect{X: c.MouseX + c.S(8), Y: c.MouseY + c.S(8), W: c.S(150), H: c.S(30)}
+					ghostR := render.Rect{X: c.MouseX + c.Scale(8).Int(), Y: c.MouseY + c.Scale(8).Int(), W: c.Scale(150).Int(), H: c.Scale(30).Int()}
 					c.PushOverlay(ghostR, func() {
-						c.Canvas.DrawRoundedBox(ghostR, c.Sf(6), c.Theme.Card.WithAlpha(235), 1.5, c.Theme.Accent)
+						c.Canvas.DrawRoundedBox(ghostR, c.ScaleF(6), c.Theme.Card.WithAlpha(235), 1.5, c.Theme.Accent)
 						if c.Font != nil {
 							_, th := c.Font.MeasureText(dragTitle, pxSize)
-							c.Font.DrawText(c.Canvas, ghostR.X+c.S(10), ghostR.Y+(ghostR.H-th)/2, dragTitle, pxSize, c.Theme.TextPrimary)
+							c.Font.DrawText(c.Canvas, ghostR.X+c.Scale(10).Int(), ghostR.Y+(ghostR.H-th)/2, dragTitle, pxSize, c.Theme.TextPrimary)
 						}
 					})
 				}
 			}
 		} else if c.MouseReleased {
-			if c.tabDragging && dy > c.S(48) {
+			if c.tabDragging && dy > c.Scale(48).Int() {
 				ev.Detached = c.tabDragIndex
 				c.RequestRedraw()
 			}
@@ -843,12 +843,12 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 	}
 
 	// Кнопка '+' добавления вкладки
-	addR := render.Rect{X: barRect.X + barRect.W - addBtnW, Y: barRect.Y + c.S(2), W: addBtnW, H: barRect.H - c.S(4)}
+	addR := render.Rect{X: barRect.X + barRect.W - addBtnW, Y: barRect.Y + c.Scale(2).Int(), W: addBtnW, H: barRect.H - c.Scale(4).Int()}
 	c.RegisterHit(id+":add", addR, platform.CursorHand)
 	addHover := !c.IsInputBlocked() && addR.Contains(c.MouseX, c.MouseY)
 	if addHover {
 		c.nextCursor = platform.CursorHand
-		c.Canvas.FillRoundedRect(addR, c.Sf(6), c.Theme.Surface)
+		c.Canvas.FillRoundedRect(addR, c.ScaleF(6), c.Theme.Surface)
 		if c.MousePressed {
 			ev.Added = true
 			c.RequestRedraw()
@@ -856,9 +856,9 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 	}
 	cx := float32(addR.X) + float32(addR.W)*0.5
 	cy := float32(addR.Y) + float32(addR.H)*0.5
-	arm := c.Sf(5)
-	c.Canvas.DrawLine(cx-arm, cy, cx+arm, cy, c.Sf(1.6), c.Theme.TextMuted)
-	c.Canvas.DrawLine(cx, cy-arm, cx, cy+arm, c.Sf(1.6), c.Theme.TextMuted)
+	arm := c.ScaleF(5)
+	c.Canvas.DrawLine(cx-arm, cy, cx+arm, cy, c.ScaleF(1.6), c.Theme.TextMuted)
+	c.Canvas.DrawLine(cx, cy-arm, cx, cy+arm, c.ScaleF(1.6), c.Theme.TextMuted)
 
 	return ev
 }

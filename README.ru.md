@@ -119,6 +119,7 @@ go run ./cmd/demo
 - [Темы и стилизация](docs/ru/theming.md)
 - [Системная интеграция (окна, трей, диалоги, Linux)](docs/ru/system.md)
 - [Тестирование и Headless-рантайм](docs/ru/testing.md)
+- [Единицы измерения и типизация (Dp / Px)](docs/ru/units.md)
 
 Для просмотра справочника API из терминала:
 

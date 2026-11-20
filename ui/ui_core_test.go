@@ -262,7 +262,7 @@ func TestWrapTextLinesWordBoundaryAndLabelAlignCenter(t *testing.T) {
 	ctx.Canvas = render.NewCanvas(400, 300)
 	ctx.Theme = DarkTheme()
 
-	pxSize := ctx.S(14)
+	pxSize := ctx.Scale(14).Int()
 	wPart1, _ := fm.MeasureTextStyled("слово ", pxSize, render.FontRegular)
 	wPart2, _ := fm.MeasureTextStyled("слово э", pxSize, render.FontRegular)
 
@@ -307,4 +307,3 @@ func TestWrapTextLinesWordBoundaryAndLabelAlignCenter(t *testing.T) {
 		t.Fatal("виджет LabelOpts не был отрендерен")
 	}
 }
-

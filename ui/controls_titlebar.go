@@ -8,7 +8,7 @@ import (
 // TitleBarConfig задаёт настройки кастомной шапки окна (для режима Frameless и тем на любых ОС).
 type TitleBarConfig struct {
 	IconSVG       string
-	HeightDp      int
+	HeightDp      Dp
 	HideMinimize  bool
 	HideMaximize  bool
 	HideClose     bool
@@ -22,7 +22,7 @@ type TitleBarConfig struct {
 // и системными кнопками управления окном (Свернуть / Развернуть / Закрыть).
 func (c *Context) TitleBar(id, title string, cfg TitleBarConfig, opts ...Option) {
 	st := ApplyOptions(opts)
-	hDp := 36
+	hDp := Dp(36)
 	if cfg.HeightDp > 0 {
 		hDp = cfg.HeightDp
 	}
@@ -41,7 +41,7 @@ func (c *Context) TitleBar(id, title string, cfg TitleBarConfig, opts ...Option)
 	c.Canvas.FillRect(r, bg)
 	c.Canvas.FillRect(render.Rect{X: r.X, Y: r.Y + r.H - 1, W: r.W, H: 1}, c.Theme.Border)
 
-	btnW := c.S(44)
+	btnW := c.Scale(44).Int()
 	btnCount := 0
 	if !cfg.HideMinimize {
 		btnCount++
@@ -54,18 +54,18 @@ func (c *Context) TitleBar(id, title string, cfg TitleBarConfig, opts ...Option)
 	}
 
 	// Левая часть: иконка и заголовок
-	curX := r.X + c.S(12)
+	curX := r.X + c.Scale(12).Int()
 	if cfg.IconSVG != "" {
-		iconSize := c.S(16)
+		iconSize := c.Scale(16).Int()
 		iy := r.Y + (r.H-iconSize)/2
 		c.Canvas.DrawSVG(cfg.IconSVG, curX, iy, iconSize, c.Theme.Accent)
-		curX += iconSize + c.S(8)
+		curX += iconSize + c.Scale(8).Int()
 	}
 
 	if title != "" && c.Font != nil {
-		pxSize := c.S(13)
+		pxSize := c.Scale(13).Int()
 		if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
-			pxSize = c.S(*st.FontSizeDp)
+			pxSize = c.Scale(*st.FontSizeDp).Int()
 		}
 		fg := c.Theme.TextPrimary
 		if st.Color != nil {
@@ -73,7 +73,7 @@ func (c *Context) TitleBar(id, title string, cfg TitleBarConfig, opts ...Option)
 		}
 		tw, th := c.Font.MeasureText(title, pxSize)
 		c.Font.DrawText(c.Canvas, curX, r.Y+(r.H-th)/2, title, pxSize, fg)
-		curX += tw + c.S(12)
+		curX += tw + c.Scale(12).Int()
 	}
 
 	// Правая граница доступная для контента (до системных кнопок)
@@ -111,12 +111,12 @@ func (c *Context) TitleBar(id, title string, cfg TitleBarConfig, opts ...Option)
 	}
 
 	if cfg.RightContent != nil && bx > curX {
-		rw := c.S(140)
+		rw := c.Scale(140).Int()
 		if bx-curX < rw {
 			rw = bx - curX
 		}
 		if rw > 0 {
-			rightBox := render.Rect{X: bx - rw - c.S(4), Y: r.Y, W: rw, H: r.H}
+			rightBox := render.Rect{X: bx - rw - c.Scale(4).Int(), Y: r.Y, W: rw, H: r.H}
 			c.renderTitleBarSlot(rightBox, cfg.RightContent)
 		}
 	}
@@ -137,7 +137,7 @@ func (c *Context) TitleBar(id, title string, cfg TitleBarConfig, opts ...Option)
 
 func (c *Context) renderTitleBarSlot(box render.Rect, fn func()) {
 	startHits := len(c.nextHitRegions)
-	c.pushBox(box, dirRow, AlignCenter, c.S(6))
+	c.pushBox(box, dirRow, AlignCenter, c.Scale(6).Int())
 	fn()
 	c.popBox()
 	for i := startHits; i < len(c.nextHitRegions); i++ {
@@ -157,8 +157,8 @@ func (c *Context) drawTitleBarMinBtn(id string, r render.Rect) {
 	}
 	cx := float32(r.X) + float32(r.W)/2
 	cy := float32(r.Y) + float32(r.H)/2
-	half := c.Sf(5)
-	c.Canvas.DrawLine(cx-half, cy, cx+half, cy, c.Sf(1.3), c.Theme.TextPrimary)
+	half := c.ScaleF(5)
+	c.Canvas.DrawLine(cx-half, cy, cx+half, cy, c.ScaleF(1.3), c.Theme.TextPrimary)
 }
 
 func (c *Context) drawTitleBarMaxBtn(id string, r render.Rect) {
@@ -179,11 +179,11 @@ func (c *Context) drawTitleBarMaxBtn(id string, r render.Rect) {
 	isMax := c.Win != nil && c.Win.IsMaximized()
 	cx := r.X + r.W/2
 	cy := r.Y + r.H/2
-	sz := c.S(9)
+	sz := c.Scale(9).Int()
 	if isMax {
 		// Два смещённых квадрата для состояния Restore
-		back := render.Rect{X: cx - sz/2 + c.S(2), Y: cy - sz/2 - c.S(1), W: sz - c.S(2), H: sz - c.S(2)}
-		front := render.Rect{X: cx - sz/2 - c.S(1), Y: cy - sz/2 + c.S(2), W: sz - c.S(2), H: sz - c.S(2)}
+		back := render.Rect{X: cx - sz/2 + c.Scale(2).Int(), Y: cy - sz/2 - c.Scale(1).Int(), W: sz - c.Scale(2).Int(), H: sz - c.Scale(2).Int()}
+		front := render.Rect{X: cx - sz/2 - c.Scale(1).Int(), Y: cy - sz/2 + c.Scale(2).Int(), W: sz - c.Scale(2).Int(), H: sz - c.Scale(2).Int()}
 		c.Canvas.DrawRoundedBox(back, 0, render.RGBA(0, 0, 0, 0), 1.2, c.Theme.TextPrimary)
 		c.Canvas.DrawRoundedBox(front, 0, c.Theme.Surface, 1.2, c.Theme.TextPrimary)
 	} else {
@@ -206,8 +206,8 @@ func (c *Context) drawTitleBarCloseBtn(id string, r render.Rect) {
 	}
 	cx := float32(r.X) + float32(r.W)/2
 	cy := float32(r.Y) + float32(r.H)/2
-	half := c.Sf(4.5)
-	stroke := c.Sf(1.4)
+	half := c.ScaleF(4.5)
+	stroke := c.ScaleF(1.4)
 	c.Canvas.DrawLine(cx-half, cy-half, cx+half, cy+half, stroke, iconCol)
 	c.Canvas.DrawLine(cx+half, cy-half, cx-half, cy+half, stroke, iconCol)
 }

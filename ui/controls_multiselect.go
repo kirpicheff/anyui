@@ -23,13 +23,13 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 	id = c.ResolveID("msel", id)
 
 	st := ApplyOptions(opts)
-	w := c.S(240)
+	w := c.Scale(240).Int()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
-		w = c.S(*st.WidthDp)
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.S(34)
+	h := c.Scale(34).Int()
 	if st.HeightDp != nil && *st.HeightDp > 0 {
-		h = c.S(*st.HeightDp)
+		h = c.Scale(*st.HeightDp).Int()
 	}
 	rect := c.allocRect(w, h)
 
@@ -55,7 +55,7 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 	if isOpen {
 		borderCol = c.Theme.BorderFocus
 	}
-	c.Canvas.DrawRoundedBox(rect, c.Sf(c.Theme.RadiusSm), c.Theme.SurfaceDark, 1.0, borderCol)
+	c.Canvas.DrawRoundedBox(rect, c.ScaleF(c.Theme.RadiusSm), c.Theme.SurfaceDark, 1.0, borderCol)
 
 	// Подсчёт выбранных пунктов и отображение чипсов/сводки
 	var selItems []SelectItem
@@ -67,35 +67,35 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 
 	loc := c.str()
 	if c.Font != nil {
-		c.Canvas.PushClip(render.Rect{X: rect.X + c.S(6), Y: rect.Y, W: rect.W - c.S(28), H: rect.H})
+		c.Canvas.PushClip(render.Rect{X: rect.X + c.Scale(6).Int(), Y: rect.Y, W: rect.W - c.Scale(28).Int(), H: rect.H})
 		if len(selItems) == 0 {
-			_, th := c.Font.MeasureText(loc.SelectPlaceholder, c.S(13))
-			c.Font.DrawText(c.Canvas, rect.X+c.S(10), rect.Y+(rect.H-th)/2, loc.SelectPlaceholder, c.S(13), c.Theme.TextMuted)
+			_, th := c.Font.MeasureText(loc.SelectPlaceholder, c.Scale(13).Int())
+			c.Font.DrawText(c.Canvas, rect.X+c.Scale(10).Int(), rect.Y+(rect.H-th)/2, loc.SelectPlaceholder, c.Scale(13).Int(), c.Theme.TextMuted)
 		} else {
 			// Пытаемся отрисовать чипсы; если их много, показываем сводку
-			curX := rect.X + c.S(6)
-			maxX := rect.X + rect.W - c.S(26)
-			pxChip := c.S(11)
+			curX := rect.X + c.Scale(6).Int()
+			maxX := rect.X + rect.W - c.Scale(26).Int()
+			pxChip := c.Scale(11).Int()
 			fitsAll := true
 			for _, it := range selItems {
 				tw, _ := c.Font.MeasureText(it.Label, pxChip)
-				cw := tw + c.S(12)
+				cw := tw + c.Scale(12).Int()
 				if curX+cw > maxX {
 					fitsAll = false
 					break
 				}
-				curX += cw + c.S(4)
+				curX += cw + c.Scale(4).Int()
 			}
 			if fitsAll && len(selItems) <= 4 {
-				curX = rect.X + c.S(6)
+				curX = rect.X + c.Scale(6).Int()
 				for _, it := range selItems {
 					tw, th := c.Font.MeasureText(it.Label, pxChip)
-					cw := tw + c.S(12)
-					ch := c.S(22)
+					cw := tw + c.Scale(12).Int()
+					ch := c.Scale(22).Int()
 					cr := render.Rect{X: curX, Y: rect.Y + (rect.H-ch)/2, W: cw, H: ch}
-					c.Canvas.FillRoundedRect(cr, c.Sf(4), c.Theme.Accent.WithAlpha(45))
-					c.Font.DrawText(c.Canvas, cr.X+c.S(6), cr.Y+(cr.H-th)/2, it.Label, pxChip, c.Theme.Accent)
-					curX += cw + c.S(4)
+					c.Canvas.FillRoundedRect(cr, c.ScaleF(4), c.Theme.Accent.WithAlpha(45))
+					c.Font.DrawText(c.Canvas, cr.X+c.Scale(6).Int(), cr.Y+(cr.H-th)/2, it.Label, pxChip, c.Theme.Accent)
+					curX += cw + c.Scale(4).Int()
 				}
 			} else {
 				var names []string
@@ -103,18 +103,18 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 					names = append(names, it.Label)
 				}
 				summary := fmt.Sprintf(loc.SelectedSummaryFmt, len(names), strings.Join(names, ", "))
-				_, th := c.Font.MeasureText(summary, c.S(12))
-				c.Font.DrawText(c.Canvas, rect.X+c.S(10), rect.Y+(rect.H-th)/2, summary, c.S(12), c.Theme.TextPrimary)
+				_, th := c.Font.MeasureText(summary, c.Scale(12).Int())
+				c.Font.DrawText(c.Canvas, rect.X+c.Scale(10).Int(), rect.Y+(rect.H-th)/2, summary, c.Scale(12).Int(), c.Theme.TextPrimary)
 			}
 		}
 		c.Canvas.PopClip()
 	}
 
 	// Стрелка справа
-	ax := float32(rect.X + rect.W - c.S(14))
+	ax := float32(rect.X + rect.W - c.Scale(14).Int())
 	ay := float32(rect.Y + rect.H/2)
-	c.Canvas.DrawLine(ax-c.Sf(4), ay-c.Sf(2), ax, ay+c.Sf(2), 1.5, c.Theme.TextMuted)
-	c.Canvas.DrawLine(ax, ay+c.Sf(2), ax+c.Sf(4), ay-c.Sf(2), 1.5, c.Theme.TextMuted)
+	c.Canvas.DrawLine(ax-c.ScaleF(4), ay-c.ScaleF(2), ax, ay+c.ScaleF(2), 1.5, c.Theme.TextMuted)
+	c.Canvas.DrawLine(ax, ay+c.ScaleF(2), ax+c.ScaleF(4), ay-c.ScaleF(2), 1.5, c.Theme.TextMuted)
 
 	changed := false
 	if !isOpen {
@@ -130,8 +130,8 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 		}
 	}
 
-	itemH := c.S(28)
-	maxListH := c.S(180)
+	itemH := c.Scale(28).Int()
+	maxListH := c.Scale(180).Int()
 	listH := len(filtered) * itemH
 	if listH > maxListH {
 		listH = maxListH
@@ -139,16 +139,17 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 	if listH < itemH {
 		listH = itemH
 	}
-	topCtrlH := c.S(62) // Поиск + кнопки Выбрать все / Сбросить
-	popH := topCtrlH + listH + c.S(8)
+	topCtrlH := c.Scale(62).Int( // Поиск + кнопки Выбрать все / Сбросить
+	)
+	popH := topCtrlH + listH + c.Scale(8).Int()
 	popW := rect.W
-	if popW < c.S(220) {
-		popW = c.S(220)
+	if popW < c.Scale(220).Int() {
+		popW = c.Scale(220).Int()
 	}
 	popX := rect.X
-	popY := rect.Y + rect.H + c.S(4)
-	if popY+popH > c.Canvas.Height-c.S(4) {
-		popY = rect.Y - popH - c.S(4)
+	popY := rect.Y + rect.H + c.Scale(4).Int()
+	if popY+popH > c.Canvas.Height-c.Scale(4).Int() {
+		popY = rect.Y - popH - c.Scale(4).Int()
 	}
 	popR := render.Rect{X: popX, Y: popY, W: popW, H: popH}
 
@@ -160,19 +161,19 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 
 	c.PushOverlay(popR, func() {
 		c.drawDropShadow(popR, c.Theme.RadiusSm, 12, 120)
-		c.Canvas.DrawRoundedBox(popR, c.Sf(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
+		c.Canvas.DrawRoundedBox(popR, c.ScaleF(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
 
 		// Поле поиска
-		sr := render.Rect{X: popR.X + c.S(8), Y: popR.Y + c.S(8), W: popR.W - c.S(16), H: c.S(26)}
+		sr := render.Rect{X: popR.X + c.Scale(8).Int(), Y: popR.Y + c.Scale(8).Int(), W: popR.W - c.Scale(16).Int(), H: c.Scale(26).Int()}
 		sVal := multiSelectSearch[id]
 		c.drawInlineSearchBox(id+":search", sr, &sVal, loc.SearchPlaceholder)
 		multiSelectSearch[id] = sVal
 
 		// Кнопки "Выбрать все" и "Сбросить"
-		btnY := sr.Y + sr.H + c.S(6)
-		btnW := (popR.W - c.S(22)) / 2
-		allR := render.Rect{X: popR.X + c.S(8), Y: btnY, W: btnW, H: c.S(22)}
-		clrR := render.Rect{X: allR.X + btnW + c.S(6), Y: btnY, W: btnW, H: c.S(22)}
+		btnY := sr.Y + sr.H + c.Scale(6).Int()
+		btnW := (popR.W - c.Scale(22).Int()) / 2
+		allR := render.Rect{X: popR.X + c.Scale(8).Int(), Y: btnY, W: btnW, H: c.Scale(22).Int()}
+		clrR := render.Rect{X: allR.X + btnW + c.Scale(6).Int(), Y: btnY, W: btnW, H: c.Scale(22).Int()}
 
 		drawMiniBtn := func(br render.Rect, key, lbl string, fn func()) {
 			c.RegisterHit(id+":mb:"+key, br, platform.CursorHand)
@@ -187,10 +188,10 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 					c.RequestRedraw()
 				}
 			}
-			c.Canvas.FillRoundedRect(br, c.Sf(4), bg)
+			c.Canvas.FillRoundedRect(br, c.ScaleF(4), bg)
 			if c.Font != nil {
-				tw, th := c.Font.MeasureText(lbl, c.S(11))
-				c.Font.DrawText(c.Canvas, br.X+(br.W-tw)/2, br.Y+(br.H-th)/2, lbl, c.S(11), c.Theme.TextMuted)
+				tw, th := c.Font.MeasureText(lbl, c.Scale(11).Int())
+				c.Font.DrawText(c.Canvas, br.X+(br.W-tw)/2, br.Y+(br.H-th)/2, lbl, c.Scale(11).Int(), c.Theme.TextMuted)
 			}
 		}
 		drawMiniBtn(allR, "all", loc.SelectAllBtn, func() {
@@ -205,7 +206,7 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 		})
 
 		// Список элементов с чекбоксами
-		listRect := render.Rect{X: popR.X + c.S(4), Y: btnY + c.S(26), W: popR.W - c.S(8), H: listH}
+		listRect := render.Rect{X: popR.X + c.Scale(4).Int(), Y: btnY + c.Scale(26).Int(), W: popR.W - c.Scale(8).Int(), H: listH}
 		si := c.getScrollInfo(id + ":list")
 		totalH := len(filtered) * itemH
 		maxScr := totalH - listRect.H
@@ -229,13 +230,13 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 			origIdx := filtered[fi]
 			itemKey := items[origIdx].Key
 			iy := listRect.Y + fi*itemH - si.y
-			ir := render.Rect{X: listRect.X + c.S(2), Y: iy, W: listRect.W - c.S(4), H: itemH}
+			ir := render.Rect{X: listRect.X + c.Scale(2).Int(), Y: iy, W: listRect.W - c.Scale(4).Int(), H: itemH}
 			c.RegisterHit(id+":opt:"+strconv.Itoa(origIdx), ir, platform.CursorHand)
 
 			ihov := ir.Contains(c.MouseX, c.MouseY)
 			if ihov {
 				c.nextCursor = platform.CursorHand
-				c.Canvas.FillRoundedRect(ir, c.Sf(4), c.Theme.Surface)
+				c.Canvas.FillRoundedRect(ir, c.ScaleF(4), c.Theme.Surface)
 				if c.MousePressed {
 					selectedIDs[itemKey] = !selectedIDs[itemKey]
 					changed = true
@@ -244,29 +245,29 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 			}
 
 			// Чекбокс
-			cbSize := c.S(15)
-			cbR := render.Rect{X: ir.X + c.S(6), Y: ir.Y + (ir.H-cbSize)/2, W: cbSize, H: cbSize}
+			cbSize := c.Scale(15).Int()
+			cbR := render.Rect{X: ir.X + c.Scale(6).Int(), Y: ir.Y + (ir.H-cbSize)/2, W: cbSize, H: cbSize}
 			checked := selectedIDs[itemKey]
 			if checked {
-				c.Canvas.FillRoundedRect(cbR, c.Sf(3), c.Theme.Accent)
+				c.Canvas.FillRoundedRect(cbR, c.ScaleF(3), c.Theme.Accent)
 				cx := float32(cbR.X + cbR.W/2)
 				cy := float32(cbR.Y + cbR.H/2)
-				c.Canvas.DrawLine(cx-c.Sf(3.5), cy, cx-c.Sf(0.5), cy+c.Sf(3), 1.8, render.RGBA(255, 255, 255, 255))
-				c.Canvas.DrawLine(cx-c.Sf(0.5), cy+c.Sf(3), cx+c.Sf(4), cy-c.Sf(3), 1.8, render.RGBA(255, 255, 255, 255))
+				c.Canvas.DrawLine(cx-c.ScaleF(3.5), cy, cx-c.ScaleF(0.5), cy+c.ScaleF(3), 1.8, render.RGBA(255, 255, 255, 255))
+				c.Canvas.DrawLine(cx-c.ScaleF(0.5), cy+c.ScaleF(3), cx+c.ScaleF(4), cy-c.ScaleF(3), 1.8, render.RGBA(255, 255, 255, 255))
 			} else {
-				c.Canvas.DrawRoundedBox(cbR, c.Sf(3), c.Theme.Bg, 1.0, c.Theme.Border)
+				c.Canvas.DrawRoundedBox(cbR, c.ScaleF(3), c.Theme.Bg, 1.0, c.Theme.Border)
 			}
 
-			itX := cbR.X + cbR.W + c.S(8)
+			itX := cbR.X + cbR.W + c.Scale(8).Int()
 			if items[origIdx].Icon != "" {
-				icSz := c.S(14)
+				icSz := c.Scale(14).Int()
 				c.Canvas.DrawSVG(items[origIdx].Icon, itX, ir.Y+(ir.H-icSz)/2, icSz, c.Theme.TextMuted)
-				itX += icSz + c.S(6)
+				itX += icSz + c.Scale(6).Int()
 			}
 
 			if c.Font != nil {
-				_, th := c.Font.MeasureText(items[origIdx].Label, c.S(12))
-				c.Font.DrawText(c.Canvas, itX, ir.Y+(ir.H-th)/2, items[origIdx].Label, c.S(12), c.Theme.TextPrimary)
+				_, th := c.Font.MeasureText(items[origIdx].Label, c.Scale(12).Int())
+				c.Font.DrawText(c.Canvas, itX, ir.Y+(ir.H-th)/2, items[origIdx].Label, c.Scale(12).Int(), c.Theme.TextPrimary)
 			}
 		}
 		c.Canvas.PopClip()
@@ -287,7 +288,7 @@ func (c *Context) TagInput(id string, tags *[]string, placeholder string, opts .
 	}
 	id = c.ResolveID("tag", id)
 	st := ApplyOptions(opts)
-	hDp := 36
+	hDp := Dp(36)
 	if st.HeightDp != nil && *st.HeightDp > 0 {
 		hDp = *st.HeightDp
 	}
@@ -300,7 +301,7 @@ func (c *Context) TagInput(id string, tags *[]string, placeholder string, opts .
 	if focused {
 		borderCol = c.Theme.BorderFocus
 	}
-	c.Canvas.DrawRoundedBox(r, c.Sf(c.Theme.RadiusSm), c.Theme.SurfaceDark, 1.0, borderCol)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(c.Theme.RadiusSm), c.Theme.SurfaceDark, 1.0, borderCol)
 
 	if !st.Disabled {
 		c.RegisterHit(id, r, platform.CursorIBeam)
@@ -360,11 +361,11 @@ func (c *Context) TagInput(id string, tags *[]string, placeholder string, opts .
 	}
 
 	// Отрисовка чипсов и поля ввода
-	c.Canvas.PushClip(render.Rect{X: r.X + c.S(4), Y: r.Y, W: r.W - c.S(8), H: r.H})
-	curX := r.X + c.S(6)
-	chipH := r.H - c.S(10)
-	chipY := r.Y + c.S(5)
-	pxChip := c.S(11)
+	c.Canvas.PushClip(render.Rect{X: r.X + c.Scale(4).Int(), Y: r.Y, W: r.W - c.Scale(8).Int(), H: r.H})
+	curX := r.X + c.Scale(6).Int()
+	chipH := r.H - c.Scale(10).Int()
+	chipY := r.Y + c.Scale(5).Int()
+	pxChip := c.Scale(11).Int()
 
 	removeIdx := -1
 	for i, tag := range *tags {
@@ -372,15 +373,15 @@ func (c *Context) TagInput(id string, tags *[]string, placeholder string, opts .
 		if c.Font != nil {
 			tw, _ = c.Font.MeasureText(tag, pxChip)
 		}
-		closeW := c.S(16)
-		cw := tw + c.S(10) + closeW
+		closeW := c.Scale(16).Int()
+		cw := tw + c.Scale(10).Int() + closeW
 		cr := render.Rect{X: curX, Y: chipY, W: cw, H: chipH}
-		curX += cw + c.S(4)
+		curX += cw + c.Scale(4).Int()
 
-		c.Canvas.FillRoundedRect(cr, c.Sf(4), c.Theme.Accent.WithAlpha(45))
+		c.Canvas.FillRoundedRect(cr, c.ScaleF(4), c.Theme.Accent.WithAlpha(45))
 		if c.Font != nil {
 			_, th := c.Font.MeasureText(tag, pxChip)
-			c.Font.DrawText(c.Canvas, cr.X+c.S(6), cr.Y+(cr.H-th)/2, tag, pxChip, c.Theme.Accent)
+			c.Font.DrawText(c.Canvas, cr.X+c.Scale(6).Int(), cr.Y+(cr.H-th)/2, tag, pxChip, c.Theme.Accent)
 		}
 
 		// Кнопка удаления "x"
@@ -396,7 +397,7 @@ func (c *Context) TagInput(id string, tags *[]string, placeholder string, opts .
 		}
 		cx := float32(xr.X + xr.W/2)
 		cy := float32(xr.Y + xr.H/2)
-		d := c.Sf(3)
+		d := c.ScaleF(3)
 		c.Canvas.DrawLine(cx-d, cy-d, cx+d, cy+d, 1.3, c.Theme.Accent)
 		c.Canvas.DrawLine(cx-d, cy+d, cx+d, cy-d, 1.3, c.Theme.Accent)
 	}
@@ -408,7 +409,7 @@ func (c *Context) TagInput(id string, tags *[]string, placeholder string, opts .
 	}
 
 	if c.Font != nil {
-		px := c.S(12)
+		px := c.Scale(12).Int()
 		txt := draft
 		col := c.Theme.TextPrimary
 		if txt == "" && len(*tags) == 0 {
@@ -417,14 +418,14 @@ func (c *Context) TagInput(id string, tags *[]string, placeholder string, opts .
 		}
 		if txt != "" {
 			_, th := c.Font.MeasureText(txt, px)
-			c.Font.DrawText(c.Canvas, curX+c.S(2), r.Y+(r.H-th)/2, txt, px, col)
+			c.Font.DrawText(c.Canvas, curX+c.Scale(2).Int(), r.Y+(r.H-th)/2, txt, px, col)
 		}
 		if focused {
 			tw := 0
 			if draft != "" {
 				tw, _ = c.Font.MeasureText(draft, px)
 			}
-			c.Canvas.FillRect(render.Rect{X: curX + c.S(2) + tw + 1, Y: r.Y + c.S(8), W: 1, H: r.H - c.S(16)}, c.Theme.Accent)
+			c.Canvas.FillRect(render.Rect{X: curX + c.Scale(2).Int() + tw + 1, Y: r.Y + c.Scale(8).Int(), W: 1, H: r.H - c.Scale(16).Int()}, c.Theme.Accent)
 		}
 	}
 	c.Canvas.PopClip()

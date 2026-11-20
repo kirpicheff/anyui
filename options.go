@@ -9,7 +9,7 @@ type Option = ui.Option
 const AutoSize = ui.AutoSize
 
 // Auto возвращает sentinel-значение (-1) для автоматического занятия доступного остатка области контейнера.
-func Auto() int { return ui.Auto() }
+func Auto() Dp { return ui.Auto() }
 
 // Bg переопределяет цвет фона виджета.
 func Bg(c Color) Option { return ui.Bg(c) }
@@ -24,16 +24,16 @@ func BorderColor(c Color) Option { return ui.BorderColor(c) }
 func Radius(dp float32) Option { return ui.Radius(dp) }
 
 // Width задаёт фиксированную ширину виджета в логических пикселях.
-func Width(dp int) Option { return ui.Width(dp) }
+func Width(dp Dp) Option { return ui.Width(dp) }
 
 // Height задаёт фиксированную высоту виджета в логических пикселях.
-func Height(dp int) Option { return ui.Height(dp) }
+func Height(dp Dp) Option { return ui.Height(dp) }
 
 // FontSize переопределяет размер шрифта виджета в логических пикселях.
-func FontSize(dp int) Option { return ui.FontSize(dp) }
+func FontSize(dp Dp) Option { return ui.FontSize(dp) }
 
 // Padding задаёт внутренний отступ виджета в логических пикселях.
-func Padding(dp int) Option { return ui.Padding(dp) }
+func Padding(dp Dp) Option { return ui.Padding(dp) }
 
 // Icon задаёт SVG-иконку виджета.
 func Icon(svg string) Option { return ui.Icon(svg) }
@@ -84,16 +84,16 @@ func Searchable(v bool) Option { return ui.Searchable(v) }
 func InputFilter(fn func(rune) bool) Option { return ui.InputFilter(fn) }
 
 // MinWidth задаёт минимальную ширину виджета в логических пикселях.
-func MinWidth(dp int) Option { return ui.MinWidth(dp) }
+func MinWidth(dp Dp) Option { return ui.MinWidth(dp) }
 
 // MaxWidth задаёт максимальную ширину виджета в логических пикселях.
-func MaxWidth(dp int) Option { return ui.MaxWidth(dp) }
+func MaxWidth(dp Dp) Option { return ui.MaxWidth(dp) }
 
 // MinHeight задаёт минимальную высоту виджета в логических пикселях.
-func MinHeight(dp int) Option { return ui.MinHeight(dp) }
+func MinHeight(dp Dp) Option { return ui.MinHeight(dp) }
 
 // MaxHeight задаёт максимальную высоту виджета в логических пикселях.
-func MaxHeight(dp int) Option { return ui.MaxHeight(dp) }
+func MaxHeight(dp Dp) Option { return ui.MaxHeight(dp) }
 
 // FillWidth растягивает виджет на всю доступную ширину контейнера.
 func FillWidth() Option { return ui.FillWidth() }

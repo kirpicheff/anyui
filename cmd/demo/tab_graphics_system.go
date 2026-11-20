@@ -15,17 +15,17 @@ func (st *demoState) drawTabGraphicsSystem(ui *anyui.UI) {
 
 		ui.Row(14, 150, func() {
 			ui.CanvasView(460, 145, func(c *render.Canvas, r anyui.Rect) {
-				c.DrawRoundedBox(r, ui.Sf(10), th.SurfaceDark, 1.0, th.Border)
+				c.DrawRoundedBox(r, ui.ScaleF(10), th.SurfaceDark, 1.0, th.Border)
 
 				// 1. Линейный градиент + тень
-				g1 := anyui.Rect{X: r.X + ui.S(14), Y: r.Y + ui.S(16), W: ui.S(120), H: ui.S(70)}
+				g1 := anyui.Rect{X: r.X + ui.Scale(14).Int(), Y: r.Y + ui.Scale(16).Int(), W: ui.Scale(120).Int(), H: ui.Scale(70).Int()}
 				c.DrawBoxShadow(g1, render.BoxShadow{
-					OffsetY: ui.Sf(4),
-					Blur:    ui.Sf(10),
+					OffsetY: ui.ScaleF(4),
+					Blur:    ui.ScaleF(10),
 					Color:   render.RGBA(0, 0, 0, 120),
-					Radii:   render.UniformRadii(ui.Sf(10)),
+					Radii:   render.UniformRadii(ui.ScaleF(10)),
 				})
-				c.FillLinearGradient(g1, render.CornerRadii{TL: ui.Sf(14), TR: ui.Sf(4), BR: ui.Sf(14), BL: ui.Sf(4)}, render.LinearGradient{
+				c.FillLinearGradient(g1, render.CornerRadii{TL: ui.ScaleF(14), TR: ui.ScaleF(4), BR: ui.ScaleF(14), BL: ui.ScaleF(4)}, render.LinearGradient{
 					StartX: 0, StartY: 0, EndX: 1, EndY: 1,
 					Stops: []render.GradientStop{
 						{Pos: 0, Color: th.Accent},
@@ -34,13 +34,13 @@ func (st *demoState) drawTabGraphicsSystem(ui *anyui.UI) {
 				})
 
 				// 2. BackdropBlur поверх градиента
-				blurR := anyui.Rect{X: g1.X + ui.S(40), Y: g1.Y + ui.S(34), W: ui.S(100), H: ui.S(54)}
-				c.BackdropBlur(blurR, ui.S(6), render.UniformRadii(ui.Sf(8)))
-				c.DrawRoundedBox(blurR, ui.Sf(8), render.RGBA(255, 255, 255, 28), 1.0, render.RGBA(255, 255, 255, 70))
+				blurR := anyui.Rect{X: g1.X + ui.Scale(40).Int(), Y: g1.Y + ui.Scale(34).Int(), W: ui.Scale(100).Int(), H: ui.Scale(54).Int()}
+				c.BackdropBlur(blurR, ui.Scale(6).Int(), render.UniformRadii(ui.ScaleF(8)))
+				c.DrawRoundedBox(blurR, ui.ScaleF(8), render.RGBA(255, 255, 255, 28), 1.0, render.RGBA(255, 255, 255, 70))
 
 				// 3. Радиальный градиент
-				g2 := anyui.Rect{X: r.X + ui.S(175), Y: r.Y + ui.S(16), W: ui.S(90), H: ui.S(90)}
-				c.FillRadialGradient(g2, render.UniformRadii(ui.Sf(45)), render.RadialGradient{
+				g2 := anyui.Rect{X: r.X + ui.Scale(175).Int(), Y: r.Y + ui.Scale(16).Int(), W: ui.Scale(90).Int(), H: ui.Scale(90).Int()}
+				c.FillRadialGradient(g2, render.UniformRadii(ui.ScaleF(45)), render.RadialGradient{
 					CenterX: 0.4, CenterY: 0.4, Radius: 0.6,
 					Stops: []render.GradientStop{
 						{Pos: 0, Color: render.RGB(56, 189, 248)},
@@ -50,15 +50,15 @@ func (st *demoState) drawTabGraphicsSystem(ui *anyui.UI) {
 
 				// 4. Векторные примитивы (Polyline + Arc) и SVG с tint
 				pts := []render.PointF{
-					{X: float32(r.X + ui.S(285)), Y: float32(r.Y + ui.S(85))},
-					{X: float32(r.X + ui.S(315)), Y: float32(r.Y + ui.S(45))},
-					{X: float32(r.X + ui.S(345)), Y: float32(r.Y + ui.S(68))},
-					{X: float32(r.X + ui.S(375)), Y: float32(r.Y + ui.S(25))},
+					{X: float32(r.X + ui.Scale(285).Int()), Y: float32(r.Y + ui.Scale(85).Int())},
+					{X: float32(r.X + ui.Scale(315).Int()), Y: float32(r.Y + ui.Scale(45).Int())},
+					{X: float32(r.X + ui.Scale(345).Int()), Y: float32(r.Y + ui.Scale(68).Int())},
+					{X: float32(r.X + ui.Scale(375).Int()), Y: float32(r.Y + ui.Scale(25).Int())},
 				}
-				c.DrawPolyline(pts, ui.Sf(2.5), th.Success, false)
-				c.DrawArc(float32(r.X+ui.S(415)), float32(r.Y+ui.S(55)), ui.Sf(22), 0, math.Pi*1.45, ui.Sf(3.5), th.Warning)
-				c.DrawSVG(svgStar, r.X+ui.S(285), r.Y+ui.S(95), ui.S(28), th.Warning)
-				c.DrawSVG(svgGear, r.X+ui.S(325), r.Y+ui.S(95), ui.S(28), th.Accent)
+				c.DrawPolyline(pts, ui.ScaleF(2.5), th.Success, false)
+				c.DrawArc(float32(r.X+ui.Scale(415).Int()), float32(r.Y+ui.Scale(55).Int()), ui.ScaleF(22), 0, math.Pi*1.45, ui.ScaleF(3.5), th.Warning)
+				c.DrawSVG(svgStar, r.X+ui.Scale(285).Int(), r.Y+ui.Scale(95).Int(), ui.Scale(28).Int(), th.Warning)
+				c.DrawSVG(svgGear, r.X+ui.Scale(325).Int(), r.Y+ui.Scale(95).Int(), ui.Scale(28).Int(), th.Accent)
 			})
 
 			ui.Column(6, func() {

@@ -88,7 +88,7 @@ type Context struct {
 	Canvas   *render.Canvas
 	Font     *render.FontManager
 	Theme    Theme
-	Scale    float32
+	DpiScale float32
 	Animator *Animator
 	Overlays OverlayLayer
 	Clock    func() time.Time // Виртуальный или пользовательский источник системного времени
@@ -159,8 +159,8 @@ type Context struct {
 	toasts            []*ToastMessage
 	nextToastID       int
 	toastPos          ToastPosition
-	toastOffsetXDp    int
-	toastOffsetYDp    int
+	toastOffsetXDp    Dp
+	toastOffsetYDp    Dp
 	toastHasOffset    bool
 
 	focusOrder     []string
@@ -245,7 +245,7 @@ func NewContext(win platform.Window, fm *render.FontManager) *Context {
 		Canvas:         canvas,
 		Font:           fm,
 		Theme:          NavyTheme(),
-		Scale:          scale,
+		DpiScale:       scale,
 		Animator:       NewAnimator(),
 		Strings:        RussianStrings(),
 		caretPos:       make(map[string]int),
@@ -256,44 +256,44 @@ func NewContext(win platform.Window, fm *render.FontManager) *Context {
 	}
 }
 
-// S переводит логические пиксели (dp) в физические с учётом DPI-масштаба.
-func (c *Context) S(dp int) int {
+// Scale переводит логические пиксели (Dp) в физические (Px) с учётом DPI-масштаба.
+func (c *Context) Scale(dp Dp) Px {
 	if dp == 0 {
 		return 0
 	}
-	v := int(float32(dp)*c.Scale + 0.5)
+	v := int(float32(dp)*c.DpiScale + 0.5)
 	if v == 0 && dp > 0 {
 		return 1
 	}
 	if v == 0 && dp < 0 {
 		return -1
 	}
-	return v
+	return Px(v)
 }
 
-// Sf переводит дробные логические пиксели (dp) в физические.
-func (c *Context) Sf(dp float32) float32 {
-	return dp * c.Scale
+// ScaleF переводит дробные логические пиксели (dp) в физические.
+func (c *Context) ScaleF(dp float32) float32 {
+	return dp * c.DpiScale
 }
 
-// PxToDp переводит физические пиксели (px) в логические (dp) с округлением до ближайшего целого.
-func (c *Context) PxToDp(px int) int {
+// PxToDp переводит физические пиксели (Px) в логические (Dp) с округлением до ближайшего целого.
+func (c *Context) PxToDp(px Px) Dp {
 	if px == 0 {
 		return 0
 	}
-	scale := c.Scale
+	scale := c.DpiScale
 	if scale <= 0 {
 		scale = 1.0
 	}
 	if px > 0 {
-		return int(float32(px)/scale + 0.5)
+		return Dp(float32(px)/scale + 0.5)
 	}
-	return int(float32(px)/scale - 0.5)
+	return Dp(float32(px)/scale - 0.5)
 }
 
 // PxToDpf переводит физические пиксели (px) в дробные логические пиксели (dp).
 func (c *Context) PxToDpf(px float32) float32 {
-	scale := c.Scale
+	scale := c.DpiScale
 	if scale <= 0 {
 		scale = 1.0
 	}
@@ -309,11 +309,11 @@ func (c *Context) Now() time.Time {
 }
 
 // DrawText рисует строку текста в произвольных физических координатах (для кастомного рисования и ListView).
-func (c *Context) DrawText(x, y int, text string, sizeDp int, col render.Color) {
+func (c *Context) DrawText(x, y int, text string, sizeDp Dp, col render.Color) {
 	if c.Font == nil || text == "" {
 		return
 	}
-	c.Font.DrawText(c.Canvas, x, y, text, c.S(sizeDp), col)
+	c.Font.DrawText(c.Canvas, x, y, text, c.Scale(sizeDp).Int(), col)
 }
 
 // RequestRedraw запрашивает повторную перерисовку после изменения состояния.
@@ -555,7 +555,7 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 		}
 	case platform.EventDPIChange:
 		if ev.Scale > 0 {
-			c.Scale = ev.Scale
+			c.DpiScale = ev.Scale
 			c.layers.InvalidateStatic()
 			c.wakeOnlyFrame = false
 			redraw = true
@@ -595,7 +595,7 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 	case platform.EventMouseDown:
 		if ev.Button == platform.MouseLeft {
 			now := c.Now()
-			dist := c.S(5)
+			dist := c.Scale(5).Int()
 			if dist < 5 {
 				dist = 5
 			}
@@ -803,7 +803,7 @@ func (c *Context) canSkipFullFrameForStreaming() bool {
 	if c.debugDirtyRect || c.needsRedraw || c.layers.staticDirty {
 		return false
 	}
-	if c.Theme != c.lastTheme || c.Scale != c.lastScale {
+	if c.Theme != c.lastTheme || c.DpiScale != c.lastScale {
 		return false
 	}
 	if c.Overlays.HasActive() || len(c.toasts) > 0 {
@@ -996,10 +996,10 @@ func (c *Context) beginFrame() {
 	c.streamingDirty = render.Rect{}
 	c.layers.lastFrameBlitted = false
 	c.layers.activeLayer = LayerDynamic
-	if c.Theme != c.lastTheme || c.Scale != c.lastScale {
+	if c.Theme != c.lastTheme || c.DpiScale != c.lastScale {
 		c.layers.InvalidateStatic()
 		c.lastTheme = c.Theme
-		c.lastScale = c.Scale
+		c.lastScale = c.DpiScale
 	}
 
 	if c.Animator != nil {

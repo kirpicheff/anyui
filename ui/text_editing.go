@@ -196,15 +196,17 @@ func (c *Context) inputErrorExtraH(errText string) int {
 	if errText == "" {
 		return 0
 	}
-	return c.S(20)
+	return c.Scale(20).Int(
+
+	// drawInputError рисует текст ошибки валидации непосредственно под полем ввода.
+	)
 }
 
-// drawInputError рисует текст ошибки валидации непосредственно под полем ввода.
 func (c *Context) drawInputError(fieldRect render.Rect, errText string) {
 	if errText == "" || c.Font == nil {
 		return
 	}
-	c.Font.DrawText(c.Canvas, fieldRect.X+c.S(2), fieldRect.Y+fieldRect.H+c.S(4), errText, c.S(12), c.Theme.Danger)
+	c.Font.DrawText(c.Canvas, fieldRect.X+c.Scale(2).Int(), fieldRect.Y+fieldRect.H+c.Scale(4).Int(), errText, c.Scale(12).Int(), c.Theme.Danger)
 }
 
 // textFieldContextMenu открывает встроенное контекстное меню по ПКМ для текстовых полей.
@@ -353,4 +355,3 @@ func (c *Context) selectableContextMenu(id string, anchor render.Rect, text stri
 	}
 	c.ContextMenu("sel_cm:"+id, anchor, items)
 }
-

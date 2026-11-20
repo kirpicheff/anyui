@@ -11,6 +11,12 @@ type Color = render.Color
 // Rect описывает прямоугольник в пиксельных координатах.
 type Rect = render.Rect
 
+// Dp задаёт логические аппаратно-независимые пиксели (Density-independent Pixels).
+type Dp = ui.Dp
+
+// Px задаёт физические пиксели буфера отрисовки (Device Pixels).
+type Px = ui.Px
+
 // Theme хранит цвета и базовые радиусы оформления интерфейса.
 type Theme = ui.Theme
 

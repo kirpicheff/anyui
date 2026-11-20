@@ -116,7 +116,6 @@ const AutoSize = ui.AutoSize
 var ErrAlreadyRunning = errors.New("приложение уже запущено")
 var SelectItems = ui.SelectItems
 func AssertGolden(t testing.TB, h *Headless, goldenName string)
-func Auto() int
 func DefaultTestFonts() (regular, bold, mono []byte)
 func IsSystemDarkTheme() bool
 func OpenFileDialog(opts FileDialogOptions) (string, bool, error)
@@ -147,6 +146,8 @@ type ContextMenuItem = ui.ContextMenuItem
 type CornerRadii = render.CornerRadii
     func UniformRadii(r float32) CornerRadii
 type CursorType = platform.CursorType
+type Dp = ui.Dp
+    func Auto() Dp
 type DrawerSide = ui.DrawerSide
 type FileDialogOptions struct{ ... }
 type FileFilter = platform.FileFilter
@@ -189,9 +190,9 @@ type Option = ui.Option
     func FillWidth() Option
     func Flex(weight float32) Option
     func FocusBorderColor(c Color) Option
-    func FontSize(dp int) Option
+    func FontSize(dp Dp) Option
     func Ghost(enabled ...bool) Option
-    func Height(dp int) Option
+    func Height(dp Dp) Option
     func HoverBg(c Color) Option
     func HoverBorderColor(c Color) Option
     func HoverTextColor(c Color) Option
@@ -201,12 +202,12 @@ type Option = ui.Option
     func InputFilter(fn func(rune) bool) Option
     func LetterSpacing(dp float32) Option
     func LineNumbers(v bool) Option
-    func MaxHeight(dp int) Option
-    func MaxWidth(dp int) Option
-    func MinHeight(dp int) Option
-    func MinWidth(dp int) Option
+    func MaxHeight(dp Dp) Option
+    func MaxWidth(dp Dp) Option
+    func MinHeight(dp Dp) Option
+    func MinWidth(dp Dp) Option
     func Mono(enabled ...bool) Option
-    func Padding(dp int) Option
+    func Padding(dp Dp) Option
     func Password() Option
     func PasswordToggle(visible ...*bool) Option
     func Primary(enabled ...bool) Option
@@ -219,11 +220,12 @@ type Option = ui.Option
     func TextAlignRight() Option
     func TextColor(c Color) Option
     func TextShadow(offsetX, offsetY, blur float32, c Color) Option
-    func Width(dp int) Option
+    func Width(dp Dp) Option
     func WordWrap(enabled ...bool) Option
 type Orientation = ui.Orientation
 type PageConfig = ui.PageConfig
 type PointF = render.PointF
+type Px = ui.Px
 type RadialGradient = render.RadialGradient
 type Rect = render.Rect
 type SelectItem = ui.SelectItem
@@ -472,7 +474,7 @@ func (u *UI) BarChart(id string, labels []string, series []ChartSeries, opts ...
 func (u *UI) Breadcrumbs(id string, items []BreadcrumbItem, opts ...Option) int
 func (u *UI) Button(id, label string, opts ...Option) bool
 func (u *UI) Canvas() *render.Canvas
-func (u *UI) CanvasView(wDp, hDp int, drawFn func(canvas *render.Canvas, area Rect))
+func (u *UI) CanvasView(wDp, hDp Dp, drawFn func(canvas *render.Canvas, area Rect))
 func (u *UI) Card(fn func(), opts ...Option)
 func (u *UI) CheckComboBox(id string, items []SelectItem, selectedIDs map[string]bool, opts ...Option) bool
 func (u *UI) Checkbox(id, label string, checked *bool, opts ...Option) bool
@@ -482,36 +484,36 @@ func (u *UI) ClearScaledImageCache()
 func (u *UI) ClipboardText() (string, error)
 func (u *UI) Collapsible(id, title string, expanded *bool, fn func(), opts ...Option) bool
 func (u *UI) ColorPicker(id string, col *render.Color, opts ...Option) bool
-func (u *UI) Column(gapDp int, fn func())
-func (u *UI) ColumnCentered(gapDp int, fn func())
-func (u *UI) ColumnFlex(gapDp int, items ...FlexItem)
-func (u *UI) ColumnWith(align Align, justify Justify, gapDp int, items ...func())
+func (u *UI) Column(gapDp Dp, fn func())
+func (u *UI) ColumnCentered(gapDp Dp, fn func())
+func (u *UI) ColumnFlex(gapDp Dp, items ...FlexItem)
+func (u *UI) ColumnWith(align Align, justify Justify, gapDp Dp, items ...func())
 func (u *UI) ComboBox(id string, items []SelectItem, selected *string, opts ...Option) bool
 func (u *UI) ContextMenu(id string, anchor Rect, items []ContextMenuItem)
 func (u *UI) CurrentArea() Rect
 func (u *UI) CurrentAreaPx() Rect
 func (u *UI) DatePicker(id string, date *time.Time, opts ...Option) bool
 func (u *UI) DateTimePicker(id string, dt *time.Time, opts ...Option) bool
-func (u *UI) DockBottom(gapDp, bottomDp int, bodyFn, bottomFn func())
-func (u *UI) DockTop(gapDp, topDp int, topFn, bodyFn func())
+func (u *UI) DockBottom(gapDp, bottomDp Dp, bodyFn, bottomFn func())
+func (u *UI) DockTop(gapDp, topDp Dp, topFn, bodyFn func())
 func (u *UI) DoubleClicked() bool
-func (u *UI) DrawSVG(svgData string, x, y, sizeDp int, tint Color)
-func (u *UI) DrawText(x, y int, text string, sizeDp int, col Color)
+func (u *UI) DrawSVG(svgData string, x, y int, sizeDp Dp, tint Color)
+func (u *UI) DrawText(x, y int, text string, sizeDp Dp, col Color)
 func (u *UI) Drawer(id string, open *bool, side DrawerSide, fn func(), opts ...Option)
 func (u *UI) Expand(fn func())
-func (u *UI) FlexSpacer(reserveDp int)
+func (u *UI) FlexSpacer(reserveDp Dp)
 func (u *UI) FloatingPanel(id, title string, open *bool, fn func(), opts ...Option)
-func (u *UI) Flow(gapXDp, gapYDp int, fn func())
+func (u *UI) Flow(gapXDp, gapYDp Dp, fn func())
 func (u *UI) FocusID() string
-func (u *UI) FormLayout(labelWidthDp, gapXDp, gapYDp int, fn func())
+func (u *UI) FormLayout(labelWidthDp, gapXDp, gapYDp Dp, fn func())
 func (u *UI) FormRow(label string, fn func())
 func (u *UI) GlyphCacheStats() (entries int, bytes int64)
-func (u *UI) Grid(cols, gapXDp, gapYDp, rowHeightDp int, fn func())
+func (u *UI) Grid(cols int, gapXDp, gapYDp, rowHeightDp Dp, fn func())
 func (u *UI) Hyperlink(id, text string, opts ...Option) bool
 func (u *UI) IDScope(key any, fn func())
 func (u *UI) IconButton(id, svg string, opts ...Option) bool
-func (u *UI) Image(img image.Image, wDp, hDp int, mode ImageScaleMode)
-func (u *UI) InteractiveCanvas(id string, wDp, hDp int, cb CanvasCallbacks, opts ...Option)
+func (u *UI) Image(img image.Image, wDp, hDp Dp, mode ImageScaleMode)
+func (u *UI) InteractiveCanvas(id string, wDp, hDp Dp, cb CanvasCallbacks, opts ...Option)
 func (u *UI) InvalidateRemember(key any)
 func (u *UI) InvalidateStatic()
 func (u *UI) Label(text string, opts ...Option)
@@ -519,21 +521,21 @@ func (u *UI) LastDirtyRects() []Rect
 func (u *UI) LastFrameStaticBlitted() bool
 func (u *UI) LayoutRect(rect Rect, fn func())
 func (u *UI) LineChart(id string, labels []string, series []ChartSeries, opts ...Option)
-func (u *UI) ListView(id string, count int, itemHeightDp int, selected *int, ...) bool
-func (u *UI) ListViewEx(id string, count int, itemHeightDp int, selected map[int]bool, checked []bool, ...) bool
+func (u *UI) ListView(id string, count int, itemHeightDp Dp, selected *int, ...) bool
+func (u *UI) ListViewEx(id string, count int, itemHeightDp Dp, selected map[int]bool, checked []bool, ...) bool
 func (u *UI) LogView(id string, entries []LogEntry, followTail *bool, opts ...Option)
 func (u *UI) MaskedInput(id string, value *string, mask string, opts ...Option) bool
 func (u *UI) MenuBar(id string, menus []MenuBarItem, opts ...Option)
 func (u *UI) MiddleClicked() bool
 func (u *UI) Modal(id string, open *bool, title string, fn func(), opts ...Option)
 func (u *UI) MouseDown() bool
-func (u *UI) MousePosDp() (int, int)
+func (u *UI) MousePosDp() (Dp, Dp)
 func (u *UI) MousePosPx() (int, int)
 func (u *UI) MousePressed() bool
 func (u *UI) MultiSelect(id string, items []SelectItem, selectedIDs map[string]bool, opts ...Option) bool
 func (u *UI) NumberInput(id string, value *float64, minVal, maxVal, step float64, decimals int, ...) bool
-func (u *UI) Padding(padDp int, fn func())
-func (u *UI) PaddingXY(pxDp, pyDp int, fn func())
+func (u *UI) Padding(padDp Dp, fn func())
+func (u *UI) PaddingXY(pxDp, pyDp Dp, fn func())
 func (u *UI) Page(cfg PageConfig, headerFn, bodyFn, footerFn func())
 func (u *UI) Pagination(id string, currentPage *int, totalPages int, opts ...Option) bool
 func (u *UI) PopID()
@@ -541,18 +543,20 @@ func (u *UI) Popover(id string, open *bool, anchor Rect, fn func(), opts ...Opti
 func (u *UI) ProgressBar(progress float32, opts ...Option)
 func (u *UI) PushID(key any)
 func (u *UI) PushOverlay(bounds Rect, drawFn func())
+func (u *UI) PxToDp(px Px) Dp
 func (u *UI) RadioButton(id, label string, selected *string, value string, opts ...Option) bool
 func (u *UI) RadioGroup(id string, options []string, selected *int, opts ...Option) bool
 func (u *UI) RangeSlider(id string, low, high *float32, minVal, maxVal float32, opts ...Option) bool
 func (u *UI) RegisterHoverArea(id string, rect Rect, cursor CursorType, trackMove bool)
 func (u *UI) RequestRedraw()
-func (u *UI) Row(gapDp, heightDp int, fn func())
-func (u *UI) RowCentered(gapDp, heightDp int, fn func())
-func (u *UI) RowFlex(gapDp, heightDp int, items ...FlexItem)
-func (u *UI) RowWith(align Align, justify Justify, gapDp, heightDp int, items ...func())
-func (u *UI) S(dp int) int
+func (u *UI) Row(gapDp, heightDp Dp, fn func())
+func (u *UI) RowCentered(gapDp, heightDp Dp, fn func())
+func (u *UI) RowFlex(gapDp, heightDp Dp, items ...FlexItem)
+func (u *UI) RowWith(align Align, justify Justify, gapDp, heightDp Dp, items ...func())
+func (u *UI) Scale(dp Dp) Px
+func (u *UI) ScaleF(dp float32) float32
 func (u *UI) ScaledImageCacheStats() (entries int, bytes int64)
-func (u *UI) ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)
+func (u *UI) ScrollView(id string, wDp, hDp Dp, fn func(), opts ...Option)
 func (u *UI) Select(id string, items []SelectItem, selected *string, opts ...Option) bool
 func (u *UI) SelectableLabel(id, text string, opts ...Option)
 func (u *UI) Separator(opts ...Option)
@@ -563,16 +567,15 @@ func (u *UI) SetFocus(id string)
 func (u *UI) SetSmartMouseMove(enabled bool)
 func (u *UI) SetStrings(s Strings)
 func (u *UI) SetTheme(theme Theme)
-func (u *UI) SetToastOffset(xDp, yDp int)
+func (u *UI) SetToastOffset(xDp, yDp Dp)
 func (u *UI) SetToastPosition(pos ToastPosition)
-func (u *UI) Sf(dp float32) float32
 func (u *UI) Shortcut(keyCode uint32, mods Modifiers, fn func())
 func (u *UI) ShowToast(title, text string, kind ToastKind, duration ...time.Duration)
 func (u *UI) SkippedMouseMoves() uint64
 func (u *UI) Slider(id string, value *float32, minVal, maxVal float32, opts ...Option) bool
-func (u *UI) Spacer(dp int)
+func (u *UI) Spacer(dp Dp)
 func (u *UI) Sparkline(id string, values []float64, opts ...Option)
-func (u *UI) Spinner(id string, sizeDp int, opts ...Option)
+func (u *UI) Spinner(id string, sizeDp Dp, opts ...Option)
 func (u *UI) SplitPane(id string, orient SplitOrientation, ratio *float32, firstFn, secondFn func(), ...)
 func (u *UI) StaticLayer(id string, fn func())
 func (u *UI) StatusBar(id string, sections []StatusBarSection, opts ...Option)
