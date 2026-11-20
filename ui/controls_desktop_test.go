@@ -162,14 +162,19 @@ func TestDateTimeAndMultiSelectTagInput(t *testing.T) {
 		t.Fatal("ожидался отказ парсинга некорректной даты")
 	}
 
-	items := []string{"Go", "Rust", "TypeScript", "Python"}
-	sel := []bool{true, false, false, false}
+	items := []SelectItem{
+		{Key: "go", Label: "Go"},
+		{Key: "rust", Label: "Rust"},
+		{Key: "ts", Label: "TypeScript"},
+		{Key: "py", Label: "Python"},
+	}
+	sel := map[string]bool{"go": true}
 	tags := []string{"ui", "desktop"}
 
 	ctx.beginFrame()
 	ctx.Column(8, func() {
 		ctx.DateTimePicker("dtp1", &dt)
-		ctx.MultiSelect("ms1", items, &sel)
+		ctx.MultiSelect("ms1", items, sel)
 		ctx.TagInput("ti1", &tags, "Добавить тег...")
 	})
 	ctx.endFrame()

@@ -31,9 +31,15 @@ func (u *UI) Checkbox(id, label string, checked *bool, opts ...Option) bool {
 	return u.ctx.Checkbox(id, label, checked, opts...)
 }
 
-// RadioButton рисует одиночную радиокнопку и возвращает true при нажатии.
-func (u *UI) RadioButton(id, label string, selected bool, opts ...Option) bool {
-	return u.ctx.RadioButton(id, label, selected, opts...)
+// SelectItem описывает элемент выпадающего списка с устойчивым строковым ключом, подписью и опциональной иконкой.
+type SelectItem = ui.SelectItem
+
+// SelectItems создает срез SelectItem из списка строк, где Key и Label совпадают.
+var SelectItems = ui.SelectItems
+
+// RadioButton рисует одиночную радиокнопку и возвращает true при выборе значения.
+func (u *UI) RadioButton(id, label string, selected *string, value string, opts ...Option) bool {
+	return u.ctx.RadioButton(id, label, selected, value, opts...)
 }
 
 // RadioGroup рисует вертикальную группу радиокнопок и обновляет selected.
@@ -62,12 +68,12 @@ func (u *UI) TextArea(id string, value *string, placeholder string, opts ...Opti
 }
 
 // Select рисует выпадающий список с оверлеем поверх интерфейса.
-func (u *UI) Select(id string, items []string, selected *int, opts ...Option) bool {
+func (u *UI) Select(id string, items []SelectItem, selected *string, opts ...Option) bool {
 	return u.ctx.Select(id, items, selected, opts...)
 }
 
 // ComboBox рисует выпадающий список с полем поиска/фильтрации элементов.
-func (u *UI) ComboBox(id string, items []string, selected *int, opts ...Option) bool {
+func (u *UI) ComboBox(id string, items []SelectItem, selected *string, opts ...Option) bool {
 	base := make([]Option, 0, len(opts)+1)
 	base = append(base, Searchable(true))
 	base = append(base, opts...)

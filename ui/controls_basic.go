@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"strconv"
+
 	"github.com/kirpicheff/anyui/platform"
 	"github.com/kirpicheff/anyui/render"
 )
@@ -144,8 +146,8 @@ func (c *Context) Checkbox(id, label string, checked *bool, opts ...Option) bool
 	return changed
 }
 
-// RadioButton рисует одиночную радиокнопку и возвращает true в кадре выбора.
-func (c *Context) RadioButton(id, label string, selected bool, opts ...Option) bool {
+// RadioButton рисует одиночную радиокнопку и возвращает true при выборе значения.
+func (c *Context) RadioButton(id, label string, selected *string, value string, opts ...Option) bool {
 	id = c.ResolveID("rad", id)
 	st := ApplyOptions(opts)
 	circlePx := c.S(18)
@@ -184,18 +186,25 @@ func (c *Context) RadioButton(id, label string, selected bool, opts ...Option) b
 		}
 	}
 
+	isSelected := selected != nil && *selected == value
 	clicked := false
 	if !st.Disabled && c.MouseReleased && c.ActiveID == id && hovered {
-		clicked = true
+		if selected != nil && *selected != value {
+			*selected = value
+			clicked = true
+		}
 		c.RequestRedraw()
 	}
 	if !st.Disabled && c.FocusID == id && c.consumeEnter() {
-		clicked = true
+		if selected != nil && *selected != value {
+			*selected = value
+			clicked = true
+		}
 		c.RequestRedraw()
 	}
 
 	target := float32(0)
-	if selected {
+	if isSelected {
 		target = 1
 	}
 	anim := c.animFloat("rad:"+id, target, 0.14)
@@ -205,7 +214,7 @@ func (c *Context) RadioButton(id, label string, selected bool, opts ...Option) b
 	outerR := float32(circlePx) * 0.5
 
 	borderCol := render.LerpColor(c.Theme.Border, c.Theme.Accent, anim)
-	if hovered && !selected {
+	if hovered && !isSelected {
 		borderCol = c.Theme.BorderFocus
 	}
 	if st.Disabled {
@@ -243,11 +252,11 @@ func (c *Context) RadioGroup(id string, options []string, selected *int, opts ..
 	c.Column(8, func() {
 		for i, label := range options {
 			itemID := id + "_" + string(rune('0'+i))
-			if c.RadioButton(itemID, label, *selected == i, opts...) {
-				if *selected != i {
-					*selected = i
-					changed = true
-				}
+			val := strconv.Itoa(i)
+			curVal := strconv.Itoa(*selected)
+			if c.RadioButton(itemID, label, &curVal, val, opts...) {
+				*selected = i
+				changed = true
 			}
 		}
 	})

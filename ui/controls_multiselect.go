@@ -15,17 +15,12 @@ var (
 )
 
 // MultiSelect отрисовывает выпадающий список с множественным выбором (чекбоксы у каждого пункта,
-// фильтрация, «Выбрать все / Сбросить» и отображение выбранных значений).
-func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts ...Option) bool {
-	if selected == nil {
+// фильтрация, «Выбрать все / Сбросить» и отображение выбранных значений по ключам).
+func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[string]bool, opts ...Option) bool {
+	if selectedIDs == nil {
 		return false
 	}
 	id = c.ResolveID("msel", id)
-	if len(*selected) != len(items) {
-		resized := make([]bool, len(items))
-		copy(resized, *selected)
-		*selected = resized
-	}
 
 	st := ApplyOptions(opts)
 	w := c.S(240)
@@ -63,17 +58,17 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 	c.Canvas.DrawRoundedBox(rect, c.Sf(c.Theme.RadiusSm), c.Theme.SurfaceDark, 1.0, borderCol)
 
 	// Подсчёт выбранных пунктов и отображение чипсов/сводки
-	var selLabels []string
-	for i, it := range items {
-		if (*selected)[i] {
-			selLabels = append(selLabels, it)
+	var selItems []SelectItem
+	for _, it := range items {
+		if selectedIDs[it.Key] {
+			selItems = append(selItems, it)
 		}
 	}
 
 	loc := c.str()
 	if c.Font != nil {
 		c.Canvas.PushClip(render.Rect{X: rect.X + c.S(6), Y: rect.Y, W: rect.W - c.S(28), H: rect.H})
-		if len(selLabels) == 0 {
+		if len(selItems) == 0 {
 			_, th := c.Font.MeasureText(loc.SelectPlaceholder, c.S(13))
 			c.Font.DrawText(c.Canvas, rect.X+c.S(10), rect.Y+(rect.H-th)/2, loc.SelectPlaceholder, c.S(13), c.Theme.TextMuted)
 		} else {
@@ -82,8 +77,8 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 			maxX := rect.X + rect.W - c.S(26)
 			pxChip := c.S(11)
 			fitsAll := true
-			for _, lbl := range selLabels {
-				tw, _ := c.Font.MeasureText(lbl, pxChip)
+			for _, it := range selItems {
+				tw, _ := c.Font.MeasureText(it.Label, pxChip)
 				cw := tw + c.S(12)
 				if curX+cw > maxX {
 					fitsAll = false
@@ -91,19 +86,23 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 				}
 				curX += cw + c.S(4)
 			}
-			if fitsAll && len(selLabels) <= 4 {
+			if fitsAll && len(selItems) <= 4 {
 				curX = rect.X + c.S(6)
-				for _, lbl := range selLabels {
-					tw, th := c.Font.MeasureText(lbl, pxChip)
+				for _, it := range selItems {
+					tw, th := c.Font.MeasureText(it.Label, pxChip)
 					cw := tw + c.S(12)
 					ch := c.S(22)
 					cr := render.Rect{X: curX, Y: rect.Y + (rect.H-ch)/2, W: cw, H: ch}
 					c.Canvas.FillRoundedRect(cr, c.Sf(4), c.Theme.Accent.WithAlpha(45))
-					c.Font.DrawText(c.Canvas, cr.X+c.S(6), cr.Y+(cr.H-th)/2, lbl, pxChip, c.Theme.Accent)
+					c.Font.DrawText(c.Canvas, cr.X+c.S(6), cr.Y+(cr.H-th)/2, it.Label, pxChip, c.Theme.Accent)
 					curX += cw + c.S(4)
 				}
 			} else {
-				summary := fmt.Sprintf(loc.SelectedSummaryFmt, len(selLabels), strings.Join(selLabels, ", "))
+				var names []string
+				for _, it := range selItems {
+					names = append(names, it.Label)
+				}
+				summary := fmt.Sprintf(loc.SelectedSummaryFmt, len(names), strings.Join(names, ", "))
 				_, th := c.Font.MeasureText(summary, c.S(12))
 				c.Font.DrawText(c.Canvas, rect.X+c.S(10), rect.Y+(rect.H-th)/2, summary, c.S(12), c.Theme.TextPrimary)
 			}
@@ -126,7 +125,7 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 	q := strings.ToLower(strings.TrimSpace(multiSelectSearch[id]))
 	var filtered []int
 	for i, it := range items {
-		if q == "" || strings.Contains(strings.ToLower(it), q) {
+		if q == "" || strings.Contains(strings.ToLower(it.Label), q) || strings.Contains(strings.ToLower(it.Key), q) {
 			filtered = append(filtered, i)
 		}
 	}
@@ -196,12 +195,12 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 		}
 		drawMiniBtn(allR, "all", loc.SelectAllBtn, func() {
 			for _, idx := range filtered {
-				(*selected)[idx] = true
+				selectedIDs[items[idx].Key] = true
 			}
 		})
 		drawMiniBtn(clrR, "reset", loc.ResetBtn, func() {
-			for i := range *selected {
-				(*selected)[i] = false
+			for k := range selectedIDs {
+				delete(selectedIDs, k)
 			}
 		})
 
@@ -228,6 +227,7 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 		startIdx, endIdx := ComputeVisibleRange(si.y, listRect.H, itemH, len(filtered))
 		for fi := startIdx; fi < endIdx; fi++ {
 			origIdx := filtered[fi]
+			itemKey := items[origIdx].Key
 			iy := listRect.Y + fi*itemH - si.y
 			ir := render.Rect{X: listRect.X + c.S(2), Y: iy, W: listRect.W - c.S(4), H: itemH}
 			c.RegisterHit(id+":opt:"+strconv.Itoa(origIdx), ir, platform.CursorHand)
@@ -237,7 +237,7 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 				c.nextCursor = platform.CursorHand
 				c.Canvas.FillRoundedRect(ir, c.Sf(4), c.Theme.Surface)
 				if c.MousePressed {
-					(*selected)[origIdx] = !(*selected)[origIdx]
+					selectedIDs[itemKey] = !selectedIDs[itemKey]
 					changed = true
 					c.RequestRedraw()
 				}
@@ -246,7 +246,7 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 			// Чекбокс
 			cbSize := c.S(15)
 			cbR := render.Rect{X: ir.X + c.S(6), Y: ir.Y + (ir.H-cbSize)/2, W: cbSize, H: cbSize}
-			checked := (*selected)[origIdx]
+			checked := selectedIDs[itemKey]
 			if checked {
 				c.Canvas.FillRoundedRect(cbR, c.Sf(3), c.Theme.Accent)
 				cx := float32(cbR.X + cbR.W/2)
@@ -257,9 +257,16 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 				c.Canvas.DrawRoundedBox(cbR, c.Sf(3), c.Theme.Bg, 1.0, c.Theme.Border)
 			}
 
+			itX := cbR.X + cbR.W + c.S(8)
+			if items[origIdx].Icon != "" {
+				icSz := c.S(14)
+				c.Canvas.DrawSVG(items[origIdx].Icon, itX, ir.Y+(ir.H-icSz)/2, icSz, c.Theme.TextMuted)
+				itX += icSz + c.S(6)
+			}
+
 			if c.Font != nil {
-				_, th := c.Font.MeasureText(items[origIdx], c.S(12))
-				c.Font.DrawText(c.Canvas, cbR.X+cbR.W+c.S(8), ir.Y+(ir.H-th)/2, items[origIdx], c.S(12), c.Theme.TextPrimary)
+				_, th := c.Font.MeasureText(items[origIdx].Label, c.S(12))
+				c.Font.DrawText(c.Canvas, itX, ir.Y+(ir.H-th)/2, items[origIdx].Label, c.S(12), c.Theme.TextPrimary)
 			}
 		}
 		c.Canvas.PopClip()
@@ -269,8 +276,8 @@ func (c *Context) MultiSelect(id string, items []string, selected *[]bool, opts 
 }
 
 // CheckComboBox — синоним MultiSelect для совместимости с десктопной терминологией.
-func (c *Context) CheckComboBox(id string, items []string, selected *[]bool, opts ...Option) bool {
-	return c.MultiSelect(id, items, selected, opts...)
+func (c *Context) CheckComboBox(id string, items []SelectItem, selectedIDs map[string]bool, opts ...Option) bool {
+	return c.MultiSelect(id, items, selectedIDs, opts...)
 }
 
 // TagInput отрисовывает поле ввода тегов/чипсов (добавление по Enter/запятой, удаление по клику на x или Backspace).

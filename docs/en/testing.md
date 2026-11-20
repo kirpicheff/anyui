@@ -301,3 +301,4 @@ Run benchmark:
 go test -bench BenchmarkFrameBudget -benchmem -run ^$
 ```
 This ensures your frame budget remains under 16.6 ms (60 FPS) and memory allocations stay predictable.
+

@@ -59,10 +59,17 @@ func (st *demoState) drawTabInputs(ui *anyui.UI) {
 
 		ui.Separator()
 		ui.Label("Выпадающие списки (Select и ComboBox с поиском)", anyui.FontSize(16), anyui.Bold())
-		opts := []string{"Windows 11", "Windows Server 2022", "Windows 10", "Windows 7", "Linux X11", "macOS"}
+		opts := []anyui.SelectItem{
+			{Key: "win11", Label: "Windows 11"},
+			{Key: "win2022", Label: "Windows Server 2022"},
+			{Key: "win10", Label: "Windows 10"},
+			{Key: "win7", Label: "Windows 7"},
+			{Key: "linux", Label: "Linux X11"},
+			{Key: "macos", Label: "macOS"},
+		}
 		ui.Row(14, 38, func() {
-			ui.Select("sel_os", opts, &st.selectIdx, anyui.Width(220))
-			ui.ComboBox("cmb_os", opts, &st.comboIdx, anyui.Width(240))
+			ui.Select("sel_os", opts, &st.selectKey, anyui.Width(220))
+			ui.ComboBox("cmb_os", opts, &st.comboKey, anyui.Width(240))
 		})
 
 		ui.Separator()

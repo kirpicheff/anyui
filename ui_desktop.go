@@ -114,13 +114,13 @@ func (u *UI) DateTimePicker(id string, dt *time.Time, opts ...Option) bool {
 }
 
 // MultiSelect отрисовывает выпадающий список с множественным выбором и чекбоксами.
-func (u *UI) MultiSelect(id string, items []string, selected *[]bool, opts ...Option) bool {
-	return u.ctx.MultiSelect(id, items, selected, opts...)
+func (u *UI) MultiSelect(id string, items []SelectItem, selectedIDs map[string]bool, opts ...Option) bool {
+	return u.ctx.MultiSelect(id, items, selectedIDs, opts...)
 }
 
 // CheckComboBox — синоним MultiSelect.
-func (u *UI) CheckComboBox(id string, items []string, selected *[]bool, opts ...Option) bool {
-	return u.ctx.CheckComboBox(id, items, selected, opts...)
+func (u *UI) CheckComboBox(id string, items []SelectItem, selectedIDs map[string]bool, opts ...Option) bool {
+	return u.ctx.CheckComboBox(id, items, selectedIDs, opts...)
 }
 
 // TagInput отрисовывает поле ввода тегов/чипсов.

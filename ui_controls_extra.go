@@ -80,9 +80,9 @@ func (u *UI) Collapsible(id, title string, expanded *bool, fn func(), opts ...Op
 	return u.ctx.Collapsible(id, title, expanded, fn, opts...)
 }
 
-// Accordion рисует группу сворачиваемых секций, где открыта не более чем одна секция.
-func (u *UI) Accordion(id string, items []AccordionItem, openIndex *int, opts ...Option) bool {
-	return u.ctx.Accordion(id, items, openIndex, opts...)
+// Accordion рисует группу сворачиваемых секций с независимым состоянием раскрытия по строковым ID.
+func (u *UI) Accordion(id string, items []AccordionItem, openIDs map[string]bool, opts ...Option) bool {
+	return u.ctx.Accordion(id, items, openIDs, opts...)
 }
 
 // NumberInput рисует числовое поле с кнопками '−' и '+' (Stepper).

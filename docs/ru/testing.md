@@ -301,3 +301,4 @@ func BenchmarkFrameBudget1000Widgets(b *testing.B) {
 go test -bench BenchmarkFrameBudget -benchmem -run ^$
 ```
 Позволяет убедиться, что время кадра остаётся в пределах бюджета 16.6 мс (60 FPS), а аллокации не создают избыточного давления на сборщик мусора Go.
+

@@ -245,22 +245,18 @@ type AccordionItem struct {
 	Draw  func()
 }
 
-// Accordion рисует группу сворачиваемых секций, где одновременно открыта не более чем одна секция.
-// Если все секции закрыты, *openIndex == -1.
-func (c *Context) Accordion(id string, items []AccordionItem, openIndex *int, opts ...Option) bool {
-	if openIndex == nil {
+// Accordion рисует группу сворачиваемых секций с независимым состоянием раскрытия по строковым ID.
+// В openIDs хранится признак открытости каждой секции (true — раскрыта).
+func (c *Context) Accordion(id string, items []AccordionItem, openIDs map[string]bool, opts ...Option) bool {
+	if openIDs == nil {
 		return false
 	}
 	id = c.nextLocalID("acc", id)
 	changed := false
-	for i, it := range items {
-		exp := *openIndex == i
+	for _, it := range items {
+		exp := openIDs[it.ID]
 		if c.Collapsible(id+":"+it.ID, it.Title, &exp, it.Draw, opts...) {
-			if exp {
-				*openIndex = i
-			} else if *openIndex == i {
-				*openIndex = -1
-			}
+			openIDs[it.ID] = exp
 			changed = true
 		}
 	}

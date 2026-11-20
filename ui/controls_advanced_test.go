@@ -95,7 +95,7 @@ func TestSplitPaneAndAccordion(t *testing.T) {
 		t.Fatalf("expected split ratio to increase after dragging right, got %v", ratio)
 	}
 
-	openIdx := 0
+	openIDs := map[string]bool{"a1": true}
 	items := []AccordionItem{
 		{ID: "a1", Title: "One", Draw: func() {}},
 		{ID: "a2", Title: "Two", Draw: func() {}},
@@ -104,10 +104,10 @@ func TestSplitPaneAndAccordion(t *testing.T) {
 	// Заголовок 1 занимает y=[0..34], контент ~ пустой (padding 16px => y=[34..50]), заголовок 2 начинается около y=50
 	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 40, Y: 60})
 	ctx.Render(func(c *Context) {
-		c.Accordion("acc", items, &openIdx, Width(300))
+		c.Accordion("acc", items, openIDs, Width(300))
 	})
-	if openIdx != 1 {
-		t.Fatalf("expected accordion openIdx=1, got %d", openIdx)
+	if !openIDs["a2"] {
+		t.Fatalf("expected accordion openIDs[a2]=true, got %v", openIDs)
 	}
 }
 
@@ -326,5 +326,112 @@ func TestDrawerSides(t *testing.T) {
 		t.Fatalf("expected DrawerTop to close on outside click")
 	}
 }
+
+func TestKeyBasedStateControls(t *testing.T) {
+	ctx := newTestContext(600, 500)
+
+	// 1. SelectItems helper
+	items := SelectItems("Альфа", "Бета", "Гамма")
+	if len(items) != 3 || items[0].Key != "Альфа" || items[0].Label != "Альфа" {
+		t.Fatalf("некорректный результат SelectItems: %+v", items)
+	}
+
+	// 2. Select и ComboBox с выбором по ключу
+	selKey := "k2"
+	customItems := []SelectItem{
+		{Key: "k1", Label: "Ключ 1", Icon: "<svg></svg>"},
+		{Key: "k2", Label: "Ключ 2"},
+		{Key: "k3", Label: "Ключ 3"},
+	}
+
+	// Nil selected
+	if ctx.Select("sel_nil", customItems, nil) {
+		t.Fatal("Select с nil selected должен возвращать false")
+	}
+
+	// Рендерим начальный кадр
+	ctx.Render(func(c *Context) {
+		c.Select("sel_test", customItems, &selKey, Width(200))
+	})
+
+	// Навигация клавишей KeyDown при закрытом списке: k2 -> k3
+	ctx.FocusID = "sel_test"
+	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: KeyDown})
+	var changed bool
+	ctx.Render(func(c *Context) {
+		if c.Select("sel_test", customItems, &selKey, Width(200)) {
+			changed = true
+		}
+	})
+	if !changed || selKey != "k3" {
+		t.Fatalf("ожидался выбор selKey=k3 после KeyDown, получено %q (changed=%v)", selKey, changed)
+	}
+
+	// Навигация KeyHome: k3 -> k1
+	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: KeyHome})
+	var changedHome bool
+	ctx.Render(func(c *Context) {
+		if c.Select("sel_test", customItems, &selKey, Width(200)) {
+			changedHome = true
+		}
+	})
+	if !changedHome || selKey != "k1" {
+		t.Fatalf("ожидался выбор selKey=k1 после KeyHome, получено %q", selKey)
+	}
+
+	// 3. MultiSelect и CheckComboBox на map[string]bool
+	selMap := map[string]bool{"k1": true}
+	if ctx.MultiSelect("ms_nil", customItems, nil) {
+		t.Fatal("MultiSelect с nil selectedIDs должен возвращать false")
+	}
+
+	ctx.Render(func(c *Context) {
+		c.MultiSelect("ms_test", customItems, selMap, Width(200))
+		c.CheckComboBox("ccb_test", customItems, selMap, Width(200))
+	})
+	if !selMap["k1"] {
+		t.Fatal("ожидалось сохранение k1=true в selMap")
+	}
+
+	// 4. Accordion с поддержкой одновременного раскрытия секций
+	accMap := map[string]bool{"s1": true, "s2": true}
+	s1Drawn := false
+	s2Drawn := false
+	accItems := []AccordionItem{
+		{ID: "s1", Title: "Секция 1", Draw: func() { s1Drawn = true }},
+		{ID: "s2", Title: "Секция 2", Draw: func() { s2Drawn = true }},
+	}
+	ctx.Render(func(c *Context) {
+		c.Accordion("acc_test", accItems, accMap)
+	})
+	if !s1Drawn || !s2Drawn {
+		t.Fatalf("в Accordion с map[string]bool должны одновременно отрисовываться обе раскрытые секции (s1=%v, s2=%v)", s1Drawn, s2Drawn)
+	}
+
+	// 5. RadioButton с выбором по строковому ключу
+	radioVal := "optA"
+	if ctx.RadioButton("rad_nil", "Лейбл", nil, "optB") {
+		t.Fatal("RadioButton с nil selected должен возвращать false")
+	}
+
+	// Клик по радиокнопке
+	ctx.MouseX = 10
+	ctx.MouseY = 10
+	ctx.MousePressed = true
+	ctx.Render(func(c *Context) {
+		c.RadioButton("rad_test", "Опция B", &radioVal, "optB")
+	})
+	ctx.MouseReleased = true
+	var changedRadio bool
+	ctx.Render(func(c *Context) {
+		if c.RadioButton("rad_test", "Опция B", &radioVal, "optB") {
+			changedRadio = true
+		}
+	})
+	if !changedRadio || radioVal != "optB" {
+		t.Fatalf("ожидался выбор radioVal=optB, получено %q (changed=%v)", radioVal, changedRadio)
+	}
+}
+
 
 

@@ -137,6 +137,21 @@ func TestCheckboxAndRadioGroup(t *testing.T) {
 	if changed {
 		t.Fatal("Disabled Checkbox не должен меняться")
 	}
+
+	// Проверка RadioButton с выбором по строковому ключу
+	radioSel := "opt1"
+	ctx.MouseX, ctx.MouseY = 8, 8
+	ctx.MousePressed = true
+	ctx.beginFrame()
+	ctx.RadioButton("rb2", "Опция 2", &radioSel, "opt2")
+	ctx.endFrame()
+	ctx.MouseReleased = true
+	ctx.beginFrame()
+	changed = ctx.RadioButton("rb2", "Опция 2", &radioSel, "opt2")
+	ctx.endFrame()
+	if !changed || radioSel != "opt2" {
+		t.Fatalf("ожидалось radioSel=opt2, получено %q (changed=%v)", radioSel, changed)
+	}
 }
 
 func TestTabBarEvents(t *testing.T) {

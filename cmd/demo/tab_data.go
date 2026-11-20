@@ -176,7 +176,7 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 						ui.Label("CPU ~0% в простое, Pure Go", anyui.FontSize(12), anyui.TextColor(th.TextMuted))
 					},
 				},
-			}, &st.accordionIdx)
+			}, st.accordionOpen)
 		}, anyui.Height(280))
 	})
 }

@@ -76,8 +76,8 @@ type demoState struct {
 	digitsVal    string
 	readOnlyVal  string
 	notesVal     string
-	selectIdx    int
-	comboIdx     int
+	selectKey    string
+	comboKey     string
 	listSelected int
 	listItems    []string
 
@@ -104,7 +104,7 @@ type demoState struct {
 	treeSelected    string
 	splitRatio      float32
 	collapsibleOpen bool
-	accordionIdx    int
+	accordionOpen   map[string]bool
 	numVal          float64
 	sliderVal       float32
 	rangeLow        float32
@@ -156,8 +156,8 @@ func newDemoState() *demoState {
 		phoneMaskVal: "+7 (999) 123-45-67",
 		dateMaskVal:  "17.11.2026",
 		ipMaskVal:    "192.168.001.010",
-		selectIdx:   0,
-		comboIdx:    2,
+		selectKey:   "win11",
+		comboKey:    "win10",
 		listItems:   listItems,
 		sampleImg:       makeSampleImage(96, 96),
 		contextLog:      "Нажмите ПКМ по области ниже для ContextMenu",
@@ -169,7 +169,7 @@ func newDemoState() *demoState {
 		treeSelected:    "f_data",
 		splitRatio:      0.45,
 		collapsibleOpen: true,
-		accordionIdx:    0,
+		accordionOpen:   map[string]bool{"sec1": true},
 		numVal:          15.0,
 		sliderVal:       62,
 		formHost:        "api.example.com",

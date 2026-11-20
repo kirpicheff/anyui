@@ -13,7 +13,7 @@ type desktopTabState struct {
 	followTail    bool
 	logs          []anyui.LogEntry
 	dt            time.Time
-	multiSel      []bool
+	multiSel      map[string]bool
 	tags          []string
 	listMultiSel  map[int]bool
 	listMultiChk  []bool
@@ -31,7 +31,7 @@ var deskTab = desktopTabState{
 	page:       2,
 	followTail: true,
 	dt:         time.Now(),
-	multiSel:   []bool{true, false, true, false, false},
+	multiSel:   map[string]bool{"go": true, "cpp": true},
 	tags:       []string{"Go", "AnyUI", "Desktop"},
 	listMultiSel: map[int]bool{0: true},
 	listMultiChk: []bool{true, false, true, false, false, false},
@@ -172,8 +172,15 @@ func (st *demoState) drawTabDesktop(ui *anyui.UI) {
 			// 4. DateTimePicker, MultiSelect и TagInput
 			ui.Label("DateTimePicker, MultiSelect и TagInput", anyui.FontSize(13), anyui.Bold())
 			ui.DateTimePicker("demo_dtp", &deskTab.dt)
+			msItems := []anyui.SelectItem{
+				{Key: "go", Label: "Go"},
+				{Key: "rust", Label: "Rust"},
+				{Key: "cpp", Label: "C++"},
+				{Key: "ts", Label: "TypeScript"},
+				{Key: "py", Label: "Python"},
+			}
 			ui.Row(12, 36, func() {
-				ui.MultiSelect("demo_ms", []string{"Go", "Rust", "C++", "TypeScript", "Python"}, &deskTab.multiSel, anyui.Width(260))
+				ui.MultiSelect("demo_ms", msItems, deskTab.multiSel, anyui.Width(260))
 				ui.TagInput("demo_tags", &deskTab.tags, "Введите тег и Enter...", anyui.Flex(1))
 			})
 

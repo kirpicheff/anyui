@@ -46,9 +46,25 @@ func ComputeVisibleRange(scrollY, viewH, itemH, count int) (int, int) {
 	return start, end
 }
 
+// SelectItem описывает элемент выпадающего списка с устойчивым строковым ключом, подписью и опциональной иконкой.
+type SelectItem struct {
+	Key   string
+	Label string
+	Icon  string
+}
+
+// SelectItems создает срез SelectItem из списка строк, где Key и Label совпадают.
+func SelectItems(labels ...string) []SelectItem {
+	items := make([]SelectItem, len(labels))
+	for i, l := range labels {
+		items[i] = SelectItem{Key: l, Label: l}
+	}
+	return items
+}
+
 // Select рисует выпадающий список (при Searchable(true) — ComboBox с фильтром поиска)
-// и возвращает true при изменении выбранного индекса.
-func (c *Context) Select(id string, items []string, selected *int, opts ...Option) bool {
+// и возвращает true при изменении выбранного ключа.
+func (c *Context) Select(id string, items []SelectItem, selected *string, opts ...Option) bool {
 	if selected == nil {
 		return false
 	}
@@ -102,21 +118,42 @@ func (c *Context) Select(id string, items []string, selected *int, opts ...Optio
 	}
 	c.Canvas.DrawRoundedBox(r, c.Sf(rad), bg, 1.0, borderCol)
 
+	var selectedItem *SelectItem
+	selectedIdx := -1
+	if *selected != "" {
+		for i := range items {
+			if items[i].Key == *selected {
+				selectedItem = &items[i]
+				selectedIdx = i
+				break
+			}
+		}
+	}
+
 	label := "Выберите..."
 	textCol := c.Theme.TextMuted
-	if *selected >= 0 && *selected < len(items) {
-		label = items[*selected]
+	var iconSVG string
+	if selectedItem != nil {
+		label = selectedItem.Label
 		textCol = c.Theme.TextPrimary
+		iconSVG = selectedItem.Icon
 	}
 	if st.Disabled {
 		textCol = c.Theme.TextMuted
+	}
+
+	contentX := r.X + c.S(12)
+	if iconSVG != "" {
+		iconSz := c.S(16)
+		c.Canvas.DrawSVG(iconSVG, contentX, r.Y+(r.H-iconSz)/2, iconSz, textCol)
+		contentX += iconSz + c.S(6)
 	}
 
 	if c.Font != nil {
 		pxSize := c.S(14)
 		_, th := c.Font.MeasureTextStyled(label, pxSize, st.FontStyle)
 		c.Canvas.PushClip(render.Rect{X: r.X + c.S(10), Y: r.Y, W: r.W - c.S(32), H: r.H})
-		c.Font.DrawTextStyled(c.Canvas, r.X+c.S(12), r.Y+(r.H-th)/2, label, pxSize, textCol, st.FontStyle)
+		c.Font.DrawTextStyled(c.Canvas, contentX, r.Y+(r.H-th)/2, label, pxSize, textCol, st.FontStyle)
 		c.Canvas.PopClip()
 	}
 
@@ -136,50 +173,51 @@ func (c *Context) Select(id string, items []string, selected *int, opts ...Optio
 				c.openState[id] = true
 				c.RequestRedraw()
 			case KeyDown:
-				if *selected < len(items)-1 {
-					*selected++
+				if selectedIdx < len(items)-1 {
+					*selected = items[selectedIdx+1].Key
 					changed = true
 					c.RequestRedraw()
 				}
 			case KeyUp:
-				if *selected > 0 {
-					*selected--
+				if selectedIdx > 0 {
+					*selected = items[selectedIdx-1].Key
 					changed = true
 					c.RequestRedraw()
-				} else if *selected < 0 {
-					*selected = 0
+				} else if selectedIdx < 0 && len(items) > 0 {
+					*selected = items[0].Key
 					changed = true
 					c.RequestRedraw()
 				}
 			case KeyHome:
-				if *selected != 0 {
-					*selected = 0
+				if len(items) > 0 && *selected != items[0].Key {
+					*selected = items[0].Key
 					changed = true
 					c.RequestRedraw()
 				}
 			case KeyEnd:
-				if *selected != len(items)-1 {
-					*selected = len(items) - 1
+				lastIdx := len(items) - 1
+				if len(items) > 0 && *selected != items[lastIdx].Key {
+					*selected = items[lastIdx].Key
 					changed = true
 					c.RequestRedraw()
 				}
 			case KeyPageUp:
-				nxt := *selected - 6
+				nxt := selectedIdx - 6
 				if nxt < 0 {
 					nxt = 0
 				}
-				if nxt != *selected {
-					*selected = nxt
+				if nxt >= 0 && nxt < len(items) && *selected != items[nxt].Key {
+					*selected = items[nxt].Key
 					changed = true
 					c.RequestRedraw()
 				}
 			case KeyPageDown:
-				nxt := *selected + 6
+				nxt := selectedIdx + 6
 				if nxt >= len(items) {
 					nxt = len(items) - 1
 				}
-				if nxt != *selected {
-					*selected = nxt
+				if nxt >= 0 && nxt < len(items) && *selected != items[nxt].Key {
+					*selected = items[nxt].Key
 					changed = true
 					c.RequestRedraw()
 				}
@@ -248,7 +286,7 @@ func (c *Context) Select(id string, items []string, selected *int, opts ...Optio
 
 			var filtered []int
 			for idx, it := range items {
-				if filterText == "" || strings.Contains(strings.ToLower(it), filterText) {
+				if filterText == "" || strings.Contains(strings.ToLower(it.Label), filterText) || strings.Contains(strings.ToLower(it.Key), filterText) {
 					filtered = append(filtered, idx)
 				}
 			}
@@ -270,7 +308,7 @@ func (c *Context) Select(id string, items []string, selected *int, opts ...Optio
 			if c.FocusID == id && len(filtered) > 0 {
 				curPos := -1
 				for p, origIdx := range filtered {
-					if origIdx == *selected {
+					if items[origIdx].Key == *selected {
 						curPos = p
 						break
 					}
@@ -282,8 +320,9 @@ func (c *Context) Select(id string, items []string, selected *int, opts ...Optio
 					if np >= len(filtered) {
 						np = len(filtered) - 1
 					}
-					if *selected != filtered[np] {
-						*selected = filtered[np]
+					targetKey := items[filtered[np]].Key
+					if *selected != targetKey {
+						*selected = targetKey
 						changed = true
 					}
 					if np*itemH < si.y {
@@ -343,27 +382,35 @@ func (c *Context) Select(id string, items []string, selected *int, opts ...Optio
 				ir := render.Rect{X: listRect.X, Y: iy, W: listRect.W, H: itemH}
 				c.RegisterHit(id+":opt:"+strconv.Itoa(origIdx), ir, platform.CursorHand)
 				itemHover := ir.Contains(c.MouseX, c.MouseY)
+				isSelectedItem := *selected == items[origIdx].Key
 				if itemHover {
 					c.nextCursor = platform.CursorHand
 					c.Canvas.FillRoundedRect(ir, c.Sf(4), c.Theme.Surface)
 					if c.MousePressed {
-						if *selected != origIdx {
-							*selected = origIdx
+						if *selected != items[origIdx].Key {
+							*selected = items[origIdx].Key
 							changed = true
 						}
 						c.openState[id] = false
 						c.RequestRedraw()
 					}
-				} else if *selected == origIdx {
+				} else if isSelectedItem {
 					c.Canvas.FillRoundedRect(ir, c.Sf(4), c.Theme.Accent.WithAlpha(45))
 				}
+
+				rowX := ir.X + c.S(10)
+				if items[origIdx].Icon != "" {
+					icSz := c.S(14)
+					c.Canvas.DrawSVG(items[origIdx].Icon, rowX, ir.Y+(ir.H-icSz)/2, icSz, c.Theme.TextMuted)
+					rowX += icSz + c.S(6)
+				}
 				if c.Font != nil {
-					_, th := c.Font.MeasureText(items[origIdx], pxSize)
+					_, th := c.Font.MeasureText(items[origIdx].Label, pxSize)
 					col := c.Theme.TextPrimary
-					if *selected == origIdx {
+					if isSelectedItem {
 						col = c.Theme.Accent
 					}
-					c.Font.DrawText(c.Canvas, ir.X+c.S(10), ir.Y+(ir.H-th)/2, items[origIdx], pxSize, col)
+					c.Font.DrawText(c.Canvas, rowX, ir.Y+(ir.H-th)/2, items[origIdx].Label, pxSize, col)
 				}
 			}
 			c.Canvas.PopClip()

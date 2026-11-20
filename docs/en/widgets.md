@@ -33,11 +33,16 @@ ui.Checkbox("agree", "I accept the terms", &agreed)
 
 ### `RadioButton` and `RadioGroup`
 - **Signatures:**
-  - `ui.RadioButton(id, label string, selected bool, opts ...Option) bool`
+  - `ui.RadioButton(id, label string, selected *string, value string, opts ...Option) bool`
   - `ui.RadioGroup(id string, options []string, selected *int, opts ...Option) bool`
 - **Example:**
 ```go
-ui.RadioGroup("theme", []string{"Deep Navy", "Dark", "Light"}, &themeIdx)
+// Key-based individual radio buttons
+ui.RadioButton("mode_perf", "Performance", &mode, "perf")
+ui.RadioButton("mode_eco", "Power saving", &mode, "eco")
+
+// Radio group
+ui.RadioGroup("theme", []string{"Navy", "Dark", "Light"}, &themeIdx)
 ```
 
 ### `Toggle`
@@ -122,12 +127,14 @@ if ui.Hyperlink("docs_link", "Open Documentation") {
 ## Lists & Navigation
 
 ### `Select` and `ComboBox`
+- **Item Model:** `anyui.SelectItem{Key string, Label string, Icon string}` (or convenience helper `anyui.SelectItems("Item 1", "Item 2")`).
 - **Signatures:**
-  - `ui.Select(id string, items []string, selected *int, opts ...Option) bool`
-  - `ui.ComboBox(id string, items []string, selected *int, opts ...Option) bool` (with search/filter input)
+  - `ui.Select(id string, items []anyui.SelectItem, selected *string, opts ...Option) bool`
+  - `ui.ComboBox(id string, items []anyui.SelectItem, selected *string, opts ...Option) bool` (with search/filter input)
 - **Example:**
 ```go
-ui.ComboBox("country", countries, &countryIdx, anyui.Width(260))
+countries := anyui.SelectItems("United States", "Germany", "Japan")
+ui.ComboBox("country", countries, &countryKey, anyui.Width(260))
 ```
 
 ### `ListView`
@@ -316,7 +323,10 @@ Collapsible sections:
 ui.Collapsible("sec1", "Advanced", &expanded, func() {
 	ui.Label("Section content")
 })
-ui.Accordion("acc", items, &openIndex)
+
+// Accordion with map of opened section IDs (supports opening multiple sections simultaneously)
+openSections := map[string]bool{"sec1": true}
+ui.Accordion("acc", items, openSections)
 ```
 
 ### `TabBar` Drag & Detach
@@ -464,7 +474,7 @@ ui.StatusBar("sb", []anyui.StatusBarSection{{Text: "Ready", Flex: 1}, {Text: "UT
 - `ui.TimePicker(id, &t, opts...)` and `ui.DateTimePicker(id, &dt, opts...)`: `HH:MM:SS` time selection with `+`/`-` buttons and mouse wheel support.
 
 ### `MultiSelect` / `CheckComboBox` and `TagInput`
-- `ui.MultiSelect(id, items, &selected, opts...)` (alias `CheckComboBox`): dropdown with checkboxes, search, "Select All / Clear", and tag/summary display.
+- `ui.MultiSelect(id, items, selectedIDs, opts...)` (alias `CheckComboBox`): dropdown with checkboxes using `map[string]bool`, search, "Select All / Clear", and tag/summary display. Accepts `[]anyui.SelectItem`.
 - `ui.TagInput(id, &tags, placeholder, opts...)`: tag editor (add with `Enter` or `,`, remove with `x` or `Backspace`).
 
 ### Multi-Selection Variants: `ListViewEx`, `TreeViewEx`, `TableEx`

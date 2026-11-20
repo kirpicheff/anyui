@@ -182,8 +182,12 @@ func TestListViewTreeViewSelectKeyboardNav(t *testing.T) {
 			Children: []*TreeNode{{ID: "child1", Label: "Child 1"}},
 		},
 	}
-	selIdx := 0
-	items := []string{"Один", "Два", "Три"}
+	selKey := "one"
+	items := []SelectItem{
+		{Key: "one", Label: "Один"},
+		{Key: "two", Label: "Два"},
+		{Key: "three", Label: "Три"},
+	}
 
 	// ListView: фокус и KeyDown
 	ctx.FocusID = "lv"
@@ -212,14 +216,14 @@ func TestListViewTreeViewSelectKeyboardNav(t *testing.T) {
 		t.Fatalf("TreeView: ожидалось treeSel=child1, получено %q", treeSel)
 	}
 
-	// Select: фокус, KeyDown меняет выбранный индекс, KeySpace открывает
+	// Select: фокус, KeyDown меняет выбранный ключ, KeySpace открывает
 	ctx.FocusID = "sel"
 	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: KeyDown})
 	ctx.Render(func(c *Context) {
-		c.Select("sel", items, &selIdx, Width(200))
+		c.Select("sel", items, &selKey, Width(200))
 	})
-	if selIdx != 1 {
-		t.Fatalf("Select: ожидалось selIdx=1 после KeyDown, получено %d", selIdx)
+	if selKey != "two" {
+		t.Fatalf("Select: ожидалось selKey=two после KeyDown, получено %q", selKey)
 	}
 }
 

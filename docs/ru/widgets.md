@@ -33,11 +33,16 @@ ui.Checkbox("agree", "Принимаю условия", &agreed)
 
 ### `RadioButton` и `RadioGroup`
 - **Сигнатуры:**
-  - `ui.RadioButton(id, label string, selected bool, opts ...Option) bool`
+  - `ui.RadioButton(id, label string, selected *string, value string, opts ...Option) bool`
   - `ui.RadioGroup(id string, options []string, selected *int, opts ...Option) bool`
 - **Пример:**
 ```go
-ui.RadioGroup("theme", []string{"Deep Navy", "Dark", "Light"}, &themeIdx)
+// Одиночные переключатели по ключу
+ui.RadioButton("mode_perf", "Производительность", &mode, "perf")
+ui.RadioButton("mode_eco", "Энергосбережение", &mode, "eco")
+
+// Группа переключателей
+ui.RadioGroup("theme", []string{"Navy", "Dark", "Light"}, &themeIdx)
 ```
 
 ### `Toggle`
@@ -122,12 +127,14 @@ if ui.Hyperlink("docs_link", "Открыть документацию") {
 ## Списки и навигация
 
 ### `Select` и `ComboBox`
+- **Модель элементов:** `anyui.SelectItem{Key string, Label string, Icon string}` (или хелпер `anyui.SelectItems("Пункт 1", "Пункт 2")`).
 - **Сигнатуры:**
-  - `ui.Select(id string, items []string, selected *int, opts ...Option) bool`
-  - `ui.ComboBox(id string, items []string, selected *int, opts ...Option) bool` (с полем фильтрации/поиска)
+  - `ui.Select(id string, items []anyui.SelectItem, selected *string, opts ...Option) bool`
+  - `ui.ComboBox(id string, items []anyui.SelectItem, selected *string, opts ...Option) bool` (с полем фильтрации/поиска)
 - **Пример:**
 ```go
-ui.ComboBox("country", countries, &countryIdx, anyui.Width(260))
+countries := anyui.SelectItems("Россия", "Казахстан", "Беларусь")
+ui.ComboBox("country", countries, &countryKey, anyui.Width(260))
 ```
 
 ### `ListView`
@@ -317,7 +324,10 @@ ui.SplitPane("split", anyui.SplitHorizontal, &ratio, func() {
 ui.Collapsible("sec1", "Дополнительно", &expanded, func() {
 	ui.Label("Содержимое секции")
 })
-ui.Accordion("acc", items, &openIndex)
+
+// Аккордеон со словарем открытых секций (поддержка независимого открытия нескольких секций)
+openSections := map[string]bool{"sec1": true}
+ui.Accordion("acc", items, openSections)
 ```
 
 ### Расширение `TabBar` (Drag & Detach)
@@ -470,7 +480,7 @@ ui.StatusBar("sb", []anyui.StatusBarSection{{Text: "Готово", Flex: 1}, {Te
 - `ui.TimePicker(id, &t, opts...)` и `ui.DateTimePicker(id, &dt, opts...)`: выбор времени `ЧЧ:ММ:СС` с кнопками `+`/`-` и колесом мыши.
 
 ### `MultiSelect` / `CheckComboBox` и `TagInput`
-- `ui.MultiSelect(id, items, &selected, opts...)` (алиас `CheckComboBox`): выпадающий список с чекбоксами, поиском, кнопками «Выбрать все / Сбросить» и отображением тегов/сводки.
+- `ui.MultiSelect(id, items, selectedIDs, opts...)` (алиас `CheckComboBox`): выпадающий список с чекбоксами на базе `map[string]bool`, поиском, кнопками «Выбрать все / Сбросить» и отображением тегов/сводки. Принимает `[]anyui.SelectItem`.
 - `ui.TagInput(id, &tags, placeholder, opts...)`: ввод тегов (добавление по `Enter` или `,`, удаление по `x` или `Backspace`).
 
 ### Расширенный мультивыбор: `ListViewEx`, `TreeViewEx`, `TableEx`
