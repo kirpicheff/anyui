@@ -12,7 +12,7 @@ All widgets are invoked inside `drawFn(ui *anyui.UI)` in Immediate Mode. Use fun
 - **Signatures:**
   - `ui.Button(id, label string, opts ...Option) bool`
   - `ui.IconButton(id, svg string, opts ...Option) bool`
-- **Options:** `Primary()`, `Secondary()`, `Danger()`, `Ghost()`, `Bg(c)`, `HoverBg(c)`, `BorderColor(c)`, `HoverBorderColor(c)`, `TextColor(c)`, `HoverTextColor(c)`, `LetterSpacing(dp)`, `TextShadow(ox, oy, blur, c)`, `Icon(svg)`, `Width(dp)`, `Height(dp)`, `Radius(dp)`, `Disabled(bool)`. When `Bg` is fully transparent (`A == 0`), hover and pressed backgrounds stay transparent (unless `HoverBg` is specified).
+- **Options:** `Primary(enabled ...bool)`, `Secondary()`, `Danger()`, `Ghost(enabled ...bool)`, `Bg(c)`, `HoverBg(c)`, `BorderColor(c)`, `HoverBorderColor(c)`, `TextColor(c)`, `HoverTextColor(c)`, `LetterSpacing(dp)`, `TextShadow(ox, oy, blur, c)`, `Icon(svg)`, `Width(dp)`, `Height(dp)`, `Radius(dp)`, `Disabled(enabled ...bool)`. When `Bg` is fully transparent (`A == 0`), hover and pressed backgrounds stay transparent (unless `HoverBg` is specified).
 - **Example:**
 ```go
 if ui.Button("save", "Save", anyui.Primary(), anyui.Icon(saveSVG)) {
@@ -25,7 +25,7 @@ if ui.IconButton("close", closeSVG, anyui.Ghost()) {
 
 ### `Checkbox`
 - **Signature:** `ui.Checkbox(id, label string, checked *bool, opts ...Option) bool`
-- **Options:** `Indeterminate(bool)`, `Disabled(bool)`, `FontSize(dp)`, `TextColor(c)`, `Radius(dp)`.
+- **Options:** `Indeterminate(enabled ...bool)`, `Disabled(enabled ...bool)`, `FontSize(dp)`, `TextColor(c)`, `Radius(dp)`.
 - **Example:**
 ```go
 ui.Checkbox("agree", "I accept the terms", &agreed)
@@ -54,7 +54,7 @@ ui.Toggle("autostart", "Launch on startup", &autoStart)
 ### `TextInput`
 - **Signature:** `ui.TextInput(id string, value *string, placeholder string, opts ...Option) bool`
 - **Features:** accurate click-to-position cursor, mouse selection, `Shift + Arrows`, word navigation/deletion (`Ctrl + Left/Right`, `Ctrl + Shift + Left/Right`, `Ctrl + Backspace/Delete`), double-click (word) and triple-click (all text), `Ctrl+A / C / V / X`, `Undo` / `Redo` (`Ctrl+Z` / `Ctrl+Y` / `Ctrl+Shift+Z`), built-in right-click context menu.
-- **Options:** `Password()`, `PasswordToggle(visible ...*bool)`, `ReadOnly(bool)`, `Clearable(bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `Error(string)`, `FocusBorderColor(c)`, `TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`, `Disabled(bool)`, `Width(dp)`.
+- **Options:** `Password()`, `PasswordToggle(visible ...*bool)`, `ReadOnly(enabled ...bool)`, `Clearable(enabled ...bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `Error(string)`, `FocusBorderColor(c)`, `TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`, `Disabled(enabled ...bool)`, `Width(dp)`.
 - **Built-in Password Visibility Toggle (PasswordToggle):**
   - `anyui.PasswordToggle()` or `anyui.PasswordToggle(&showPassword)` renders a clickable eye icon **inside** the right edge of the input field (automatically reserving inner `rightOffset`).
   - Clicking the eye toggles symbol masking (`••••••••` / plain text) and switches the icon between eye and eye-off.
@@ -103,7 +103,7 @@ ui.TextArea("notes", &notes, "Comment...",
 
 ### `Label`, `SelectableLabel`, and `Hyperlink`
 - **Signatures:**
-  - `ui.Label(text string, opts ...Option)` — static text with `WordWrap(true)` (word boundary wrapping by spaces), `Ellipsis(true)`, text alignment (`TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`), `LetterSpacing(dp)`, and `TextShadow(offsetX, offsetY, blur, col)` options.
+  - `ui.Label(text string, opts ...Option)` — static text with `WordWrap(enabled ...bool)` (word boundary wrapping by spaces), `Ellipsis(true)`, text alignment (`TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`), `LetterSpacing(dp)`, and `TextShadow(offsetX, offsetY, blur, col)` options.
   - `ui.SelectableLabel(id, text string, opts ...Option)` — selectable static text (including double/triple-click), `Ctrl+C`/`Ctrl+A`, and right-click context menu.
   - `ui.Hyperlink(id, text string, opts ...Option) bool` — clickable link with hover underline and hand cursor.
 - **Example:**
@@ -142,7 +142,7 @@ ui.ListView("files", len(files), 36, &selectedIdx, func(i int, area anyui.Rect, 
 
 ### `Tabs` and `TabBar`
 - **Signatures:**
-  - `ui.Tabs(id string, items []string, active *int, vertical bool, opts ...Option) bool`
+  - `ui.Tabs(id string, items []string, active *int, orient anyui.Orientation, opts ...Option) bool`
   - `ui.TabBar(id string, tabs []TabItem, active *int, opts ...Option) TabBarEvent`
 - **`TabBar` Example:**
 ```go
@@ -405,7 +405,7 @@ ui.Card(func() {
 ## Extended Mouse, Keyboard & Focus Events
 
 ### `DoubleClick` and `MiddleClick`
-- `UI` and `ui.Context` expose `MousePos() (int, int)`, `MousePressed() bool` (LMB pressed this frame), `MouseDown() bool` (LMB held down), `DoubleClicked() bool`, and `MiddleClicked() bool` (`MiddleMousePressed` / `MiddleMouseDown` / `MiddleMouseReleased` on `ui.Context`).
+- `UI` and `ui.Context` expose `MousePosDp() (int, int)` (cursor position in logical dp units), `MousePosPx() (int, int)` (cursor position in physical window pixels), `MousePressed() bool` (LMB pressed this frame), `MouseDown() bool` (LMB held down), `DoubleClicked() bool`, and `MiddleClicked() bool` (`MiddleMousePressed` / `MiddleMouseDown` / `MiddleMouseReleased` on `ui.Context`).
 - `TableEvent` returns `RowDoubleClicked` and `RowMiddleClicked` (`-1` if none):
 ```go
 ev := ui.Table("tbl", cols, len(rows), &sel, &sort, drawCell)

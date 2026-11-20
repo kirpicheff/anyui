@@ -506,10 +506,11 @@ func (c *Context) ListView(id string, count int, itemHeightDp int, selected *int
 }
 
 // Tabs рисует статические горизонтальные вкладки или вертикальное боковое меню.
-func (c *Context) Tabs(id string, items []string, active *int, vertical bool, opts ...Option) bool {
+func (c *Context) Tabs(id string, items []string, active *int, orient Orientation, opts ...Option) bool {
 	if active == nil || len(items) == 0 {
 		return false
 	}
+	vertical := orient == Vertical
 	id = c.ResolveID("tabs", id)
 	st := ApplyOptions(opts)
 	changed := false

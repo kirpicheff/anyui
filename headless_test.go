@@ -258,7 +258,7 @@ func TestHeadlessGoldenRendering(t *testing.T) {
 		FontRegular: reg,
 		FontBold:    bold,
 		FontMono:    mono,
-		Theme:       DeepNavyTheme(),
+		Theme:       NavyTheme(),
 	})
 	if err != nil {
 		t.Fatal(err)

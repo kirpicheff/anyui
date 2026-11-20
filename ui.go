@@ -1,6 +1,7 @@
 package anyui
 
 import (
+	"errors"
 	"image"
 
 	"github.com/kirpicheff/anyui/platform"
@@ -109,6 +110,34 @@ func (u *UI) SetStrings(s Strings) {
 // Window возвращает окно, к которому привязан текущий UI-контекст.
 func (u *UI) Window() *Window {
 	return u.win
+}
+
+// ClipboardText возвращает текст из системного буфера обмена ОС.
+func (u *UI) ClipboardText() (string, error) {
+	if u == nil {
+		return "", errors.New("контекст не инициализирован")
+	}
+	if u.win != nil {
+		return u.win.ClipboardText()
+	}
+	if u.ctx != nil && u.ctx.Win != nil {
+		return u.ctx.Win.ClipboardText()
+	}
+	return "", errors.New("окно не инициализировано")
+}
+
+// SetClipboardText записывает текст в системный буфер обмена ОС.
+func (u *UI) SetClipboardText(text string) error {
+	if u == nil {
+		return errors.New("контекст не инициализирован")
+	}
+	if u.win != nil {
+		return u.win.SetClipboardText(text)
+	}
+	if u.ctx != nil && u.ctx.Win != nil {
+		return u.ctx.Win.SetClipboardText(text)
+	}
+	return errors.New("окно не инициализировано")
 }
 
 // App возвращает экземпляр приложения.
@@ -429,9 +458,30 @@ func (u *UI) SetDebugDirtyRect(enabled bool) {
 	u.ctx.SetDebugDirtyRect(enabled)
 }
 
-// MousePos возвращает текущие физические координаты курсора мыши в окне.
-func (u *UI) MousePos() (int, int) {
+// MousePosPx возвращает текущие физические координаты курсора мыши в окне (в пикселях).
+func (u *UI) MousePosPx() (int, int) {
+	if u.ctx == nil {
+		return 0, 0
+	}
 	return u.ctx.MouseX, u.ctx.MouseY
+}
+
+// MousePosDp возвращает текущие логические координаты курсора мыши в окне (в dp).
+func (u *UI) MousePosDp() (int, int) {
+	if u.ctx == nil {
+		return 0, 0
+	}
+	scale := u.ctx.Scale
+	if scale <= 0 {
+		scale = 1.0
+	}
+	pxToDp := func(px int) int {
+		if px >= 0 {
+			return int(float32(px)/scale + 0.5)
+		}
+		return int(float32(px)/scale - 0.5)
+	}
+	return pxToDp(u.ctx.MouseX), pxToDp(u.ctx.MouseY)
 }
 
 // MousePressed возвращает true, если в текущем кадре нажата левая кнопка мыши.

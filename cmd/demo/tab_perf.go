@@ -165,7 +165,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 			ui.Row(12, 54, func() {
 				ui.CanvasView(340, 50, func(c *render.Canvas, r anyui.Rect) {
 					ui.RegisterHoverArea("perf_hover_static", r, anyui.CursorHand, false)
-					mx, my := ui.MousePos()
+					mx, my := ui.MousePosPx()
 					hov := r.Contains(mx, my)
 					bg := th.Surface
 					if hov {
@@ -177,7 +177,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 				})
 				ui.CanvasView(340, 50, func(c *render.Canvas, r anyui.Rect) {
 					ui.RegisterHoverArea("perf_hover_track", r, anyui.CursorCrosshair, true)
-					mx, my := ui.MousePos()
+					mx, my := ui.MousePosPx()
 					hov := r.Contains(mx, my)
 					bg := th.Surface
 					if hov {
@@ -218,7 +218,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 					item := ci
 					ui.CanvasView(134, 34, func(c *render.Canvas, r anyui.Rect) {
 						ui.RegisterHoverArea("perf_"+item.id, r, item.cursor, false)
-						mx, my := ui.MousePos()
+						mx, my := ui.MousePosPx()
 						hov := r.Contains(mx, my)
 						bg := th.Surface
 						border := th.Border

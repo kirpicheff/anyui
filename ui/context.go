@@ -244,7 +244,7 @@ func NewContext(win platform.Window, fm *render.FontManager) *Context {
 		Win:            win,
 		Canvas:         canvas,
 		Font:           fm,
-		Theme:          DeepNavyTheme(),
+		Theme:          NavyTheme(),
 		Scale:          scale,
 		Animator:       NewAnimator(),
 		Strings:        RussianStrings(),

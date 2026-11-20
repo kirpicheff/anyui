@@ -109,7 +109,7 @@ func NewApp(cfg Config) *App {
 		if cfg.FollowSystemTheme {
 			cfg.Theme = SystemTheme()
 		} else {
-			cfg.Theme = DeepNavyTheme()
+			cfg.Theme = NavyTheme()
 		}
 	}
 	if !cfg.DarkTitle {

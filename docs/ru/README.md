@@ -8,7 +8,7 @@
 - Один корневой пакет `anyui` для построения интерфейса.
 - Нулевая нагрузка на CPU в простое (цикл сообщений `GetMessageW` пробуждается только при событиях ОС, `Dispatch` или активных анимациях).
 - Плавный движок анимаций (`Animator`) с автоматическим переходом в сон после завершения переходов.
-- Поддержка тем (`DeepNavyTheme`, `DarkTheme`, `LightTheme`) и функциональных опций стилизации (`Option`).
+- Поддержка тем (`NavyTheme`, `DarkTheme`, `LightTheme`) и функциональных опций стилизации (`Option`).
 - Навигация фокуса по `Tab` / `Shift+Tab`, подтверждение по `Enter`, сброс по `Escape`, горячие клавиши (`Shortcut`).
 - Слой оверлеев (`PushOverlay`) с блокировкой кликов под всплывающими панелями.
 
@@ -20,7 +20,7 @@ package main
 import (
 	"log"
 
-	"git.gtw.su/kirpich/anyui"
+	"github.com/kirpicheff/anyui"
 )
 
 func main() {
@@ -28,7 +28,7 @@ func main() {
 		Title:  "My App",
 		Width:  960,
 		Height: 600,
-		Theme:  anyui.DeepNavyTheme(),
+		Theme:  anyui.NavyTheme(),
 	})
 
 	name := ""

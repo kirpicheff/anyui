@@ -24,7 +24,7 @@ func main() {
 		Title:  "AnyUI Benchmark",
 		Width:  480,
 		Height: 320,
-		Theme:  anyui.DeepNavyTheme(),
+		Theme:  anyui.NavyTheme(),
 	})
 
 	text := ""

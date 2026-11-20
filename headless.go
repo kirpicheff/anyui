@@ -105,7 +105,7 @@ func NewHeadless(cfg Config, drawFn ...func(*UI)) (*Headless, error) {
 		cfg.Height = 600
 	}
 	if cfg.Theme.Bg.A == 0 && cfg.Theme.TextPrimary.A == 0 {
-		cfg.Theme = DeepNavyTheme()
+		cfg.Theme = NavyTheme()
 	}
 
 	fm, err := render.NewFontFromBytes(cfg.FontRegular)

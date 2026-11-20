@@ -5,19 +5,29 @@ import (
 	"github.com/kirpicheff/anyui/render"
 )
 
-// SplitOrientation задаёт направление разделения в SplitPane.
-type SplitOrientation uint8
+// Orientation задаёт направление ориентации элементов интерфейса (горизонтальное или вертикальное).
+type Orientation uint8
+
+const (
+	// Horizontal задаёт горизонтальную ориентацию.
+	Horizontal Orientation = iota
+	// Vertical задаёт вертикальную ориентацию.
+	Vertical
+)
+
+// SplitOrientation задаёт направление разделения в SplitPane (псевдоним Orientation).
+type SplitOrientation = Orientation
 
 const (
 	// SplitHorizontal разделяет область на левую и правую панели с вертикальным разделителем.
-	SplitHorizontal SplitOrientation = iota
+	SplitHorizontal = Horizontal
 	// SplitVertical разделяет область на верхнюю и нижнюю панели с горизонтальным разделителем.
-	SplitVertical
+	SplitVertical = Vertical
 )
 
 // SplitPane делит область на 2 панели с перетаскиваемым разделителем.
 // ratio задаёт долю первой панели в диапазоне [0.1, 0.9].
-func (c *Context) SplitPane(id string, orient SplitOrientation, ratio *float32, firstFn, secondFn func(), opts ...Option) {
+func (c *Context) SplitPane(id string, orient Orientation, ratio *float32, firstFn, secondFn func(), opts ...Option) {
 	if ratio == nil {
 		return
 	}

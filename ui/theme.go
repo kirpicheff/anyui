@@ -30,8 +30,8 @@ type Theme struct {
 	RadiusLg float32
 }
 
-// DeepNavyTheme возвращает стандартную тёмную тему в стиле AnyPort Deep Navy.
-func DeepNavyTheme() Theme {
+// NavyTheme возвращает стандартную тёмную тему в стиле AnyPort Navy.
+func NavyTheme() Theme {
 	return Theme{
 		Bg:          render.Hex(0x0F172A),
 		Surface:     render.Hex(0x162033),

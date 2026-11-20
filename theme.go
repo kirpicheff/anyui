@@ -70,9 +70,9 @@ func Hex(rgb uint32) Color {
 	return render.Hex(rgb)
 }
 
-// DeepNavyTheme возвращает стандартную тёмно-синюю тему.
-func DeepNavyTheme() Theme {
-	return ui.DeepNavyTheme()
+// NavyTheme возвращает стандартную тёмно-синюю тему.
+func NavyTheme() Theme {
+	return ui.NavyTheme()
 }
 
 // DarkTheme возвращает нейтральную тёмную тему.

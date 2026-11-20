@@ -85,9 +85,9 @@ func TestWindowSetThemeUpdatesDarkTitleAndColors(t *testing.T) {
 	if mw.darkTitle {
 		t.Fatal("для LightTheme должен устанавливаться светлый системный заголовок")
 	}
-	win.SetTheme(DeepNavyTheme())
+	win.SetTheme(NavyTheme())
 	if !mw.darkTitle {
-		t.Fatal("для DeepNavyTheme должен устанавливаться тёмный системный заголовок")
+		t.Fatal("для NavyTheme должен устанавливаться тёмный системный заголовок")
 	}
 
 	c := RGB(15, 23, 42)
@@ -132,7 +132,7 @@ func TestHandleSystemThemeChange(t *testing.T) {
 func TestThemeSwitchingAndStaticLayer(t *testing.T) {
 	mw := &stylerMockWindow{w: 900, h: 300, scale: 1.0}
 	ctx := ui.NewContext(mw, nil)
-	ctx.Theme = DeepNavyTheme()
+	ctx.Theme = NavyTheme()
 
 	staticCalls := 0
 	var win *Window
@@ -152,8 +152,8 @@ func TestThemeSwitchingAndStaticLayer(t *testing.T) {
 				if u.Button("th_dark", "Dark", Ghost(), Width(80), Height(32)) {
 					u.SetTheme(DarkTheme())
 				}
-				if u.Button("th_navy", "DeepNavy", Ghost(), Width(90), Height(32)) {
-					u.SetTheme(DeepNavyTheme())
+				if u.Button("th_navy", "Navy", Ghost(), Width(90), Height(32)) {
+					u.SetTheme(NavyTheme())
 				}
 			})
 		})
@@ -165,14 +165,14 @@ func TestThemeSwitchingAndStaticLayer(t *testing.T) {
 	}
 	win.ui = &UI{ctx: ctx, win: win}
 
-	// Стартовая отрисовка в DeepNavy
+	// Стартовая отрисовка в Navy
 	win.handleEvent(platform.Event{Type: platform.EventPaint})
-	if ctx.Theme != DeepNavyTheme() || staticCalls != 1 {
+	if ctx.Theme != NavyTheme() || staticCalls != 1 {
 		t.Fatalf("некорректное начальное состояние темы: staticCalls=%d", staticCalls)
 	}
 	bgNavy := ctx.Canvas.Pixels[0:4] // BGRA в точке (0,0)
-	if bgNavy[2] != DeepNavyTheme().Bg.R || bgNavy[1] != DeepNavyTheme().Bg.G || bgNavy[0] != DeepNavyTheme().Bg.B {
-		t.Fatalf("фон DeepNavy не совпал: got RGB(%d,%d,%d)", bgNavy[2], bgNavy[1], bgNavy[0])
+	if bgNavy[2] != NavyTheme().Bg.R || bgNavy[1] != NavyTheme().Bg.G || bgNavy[0] != NavyTheme().Bg.B {
+		t.Fatalf("фон Navy не совпал: got RGB(%d,%d,%d)", bgNavy[2], bgNavy[1], bgNavy[0])
 	}
 
 	clickAt := func(x, y int) {

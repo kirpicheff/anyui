@@ -11,7 +11,7 @@ func ExampleNewApp() {
 		Title:  "My App",
 		Width:  960,
 		Height: 600,
-		Theme:  anyui.DeepNavyTheme(),
+		Theme:  anyui.NavyTheme(),
 	})
 
 	name := ""

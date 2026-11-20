@@ -133,9 +133,9 @@ app := anyui.NewApp(anyui.Config{
 
 ## Clipboard
 
-Text and image clipboard access is available on `*anyui.Window`:
-- Text: `ClipboardText() (string, error)` / `SetClipboardText(text string) error` (used automatically by `TextInput` / `TextArea` on `Ctrl+C` / `Ctrl+V`).
-- Images: `ClipboardImage() (image.Image, error)` / `SetClipboardImage(img image.Image) error` (on Windows uses `CF_DIB` 24/32 bpp; on Linux uses PNG).
+Clipboard access is available on `*anyui.Window` and `*anyui.UI`:
+- Text: `win.ClipboardText() (string, error)` / `win.SetClipboardText(text string) error` (also directly accessible via `ui.ClipboardText()` / `ui.SetClipboardText()`; used automatically by `TextInput` / `TextArea` on `Ctrl+C` / `Ctrl+V`).
+- Images: `win.ClipboardImage() (image.Image, error)` / `win.SetClipboardImage(img image.Image) error` (on Windows uses `CF_DIB` 24/32 bpp; on Linux uses PNG).
 
 ---
 

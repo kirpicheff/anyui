@@ -132,8 +132,8 @@ func newDemoState() *demoState {
 		listItems[i] = fmt.Sprintf("Элемент списка #%03d — виртуализированная строка", i+1)
 	}
 
-	okCol := anyui.DeepNavyTheme().Success
-	warnCol := anyui.DeepNavyTheme().Warning
+	okCol := anyui.NavyTheme().Success
+	warnCol := anyui.NavyTheme().Warning
 
 	return &demoState{
 		tabs: []anyui.TabItem{
@@ -177,7 +177,7 @@ func newDemoState() *demoState {
 		formToken:       "secret-token",
 		rangeLow:        20,
 		rangeHigh:       75,
-		pickedColor:     anyui.DeepNavyTheme().Accent,
+		pickedColor:     anyui.NavyTheme().Accent,
 		pickedDate:      time.Now(),
 	}
 }
@@ -207,7 +207,7 @@ func main() {
 		Height:          780,
 		MinWidth:        820,
 		MinHeight:       560,
-		Theme:           anyui.DeepNavyTheme(),
+		Theme:           anyui.NavyTheme(),
 		AcceptDropFiles: true,
 		HideOnClose:     false,
 		OnDropFiles: func(files []string, x, y int) {
@@ -271,8 +271,8 @@ func main() {
 						ui.Badge(buildVer, anyui.Secondary())
 					})
 					ui.FlexSpacer(240)
-					if ui.Button("th_navy", "DeepNavy", anyui.Ghost(), anyui.Padding(10)) {
-						ui.SetTheme(anyui.DeepNavyTheme())
+					if ui.Button("th_navy", "Navy", anyui.Ghost(), anyui.Padding(10)) {
+						ui.SetTheme(anyui.NavyTheme())
 					}
 					if ui.Button("th_dark", "Dark", anyui.Ghost(), anyui.Padding(10)) {
 						ui.SetTheme(anyui.DarkTheme())
@@ -344,7 +344,7 @@ func main() {
 						ui.StaticLayer("demo_nav_title", func() {
 							ui.Label("Разделы", anyui.FontSize(12), anyui.TextColor(th.TextMuted), anyui.Bold())
 						})
-						ui.Tabs("nav_tabs", navItems, &st.activeNav, true, anyui.Width(210))
+						ui.Tabs("nav_tabs", navItems, &st.activeNav, anyui.Vertical, anyui.Width(210))
 						ui.Spacer(12)
 						ui.Separator()
 						ui.Spacer(6)

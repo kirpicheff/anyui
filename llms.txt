@@ -35,7 +35,7 @@ func main() {
 		Title:  "My App",
 		Width:  800,
 		Height: 500,
-		Theme:  anyui.DeepNavyTheme(),
+		Theme:  anyui.NavyTheme(),
 	})
 
 	name := ""
@@ -86,12 +86,12 @@ pixels) и автоматически масштабируются под тек
 
 # Архитектура подпакетов
 
-  - git.gtw.su/kirpich/anyui/ui — внутренний движок раскладки, фокуса, анимаций
-    и виджетов.
-  - git.gtw.su/kirpich/anyui/render — программный 2D-рендерер (BGRA),
+  - github.com/kirpicheff/anyui/ui — внутренний движок раскладки, фокуса,
+    анимаций и виджетов.
+  - github.com/kirpicheff/anyui/render — программный 2D-рендерер (BGRA),
     SDF-примитивы и кеш шрифтов.
-  - git.gtw.su/kirpich/anyui/platform — абстракция окна ОС, диалоги, трей и цикл
-    событий.
+  - github.com/kirpicheff/anyui/platform — абстракция окна ОС, диалоги, трей и
+    цикл событий.
 
 const HitClient = platform.HitClient ...
 const MsgInfo = platform.MsgInfo ...
@@ -106,11 +106,14 @@ const CursorArrow = platform.CursorArrow ...
 const AlignStart = ui.AlignStart ...
 const JustifyStart = ui.JustifyStart ...
 const DrawerLeft = ui.DrawerLeft ...
+const Horizontal = ui.Horizontal ...
 const SplitHorizontal = ui.SplitHorizontal ...
 const ToastInfo = ui.ToastInfo ...
 const ToastBottomRight = ui.ToastBottomRight ...
 const LogInfo = ui.LogInfo ...
 var ErrAlreadyRunning = errors.New("приложение уже запущено")
+func AssertGolden(t testing.TB, h *Headless, goldenName string)
+func DefaultTestFonts() (regular, bold, mono []byte)
 func IsSystemDarkTheme() bool
 func OpenFileDialog(opts FileDialogOptions) (string, bool, error)
 func OpenFilesDialog(opts FileDialogOptions) ([]string, bool, error)
@@ -147,9 +150,13 @@ type FlexItem = ui.FlexItem
 type FolderDialogOptions struct{ ... }
 type FontStyle = render.FontStyle
 type GradientStop = render.GradientStop
+type Headless struct{ ... }
+    func NewHeadless(cfg Config, drawFn ...func(*UI)) (*Headless, error)
 type HitTestResult = platform.HitTestResult
 type ImageScaleMode = render.ImageScaleMode
 type Justify = ui.Justify
+type Key = uint32
+    const KeyBackspace Key = ui.KeyBackspace ...
 type KeyEvent = ui.RawKeyEvent
 type LinearGradient = render.LinearGradient
 type LogEntry = ui.LogEntry
@@ -167,11 +174,11 @@ type NotificationIcon = platform.NotificationIcon
 type Option = ui.Option
     func AutoHeight() Option
     func Bg(c Color) Option
-    func Bold() Option
+    func Bold(enabled ...bool) Option
     func BorderColor(c Color) Option
-    func Clearable(v bool) Option
+    func Clearable(enabled ...bool) Option
     func Danger() Option
-    func Disabled(v bool) Option
+    func Disabled(enabled ...bool) Option
     func Ellipsis(v bool) Option
     func Error(text string) Option
     func FillHeight() Option
@@ -179,14 +186,14 @@ type Option = ui.Option
     func Flex(weight float32) Option
     func FocusBorderColor(c Color) Option
     func FontSize(dp int) Option
-    func Ghost() Option
+    func Ghost(enabled ...bool) Option
     func Height(dp int) Option
     func HoverBg(c Color) Option
     func HoverBorderColor(c Color) Option
     func HoverTextColor(c Color) Option
     func Icon(svg string) Option
     func IconRight(svg string) Option
-    func Indeterminate(v bool) Option
+    func Indeterminate(enabled ...bool) Option
     func InputFilter(fn func(rune) bool) Option
     func LetterSpacing(dp float32) Option
     func LineNumbers(v bool) Option
@@ -194,13 +201,13 @@ type Option = ui.Option
     func MaxWidth(dp int) Option
     func MinHeight(dp int) Option
     func MinWidth(dp int) Option
-    func Mono() Option
+    func Mono(enabled ...bool) Option
     func Padding(dp int) Option
     func Password() Option
     func PasswordToggle(visible ...*bool) Option
-    func Primary() Option
+    func Primary(enabled ...bool) Option
     func Radius(dp float32) Option
-    func ReadOnly(v bool) Option
+    func ReadOnly(enabled ...bool) Option
     func Searchable(v bool) Option
     func Secondary() Option
     func TextAlignCenter() Option
@@ -209,7 +216,8 @@ type Option = ui.Option
     func TextColor(c Color) Option
     func TextShadow(offsetX, offsetY, blur float32, c Color) Option
     func Width(dp int) Option
-    func WordWrap(v bool) Option
+    func WordWrap(enabled ...bool) Option
+type Orientation = ui.Orientation
 type PageConfig = ui.PageConfig
 type PointF = render.PointF
 type RadialGradient = render.RadialGradient
@@ -231,8 +239,8 @@ type TableSort = ui.TableSort
 type TextAlign = ui.TextAlign
 type Theme = ui.Theme
     func DarkTheme() Theme
-    func DeepNavyTheme() Theme
     func LightTheme() Theme
+    func NavyTheme() Theme
     func SystemTheme() Theme
 type TitleBarConfig = ui.TitleBarConfig
 type ToastKind = ui.ToastKind
@@ -410,6 +418,7 @@ type Window struct {
 
 func (w *Window) BringToFront()
 func (w *Window) ClipboardImage() (image.Image, error)
+func (w *Window) ClipboardText() (string, error)
 func (w *Window) Close()
 func (w *Window) Hide()
 func (w *Window) Invalidate()
@@ -422,6 +431,7 @@ func (w *Window) Position() (int, int)
 func (w *Window) Restore()
 func (w *Window) RestoreState(state WindowState)
 func (w *Window) SetClipboardImage(img image.Image) error
+func (w *Window) SetClipboardText(text string) error
 func (w *Window) SetDarkTitle(dark bool)
 func (w *Window) SetFullscreen(fullscreen bool)
 func (w *Window) SetHideOnClose(hide bool)
@@ -464,6 +474,7 @@ func (u *UI) Checkbox(id, label string, checked *bool, opts ...Option) bool
 func (u *UI) ClearGlyphCache()
 func (u *UI) ClearRemember()
 func (u *UI) ClearScaledImageCache()
+func (u *UI) ClipboardText() (string, error)
 func (u *UI) Collapsible(id, title string, expanded *bool, fn func(), opts ...Option) bool
 func (u *UI) ColorPicker(id string, col *render.Color, opts ...Option) bool
 func (u *UI) Column(gapDp int, fn func())
@@ -510,7 +521,8 @@ func (u *UI) MenuBar(id string, menus []MenuBarItem, opts ...Option)
 func (u *UI) MiddleClicked() bool
 func (u *UI) Modal(id string, open *bool, title string, fn func(), opts ...Option)
 func (u *UI) MouseDown() bool
-func (u *UI) MousePos() (int, int)
+func (u *UI) MousePosDp() (int, int)
+func (u *UI) MousePosPx() (int, int)
 func (u *UI) MousePressed() bool
 func (u *UI) MultiSelect(id string, items []string, selected *[]bool, opts ...Option) bool
 func (u *UI) NumberInput(id string, value *float64, minVal, maxVal, step float64, decimals int, ...) bool
@@ -538,6 +550,7 @@ func (u *UI) ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)
 func (u *UI) Select(id string, items []string, selected *int, opts ...Option) bool
 func (u *UI) SelectableLabel(id, text string, opts ...Option)
 func (u *UI) Separator(opts ...Option)
+func (u *UI) SetClipboardText(text string) error
 func (u *UI) SetCursor(cursor CursorType)
 func (u *UI) SetDebugDirtyRect(enabled bool)
 func (u *UI) SetFocus(id string)
@@ -562,7 +575,7 @@ func (u *UI) Strings() Strings
 func (u *UI) TabBar(id string, tabs []TabItem, active *int, opts ...Option) TabBarEvent
 func (u *UI) Table(id string, cols []TableColumn, rowCount int, selected *int, sort *TableSort, ...) TableEvent
 func (u *UI) TableEx(id string, cols []TableColumn, rowCount int, cfg *TableExConfig, ...) TableEvent
-func (u *UI) Tabs(id string, items []string, active *int, vertical bool, opts ...Option) bool
+func (u *UI) Tabs(id string, items []string, active *int, orient Orientation, opts ...Option) bool
 func (u *UI) TagInput(id string, tags *[]string, placeholder string, opts ...Option) bool
 func (u *UI) TextArea(id string, value *string, placeholder string, opts ...Option) bool
 func (u *UI) TextInput(id string, value *string, placeholder string, opts ...Option) bool

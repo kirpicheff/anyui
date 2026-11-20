@@ -80,8 +80,8 @@ func (u *UI) ListView(id string, count int, itemHeightDp int, selected *int, dra
 }
 
 // Tabs рисует статические горизонтальные вкладки или вертикальное боковое меню.
-func (u *UI) Tabs(id string, items []string, active *int, vertical bool, opts ...Option) bool {
-	return u.ctx.Tabs(id, items, active, vertical, opts...)
+func (u *UI) Tabs(id string, items []string, active *int, orient Orientation, opts ...Option) bool {
+	return u.ctx.Tabs(id, items, active, orient, opts...)
 }
 
 // TabBar рисует динамические закрываемые вкладки с кнопками '×' и '+'.

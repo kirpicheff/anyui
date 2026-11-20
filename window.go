@@ -128,6 +128,22 @@ func (w *Window) RestoreState(state WindowState) {
 	}
 }
 
+// ClipboardText возвращает текст из системного буфера обмена ОС.
+func (w *Window) ClipboardText() (string, error) {
+	if w == nil || w.platWin == nil {
+		return "", errors.New("окно не инициализировано")
+	}
+	return w.platWin.ClipboardText()
+}
+
+// SetClipboardText записывает текст в системный буфер обмена ОС.
+func (w *Window) SetClipboardText(text string) error {
+	if w == nil || w.platWin == nil {
+		return errors.New("окно не инициализировано")
+	}
+	return w.platWin.SetClipboardText(text)
+}
+
 // ClipboardImage считывает изображение из буфера обмена ОС.
 func (w *Window) ClipboardImage() (image.Image, error) {
 	if ci, ok := w.platWin.(platform.ClipboardImager); ok {

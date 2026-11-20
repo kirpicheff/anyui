@@ -143,17 +143,30 @@ func Icon(svg string) Option {
 	}
 }
 
+func optBool(enabled []bool) bool {
+	if len(enabled) == 0 {
+		return true
+	}
+	return enabled[0]
+}
+
 // Disabled переводит виджет в неактивное состояние.
-func Disabled(v bool) Option {
+func Disabled(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.Disabled = v
+		s.Disabled = val
 	}
 }
 
 // Primary задаёт акцентный стиль виджета.
-func Primary() Option {
+func Primary(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.Variant = VariantPrimary
+		if val {
+			s.Variant = VariantPrimary
+		} else {
+			s.Variant = VariantDefault
+		}
 	}
 }
 
@@ -172,23 +185,38 @@ func Danger() Option {
 }
 
 // Ghost задаёт прозрачный стиль без заливки фона в покое.
-func Ghost() Option {
+func Ghost(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.Variant = VariantGhost
+		if val {
+			s.Variant = VariantGhost
+		} else {
+			s.Variant = VariantDefault
+		}
 	}
 }
 
 // Bold выбирает полужирное начертание шрифта для текста виджета.
-func Bold() Option {
+func Bold(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.FontStyle = render.FontBold
+		if val {
+			s.FontStyle = render.FontBold
+		} else {
+			s.FontStyle = render.FontRegular
+		}
 	}
 }
 
 // Mono выбирает моноширинное начертание шрифта для текста виджета.
-func Mono() Option {
+func Mono(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.FontStyle = render.FontMono
+		if val {
+			s.FontStyle = render.FontMono
+		} else {
+			s.FontStyle = render.FontRegular
+		}
 	}
 }
 
@@ -220,23 +248,26 @@ func PasswordToggle(visible ...*bool) Option {
 }
 
 // ReadOnly запрещает редактирование текста, оставляя возможность выделения и копирования.
-func ReadOnly(v bool) Option {
+func ReadOnly(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.ReadOnly = v
+		s.ReadOnly = val
 	}
 }
 
 // Clearable добавляет кнопку быстрой очистки в правую часть поля ввода.
-func Clearable(v bool) Option {
+func Clearable(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.Clearable = v
+		s.Clearable = val
 	}
 }
 
 // Indeterminate переводит Checkbox в промежуточное (неопределённое) состояние.
-func Indeterminate(v bool) Option {
+func Indeterminate(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.Indeterminate = v
+		s.Indeterminate = val
 	}
 }
 
@@ -311,9 +342,10 @@ func Flex(weight float32) Option {
 }
 
 // WordWrap включает перенос текста по ширине (для Label и SelectableLabel).
-func WordWrap(v bool) Option {
+func WordWrap(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.WordWrap = v
+		s.WordWrap = val
 	}
 }
 

@@ -33,10 +33,10 @@ func Padding(dp int) Option { return ui.Padding(dp) }
 func Icon(svg string) Option { return ui.Icon(svg) }
 
 // Disabled переводит виджет в неактивное состояние.
-func Disabled(v bool) Option { return ui.Disabled(v) }
+func Disabled(enabled ...bool) Option { return ui.Disabled(enabled...) }
 
 // Primary задаёт акцентный стиль виджета.
-func Primary() Option { return ui.Primary() }
+func Primary(enabled ...bool) Option { return ui.Primary(enabled...) }
 
 // Secondary задаёт второстепенный стиль виджета.
 func Secondary() Option { return ui.Secondary() }
@@ -45,13 +45,13 @@ func Secondary() Option { return ui.Secondary() }
 func Danger() Option { return ui.Danger() }
 
 // Ghost задаёт прозрачный стиль без заливки фона в покое.
-func Ghost() Option { return ui.Ghost() }
+func Ghost(enabled ...bool) Option { return ui.Ghost(enabled...) }
 
 // Bold выбирает полужирное начертание шрифта для текста виджета.
-func Bold() Option { return ui.Bold() }
+func Bold(enabled ...bool) Option { return ui.Bold(enabled...) }
 
 // Mono выбирает моноширинное начертание шрифта для текста виджета.
-func Mono() Option { return ui.Mono() }
+func Mono(enabled ...bool) Option { return ui.Mono(enabled...) }
 
 // IconRight задаёт SVG-иконку справа.
 func IconRight(svg string) Option { return ui.IconRight(svg) }
@@ -63,13 +63,13 @@ func Password() Option { return ui.Password() }
 func PasswordToggle(visible ...*bool) Option { return ui.PasswordToggle(visible...) }
 
 // ReadOnly запрещает редактирование текстового поля.
-func ReadOnly(v bool) Option { return ui.ReadOnly(v) }
+func ReadOnly(enabled ...bool) Option { return ui.ReadOnly(enabled...) }
 
 // Clearable добавляет кнопку очистки в поле ввода.
-func Clearable(v bool) Option { return ui.Clearable(v) }
+func Clearable(enabled ...bool) Option { return ui.Clearable(enabled...) }
 
 // Indeterminate переводит Checkbox в промежуточное состояние.
-func Indeterminate(v bool) Option { return ui.Indeterminate(v) }
+func Indeterminate(enabled ...bool) Option { return ui.Indeterminate(enabled...) }
 
 // Searchable включает поиск в выпадающем списке.
 func Searchable(v bool) Option { return ui.Searchable(v) }
@@ -102,7 +102,7 @@ func AutoHeight() Option { return ui.AutoHeight() }
 func Flex(weight float32) Option { return ui.Flex(weight) }
 
 // WordWrap включает перенос текста по ширине (для Label и SelectableLabel).
-func WordWrap(v bool) Option { return ui.WordWrap(v) }
+func WordWrap(enabled ...bool) Option { return ui.WordWrap(enabled...) }
 
 // Ellipsis включает обрезку текста с многоточием при нехватке ширины (для Label).
 func Ellipsis(v bool) Option { return ui.Ellipsis(v) }

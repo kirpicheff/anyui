@@ -19,6 +19,14 @@ type TableEvent = ui.TableEvent
 // TreeNode описывает узел дерева для TreeView.
 type TreeNode = ui.TreeNode
 
+// Orientation задаёт направление ориентации элементов интерфейса (горизонтальное или вертикальное).
+type Orientation = ui.Orientation
+
+const (
+	Horizontal = ui.Horizontal
+	Vertical   = ui.Vertical
+)
+
 // SplitOrientation задаёт направление разделения в SplitPane.
 type SplitOrientation = ui.SplitOrientation
 

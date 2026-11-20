@@ -27,7 +27,7 @@
 - **Программный 2D-рендерер (`render`):** сглаженные SDF-примитивы, линейные и радиальные градиенты, мягкие тени (`BoxShadow`), размытие фона, растеризация SVG-иконок с покраской, LRU-кеши глифов и изображений, частичная перерисовка (dirty rectangles).
 - **Чистый Go на Windows и Linux (`CGO_ENABLED=0`):** компактный бинарник (3–5 МБ) без внешних зависимостей.
 - **Богатый набор виджетов (`ui`):** Immediate Mode API с `Button`, `TextInput`, `MaskedInput`, `TextArea`, `Select`, `ComboBox`, `MultiSelect`, `Table`, `TreeView`, `ListView`, `TabBar`, `MenuBar`, `Toolbar`, `StatusBar`, `LogView`, графиками (`Sparkline`, `LineChart`, `BarChart`), `DatePicker`, `TimePicker`, `ColorPicker`, `Modal`, `Drawer`, `SplitPane` и др.
-- **Гибкая раскладка и стилизация:** `Row`, `Column`, `RowFlex`, `ColumnFlex`, `Grid`, `FormLayout`, `Flow`, `ScrollView`, `Card`, `Page`, готовые темы (`DeepNavyTheme`, `DarkTheme`, `LightTheme`, `SystemTheme`) и функциональные опции `Option`.
+- **Гибкая раскладка и стилизация:** `Row`, `Column`, `RowFlex`, `ColumnFlex`, `Grid`, `FormLayout`, `Flow`, `ScrollView`, `Card`, `Page`, готовые темы (`NavyTheme`, `DarkTheme`, `LightTheme`, `SystemTheme`) и функциональные опции `Option`.
 - **Системная интеграция (`platform`):** системный трей, уведомления ОС, нативные диалоги файлов/папок/сообщений, буфер обмена (текст и изображения), Drag & Drop файлов, режим `Frameless` / виджет `TitleBar`, `SingleInstance`, сохранение `WindowState`, многооконность и `i18n`.
 
 ---
@@ -79,7 +79,7 @@ func main() {
 		Title:  "My App",
 		Width:  960,
 		Height: 600,
-		Theme:  anyui.DeepNavyTheme(),
+		Theme:  anyui.NavyTheme(),
 	})
 
 	name := ""

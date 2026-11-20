@@ -12,7 +12,7 @@
 - **Сигнатуры:**
   - `ui.Button(id, label string, opts ...Option) bool`
   - `ui.IconButton(id, svg string, opts ...Option) bool`
-- **Опции:** `Primary()`, `Secondary()`, `Danger()`, `Ghost()`, `Bg(c)`, `HoverBg(c)`, `BorderColor(c)`, `HoverBorderColor(c)`, `TextColor(c)`, `HoverTextColor(c)`, `LetterSpacing(dp)`, `TextShadow(ox, oy, blur, c)`, `Icon(svg)`, `Width(dp)`, `Height(dp)`, `Radius(dp)`, `Disabled(bool)`. При полностью прозрачном `Bg` (`A == 0`) подложка при наведении и нажатии остаётся прозрачной (если не задан `HoverBg`).
+- **Опции:** `Primary(enabled ...bool)`, `Secondary()`, `Danger()`, `Ghost(enabled ...bool)`, `Bg(c)`, `HoverBg(c)`, `BorderColor(c)`, `HoverBorderColor(c)`, `TextColor(c)`, `HoverTextColor(c)`, `LetterSpacing(dp)`, `TextShadow(ox, oy, blur, c)`, `Icon(svg)`, `Width(dp)`, `Height(dp)`, `Radius(dp)`, `Disabled(enabled ...bool)`. При полностью прозрачном `Bg` (`A == 0`) подложка при наведении и нажатии остаётся прозрачной (если не задан `HoverBg`).
 - **Пример:**
 ```go
 if ui.Button("save", "Сохранить", anyui.Primary(), anyui.Icon(saveSVG)) {
@@ -25,7 +25,7 @@ if ui.IconButton("close", closeSVG, anyui.Ghost()) {
 
 ### `Checkbox`
 - **Сигнатура:** `ui.Checkbox(id, label string, checked *bool, opts ...Option) bool`
-- **Опции:** `Indeterminate(bool)`, `Disabled(bool)`, `FontSize(dp)`, `TextColor(c)`, `Radius(dp)`.
+- **Опции:** `Indeterminate(enabled ...bool)`, `Disabled(enabled ...bool)`, `FontSize(dp)`, `TextColor(c)`, `Radius(dp)`.
 - **Пример:**
 ```go
 ui.Checkbox("agree", "Принимаю условия", &agreed)
@@ -54,7 +54,7 @@ ui.Toggle("autostart", "Запускать при старте ОС", &autoStart
 ### `TextInput`
 - **Сигнатура:** `ui.TextInput(id string, value *string, placeholder string, opts ...Option) bool`
 - **Возможности:** точный клик курсора, выделение мышью, `Shift + Стрелки`, навигация/удаление по словам (`Ctrl + Left/Right`, `Ctrl + Shift + Left/Right`, `Ctrl + Backspace/Delete`), двойной клик (слово) и тройной клик (весь текст), `Ctrl+A / C / V / X`, история правок `Undo` / `Redo` (`Ctrl+Z` / `Ctrl+Y` / `Ctrl+Shift+Z`), встроенное контекстное меню по ПКМ.
-- **Опции:** `Password()`, `PasswordToggle(visible ...*bool)`, `ReadOnly(bool)`, `Clearable(bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `Error(string)`, `FocusBorderColor(c)`, `TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`, `Disabled(bool)`, `Width(dp)`.
+- **Опции:** `Password()`, `PasswordToggle(visible ...*bool)`, `ReadOnly(enabled ...bool)`, `Clearable(enabled ...bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `Error(string)`, `FocusBorderColor(c)`, `TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`, `Disabled(enabled ...bool)`, `Width(dp)`.
 - **Встроенная кнопка пароля (PasswordToggle):**
   - `anyui.PasswordToggle()` или `anyui.PasswordToggle(&showPassword)` встраивает кликабельную иконку глазика прямо **внутрь** поля с правого края (с автоматическим резервированием внутреннего отступа `rightOffset`).
   - По клику на глазик маскировка символов переключается (`••••••••` / открытый текст), а иконка меняется с открытого глаза на перечёркнутый.
@@ -103,7 +103,7 @@ ui.TextArea("notes", &notes, "Комментарий...",
 
 ### `Label`, `SelectableLabel` и `Hyperlink`
 - **Сигнатуры:**
-  - `ui.Label(text string, opts ...Option)` — вывод текста с опциями `WordWrap(true)` (с аккуратным переносом по пробелам между словами), `Ellipsis(true)`, выравнивания (`TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`), `LetterSpacing(dp)` и `TextShadow(offsetX, offsetY, blur, col)`.
+  - `ui.Label(text string, opts ...Option)` — вывод текста с опциями `WordWrap(enabled ...bool)` (с аккуратным переносом по пробелам между словами), `Ellipsis(true)`, выравнивания (`TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`), `LetterSpacing(dp)` и `TextShadow(offsetX, offsetY, blur, col)`.
   - `ui.SelectableLabel(id, text string, opts ...Option)` — статический текст с выделением мышью (включая двойной/тройной клик), `Ctrl+C`/`Ctrl+A` и контекстным меню по ПКМ.
   - `ui.Hyperlink(id, text string, opts ...Option) bool` — кликабельная ссылка с подчёркиванием при наведении и курсором руки.
 - **Пример:**
@@ -142,7 +142,7 @@ ui.ListView("files", len(files), 36, &selectedIdx, func(i int, area anyui.Rect, 
 
 ### `Tabs` и `TabBar`
 - **Сигнатуры:**
-  - `ui.Tabs(id string, items []string, active *int, vertical bool, opts ...Option) bool`
+  - `ui.Tabs(id string, items []string, active *int, orient anyui.Orientation, opts ...Option) bool`
   - `ui.TabBar(id string, tabs []TabItem, active *int, opts ...Option) TabBarEvent`
 - **Пример `TabBar`:**
 ```go
@@ -404,7 +404,7 @@ ui.Card(func() {
 ## Расширенные события мыши, клавиатуры и фокуса
 
 ### Двойной клик (`DoubleClick`) и средняя кнопка мыши (`MiddleClick`)
-- В `UI` и `ui.Context` доступны методы `MousePos() (int, int)`, `MousePressed() bool` (клик ЛКМ в текущем кадре), `MouseDown() bool` (зажата ли ЛКМ), `DoubleClicked() bool` и `MiddleClicked() bool` (в `ui.Context` — `MiddleMousePressed` / `MiddleMouseDown` / `MiddleMouseReleased`).
+- В `UI` и `ui.Context` доступны методы `MousePosDp() (int, int)` (координаты курсора в логических единицах dp), `MousePosPx() (int, int)` (координаты в физических пикселях окна), `MousePressed() bool` (клик ЛКМ в текущем кадре), `MouseDown() bool` (зажата ли ЛКМ), `DoubleClicked() bool` и `MiddleClicked() bool` (в `ui.Context` — `MiddleMousePressed` / `MiddleMouseDown` / `MiddleMouseReleased`).
 - В `Table` структура `TableEvent` возвращает поля `RowDoubleClicked` и `RowMiddleClicked` (`-1`, если события не было):
 ```go
 ev := ui.Table("tbl", cols, len(rows), &sel, &sort, drawCell)

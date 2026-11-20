@@ -8,7 +8,7 @@ A lightweight, embeddable cross-platform Go UI framework with software 2D render
 - Single root package `anyui` for building interfaces.
 - Zero CPU usage when idle (the OS event loop wakes up only on OS events, `Dispatch`, or active animations).
 - Smooth animation engine (`Animator`) that automatically goes to sleep once transitions finish.
-- Theme support (`DeepNavyTheme`, `DarkTheme`, `LightTheme`) and functional styling options (`Option`).
+- Theme support (`NavyTheme`, `DarkTheme`, `LightTheme`) and functional styling options (`Option`).
 - Keyboard focus navigation (`Tab` / `Shift+Tab`), confirmation via `Enter`, dismissal via `Escape`, and global shortcuts (`Shortcut`).
 - Overlay layer (`PushOverlay`) blocking clicks beneath floating panels and popups.
 
@@ -20,7 +20,7 @@ package main
 import (
 	"log"
 
-	"git.gtw.su/kirpich/anyui"
+	"github.com/kirpicheff/anyui"
 )
 
 func main() {
@@ -28,7 +28,7 @@ func main() {
 		Title:  "My App",
 		Width:  960,
 		Height: 600,
-		Theme:  anyui.DeepNavyTheme(),
+		Theme:  anyui.NavyTheme(),
 	})
 
 	name := ""

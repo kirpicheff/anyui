@@ -133,9 +133,9 @@ app := anyui.NewApp(anyui.Config{
 
 ## Буфер обмена
 
-Работа с текстовым и графическим буфером обмена доступна через `*anyui.Window`:
-- Текст: `ClipboardText() (string, error)` / `SetClipboardText(text string) error` (автоматически используется в `TextInput` / `TextArea` по `Ctrl+C` / `Ctrl+V`).
-- Изображения: `ClipboardImage() (image.Image, error)` / `SetClipboardImage(img image.Image) error` (на Windows работает через `CF_DIB` 24/32 bpp).
+Работа с буфером обмена ОС доступна на уровне окна `*anyui.Window` и UI-контекста `*anyui.UI`:
+- Текст: `win.ClipboardText() (string, error)` / `win.SetClipboardText(text string) error` (также доступно напрямую через `ui.ClipboardText()` / `ui.SetClipboardText()`; автоматически используется в `TextInput` / `TextArea` по `Ctrl+C` / `Ctrl+V`).
+- Изображения: `win.ClipboardImage() (image.Image, error)` / `win.SetClipboardImage(img image.Image) error` (на Windows работает через `CF_DIB` 24/32 bpp, на Linux через PNG).
 
 ---
 
