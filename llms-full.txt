@@ -52,8 +52,10 @@ if loading {
 ## Базовые типы
 
 ```go
-type Dp int               // Логические DPI-независимые пиксели (.Int() int)
-type Px int               // Физические пиксели буфера отрисовки (.Int() int)
+type Dp int               // Логические DPI-независимые пиксели
+func (d Dp) Int() int
+type Px int               // Физические пиксели буфера отрисовки
+func (p Px) Int() int
 const Auto Dp = -1        // Sentinel-значение: занять всё доступное пространство контейнера
 type Key = uint32         // Виртуальный код клавиши (VK-коды, передаётся в Shortcut / InjectKey / KeyEvent.KeyCode)
 type Modifiers struct { Shift, Ctrl, Alt, Win bool }
@@ -292,7 +294,7 @@ func WordWrap(enabled ...bool) Option
 // Непрозрачные типы (конструируются только через API пакета):
 type Option func(...) // Функциональная опция стилизации/размеров (см. секцию «Опции стилизации»)
 type Canvas struct{}  // Программный 2D-холст (возвращается UI.Canvas() и передаётся в CanvasView/InteractiveCanvas)
-type SingleInstanceGuard struct{} // Возвращается AcquireSingleInstance; методы: SetCallback(func(args []string)), StartIPC() error, Close() error
+type SingleInstanceGuard struct{} // Непрозрачный тип (возвращается AcquireSingleInstance; методы см. в секции «Методы SingleInstanceGuard»)
 
 type Config struct {
 	Title               string
@@ -947,5 +949,51 @@ func (u *UI) TreeView(id string, roots []*TreeNode, selectedID *string, opts ...
 func (u *UI) TreeViewEx(id string, roots []*TreeNode, cfg *TreeViewExConfig, opts ...Option) bool
 func (u *UI) VirtualTextView(id string, lines []string, opts ...Option)
 func (u *UI) Window() *Window
+```
+
+## Методы `Canvas`
+
+```go
+func (c *Canvas) AddDirtyRect(r Rect)
+func (c *Canvas) BackdropBlur(r Rect, radius int, cr CornerRadii)
+func (c *Canvas) BlendPixel(x, y int, col Color, cov uint8)
+func (c *Canvas) BlitFrom(src *Canvas, area Rect)
+func (c *Canvas) Clear(col Color)
+func (c *Canvas) ClearTransparent()
+func (c *Canvas) CompositeFrom(src *Canvas, area Rect)
+func (c *Canvas) CurrentClip() Rect
+func (c *Canvas) DirtyBounds() Rect
+func (c *Canvas) DirtyRects() []Rect
+func (c *Canvas) DrawArc(cx, cy, radius, startAngleRad, endAngleRad, thickness float32, col Color)
+func (c *Canvas) DrawBGRA(dst Rect, src []byte, srcW, srcH int, mode ImageScaleMode)
+func (c *Canvas) DrawBGRAFast(dst Rect, src []byte, srcW, srcH int, mode ImageScaleMode)
+func (c *Canvas) DrawBoxShadow(r Rect, sh BoxShadow)
+func (c *Canvas) DrawImage(dst Rect, img image.Image, mode ImageScaleMode)
+func (c *Canvas) DrawLine(x1, y1, x2, y2, thickness float32, col Color)
+func (c *Canvas) DrawPolyline(pts []PointF, thickness float32, col Color, closed bool)
+func (c *Canvas) DrawRGBA(dst Rect, src []byte, srcW, srcH int, mode ImageScaleMode)
+func (c *Canvas) DrawRoundedBox(r Rect, radius float32, fill Color, borderW float32, borderCol Color)
+func (c *Canvas) DrawRoundedBoxCorners(r Rect, cr CornerRadii, fill Color, borderW float32, borderCol Color)
+func (c *Canvas) DrawSVG(svgData string, x, y, sizePx int, tint Color)
+func (c *Canvas) FillCircle(cx, cy, radius float32, col Color)
+func (c *Canvas) FillLinearGradient(r Rect, cr CornerRadii, grad LinearGradient)
+func (c *Canvas) FillRadialGradient(r Rect, cr CornerRadii, grad RadialGradient)
+func (c *Canvas) FillRect(r Rect, col Color)
+func (c *Canvas) FillRoundedRect(r Rect, radius float32, fill Color)
+func (c *Canvas) FillRoundedRectCorners(r Rect, cr CornerRadii, fill Color)
+func (c *Canvas) MarkFullDirty()
+func (c *Canvas) PopClip()
+func (c *Canvas) PushClip(r Rect)
+func (c *Canvas) ResetDirtyRects()
+func (c *Canvas) Resize(w, h int)
+func (c *Canvas) ResizeWithBuffer(w, h int, external []byte)
+```
+
+## Методы `SingleInstanceGuard`
+
+```go
+func (g *SingleInstanceGuard) Close() error
+func (g *SingleInstanceGuard) SetCallback(fn func(args []string))
+func (g *SingleInstanceGuard) StartIPC() error
 ```
 

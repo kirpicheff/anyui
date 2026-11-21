@@ -33,8 +33,9 @@ type constEntry struct {
 type apiIndex struct {
 	fset         *token.FileSet
 	rootFiles    []*ast.File
-	subPkgTypes  map[string]map[string]*ast.TypeSpec // pkg -> typeName -> TypeSpec
-	subPkgConsts map[string]map[string]string        // pkg -> constName -> literal value
+	subPkgTypes   map[string]map[string]*ast.TypeSpec        // pkg -> typeName -> TypeSpec
+	subPkgConsts  map[string]map[string]string               // pkg -> constName -> literal value
+	subPkgMethods map[string]map[string]map[string]string    // pkg -> recvType -> methodName -> fullSig
 	aliases      map[string]aliasTarget              // publicName -> subpkg target
 	localTypes   map[string]*ast.TypeSpec
 	constGroups  [][]constEntry
@@ -167,8 +168,9 @@ func parseDirNonTest(fset *token.FileSet, dir string) ([]*ast.File, error) {
 func parseAPI(rootDir string) (*apiIndex, error) {
 	idx := &apiIndex{
 		fset:         token.NewFileSet(),
-		subPkgTypes:  make(map[string]map[string]*ast.TypeSpec),
-		subPkgConsts: make(map[string]map[string]string),
+		subPkgTypes:    make(map[string]map[string]*ast.TypeSpec),
+		subPkgConsts:   make(map[string]map[string]string),
+		subPkgMethods:  make(map[string]map[string]map[string]string),
 		aliases:      make(map[string]aliasTarget),
 		localTypes:   make(map[string]*ast.TypeSpec),
 		optionNames:    make(map[string]bool),
@@ -193,8 +195,23 @@ func parseAPI(rootDir string) (*apiIndex, error) {
 		}
 		idx.subPkgTypes[sub] = make(map[string]*ast.TypeSpec)
 		idx.subPkgConsts[sub] = make(map[string]string)
+		idx.subPkgMethods[sub] = make(map[string]map[string]string)
 		for _, f := range subFiles {
 			for _, decl := range f.Decls {
+				if fd, ok := decl.(*ast.FuncDecl); ok {
+					if fd.Recv != nil && len(fd.Recv.List) > 0 && ast.IsExported(fd.Name.Name) {
+						rn := receiverTypeName(fd.Recv.List[0].Type)
+						if ast.IsExported(rn) {
+							if idx.subPkgMethods[sub][rn] == nil {
+								idx.subPkgMethods[sub][rn] = make(map[string]string)
+							}
+							if _, exists := idx.subPkgMethods[sub][rn][fd.Name.Name]; !exists {
+								idx.subPkgMethods[sub][rn][fd.Name.Name] = idx.formatFuncSig(fd)
+							}
+						}
+					}
+					continue
+				}
 				gd, ok := decl.(*ast.GenDecl)
 				if !ok {
 					continue
@@ -349,6 +366,25 @@ func parseAPI(rootDir string) (*apiIndex, error) {
 		}
 	}
 
+	// Переносим методы алиасных типов из подпакетов (Canvas, SingleInstanceGuard, Dp, Px).
+	for _, pubName := range []string{"Canvas", "SingleInstanceGuard", "Dp", "Px"} {
+		target, ok := idx.aliases[pubName]
+		if !ok {
+			continue
+		}
+		mMap := idx.subPkgMethods[target.pkg][target.name]
+		if len(mMap) == 0 {
+			continue
+		}
+		if idx.methodNames[pubName] == nil {
+			idx.methodNames[pubName] = make(map[string]bool)
+		}
+		for mName, sig := range mMap {
+			idx.methods[pubName] = append(idx.methods[pubName], sig)
+			idx.methodNames[pubName][mName] = true
+		}
+	}
+
 	sort.Strings(idx.vars)
 	sort.Strings(idx.optionFuncs)
 	sort.Strings(idx.otherFuncs)
@@ -459,7 +495,7 @@ func sanitizeInternalTypes(s string) string {
 	return replacer.Replace(s)
 }
 
-func writeCommonHeader(out *bytes.Buffer, version string, isFull bool) {
+func writeCommonHeader(out *bytes.Buffer, version string, isFull bool, idx *apiIndex) {
 	if isFull {
 		fmt.Fprintf(out, "# AnyUI (%s) — Полный справочник API\n\n", version)
 	} else {
@@ -511,7 +547,7 @@ func writeCommonHeader(out *bytes.Buffer, version string, isFull bool) {
 	out.WriteString("}\n")
 	out.WriteString("```\n\n")
 
-	writeBaseTypes(out)
+	writeBaseTypes(out, idx)
 
 	out.WriteString("## Матрица применимости опций (`Option`)\n\n")
 	out.WriteString("Основные поддерживаемые опции (неприменимые игнорируются без ошибки):\n\n")
@@ -596,10 +632,16 @@ var optionMatrixRows = []optionMatrixRow{
 	},
 }
 
-func writeBaseTypes(out *bytes.Buffer) {
+func writeBaseTypes(out *bytes.Buffer, idx *apiIndex) {
 	out.WriteString("## Базовые типы\n\n```go\n")
-	out.WriteString("type Dp int               // Логические DPI-независимые пиксели (.Int() int)\n")
-	out.WriteString("type Px int               // Физические пиксели буфера отрисовки (.Int() int)\n")
+	out.WriteString("type Dp int               // Логические DPI-независимые пиксели\n")
+	for _, sig := range idx.methods["Dp"] {
+		out.WriteString(sig + "\n")
+	}
+	out.WriteString("type Px int               // Физические пиксели буфера отрисовки\n")
+	for _, sig := range idx.methods["Px"] {
+		out.WriteString(sig + "\n")
+	}
 	out.WriteString("const Auto Dp = -1        // Sentinel-значение: занять всё доступное пространство контейнера\n")
 	out.WriteString("type Key = uint32         // Виртуальный код клавиши (VK-коды, передаётся в Shortcut / InjectKey / KeyEvent.KeyCode)\n")
 	out.WriteString("type Modifiers struct { Shift, Ctrl, Alt, Win bool }\n")
@@ -663,7 +705,7 @@ func main() {
 }
 
 func writeShortLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
-	writeCommonHeader(out, version, false)
+	writeCommonHeader(out, version, false, idx)
 	writeQuickStart(out)
 
 	out.WriteString("## Ключевые структуры старта (офлайн-минимум; все структуры — в `llms-full.txt`)\n\n```go\n")
@@ -684,13 +726,31 @@ func writeShortLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
 	out.WriteString("- **Текст, индикаторы и навигация (`UI`):** `Label`, `SelectableLabel`, `StatusDot`, `Badge`, `Separator`, `ProgressBar`, `Spinner`, `TabBar`, `MenuBar`, `Toolbar`, `StatusBar`, `Breadcrumbs`, `Pagination`, `TitleBar`, `TitleBarHitTest`.\n")
 	out.WriteString("- **Оверлеи и уведомления (`UI`):** `Modal`, `Popover`, `FloatingPanel`, `Drawer`, `ContextMenu`, `Tooltip`, `PushOverlay`, `ShowToast`, `SetToastPosition`, `SetToastOffset`.\n")
 	out.WriteString("- **Графика, слои, кеши и диагностика (`UI`):** `Image`, `CanvasView`, `InteractiveCanvas`, `Canvas`, `DrawText`, `DrawSVG`, `StaticLayer`, `InvalidateStatic`, `LastFrameStaticBlitted`, `LastDirtyRectsPx`, `SetDebugDirtyRect`, `SetSmartMouseMove`, `SkippedMouseMoves`, `GlyphCacheStats`, `ClearGlyphCache`, `ScaledImageCacheStats`, `ClearScaledImageCache`, `RequestRedraw`, `CurrentArea`, `CurrentAreaPx`, `Scale`, `ScaleF`, `PxToDp`, `PxToDpf`.\n")
-	out.WriteString("- **Ввод, буфер обмена, контекст и темы (`UI`):** `App`, `Window`, `Shortcut`, `FocusID`, `SetFocus`, `SetCursor`, `RegisterHoverArea`, `MousePosDp`, `MousePosPx`, `MousePressed`, `MouseDown`, `DoubleClicked`, `MiddleClicked`, `ClipboardText`, `SetClipboardText`, `ClipboardImage`, `SetClipboardImage`, `InvalidateRemember`, `ClearRemember`, `Theme`, `SetTheme`, `Strings`, `SetStrings`.\n")
+	out.WriteString("- **Ввод, буфер обмена, контекст и темы (`UI`):** `UI.App`, `UI.Window`, `Shortcut`, `FocusID`, `SetFocus`, `SetCursor`, `RegisterHoverArea`, `MousePosDp`, `MousePosPx`, `MousePressed`, `MouseDown`, `DoubleClicked`, `MiddleClicked`, `ClipboardText`, `SetClipboardText`, `ClipboardImage`, `SetClipboardImage`, `InvalidateRemember`, `ClearRemember`, `Theme`, `SetTheme`, `Strings`, `SetStrings`.\n")
+	out.WriteString("- **Холст (`Canvas`):** ")
+	canvasNames := sortedKeys(idx.methodNames["Canvas"])
+	for i, m := range canvasNames {
+		if i > 0 {
+			out.WriteString(", ")
+		}
+		out.WriteString("`Canvas." + m + "`")
+	}
+	out.WriteString(".\n")
+	out.WriteString("- **Single-instance (`SingleInstanceGuard`):** ")
+	sigNames := sortedKeys(idx.methodNames["SingleInstanceGuard"])
+	for i, m := range sigNames {
+		if i > 0 {
+			out.WriteString(", ")
+		}
+		out.WriteString("`SingleInstanceGuard." + m + "`")
+	}
+	out.WriteString(".\n")
 	out.WriteString("- **Функции пакета (`anyui.*`):** `anyui.Remember` (generic), `anyui.RGB`, `anyui.RGBA`, `anyui.Hex`, `anyui.UniformRadii`, `anyui.NavyTheme`, `anyui.DarkTheme`, `anyui.LightTheme`, `anyui.SystemTheme`, `anyui.IsSystemDarkTheme`, `anyui.RussianStrings`, `anyui.EnglishStrings`, `anyui.TabItems`, `anyui.SelectItems`, `anyui.SetTreeNodeChecked`, `anyui.SyncTreeCheckState`, `anyui.OpenFileDialog`, `anyui.OpenFilesDialog`, `anyui.SaveFileDialog`, `anyui.SelectFolderDialog`, `anyui.MessageBox`, `anyui.OpenURL`, `anyui.RevealInFileManager`, `anyui.AcquireSingleInstance`, `anyui.LoadWindowState`, `anyui.SaveWindowState`.\n")
 	out.WriteString("- **Тестирование (`Headless`):** `anyui.NewHeadless`, `Headless.SetDraw`, `Headless.Step`, `Headless.AdvanceTime`, `Headless.SetTime`, `Headless.Time`, `Headless.SetScale`, `Headless.InjectMouseMove`, `Headless.InjectMouseMovePx`, `Headless.InjectMouseDown`, `Headless.InjectMouseDownPx`, `Headless.InjectMouseUp`, `Headless.InjectMouseUpPx`, `Headless.InjectMouseClick`, `Headless.InjectMouseClickPx`, `Headless.InjectMouseWheel`, `Headless.InjectMouseWheelPx`, `Headless.InjectKey`, `Headless.InjectKeyDown`, `Headless.InjectKeyUp`, `Headless.InjectText`, `Headless.InjectFocus`, `Headless.FocusID`, `Headless.FocusOrder`, `Headless.CaptureImage`, `Headless.CapturePNG`, `Headless.App`, `Headless.Window`, `Headless.UI`, `Headless.Close`, `anyui.AssertGolden`, `anyui.DefaultTestFonts`.\n")
 }
 
 func writeFullLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
-	writeCommonHeader(out, version, true)
+	writeCommonHeader(out, version, true, idx)
 	writeQuickStart(out)
 
 	out.WriteString("## Константы и переменные пакета `anyui`\n\n```go\n")
@@ -767,7 +827,7 @@ func writeFullLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
 	out.WriteString("// Непрозрачные типы (конструируются только через API пакета):\n")
 	out.WriteString("type Option func(...) // Функциональная опция стилизации/размеров (см. секцию «Опции стилизации»)\n")
 	out.WriteString("type Canvas struct{}  // Программный 2D-холст (возвращается UI.Canvas() и передаётся в CanvasView/InteractiveCanvas)\n")
-	out.WriteString("type SingleInstanceGuard struct{} // Возвращается AcquireSingleInstance; методы: SetCallback(func(args []string)), StartIPC() error, Close() error\n\n")
+	out.WriteString("type SingleInstanceGuard struct{} // Непрозрачный тип (возвращается AcquireSingleInstance; методы см. в секции «Методы SingleInstanceGuard»)\n\n")
 	for _, name := range structOrder {
 		if def, ok := idx.formatTypeDef(name); ok {
 			out.WriteString(def)
@@ -776,7 +836,7 @@ func writeFullLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
 	}
 	out.WriteString("```\n\n")
 
-	for _, recv := range []string{"App", "Window", "Headless", "UI"} {
+	for _, recv := range []string{"App", "Window", "Headless", "UI", "Canvas", "SingleInstanceGuard"} {
 		out.WriteString(fmt.Sprintf("## Методы `%s`\n\n```go\n", recv))
 		for _, sig := range idx.methods[recv] {
 			out.WriteString(sig + "\n")
@@ -785,10 +845,19 @@ func writeFullLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
 	}
 }
 
+func sortedKeys(m map[string]bool) []string {
+	res := make([]string, 0, len(m))
+	for k := range m {
+		res = append(res, k)
+	}
+	sort.Strings(res)
+	return res
+}
+
 var (
 	reBacktick = regexp.MustCompile("`([^`]+)`")
 	reIdent    = regexp.MustCompile(`^[A-Z][A-Za-z0-9_]*$`)
-	reRecvSym  = regexp.MustCompile(`^(UI|App|Window|Headless)\.([A-Z][A-Za-z0-9_]*)$`)
+	reRecvSym  = regexp.MustCompile(`^(UI|App|Window|Headless|Canvas|SingleInstanceGuard)\.([A-Z][A-Za-z0-9_]*)$`)
 	rePkgSym   = regexp.MustCompile(`^anyui\.([A-Z][A-Za-z0-9_]*)$`)
 )
 
@@ -879,11 +948,11 @@ func lintOutputs(idx *apiIndex, shortText, fullText string) error {
 		}
 	}
 	for meth := range idx.methodNames["UI"] {
-		if !strings.Contains(mapBlock, "`"+meth+"`") {
+		if !strings.Contains(mapBlock, "`"+meth+"`") && !strings.Contains(mapBlock, "`UI."+meth+"`") {
 			missing = append(missing, "UI."+meth)
 		}
 	}
-	for _, recv := range []string{"App", "Window", "Headless"} {
+	for _, recv := range []string{"App", "Window", "Headless", "Canvas", "SingleInstanceGuard"} {
 		for meth := range idx.methodNames[recv] {
 			if !strings.Contains(mapBlock, "`"+recv+"."+meth+"`") {
 				missing = append(missing, recv+"."+meth)
