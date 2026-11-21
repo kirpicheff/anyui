@@ -48,7 +48,7 @@ canvas.BackdropBlur(panelRect, 8, anyui.UniformRadii(12))
 ## Vector Primitives (`DrawLine`, `DrawPolyline`, `DrawArc`)
 
 ```go
-ui.CanvasView(240, 80, func(canvas *render.Canvas, area anyui.Rect) {
+ui.CanvasView(func(canvas *anyui.Canvas, area anyui.Rect) {
 	pts := []anyui.PointF{
 		{X: float32(area.X), Y: float32(area.Y + 60)},
 		{X: float32(area.X + 80), Y: float32(area.Y + 20)},
@@ -56,7 +56,7 @@ ui.CanvasView(240, 80, func(canvas *render.Canvas, area anyui.Rect) {
 		{X: float32(area.X + 240), Y: float32(area.Y + 10)},
 	}
 	canvas.DrawPolyline(pts, 2.0, ui.Theme().Accent, false)
-})
+}, anyui.Width(240), anyui.Height(80))
 ```
 
 ## SVG Icons
@@ -73,13 +73,13 @@ ui.Button("btn_save", "Save", anyui.Icon(saveSVG), anyui.Primary())
 
 ## Images and Video Frames
 
-- `ui.Image(img, wDp, hDp, anyui.ScaleFit)` — render an `image.Image` (`ScaleFit`, `ScaleFill`, `ScaleOneToOne`).
+- `ui.Image(img, anyui.ScaleFit, anyui.Width(wDp), anyui.Height(hDp))` — render an `image.Image` (`ScaleFit`, `ScaleFill`, `ScaleOneToOne`).
 - For high-frequency video streams (e.g., remote desktop), use `canvas.DrawBGRAFast(area, pixels, srcW, srcH, anyui.ScaleFit)` (zero-allocation, bypasses image cache) inside `ui.InteractiveCanvas` or `ui.CanvasView`.
 - For an interactive canvas with focus, mouse drag capture, and raw keyboard (`ScanCode`, `Extended`, `KeyDown`/`KeyUp`) and mouse/wheel input, use `ui.InteractiveCanvas`:
 
 ```go
-ui.InteractiveCanvas("rdp_view", 0, 0, anyui.CanvasCallbacks{
-	OnDraw: func(canvas *render.Canvas, area anyui.Rect, focused bool) {
+ui.InteractiveCanvas("rdp_view", anyui.CanvasCallbacks{
+	OnDraw: func(canvas *anyui.Canvas, area anyui.Rect, focused bool) {
 		canvas.DrawBGRAFast(area, frameBGRA, frameW, frameH, anyui.ScaleFit)
 	},
 	OnKey: func(ev anyui.KeyEvent) {
@@ -96,7 +96,7 @@ ui.InteractiveCanvas("rdp_view", 0, 0, anyui.CanvasCallbacks{
 	},
 })
 ```
-- For OS image clipboard exchange, use `win.ClipboardImage()` and `win.SetClipboardImage(img)`.
+- For OS image clipboard exchange, use `ui.ClipboardImage()` / `ui.SetClipboardImage(img)` or `win.ClipboardImage()` / `win.SetClipboardImage(img)`.
 
 ## Font Styles and Fallback
 

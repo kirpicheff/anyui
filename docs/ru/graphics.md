@@ -48,7 +48,7 @@ canvas.BackdropBlur(panelRect, 8, anyui.UniformRadii(12))
 ## Векторные примитивы (`DrawLine`, `DrawPolyline`, `DrawArc`)
 
 ```go
-ui.CanvasView(240, 80, func(canvas *render.Canvas, area anyui.Rect) {
+ui.CanvasView(func(canvas *anyui.Canvas, area anyui.Rect) {
 	pts := []anyui.PointF{
 		{X: float32(area.X), Y: float32(area.Y + 60)},
 		{X: float32(area.X + 80), Y: float32(area.Y + 20)},
@@ -56,7 +56,7 @@ ui.CanvasView(240, 80, func(canvas *render.Canvas, area anyui.Rect) {
 		{X: float32(area.X + 240), Y: float32(area.Y + 10)},
 	}
 	canvas.DrawPolyline(pts, 2.0, ui.Theme().Accent, false)
-})
+}, anyui.Width(240), anyui.Height(80))
 ```
 
 ## SVG-иконки
@@ -73,13 +73,13 @@ ui.Button("btn_save", "Сохранить", anyui.Icon(saveSVG), anyui.Primary()
 
 ## Вывод изображений и видеокадров
 
-- `ui.Image(img, wDp, hDp, anyui.ScaleFit)` — вывод `image.Image` (`ScaleFit`, `ScaleFill`, `ScaleOneToOne`).
+- `ui.Image(img, anyui.ScaleFit, anyui.Width(wDp), anyui.Height(hDp))` — вывод `image.Image` (`ScaleFit`, `ScaleFill`, `ScaleOneToOne`).
 - Для высокочастотных видеопотоков (например, удалённый рабочий стол) используйте `canvas.DrawBGRAFast(area, pixels, srcW, srcH, anyui.ScaleFit)` (без аллокаций и кеша) внутри `ui.InteractiveCanvas` или `ui.CanvasView`.
 - Для интерактивного холста с фокусом, захватом мыши при перетаскивании и сырым вводом клавиатуры (`ScanCode`, `Extended`, `KeyDown`/`KeyUp`) и мыши/колеса используйте `ui.InteractiveCanvas`:
 
 ```go
-ui.InteractiveCanvas("rdp_view", 0, 0, anyui.CanvasCallbacks{
-	OnDraw: func(canvas *render.Canvas, area anyui.Rect, focused bool) {
+ui.InteractiveCanvas("rdp_view", anyui.CanvasCallbacks{
+	OnDraw: func(canvas *anyui.Canvas, area anyui.Rect, focused bool) {
 		canvas.DrawBGRAFast(area, frameBGRA, frameW, frameH, anyui.ScaleFit)
 	},
 	OnKey: func(ev anyui.KeyEvent) {
@@ -96,7 +96,7 @@ ui.InteractiveCanvas("rdp_view", 0, 0, anyui.CanvasCallbacks{
 	},
 })
 ```
-- Для обмена изображениями с ОС используйте методы окна `win.ClipboardImage()` и `win.SetClipboardImage(img)` (поддерживается формат `CF_DIB` 24/32 bpp).
+- Для обмена изображениями с ОС используйте `ui.ClipboardImage()` / `ui.SetClipboardImage(img)` или методы окна `win.ClipboardImage()` / `win.SetClipboardImage(img)` (поддерживается формат `CF_DIB` 24/32 bpp).
 
 ## Начертания шрифтов и fallback
 

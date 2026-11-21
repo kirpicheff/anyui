@@ -167,9 +167,9 @@ if ev.Closed >= 0 {
 ## Контейнеры, индикаторы и оверлеи
 
 ### `ScrollView`
-- **Сигнатура:** `ui.ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)`
+- **Сигнатура:** `ui.ScrollView(id string, fn func(), opts ...Option)`
 - **Возможности:** вертикальная и горизонтальная прокрутка колесом мыши и перетаскиванием скроллбаров.
-- **Автозаполнение (Auto-Fill):** передача `anyui.Auto()`, `-1` или `<= 0` (а также опций `anyui.FillWidth()`, `anyui.FillHeight()`, `anyui.Width(anyui.Auto())`, `anyui.Height(anyui.Auto())`) указывает контейнеру автоматически занять весь доступный остаток области по ширине или высоте без необходимости ручного вычисления размеров.
+- **Автозаполнение (Auto-Fill):** по умолчанию `ScrollView` автоматически занимает весь доступный остаток области по ширине и высоте; для явного задания размеров передавайте опции `anyui.Width(...)`, `anyui.Height(...)`, `anyui.FillWidth()`, `anyui.FillHeight()`.
 
 ### Координаты контейнера (`CurrentArea` и `CurrentAreaPx`)
 - **`ui.CurrentArea() Rect`:** возвращает текущий прямоугольник контейнера строго в логических пикселях (`Dp`). Используется для пропорционального позиционирования и адаптивной верстки.
@@ -473,7 +473,7 @@ AnyUI поддерживает программную прокрутку неп�
   - `anyui.ScrollToID(id)` прокручивает контейнер `ScrollView` к дочернему элементу с указанным идентификатором (например, кнопке `ui.Button("buy_btn", ...)` или маркеру `ui.Anchor("pricing_section")`).
   - `ui.Anchor(id string)` размещает невидимый маркер нулевого размера в произвольном месте контента для быстрой навигации к заголовкам секций или блокам текста.
   ```go
-  ui.ScrollView("page", anyui.Auto(), anyui.Auto(), func() {
+  ui.ScrollView("page", func() {
       ui.Label("Верх страницы", anyui.FontSize(18))
       // ...
       ui.Anchor("pricing_section")
@@ -491,16 +491,20 @@ AnyUI поддерживает программную прокрутку неп�
 ### `MenuBar`, `Toolbar`, `StatusBar`, `Breadcrumbs`, `Pagination`
 ```go
 ui.MenuBar("mb", []anyui.MenuBarItem{
-    {Label: "Файл", Items: []anyui.BarMenuItem{
+    {Label: "Файл", Items: []anyui.MenuBarEntry{
         {Label: "Новый", Shortcut: "Ctrl+N", OnClick: func() {}},
         {Separator: true},
-        {Label: "Экспорт", SubItems: []anyui.BarMenuItem{{Label: "PNG"}}},
+        {Label: "Экспорт", SubItems: []anyui.MenuBarEntry{{Label: "PNG"}}},
     }},
 })
 ui.Toolbar("tb", []anyui.ToolbarItem{
     {ID: "save", Label: "Сохранить", Tooltip: "Сохранить файл", OnClick: func() {}},
 })
-ui.Breadcrumbs("bc", []anyui.BreadcrumbItem{{Label: "Главная"}, {Label: "Раздел"}})
+clickedID := ui.Breadcrumbs("bc", []anyui.BreadcrumbItem{
+    {ID: "home", Label: "Главная"},
+    {ID: "section", Label: "Раздел"},
+})
+_ = clickedID
 ui.Pagination("pg", &page, 10)
 ui.StatusBar("sb", []anyui.StatusBarSection{{Text: "Готово", Flex: 1}, {Text: "UTF-8", WidthDp: 70}})
 ```

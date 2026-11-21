@@ -167,9 +167,9 @@ if ev.Closed >= 0 {
 ## Containers, Indicators & Overlays
 
 ### `ScrollView`
-- **Signature:** `ui.ScrollView(id string, wDp, hDp int, fn func(), opts ...Option)`
+- **Signature:** `ui.ScrollView(id string, fn func(), opts ...Option)`
 - **Features:** vertical and horizontal scrolling via mouse wheel and draggable scrollbars.
-- **Auto-Fill:** passing `anyui.Auto()`, `-1`, or `<= 0` (or using `anyui.FillWidth()`, `anyui.FillHeight()`, `anyui.Width(anyui.Auto())`, `anyui.Height(anyui.Auto())`) automatically fills the remaining container space without manual size calculations.
+- **Auto-Fill:** by default `ScrollView` fills the remaining container space automatically; pass `anyui.Width(...)`, `anyui.Height(...)`, `anyui.FillWidth()`, or `anyui.FillHeight()` to customize dimensions.
 
 ### Container Coordinates (`CurrentArea` vs `CurrentAreaPx`)
 - **`ui.CurrentArea() Rect`:** returns the container's rectangle strictly in logical pixels (`Dp`).
@@ -464,7 +464,7 @@ AnyUI provides declarative scrolling directly within the frame rendering pipelin
   - `anyui.ScrollToID(id)` scrolls `ScrollView` directly to the child widget with the given identifier (e.g., `ui.Button("buy_btn", ...)` or an anchor `ui.Anchor("pricing_section")`).
   - `ui.Anchor(id string)` creates a zero-size anchor marker anywhere in the layout for quick navigation to headings or sections.
   ```go
-  ui.ScrollView("page", anyui.Auto(), anyui.Auto(), func() {
+  ui.ScrollView("page", func() {
       ui.Label("Page Header", anyui.FontSize(18))
       // ...
       ui.Anchor("pricing_section")
@@ -482,16 +482,20 @@ AnyUI provides declarative scrolling directly within the frame rendering pipelin
 ### `MenuBar`, `Toolbar`, `StatusBar`, `Breadcrumbs`, `Pagination`
 ```go
 ui.MenuBar("mb", []anyui.MenuBarItem{
-	{Label: "File", Items: []anyui.BarMenuItem{
+	{Label: "File", Items: []anyui.MenuBarEntry{
 		{Label: "New", Shortcut: "Ctrl+N", OnClick: func() {}},
 		{Separator: true},
-		{Label: "Export", SubItems: []anyui.BarMenuItem{{Label: "PNG"}}},
+		{Label: "Export", SubItems: []anyui.MenuBarEntry{{Label: "PNG"}}},
 	}},
 })
 ui.Toolbar("tb", []anyui.ToolbarItem{
 	{ID: "save", Label: "Save", Tooltip: "Save file", OnClick: func() {}},
 })
-ui.Breadcrumbs("bc", []anyui.BreadcrumbItem{{Label: "Home"}, {Label: "Section"}})
+clickedID := ui.Breadcrumbs("bc", []anyui.BreadcrumbItem{
+	{ID: "home", Label: "Home"},
+	{ID: "section", Label: "Section"},
+})
+_ = clickedID
 ui.Pagination("pg", &page, 10)
 ui.StatusBar("sb", []anyui.StatusBarSection{{Text: "Ready", Flex: 1}, {Text: "UTF-8", WidthDp: 70}})
 ```

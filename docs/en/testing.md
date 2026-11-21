@@ -149,11 +149,11 @@ This test runs in sub-milliseconds without calling `time.Sleep` and with zero fl
 ## Synthetic Input Injection
 
 ### Mouse and Scroll Wheel
-- `h.InjectMouseMove(x, y int)` — move virtual cursor to `(x, y)`.
-- `h.InjectMouseDown(x, y int, btn anyui.MouseButton)` — press a mouse button (`MouseLeft`, `MouseRight`, `MouseMiddle`).
-- `h.InjectMouseUp(x, y int, btn anyui.MouseButton)` — release a mouse button.
-- `h.InjectMouseClick(x, y int, btn anyui.MouseButton)` — full click sequence (`MouseMove` -> `MouseDown` -> `MouseUp`).
-- `h.InjectMouseWheel(dx, dy int)` — rotate wheel (`dy > 0` scrolls up, `dy < 0` scrolls down).
+- `h.InjectMouseMove(xDp, yDp anyui.Dp)` — move virtual cursor to logical `(xDp, yDp)` (device-pixel variant: `InjectMouseMovePx(xPx, yPx anyui.Px)`).
+- `h.InjectMouseDown(xDp, yDp anyui.Dp, btn anyui.MouseButton)` — press a mouse button (`MouseLeft`, `MouseRight`, `MouseMiddle`).
+- `h.InjectMouseUp(xDp, yDp anyui.Dp, btn anyui.MouseButton)` — release a mouse button.
+- `h.InjectMouseClick(xDp, yDp anyui.Dp, btn anyui.MouseButton)` — full click sequence (`MouseMove` -> `MouseDown` -> `MouseUp`).
+- `h.InjectMouseWheel(dxDp, dyDp anyui.Dp)` — rotate wheel (`dyDp > 0` scrolls up, `dyDp < 0` scrolls down).
 
 ### Keyboard and Text
 - `h.InjectText(text string)` — emulate typing Unicode runes (`EventChar`) into the focused widget.
@@ -271,7 +271,7 @@ func BenchmarkFrameBudget1000Widgets(b *testing.B) {
 	defer h.Close()
 
 	h.SetDraw(func(ui *anyui.UI) {
-		ui.ScrollView("bench_scroll", 1280, 960, func() {
+		ui.ScrollView("bench_scroll", func() {
 			for i := 0; i < 200; i++ {
 				ui.Row(8, 30, func() {
 					ui.Label("Item")
@@ -282,7 +282,7 @@ func BenchmarkFrameBudget1000Widgets(b *testing.B) {
 					ui.TextInput("txt", &str, "Placeholder")
 				})
 			}
-		})
+		}, anyui.Width(1280), anyui.Height(960))
 	})
 
 	// Warmup frame

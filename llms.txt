@@ -22,7 +22,7 @@
 - `PushOverlay(bounds, fn)` предназначен только для всплывающих контролов (кастомных выпадающих списков, меню, тултипов), которым нужно отрисоваться поверх родительских контейнеров без обрезания клипом.
 - Горячие клавиши: `ui.Shortcut` регистрирует глобальный шорткат окна; не вызывайте его повторно на каждом кадре внутри циклических веток UI.
 - `Card(fn, ...)` по умолчанию подбирает высоту по содержимому (`AutoHeight`); чтобы растянуть карточку на весь остаток высоты, передайте `anyui.FillHeight()`.
-- Автозаполнение контейнеров (Auto-Fill): для `ScrollView`, `ListView`, `CanvasView` передавайте `anyui.Auto` (либо `anyui.FillWidth()` / `anyui.FillHeight()`), чтобы занять весь доступный остаток области без ручного вычисления размеров. `ui.CurrentArea()` возвращает геометрию строго в Dp; для низкоуровневых операций с `Canvas` используйте `ui.CurrentAreaPx()`.
+- Автозаполнение контейнеров (Auto-Fill): `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image` и `ListView` по умолчанию занимают доступное пространство; явные размеры задаются единообразно через опции `anyui.Width(...)`, `anyui.Height(...)`, `anyui.FillWidth()`, `anyui.FillHeight()` (или `anyui.Auto`). `ui.CurrentArea()` возвращает геометрию строго в Dp; для низкоуровневых операций с `Canvas` используйте `ui.CurrentAreaPx()`.
 - В `Table` / `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.
 - Декларативная навигация: используйте `anyui.ScrollToIndex(idx)` для программной прокрутки в `ListView` и `Table`, и `anyui.ScrollToID(id)` / `ui.Anchor(id)` для навигации в `ScrollView`.
 - Drag & Drop (Reorder): `anyui.OnReorder(func(ev anyui.DragEvent))` вместе с `anyui.Reorderable()` — для `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы) и `TreeView`, `TreeViewEx` (ключи). По умолчанию в деревьях разрешён перенос внутри одного родителя (`DropAbove`/`DropBelow`); с `anyui.AllowReparent()` поддерживаются смена родителя и вложение `DropInside` с защитой от циклов.
@@ -137,9 +137,9 @@ type AccordionItem = ui.AccordionItem
 type Align = ui.Align
 type App struct{ ... }
     func NewApp(cfg Config) *App
-type BarMenuItem = ui.BarMenuItem
 type BoxShadow = render.BoxShadow
 type BreadcrumbItem = ui.BreadcrumbItem
+type Canvas = render.Canvas
 type CanvasCallbacks = ui.CanvasCallbacks
 type ChartSeries = ui.ChartSeries
 type Color = render.Color
@@ -171,8 +171,10 @@ type Key = uint32
     const KeyBackspace Key = ui.KeyBackspace ...
 type KeyEvent = ui.RawKeyEvent
 type LinearGradient = render.LinearGradient
+type ListViewExConfig = ui.ListViewExConfig
 type LogEntry = ui.LogEntry
 type LogLevel = ui.LogLevel
+type MenuBarEntry = ui.MenuBarEntry
 type MenuBarItem = ui.MenuBarItem
 type MenuItem struct{ ... }
 type MessageBoxButtons = platform.MessageBoxButtons
@@ -269,6 +271,7 @@ type ToastPosition = ui.ToastPosition
 type ToolbarItem = ui.ToolbarItem
 type TrayConfig struct{ ... }
 type TreeNode = ui.TreeNode
+type TreeViewExConfig = ui.TreeViewExConfig
 type UI struct{ ... }
 type Window struct{ ... }
 type WindowState = platform.WindowState
@@ -361,6 +364,33 @@ package anyui // import "github.com/kirpicheff/anyui"
 
 type TableColumn = ui.TableColumn
     TableColumn описывает колонку таблицы.
+```
+
+## ListViewExConfig
+
+```go
+package anyui // import "github.com/kirpicheff/anyui"
+
+type ListViewExConfig = ui.ListViewExConfig
+    ListViewExConfig задаёт расширенные настройки списка ListViewEx.
+```
+
+## TreeViewExConfig
+
+```go
+package anyui // import "github.com/kirpicheff/anyui"
+
+type TreeViewExConfig = ui.TreeViewExConfig
+    TreeViewExConfig задаёт расширенные настройки дерева TreeViewEx.
+```
+
+## TableExConfig
+
+```go
+package anyui // import "github.com/kirpicheff/anyui"
+
+type TableExConfig = ui.TableExConfig
+    TableExConfig задаёт расширенные настройки таблицы TableEx.
 ```
 
 ## TabItem
@@ -488,16 +518,16 @@ func (h *Headless) InjectFocus(id string)
 func (h *Headless) InjectKey(key Key, mod Modifiers)
 func (h *Headless) InjectKeyDown(key Key, mod Modifiers)
 func (h *Headless) InjectKeyUp(key Key, mod Modifiers)
-func (h *Headless) InjectMouseClick(xDp, yDp int, btn MouseButton)
-func (h *Headless) InjectMouseClickPx(xPx, yPx int, btn MouseButton)
-func (h *Headless) InjectMouseDown(xDp, yDp int, btn MouseButton)
-func (h *Headless) InjectMouseDownPx(xPx, yPx int, btn MouseButton)
-func (h *Headless) InjectMouseMove(xDp, yDp int)
-func (h *Headless) InjectMouseMovePx(xPx, yPx int)
-func (h *Headless) InjectMouseUp(xDp, yDp int, btn MouseButton)
-func (h *Headless) InjectMouseUpPx(xPx, yPx int, btn MouseButton)
-func (h *Headless) InjectMouseWheel(dxDp, dyDp int)
-func (h *Headless) InjectMouseWheelPx(dxPx, dyPx int)
+func (h *Headless) InjectMouseClick(xDp, yDp Dp, btn MouseButton)
+func (h *Headless) InjectMouseClickPx(xPx, yPx Px, btn MouseButton)
+func (h *Headless) InjectMouseDown(xDp, yDp Dp, btn MouseButton)
+func (h *Headless) InjectMouseDownPx(xPx, yPx Px, btn MouseButton)
+func (h *Headless) InjectMouseMove(xDp, yDp Dp)
+func (h *Headless) InjectMouseMovePx(xPx, yPx Px)
+func (h *Headless) InjectMouseUp(xDp, yDp Dp, btn MouseButton)
+func (h *Headless) InjectMouseUpPx(xPx, yPx Px, btn MouseButton)
+func (h *Headless) InjectMouseWheel(dxDp, dyDp Dp)
+func (h *Headless) InjectMouseWheelPx(dxPx, dyPx Px)
 func (h *Headless) InjectText(text string)
 func (h *Headless) SetDraw(drawFn func(*UI))
 func (h *Headless) SetScale(scale float32)
@@ -593,23 +623,24 @@ func (u *UI) Anchor(id string)
 func (u *UI) App() *App
 func (u *UI) Badge(text string, opts ...Option)
 func (u *UI) BarChart(id string, labels []string, series []ChartSeries, opts ...Option)
-func (u *UI) Breadcrumbs(id string, items []BreadcrumbItem, opts ...Option) int
+func (u *UI) Breadcrumbs(id string, items []BreadcrumbItem, opts ...Option) string
 func (u *UI) Button(id, label string, opts ...Option) bool
-func (u *UI) Canvas() *render.Canvas
-func (u *UI) CanvasView(wDp, hDp Dp, drawFn func(canvas *render.Canvas, areaPx Rect))
+func (u *UI) Canvas() *Canvas
+func (u *UI) CanvasView(drawFn func(canvas *Canvas, areaPx Rect), opts ...Option)
 func (u *UI) Card(fn func(), opts ...Option)
 func (u *UI) Checkbox(id, label string, checked *bool, opts ...Option) bool
 func (u *UI) ClearGlyphCache()
 func (u *UI) ClearRemember()
 func (u *UI) ClearScaledImageCache()
+func (u *UI) ClipboardImage() (image.Image, error)
 func (u *UI) ClipboardText() (string, error)
 func (u *UI) Collapsible(id, title string, expanded *bool, fn func(), opts ...Option) bool
-func (u *UI) ColorPicker(id string, col *render.Color, opts ...Option) bool
+func (u *UI) ColorPicker(id string, col *Color, opts ...Option) bool
 func (u *UI) Column(gapDp Dp, fn func())
 func (u *UI) ColumnCentered(gapDp Dp, fn func())
 func (u *UI) ColumnFlex(gapDp Dp, items ...FlexItem)
 func (u *UI) ColumnWith(align Align, justify Justify, gapDp Dp, items ...func())
-func (u *UI) ContextMenu(id string, anchor Rect, items []ContextMenuItem)
+func (u *UI) ContextMenu(id string, anchor Rect, items []ContextMenuItem, opts ...Option)
 func (u *UI) CurrentArea() Rect
 func (u *UI) CurrentAreaPx() Rect
 func (u *UI) DatePicker(id string, date *time.Time, opts ...Option) bool
@@ -617,8 +648,8 @@ func (u *UI) DateTimePicker(id string, dt *time.Time, opts ...Option) bool
 func (u *UI) DockBottom(gapDp, bottomDp Dp, bodyFn, bottomFn func())
 func (u *UI) DockTop(gapDp, topDp Dp, topFn, bodyFn func())
 func (u *UI) DoubleClicked() bool
-func (u *UI) DrawSVG(svgData string, xPx, yPx int, sizeDp Dp, tint Color)
-func (u *UI) DrawText(xPx, yPx int, text string, sizeDp Dp, col Color)
+func (u *UI) DrawSVG(svgData string, xPx, yPx Px, sizeDp Dp, tint Color)
+func (u *UI) DrawText(xPx, yPx Px, text string, sizeDp Dp, col Color)
 func (u *UI) Drawer(id string, open *bool, side DrawerSide, fn func(), opts ...Option)
 func (u *UI) Expand(fn func())
 func (u *UI) FlexSpacer(reserveDp Dp)
@@ -632,8 +663,8 @@ func (u *UI) Grid(cols int, gapXDp, gapYDp, rowHeightDp Dp, fn func())
 func (u *UI) Hyperlink(id, text string, opts ...Option) bool
 func (u *UI) IDScope(key any, fn func())
 func (u *UI) IconButton(id, svg string, opts ...Option) bool
-func (u *UI) Image(img image.Image, wDp, hDp Dp, mode ImageScaleMode)
-func (u *UI) InteractiveCanvas(id string, wDp, hDp Dp, cb CanvasCallbacks, opts ...Option)
+func (u *UI) Image(img image.Image, mode ImageScaleMode, opts ...Option)
+func (u *UI) InteractiveCanvas(id string, cb CanvasCallbacks, opts ...Option)
 func (u *UI) InvalidateRemember(key any)
 func (u *UI) InvalidateStatic()
 func (u *UI) Label(text string, opts ...Option)
@@ -642,7 +673,7 @@ func (u *UI) LastFrameStaticBlitted() bool
 func (u *UI) LayoutRect(rect Rect, fn func())
 func (u *UI) LineChart(id string, labels []string, series []ChartSeries, opts ...Option)
 func (u *UI) ListView(id string, count int, itemHeightDp Dp, selected *int, ...) bool
-func (u *UI) ListViewEx(id string, count int, itemHeightDp Dp, selected map[int]bool, checked []bool, ...) bool
+func (u *UI) ListViewEx(id string, count int, itemHeightDp Dp, cfg *ListViewExConfig, ...) bool
 func (u *UI) LogView(id string, entries []LogEntry, followTail *bool, opts ...Option)
 func (u *UI) MaskedInput(id string, value *string, mask string, opts ...Option) bool
 func (u *UI) MenuBar(id string, menus []MenuBarItem, opts ...Option)
@@ -677,10 +708,11 @@ func (u *UI) RowWith(align Align, justify Justify, gapDp, heightDp Dp, items ...
 func (u *UI) Scale(dp Dp) Px
 func (u *UI) ScaleF(dp float32) float32
 func (u *UI) ScaledImageCacheStats() (entries int, bytes int64)
-func (u *UI) ScrollView(id string, wDp, hDp Dp, fn func(), opts ...Option)
+func (u *UI) ScrollView(id string, fn func(), opts ...Option)
 func (u *UI) Select(id string, items []SelectItem, selected *string, opts ...Option) bool
 func (u *UI) SelectableLabel(id, text string, opts ...Option)
 func (u *UI) Separator(opts ...Option)
+func (u *UI) SetClipboardImage(img image.Image) error
 func (u *UI) SetClipboardText(text string) error
 func (u *UI) SetCursor(cursor CursorType)
 func (u *UI) SetDebugDirtyRect(enabled bool)
@@ -700,7 +732,7 @@ func (u *UI) Spinner(id string, sizeDp Dp, opts ...Option)
 func (u *UI) SplitPane(id string, orient Orientation, ratio *float32, firstFn, secondFn func(), ...)
 func (u *UI) StaticLayer(id string, fn func())
 func (u *UI) StatusBar(id string, sections []StatusBarSection, opts ...Option)
-func (u *UI) StatusDot(dotColor Color, label string)
+func (u *UI) StatusDot(dotColor Color, label string, opts ...Option)
 func (u *UI) Strings() Strings
 func (u *UI) TabBar(id string, tabs []TabItem, activeID *string, opts ...Option) TabBarEvent
 func (u *UI) Table(id string, cols []TableColumn, rowCount int, selected *int, sort *TableSort, ...) TableEvent
@@ -711,12 +743,12 @@ func (u *UI) TextInput(id string, value *string, placeholder string, opts ...Opt
 func (u *UI) Theme() Theme
 func (u *UI) TimePicker(id string, t *time.Time, opts ...Option) bool
 func (u *UI) TitleBar(id, title string, cfg TitleBarConfig, opts ...Option)
-func (u *UI) TitleBarHitTest(xPx, yPx int) HitTestResult
+func (u *UI) TitleBarHitTest(xPx, yPx Px) HitTestResult
 func (u *UI) Toggle(id, label string, value *bool, opts ...Option) bool
 func (u *UI) Toolbar(id string, items []ToolbarItem, opts ...Option)
-func (u *UI) Tooltip(text string, anchor Rect)
+func (u *UI) Tooltip(text string, anchor Rect, opts ...Option)
 func (u *UI) TreeView(id string, roots []*TreeNode, selectedID *string, opts ...Option) bool
-func (u *UI) TreeViewEx(id string, roots []*TreeNode, selectedIDs map[string]bool, showCheckboxes bool, ...) bool
+func (u *UI) TreeViewEx(id string, roots []*TreeNode, cfg *TreeViewExConfig, opts ...Option) bool
 func (u *UI) VirtualTextView(id string, lines []string, opts ...Option)
 func (u *UI) Window() *Window
 ```

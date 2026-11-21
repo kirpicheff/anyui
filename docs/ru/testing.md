@@ -149,11 +149,11 @@ func TestToastExpiration(t *testing.T) {
 ## Синтетическая инъекция ввода
 
 ### Мышь и колесо
-- `h.InjectMouseMove(x, y int)` — переместить курсор в координаты `(x, y)`.
-- `h.InjectMouseDown(x, y int, btn anyui.MouseButton)` — зажать кнопку мыши (`MouseLeft`, `MouseRight`, `MouseMiddle`).
-- `h.InjectMouseUp(x, y int, btn anyui.MouseButton)` — отпустить кнопку мыши.
-- `h.InjectMouseClick(x, y int, btn anyui.MouseButton)` — полный цикл клика (`MouseMove` -> `MouseDown` -> `MouseUp`).
-- `h.InjectMouseWheel(dx, dy int)` — прокрутить колесо мыши (`dy > 0` — вверх, `dy < 0` — вниз).
+- `h.InjectMouseMove(xDp, yDp anyui.Dp)` — переместить курсор в логические координаты `(xDp, yDp)` (аналог в физических пикселях: `InjectMouseMovePx(xPx, yPx anyui.Px)`).
+- `h.InjectMouseDown(xDp, yDp anyui.Dp, btn anyui.MouseButton)` — зажать кнопку мыши (`MouseLeft`, `MouseRight`, `MouseMiddle`).
+- `h.InjectMouseUp(xDp, yDp anyui.Dp, btn anyui.MouseButton)` — отпустить кнопку мыши.
+- `h.InjectMouseClick(xDp, yDp anyui.Dp, btn anyui.MouseButton)` — полный цикл клика (`MouseMove` -> `MouseDown` -> `MouseUp`).
+- `h.InjectMouseWheel(dxDp, dyDp anyui.Dp)` — прокрутить колесо мыши (`dyDp > 0` — вверх, `dyDp < 0` — вниз).
 
 ### Клавиатура и ввод текста
 - `h.InjectText(text string)` — эмуляция ввода символов Unicode (`EventChar`) в сфокусированное поле.
@@ -272,7 +272,7 @@ func BenchmarkFrameBudget1000Widgets(b *testing.B) {
 	defer h.Close()
 
 	h.SetDraw(func(ui *anyui.UI) {
-		ui.ScrollView("bench_scroll", 1280, 960, func() {
+		ui.ScrollView("bench_scroll", func() {
 			for i := 0; i < 200; i++ {
 				ui.Row(8, 30, func() {
 					ui.Label("Элемент")
@@ -283,7 +283,7 @@ func BenchmarkFrameBudget1000Widgets(b *testing.B) {
 					ui.TextInput("txt", &str, "Подсказка")
 				})
 			}
-		})
+		}, anyui.Width(1280), anyui.Height(960))
 	})
 
 	// Прогревочный шаг

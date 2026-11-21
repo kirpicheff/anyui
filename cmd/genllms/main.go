@@ -36,6 +36,9 @@ func main() {
 		{"TrayConfig", modulePath + ".TrayConfig"},
 		{"FlexItem", modulePath + ".FlexItem"},
 		{"TableColumn", modulePath + ".TableColumn"},
+		{"ListViewExConfig", modulePath + ".ListViewExConfig"},
+		{"TreeViewExConfig", modulePath + ".TreeViewExConfig"},
+		{"TableExConfig", modulePath + ".TableExConfig"},
 		{"TabItem", modulePath + ".TabItem"},
 		{"StatusBarSection", modulePath + ".StatusBarSection"},
 		{"CanvasCallbacks", modulePath + ".CanvasCallbacks"},
@@ -111,7 +114,7 @@ func writeHeader(out *bytes.Buffer, version string) {
 	out.WriteString("- `PushOverlay(bounds, fn)` предназначен только для всплывающих контролов (кастомных выпадающих списков, меню, тултипов), которым нужно отрисоваться поверх родительских контейнеров без обрезания клипом.\n")
 	out.WriteString("- Горячие клавиши: `ui.Shortcut` регистрирует глобальный шорткат окна; не вызывайте его повторно на каждом кадре внутри циклических веток UI.\n")
 	out.WriteString("- `Card(fn, ...)` по умолчанию подбирает высоту по содержимому (`AutoHeight`); чтобы растянуть карточку на весь остаток высоты, передайте `anyui.FillHeight()`.\n")
-	out.WriteString("- Автозаполнение контейнеров (Auto-Fill): для `ScrollView`, `ListView`, `CanvasView` передавайте `anyui.Auto` (либо `anyui.FillWidth()` / `anyui.FillHeight()`), чтобы занять весь доступный остаток области без ручного вычисления размеров. `ui.CurrentArea()` возвращает геометрию строго в Dp; для низкоуровневых операций с `Canvas` используйте `ui.CurrentAreaPx()`.\n")
+	out.WriteString("- Автозаполнение контейнеров (Auto-Fill): `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image` и `ListView` по умолчанию занимают доступное пространство; явные размеры задаются единообразно через опции `anyui.Width(...)`, `anyui.Height(...)`, `anyui.FillWidth()`, `anyui.FillHeight()` (или `anyui.Auto`). `ui.CurrentArea()` возвращает геометрию строго в Dp; для низкоуровневых операций с `Canvas` используйте `ui.CurrentAreaPx()`.\n")
 	out.WriteString("- В `Table` / `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.\n")
 	out.WriteString("- Декларативная навигация: используйте `anyui.ScrollToIndex(idx)` для программной прокрутки в `ListView` и `Table`, и `anyui.ScrollToID(id)` / `ui.Anchor(id)` для навигации в `ScrollView`.\n")
 	out.WriteString("- Drag & Drop (Reorder): `anyui.OnReorder(func(ev anyui.DragEvent))` вместе с `anyui.Reorderable()` — для `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы) и `TreeView`, `TreeViewEx` (ключи). По умолчанию в деревьях разрешён перенос внутри одного родителя (`DropAbove`/`DropBelow`); с `anyui.AllowReparent()` поддерживаются смена родителя и вложение `DropInside` с защитой от циклов.\n\n")

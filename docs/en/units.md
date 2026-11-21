@@ -42,18 +42,22 @@ This document tracks the status of strict scalar typing in the AnyUI library acc
 | **Overlays and Interaction (All in Dp)** | | | |
 | `func (u *UI) PushOverlay(bounds Rect, drawFn func())` | | ✓ | Overlay bounds strictly in Dp (scaled to Px at boundary) |
 | `func (u *UI) LayoutRect(rect Rect, fn func())` | | ✓ | Direct layout box strictly in Dp |
-| `func (u *UI) Tooltip(text string, anchor Rect)` | | ✓ | Tooltip anchor strictly in Dp |
+| `func (u *UI) Tooltip(text string, anchor Rect, opts ...Option)` | | ✓ | Tooltip anchor strictly in Dp |
 | `func (u *UI) Popover(id string, open *bool, anchor Rect, fn func(), opts ...Option)` | | ✓ | Popover anchor strictly in Dp |
-| `func (u *UI) ContextMenu(id string, anchor Rect, items []ContextMenuItem)` | | ✓ | Context menu anchor strictly in Dp |
+| `func (u *UI) ContextMenu(id string, anchor Rect, items []ContextMenuItem, opts ...Option)` | | ✓ | Context menu anchor strictly in Dp |
 | `func (u *UI) RegisterHoverArea(id string, rect Rect, cursor CursorType, trackMove bool)` | | ✓ | Interactive hover area strictly in Dp |
 | `func (u *UI) LastDirtyRectsPx() []Rect` | | ✓ | Window damage rectangles in device Px (do NOT pass to Dp overlay APIs) |
 | **Testing (Headless)** | | | |
-| `func (h *Headless) InjectMouseMove(xDp, yDp int)` | | ✓ | Mouse move event in logical Dp (auto-scaled by Scale) |
-| `func (h *Headless) InjectMouseClick(xDp, yDp int, btn MouseButton)` | | ✓ | Full mouse click in logical Dp (auto-scaled by Scale) |
-| `func (h *Headless) InjectMouseWheel(dxDp, dyDp int)` | | ✓ | Mouse wheel delta in logical steps (Dp) |
-| `func (h *Headless) InjectMouseMovePx(xPx, yPx int)` | ✓ | | Raw mouse move event in physical device Px |
-| `func (h *Headless) InjectMouseClickPx(xPx, yPx int, btn MouseButton)` | ✓ | | Raw mouse click event in physical device Px |
-| `func (h *Headless) InjectMouseWheelPx(dxPx, dyPx int)` | ✓ | | Raw mouse wheel delta in physical device steps (Px) |
+| `func (h *Headless) InjectMouseMove(xDp, yDp Dp)` | | ✓ | Mouse move event in logical Dp (auto-scaled by Scale) |
+| `func (h *Headless) InjectMouseDown(xDp, yDp Dp, btn MouseButton)` | | ✓ | Mouse button press in logical Dp |
+| `func (h *Headless) InjectMouseUp(xDp, yDp Dp, btn MouseButton)` | | ✓ | Mouse button release in logical Dp |
+| `func (h *Headless) InjectMouseClick(xDp, yDp Dp, btn MouseButton)` | | ✓ | Full mouse click in logical Dp (auto-scaled by Scale) |
+| `func (h *Headless) InjectMouseWheel(dxDp, dyDp Dp)` | | ✓ | Mouse wheel delta in logical steps (Dp) |
+| `func (h *Headless) InjectMouseMovePx(xPx, yPx Px)` | | ✓ | Raw mouse move event in physical device Px |
+| `func (h *Headless) InjectMouseDownPx(xPx, yPx Px, btn MouseButton)` | | ✓ | Raw mouse button press in physical device Px |
+| `func (h *Headless) InjectMouseUpPx(xPx, yPx Px, btn MouseButton)` | | ✓ | Raw mouse button release in physical device Px |
+| `func (h *Headless) InjectMouseClickPx(xPx, yPx Px, btn MouseButton)` | | ✓ | Raw mouse click event in physical device Px |
+| `func (h *Headless) InjectMouseWheelPx(dxPx, dyPx Px)` | | ✓ | Raw mouse wheel delta in physical device steps (Px) |
 | **Styling Options** | | | |
 | `Width(dp Dp) Option` | | ✓ | Fixed widget width |
 | `Height(dp Dp) Option` | | ✓ | Fixed widget height |
@@ -98,17 +102,19 @@ This document tracks the status of strict scalar typing in the AnyUI library acc
 | `PageConfig.FooterDp Dp` | | ✓ | Page footer height |
 | `PageConfig.GapDp Dp` | | ✓ | Gap between page sections |
 | **Widgets and Components** | | | |
-| `Label(text string, sizeDp Dp, col Color)` | | ✓ | Text label |
-| `DrawText(x, y int, text string, sizeDp Dp, col Color)` | | ✓ | Text at specific canvas coordinates |
-| `DrawSVG(svgData string, x, y int, sizeDp Dp, tint Color)` | | ✓ | SVG icon with specified size |
-| `Card(wDp, hDp, padDp Dp, fn func())` | | ✓ | Rounded card |
-| `Button(id, label string, primary bool, widthDp Dp) bool` | | ✓ | Button with width |
-| `Image(img image.Image, wDp, hDp Dp, mode ImageScaleMode)` | | ✓ | Image display |
-| `CanvasView(wDp, hDp Dp, drawFn func(canvas *render.Canvas, areaPx Rect))` | | ✓ | Custom canvas drawing area (areaPx in device Px) |
-| `InteractiveCanvas(id string, wDp, hDp Dp, cb CanvasCallbacks, opts ...Option)` | | ✓ | Interactive custom canvas |
-| `ScrollView(id string, wDp, hDp Dp, fn func(), opts ...Option)` | | ✓ | Scrollable container |
+| `Label(text string, opts ...Option)` | | ✓ | Text label |
+| `DrawText(xPx, yPx Px, text string, sizeDp Dp, col Color)` | | ✓ | Text at physical canvas coordinates |
+| `DrawSVG(svgData string, xPx, yPx Px, sizeDp Dp, tint Color)` | | ✓ | SVG icon at physical canvas coordinates |
+| `TitleBarHitTest(xPx, yPx Px) HitTestResult` | | ✓ | Custom title bar hit-test in device Px |
+| `Card(fn func(), opts ...Option)` | | ✓ | Rounded card |
+| `Button(id, label string, opts ...Option) bool` | | ✓ | Button |
+| `Image(img image.Image, mode ImageScaleMode, opts ...Option)` | | ✓ | Image display (sized via options) |
+| `CanvasView(drawFn func(canvas *Canvas, areaPx Rect), opts ...Option)` | | ✓ | Custom canvas drawing area (areaPx in device Px, sized via options) |
+| `InteractiveCanvas(id string, cb CanvasCallbacks, opts ...Option)` | | ✓ | Interactive custom canvas (sized via options) |
+| `ScrollView(id string, fn func(), opts ...Option)` | | ✓ | Scrollable container (sized via options) |
 | `ListView(id string, count int, itemHeightDp Dp, selected *int, drawItem func(idx int, areaPx Rect, sel bool), opts ...Option)` | | ✓ | Virtualized list (areaPx in device Px; count, selected — int indices) |
-| `ListViewEx(id string, count int, itemHeightDp Dp, selected map[int]bool, checked []bool, drawItem func(idx int, areaPx Rect, sel bool), opts ...Option)` | | ✓ | Extended list (areaPx in device Px; count — int item count) |
+| `ListViewEx(id string, count int, itemHeightDp Dp, cfg *ListViewExConfig, drawItem func(idx int, areaPx Rect, sel bool), opts ...Option)` | | ✓ | Extended list (areaPx in device Px; count — int item count) |
+| `TreeViewEx(id string, roots []*TreeNode, cfg *TreeViewExConfig, opts ...Option)` | | ✓ | Extended tree with multi-select and checkboxes |
 | `TableColumn.WidthDp Dp` | | ✓ | Table column base width |
 | `TableColumn.MinWidthDp Dp` | | ✓ | Table column min width |
 | `StatusBarSection.WidthDp Dp` | | ✓ | Status bar section width |

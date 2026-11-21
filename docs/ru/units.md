@@ -42,18 +42,22 @@
 | **Оверлеи и интерактивные зоны (все строго в Dp)** | | | |
 | `func (u *UI) PushOverlay(bounds Rect, drawFn func())` | | ✓ | Границы оверлея в Dp (масштабируются в Px на границе) |
 | `func (u *UI) LayoutRect(rect Rect, fn func())` | | ✓ | Область явной раскладки строго в Dp |
-| `func (u *UI) Tooltip(text string, anchor Rect)` | | ✓ | Якорь всплывающей подсказки строго в Dp |
+| `func (u *UI) Tooltip(text string, anchor Rect, opts ...Option)` | | ✓ | Якорь всплывающей подсказки строго в Dp |
 | `func (u *UI) Popover(id string, open *bool, anchor Rect, fn func(), opts ...Option)` | | ✓ | Якорь поповера строго в Dp |
-| `func (u *UI) ContextMenu(id string, anchor Rect, items []ContextMenuItem)` | | ✓ | Якорь контекстного меню строго в Dp |
+| `func (u *UI) ContextMenu(id string, anchor Rect, items []ContextMenuItem, opts ...Option)` | | ✓ | Якорь контекстного меню строго в Dp |
 | `func (u *UI) RegisterHoverArea(id string, rect Rect, cursor CursorType, trackMove bool)` | | ✓ | Интерактивная зона курсора строго в Dp |
 | `func (u *UI) LastDirtyRectsPx() []Rect` | | ✓ | Изменённые области окна в физических Px (не передавать в методы оверлеев Dp) |
 | **Тестирование (Headless)** | | | |
-| `func (h *Headless) InjectMouseMove(xDp, yDp int)` | | ✓ | Перемещение мыши в логических Dp (масштабируется по Scale) |
-| `func (h *Headless) InjectMouseClick(xDp, yDp int, btn MouseButton)` | | ✓ | Полный клик мыши в логических Dp (масштабируется по Scale) |
-| `func (h *Headless) InjectMouseWheel(dxDp, dyDp int)` | | ✓ | Прокрутка колеса мыши в логических шагах (Dp) |
-| `func (h *Headless) InjectMouseMovePx(xPx, yPx int)` | ✓ | | Прямое перемещение мыши в физических пикселях Px |
-| `func (h *Headless) InjectMouseClickPx(xPx, yPx int, btn MouseButton)` | ✓ | | Прямой клик мыши в физических пикселях Px |
-| `func (h *Headless) InjectMouseWheelPx(dxPx, dyPx int)` | ✓ | | Прямая прокрутка колеса мыши в физических шагах (Px) |
+| `func (h *Headless) InjectMouseMove(xDp, yDp Dp)` | | ✓ | Перемещение мыши в логических Dp (масштабируется по Scale) |
+| `func (h *Headless) InjectMouseDown(xDp, yDp Dp, btn MouseButton)` | | ✓ | Нажатие кнопки мыши в логических Dp |
+| `func (h *Headless) InjectMouseUp(xDp, yDp Dp, btn MouseButton)` | | ✓ | Отпускание кнопки мыши в логических Dp |
+| `func (h *Headless) InjectMouseClick(xDp, yDp Dp, btn MouseButton)` | | ✓ | Полный клик мыши в логических Dp (масштабируется по Scale) |
+| `func (h *Headless) InjectMouseWheel(dxDp, dyDp Dp)` | | ✓ | Прокрутка колеса мыши в логических шагах (Dp) |
+| `func (h *Headless) InjectMouseMovePx(xPx, yPx Px)` | | ✓ | Прямое перемещение мыши в физических пикселях Px |
+| `func (h *Headless) InjectMouseDownPx(xPx, yPx Px, btn MouseButton)` | | ✓ | Прямое нажатие кнопки мыши в физических пикселях Px |
+| `func (h *Headless) InjectMouseUpPx(xPx, yPx Px, btn MouseButton)` | | ✓ | Прямое отпускание кнопки мыши в физических пикселях Px |
+| `func (h *Headless) InjectMouseClickPx(xPx, yPx Px, btn MouseButton)` | | ✓ | Прямой клик мыши в физических пикселях Px |
+| `func (h *Headless) InjectMouseWheelPx(dxPx, dyPx Px)` | | ✓ | Прямая прокрутка колеса мыши в физических шагах (Px) |
 | **Опции стилизации (Options)** | | | |
 | `Width(dp Dp) Option` | | ✓ | Фиксированная ширина виджета |
 | `Height(dp Dp) Option` | | ✓ | Фиксированная высота виджета |
@@ -98,17 +102,19 @@
 | `PageConfig.FooterDp Dp` | | ✓ | Высота футера страницы |
 | `PageConfig.GapDp Dp` | | ✓ | Отступ между секциями страницы |
 | **Виджеты и компоненты** | | | |
-| `Label(text string, sizeDp Dp, col Color)` | | ✓ | Текстовая метка |
-| `DrawText(x, y int, text string, sizeDp Dp, col Color)` | | ✓ | Текст в произвольных координатах |
-| `DrawSVG(svgData string, x, y int, sizeDp Dp, tint Color)` | | ✓ | SVG-иконка заданного размера |
-| `Card(wDp, hDp, padDp Dp, fn func())` | | ✓ | Скруглённая карточка |
-| `Button(id, label string, primary bool, widthDp Dp) bool` | | ✓ | Кнопка с шириной |
-| `Image(img image.Image, wDp, hDp Dp, mode ImageScaleMode)` | | ✓ | Вывод изображения |
-| `CanvasView(wDp, hDp Dp, drawFn func(canvas *render.Canvas, areaPx Rect))` | | ✓ | Область кастомного рисования (areaPx в физических Px) |
-| `InteractiveCanvas(id string, wDp, hDp Dp, cb CanvasCallbacks, opts ...Option)` | | ✓ | Интерактивный холст |
-| `ScrollView(id string, wDp, hDp Dp, fn func(), opts ...Option)` | | ✓ | Прокручиваемый контейнер |
+| `Label(text string, opts ...Option)` | | ✓ | Текстовая метка |
+| `DrawText(xPx, yPx Px, text string, sizeDp Dp, col Color)` | | ✓ | Текст в физических координатах холста |
+| `DrawSVG(svgData string, xPx, yPx Px, sizeDp Dp, tint Color)` | | ✓ | SVG-иконка в физических координатах холста |
+| `TitleBarHitTest(xPx, yPx Px) HitTestResult` | | ✓ | Хит-тест кастомной шапки в физических пикселях |
+| `Card(fn func(), opts ...Option)` | | ✓ | Скруглённая карточка |
+| `Button(id, label string, opts ...Option) bool` | | ✓ | Кнопка |
+| `Image(img image.Image, mode ImageScaleMode, opts ...Option)` | | ✓ | Вывод изображения (размеры через опции) |
+| `CanvasView(drawFn func(canvas *Canvas, areaPx Rect), opts ...Option)` | | ✓ | Область кастомного рисования (areaPx в физических Px, размеры через опции) |
+| `InteractiveCanvas(id string, cb CanvasCallbacks, opts ...Option)` | | ✓ | Интерактивный холст (размеры через опции) |
+| `ScrollView(id string, fn func(), opts ...Option)` | | ✓ | Прокручиваемый контейнер (размеры через опции) |
 | `ListView(id string, count int, itemHeightDp Dp, selected *int, drawItem func(idx int, areaPx Rect, sel bool), opts ...Option)` | | ✓ | Виртуализированный список (areaPx в Px буфера; count, selected — int индексы) |
-| `ListViewEx(id string, count int, itemHeightDp Dp, selected map[int]bool, checked []bool, drawItem func(idx int, areaPx Rect, sel bool), opts ...Option)` | | ✓ | Расширенный список (areaPx в Px буфера; count — int число элементов) |
+| `ListViewEx(id string, count int, itemHeightDp Dp, cfg *ListViewExConfig, drawItem func(idx int, areaPx Rect, sel bool), opts ...Option)` | | ✓ | Расширенный список (areaPx в Px буфера; count — int число элементов) |
+| `TreeViewEx(id string, roots []*TreeNode, cfg *TreeViewExConfig, opts ...Option)` | | ✓ | Расширенное дерево с мультивыбором и чекбоксами |
 | `TableColumn.WidthDp Dp` | | ✓ | Базовая ширина колонки таблицы |
 | `TableColumn.MinWidthDp Dp` | | ✓ | Минимальная ширина колонки таблицы |
 | `StatusBarSection.WidthDp Dp` | | ✓ | Ширина секции строки состояния |
