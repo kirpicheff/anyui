@@ -330,7 +330,13 @@ func (c *Context) TreeViewEx(
 			c.Canvas.FillRect(ir, c.Theme.Surface)
 		}
 
-		curX := ir.X + c.Scale(8).Int() + item.Depth*c.Scale(18).Int()
+		// Приглушение перемещаемого узла во время Reorder
+		_, fromKey, reorderActive := c.ReorderSource(id)
+		if reorderActive && fromKey == n.ID {
+			c.Canvas.FillRect(ir, c.Theme.Bg.WithAlpha(160))
+		}
+
+		curX := ir.X + c.Scale(8).Int() + item.Depth*c.Scale(TreeIndent).Int()
 
 		// Стрелка раскрытия/сворачивания
 		arrowR := render.Rect{X: curX, Y: ir.Y + (ir.H-c.Scale(16).Int())/2, W: c.Scale(16).Int(), H: c.Scale(16).Int()}
@@ -388,42 +394,60 @@ func (c *Context) TreeViewEx(
 			c.Font.DrawText(c.Canvas, curX, ir.Y+(ir.H-th)/2, n.Label, pxSize, c.Theme.TextPrimary)
 		}
 
-		if hov && c.MousePressed && selectedIDs != nil {
-			c.FocusID = id
-			anchor, hasAnchor := treeAnchorStore[id]
-			if mods.Shift && hasAnchor && anchor >= 0 && anchor < len(flat) {
-				lo, hi := anchor, i
-				if lo > hi {
-					lo, hi = hi, lo
-				}
-				if !mods.Ctrl {
-					for k := range selectedIDs {
-						delete(selectedIDs, k)
-					}
-				}
-				for k := lo; k <= hi; k++ {
-					selectedIDs[flat[k].Node.ID] = true
-				}
-			} else if mods.Ctrl {
-				if selectedIDs[n.ID] {
-					delete(selectedIDs, n.ID)
-				} else {
-					selectedIDs[n.ID] = true
-				}
-				treeAnchorStore[id] = i
-			} else {
-				for k := range selectedIDs {
-					delete(selectedIDs, k)
-				}
-				selectedIDs[n.ID] = true
-				treeAnchorStore[id] = i
+		if hov && c.MousePressed {
+			// Вооружение Reorder (при клике на стрелку или чекбокс hov уже сброшен в false)
+			if st.Reorderable {
+				c.ArmReorder(id, -1, n.ID)
 			}
-			changed = true
-			c.RequestRedraw()
+			if selectedIDs != nil {
+				c.FocusID = id
+				anchor, hasAnchor := treeAnchorStore[id]
+				if mods.Shift && hasAnchor && anchor >= 0 && anchor < len(flat) {
+					lo, hi := anchor, i
+					if lo > hi {
+						lo, hi = hi, lo
+					}
+					if !mods.Ctrl {
+						for k := range selectedIDs {
+							delete(selectedIDs, k)
+						}
+					}
+					for k := lo; k <= hi; k++ {
+						selectedIDs[flat[k].Node.ID] = true
+					}
+				} else if mods.Ctrl {
+					if selectedIDs[n.ID] {
+						delete(selectedIDs, n.ID)
+					} else {
+						selectedIDs[n.ID] = true
+					}
+					treeAnchorStore[id] = i
+				} else {
+					// При Reorder клик по узлу, уже входящему в группу выделенных, не схлопывает группу
+					if !(st.Reorderable && selectedIDs[n.ID] && len(selectedIDs) > 1) {
+						for k := range selectedIDs {
+							delete(selectedIDs, k)
+						}
+						selectedIDs[n.ID] = true
+					}
+					treeAnchorStore[id] = i
+				}
+				changed = true
+				c.RequestRedraw()
+			}
 		}
 	}
 
 	c.Canvas.PopClip()
+
+	// Обработка перетаскивания (Reorder) узлов TreeViewEx
+	if st.Reorderable {
+		if c.HandleTreeReorder(id, viewRect, contentW, rowH, flat, si, maxScroll, st.AllowReparent, st.OnReorder, func() {
+			delete(treeAnchorStore, id)
+		}) {
+			changed = true
+		}
+	}
 
 	if hasScroll {
 		sbTrack := render.Rect{X: viewRect.X + contentW, Y: viewRect.Y, W: sbW, H: viewRect.H}

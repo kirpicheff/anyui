@@ -160,9 +160,16 @@ func ScrollToIndex(idx int) Option { return ui.ScrollToIndex(idx) }
 // ScrollToID задаёт строковый идентификатор дочернего элемента или якоря для программной прокрутки в ScrollView.
 func ScrollToID(id string) Option { return ui.ScrollToID(id) }
 
-// Reorderable разрешает перетаскивание элементов (строк в Table/ListView или узлов в TreeView) внутри компонента для изменения порядка.
+// Reorderable разрешает перетаскивание элементов внутри компонента для изменения порядка.
+// Действует для Table, ListView, ListViewEx, TreeView, TreeViewEx; TableEx пока не поддерживается.
 // Без опции OnReorder результат перетаскивания отбрасывается.
 func Reorderable(enabled ...bool) Option { return ui.Reorderable(enabled...) }
 
+// AllowReparent разрешает в TreeView и TreeViewEx смену родителя при перетаскивании узлов
+// (DropAbove/DropBelow между разными родителями) и вложение внутрь целевого узла (DropInside)
+// с автоматической защитой от циклов. Работает совместно с Reorderable() и OnReorder(...).
+func AllowReparent(enabled ...bool) Option { return ui.AllowReparent(enabled...) }
+
 // OnReorder регистрирует обработчик события завершения перетаскивания элемента.
+// Действует для Table, ListView, ListViewEx, TreeView, TreeViewEx; TableEx пока не поддерживается.
 func OnReorder(fn func(ev DragEvent)) Option { return ui.OnReorder(fn) }

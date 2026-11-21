@@ -1245,6 +1245,11 @@ func (c *Context) DrawDropLine(xPx, yPx, wPx int) {
 	}, c.Theme.Accent)
 }
 
+// DrawDropInside отрисовывает подсветку и рамку целевой строки цветом Accent при вложении (DropInside).
+func (c *Context) DrawDropInside(r render.Rect) {
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(4), c.Theme.Accent.WithAlpha(35), c.ScaleF(1.5), c.Theme.Accent)
+}
+
 // ApplyReorderAutoScroll выполняет плавный авто-скролл контейнера при нахождении курсора у верхней или нижней границы.
 func (c *Context) ApplyReorderAutoScroll(viewY, viewH int, si *scrollInfo, maxSc int) {
 	if si == nil {
@@ -1304,9 +1309,12 @@ func (c *Context) ApplyReorderAutoScroll(viewY, viewH int, si *scrollInfo, maxSc
 	}
 }
 
-// LinearDropTarget рассчитывает строку-цель, зону сброса (DropAbove/DropBelow) и ToIndex (индекс после удаления)
-// для линейных списков и таблиц. Является чистой детерминированной функцией без графических зависимостей.
-func (c *Context) LinearDropTarget(from, cursorY, rowsTop, itemH, count int) (targetRow int, zone DropZone, toIdx int, noop bool) {
+// RowDropTarget рассчитывает строку-цель, зону сброса и ToIndex (индекс после удаления)
+// для линейных списков, таблиц и плоского представления дерева.
+// При allowInside == false строка делится пополам (DropAbove / DropBelow).
+// При allowInside == true строка делится на 25% (DropAbove) / 50% (DropInside) / 25% (DropBelow).
+// Является чистой детерминированной функцией без графических зависимостей.
+func (c *Context) RowDropTarget(from, cursorY, rowsTop, itemH, count int, allowInside bool) (targetRow int, zone DropZone, toIdx int, noop bool) {
 	if count <= 0 || itemH <= 0 {
 		return 0, DropBelow, from, true
 	}
@@ -1319,9 +1327,23 @@ func (c *Context) LinearDropTarget(from, cursorY, rowsTop, itemH, count int) (ta
 		targetRow = count - 1
 	}
 	targetRowY := rowsTop + targetRow*itemH
-	zone = DropBelow
-	if cursorY < targetRowY+itemH/2 {
-		zone = DropAbove
+	if allowInside {
+		q := itemH / 4
+		if cursorY < targetRowY+q {
+			zone = DropAbove
+		} else if cursorY >= targetRowY+itemH-q {
+			zone = DropBelow
+		} else {
+			zone = DropInside
+		}
+	} else {
+		zone = DropBelow
+		if cursorY < targetRowY+itemH/2 {
+			zone = DropAbove
+		}
+	}
+	if zone == DropInside {
+		return targetRow, DropInside, targetRow, targetRow == from
 	}
 	insertIdx := targetRow
 	if zone == DropBelow {
@@ -1360,7 +1382,7 @@ func (c *Context) HandleLinearReorder(
 	c.ApplyReorderAutoScroll(viewRect.Y, viewRect.H, si, maxSc)
 
 	if !c.IsInputBlocked() && viewRect.Contains(c.MouseX, c.MouseY) && c.MouseX < lineX+lineW {
-		targetRow, zone, toIdx, noop := c.LinearDropTarget(fromIdx, c.MouseY, viewRect.Y-si.y, itemH, count)
+		targetRow, zone, toIdx, noop := c.RowDropTarget(fromIdx, c.MouseY, viewRect.Y-si.y, itemH, count, false)
 		targetRowY := viewRect.Y + targetRow*itemH - si.y
 		lineY := targetRowY
 		if zone == DropBelow {
@@ -1383,6 +1405,112 @@ func (c *Context) HandleLinearReorder(
 			}
 			c.ResetReorder()
 			return true
+		}
+	}
+	return false
+}
+
+// HandleTreeReorder выполняет авто-скролл, расчёт целевого узла и зоны сброса (через RowDropTarget),
+// проверку правил сиблингов / защиту от циклов, отрисовку индикатора (линия или DropInside) и генерацию DragEvent.
+// Возвращает true, если произошёл валидный сброс (Drop) узла.
+func (c *Context) HandleTreeReorder(
+	widgetID string,
+	viewRect render.Rect,
+	contentW int,
+	itemH int,
+	flat []FlatTreeItem,
+	si *scrollInfo,
+	maxSc int,
+	allowReparent bool,
+	onReorder func(DragEvent),
+	onDrop func(),
+) bool {
+	if !c.UpdateReorderDrag(widgetID) {
+		return false
+	}
+	_, fromKey, active := c.ReorderSource(widgetID)
+	if !active {
+		c.ResetReorder()
+		return false
+	}
+	sourceIdx := -1
+	for idx, it := range flat {
+		if it.Node != nil && it.Node.ID == fromKey {
+			sourceIdx = idx
+			break
+		}
+	}
+	if sourceIdx < 0 {
+		c.ResetReorder()
+		return false
+	}
+	sourceItem := flat[sourceIdx]
+
+	c.ApplyReorderAutoScroll(viewRect.Y, viewRect.H, si, maxSc)
+
+	if !c.IsInputBlocked() && viewRect.Contains(c.MouseX, c.MouseY) && c.MouseX < viewRect.X+contentW {
+		targetIdx, zone, _, _ := c.RowDropTarget(sourceIdx, c.MouseY, viewRect.Y-si.y, itemH, len(flat), allowReparent)
+		if targetIdx >= 0 && targetIdx < len(flat) {
+			targetItem := flat[targetIdx]
+			targetNode := targetItem.Node
+			targetRowY := viewRect.Y + targetIdx*itemH - si.y
+
+			var isValidDrop bool
+			if allowReparent {
+				// Смена родителя и DropInside с защитой от циклов и no-op на текущем родителе
+				isValidDrop = targetNode.ID != sourceItem.Node.ID &&
+					!isTreeDescendant(sourceItem.Node, targetNode.ID) &&
+					!(zone == DropInside && targetNode.ID == sourceItem.ParentID)
+			} else {
+				// Без AllowReparent перетаскивание узлов разрешено строго между сиблингами одного родителя
+				isValidDrop = targetItem.ParentID == sourceItem.ParentID && targetNode.ID != sourceItem.Node.ID
+			}
+
+			if isValidDrop {
+				if zone == DropInside {
+					c.DrawDropInside(render.Rect{
+						X: viewRect.X,
+						Y: targetRowY,
+						W: contentW,
+						H: itemH,
+					})
+				} else {
+					lineY := targetRowY
+					if zone == DropBelow {
+						lineY += itemH
+					}
+					treeIndentPx := c.Scale(TreeIndent).Int()
+					treeInsetPx := c.Scale(TreeIndicatorInset).Int()
+					targetIndent := targetItem.Depth*treeIndentPx + treeInsetPx
+					lineX := viewRect.X + targetIndent
+					lineW := contentW - targetIndent
+					if lineW > 0 {
+						c.DrawDropLine(lineX, lineY, lineW)
+					}
+				}
+
+				if c.MouseReleased {
+					if onDrop != nil {
+						onDrop()
+					}
+					dragEv := DragEvent{
+						FromWidget: widgetID,
+						ToWidget:   widgetID,
+						FromKey:    sourceItem.Node.ID,
+						ToKey:      targetNode.ID,
+						FromIndex:  -1,
+						ToIndex:    -1,
+						Drop:       zone,
+					}
+					if onReorder != nil {
+						onReorder(dragEv)
+					}
+					c.ResetReorder()
+					return true
+				}
+			} else if c.MouseReleased {
+				c.ResetReorder()
+			}
 		}
 	}
 	return false

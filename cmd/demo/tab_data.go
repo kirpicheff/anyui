@@ -130,6 +130,13 @@ func insertNode(nodes []*anyui.TreeNode, targetID string, item *anyui.TreeNode, 
 				res = append(res, nodes[i:]...)
 				return res
 			case anyui.DropBelow:
+				if n.Expanded && len(n.Children) > 0 {
+					res := make([]*anyui.TreeNode, 0, len(n.Children)+1)
+					res = append(res, item)
+					res = append(res, n.Children...)
+					n.Children = res
+					return nodes
+				}
 				res := make([]*anyui.TreeNode, 0, len(nodes)+1)
 				res = append(res, nodes[:i+1]...)
 				res = append(res, item)
@@ -249,10 +256,10 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 		}
 
 		ui.Spacer(12)
-		ui.Label("SplitPane + TreeView (Drag-Reorder узлов внутри родителя) + Collapsible & Accordion", anyui.FontSize(16), anyui.Bold())
+		ui.Label("SplitPane + TreeView (Drag-Reorder, вложение DropInside и смена родителя) + Collapsible & Accordion", anyui.FontSize(16), anyui.Bold())
 		ui.SplitPane("split_main", anyui.Horizontal, &st.splitRatio, func() {
-			ui.Label("TreeView Проект (перестановка узлов внутри одного родителя)", anyui.FontSize(13), anyui.Bold())
-			if ui.TreeView("tree_proj", st.treeRoots, &st.treeSelected, anyui.Height(170), anyui.Reorderable(), anyui.OnReorder(handleTreeDrop)) {
+			ui.Label("TreeView Проект (AllowReparent: смена родителя и вложение DropInside)", anyui.FontSize(13), anyui.Bold())
+			if ui.TreeView("tree_proj", st.treeRoots, &st.treeSelected, anyui.Height(170), anyui.Reorderable(), anyui.AllowReparent(), anyui.OnReorder(handleTreeDrop)) {
 				st.statusMsg = fmt.Sprintf("TreeView: %s", st.treeSelected)
 			}
 			ui.Spacer(6)

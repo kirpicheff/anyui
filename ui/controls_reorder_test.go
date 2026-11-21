@@ -981,18 +981,18 @@ func TestListViewExReorder_ShortCheckedSliceNoPanic(t *testing.T) {
 	}
 }
 
-func TestLinearDropTarget_Matrix(t *testing.T) {
+func TestRowDropTarget_Matrix(t *testing.T) {
 	c := &Context{}
 	count := 5
 	itemH := 20
 	rowsTop := 100
 
-	// 1. Полный перебор матрицы from (0..4) x target (0..4) x 2 зоны (DropAbove / DropBelow)
+	// 1. Полный перебор матрицы from (0..4) x target (0..4) x 2 зоны (allowInside == false: DropAbove / DropBelow)
 	for from := 0; from < count; from++ {
 		for target := 0; target < count; target++ {
 			// Зона DropAbove (верхняя четверть строки target)
 			cursorYAbove := rowsTop + target*itemH + itemH/4
-			targetRow, zone, toIdx, noop := c.LinearDropTarget(from, cursorYAbove, rowsTop, itemH, count)
+			targetRow, zone, toIdx, noop := c.RowDropTarget(from, cursorYAbove, rowsTop, itemH, count, false)
 			if targetRow != target {
 				t.Fatalf("from=%d target=%d DropAbove: targetRow=%d, ожидали %d", from, target, targetRow, target)
 			}
@@ -1013,7 +1013,7 @@ func TestLinearDropTarget_Matrix(t *testing.T) {
 
 			// Зона DropBelow (нижняя четверть строки target)
 			cursorYBelow := rowsTop + target*itemH + 3*itemH/4
-			targetRowB, zoneB, toIdxB, noopB := c.LinearDropTarget(from, cursorYBelow, rowsTop, itemH, count)
+			targetRowB, zoneB, toIdxB, noopB := c.RowDropTarget(from, cursorYBelow, rowsTop, itemH, count, false)
 			if targetRowB != target {
 				t.Fatalf("from=%d target=%d DropBelow: targetRow=%d, ожидали %d", from, target, targetRowB, target)
 			}
@@ -1034,25 +1034,47 @@ func TestLinearDropTarget_Matrix(t *testing.T) {
 		}
 	}
 
-	// 2. Граничные значения курсора выше верха и ниже низа
-	// Курсор выше верха (-50px)
-	trAbove, zAbove, toAbove, _ := c.LinearDropTarget(2, rowsTop-50, rowsTop, itemH, count)
-	if trAbove != 0 || zAbove != DropAbove || toAbove != 0 {
-		t.Fatalf("курсор выше верха: tr=%d z=%v to=%d, ожидали (0, DropAbove, 0)", trAbove, zAbove, toAbove)
+	// 2. Полный перебор матрицы с allowInside == true (25% DropAbove / 50% DropInside / 25% DropBelow)
+	for from := 0; from < count; from++ {
+		for target := 0; target < count; target++ {
+			baseY := rowsTop + target*itemH
+			// Верхняя четверть -> DropAbove
+			trA, zA, _, _ := c.RowDropTarget(from, baseY+2, rowsTop, itemH, count, true)
+			if trA != target || zA != DropAbove {
+				t.Fatalf("allowInside from=%d target=%d top: tr=%d z=%v, ожидали (%d, DropAbove)", from, target, trA, zA, target)
+			}
+			// Середина -> DropInside
+			trI, zI, toI, noopI := c.RowDropTarget(from, baseY+itemH/2, rowsTop, itemH, count, true)
+			if trI != target || zI != DropInside || toI != target || noopI != (target == from) {
+				t.Fatalf("allowInside from=%d target=%d mid: tr=%d z=%v to=%d noop=%v", from, target, trI, zI, toI, noopI)
+			}
+			// Нижняя четверть -> DropBelow
+			trB, zB, _, _ := c.RowDropTarget(from, baseY+itemH-2, rowsTop, itemH, count, true)
+			if trB != target || zB != DropBelow {
+				t.Fatalf("allowInside from=%d target=%d bot: tr=%d z=%v, ожидали (%d, DropBelow)", from, target, trB, zB, target)
+			}
+		}
 	}
 
-	// Курсор ниже низа (+500px)
-	trBelow, zBelow, toBelow, _ := c.LinearDropTarget(2, rowsTop+count*itemH+500, rowsTop, itemH, count)
-	if trBelow != count-1 || zBelow != DropBelow || toBelow != count-1 {
-		t.Fatalf("курсор ниже низа: tr=%d z=%v to=%d, ожидали (%d, DropBelow, %d)", trBelow, zBelow, toBelow, count-1, count-1)
+	// 3. Граничные значения курсора выше верха и ниже низа
+	for _, allowInside := range []bool{false, true} {
+		trAbove, zAbove, toAbove, _ := c.RowDropTarget(2, rowsTop-50, rowsTop, itemH, count, allowInside)
+		if trAbove != 0 || zAbove != DropAbove || toAbove != 0 {
+			t.Fatalf("allowInside=%v курсор выше верха: tr=%d z=%v to=%d, ожидали (0, DropAbove, 0)", allowInside, trAbove, zAbove, toAbove)
+		}
+
+		trBelow, zBelow, toBelow, _ := c.RowDropTarget(2, rowsTop+count*itemH+500, rowsTop, itemH, count, allowInside)
+		if trBelow != count-1 || zBelow != DropBelow || toBelow != count-1 {
+			t.Fatalf("allowInside=%v курсор ниже низа: tr=%d z=%v to=%d, ожидали (%d, DropBelow, %d)", allowInside, trBelow, zBelow, toBelow, count-1, count-1)
+		}
 	}
 
-	// 3. Вырожденные списки
-	_, _, _, noopEmpty := c.LinearDropTarget(0, 50, 0, itemH, 0)
+	// 4. Вырожденные списки
+	_, _, _, noopEmpty := c.RowDropTarget(0, 50, 0, itemH, 0, false)
 	if !noopEmpty {
 		t.Fatalf("пустой список должен возвращать noop=true")
 	}
-	_, _, _, noopZeroH := c.LinearDropTarget(0, 50, 0, 0, count)
+	_, _, _, noopZeroH := c.RowDropTarget(0, 50, 0, 0, count, true)
 	if !noopZeroH {
 		t.Fatalf("нулевая высота строки должна возвращать noop=true")
 	}
@@ -1125,5 +1147,384 @@ func TestApplyReorderAutoScroll_ZeroAndNegativeMaxSc(t *testing.T) {
 	}
 	if siList.y != 0 || ctxShort.reorderScrollAccum != 0 {
 		t.Fatalf("после дропа в коротком списке si.y=%d, accum=%v, ожидали 0/0", siList.y, ctxShort.reorderScrollAccum)
+	}
+}
+
+func makeReparentTestTree() []*TreeNode {
+	return []*TreeNode{
+		{
+			ID:       "p1",
+			Label:    "Parent 1",
+			Expanded: true,
+			Children: []*TreeNode{
+				{
+					ID:       "c1",
+					Label:    "Child 1",
+					Expanded: true,
+					Children: []*TreeNode{
+						{ID: "g1", Label: "Grandchild 1"},
+					},
+				},
+			},
+		},
+		{
+			ID:       "p2",
+			Label:    "Parent 2",
+			Expanded: true,
+			Children: []*TreeNode{
+				{ID: "c2", Label: "Child 2"},
+			},
+		},
+	}
+}
+
+func TestTreeViewReorder_AllowReparent_DropInside(t *testing.T) {
+	ctx := newTestContext(600, 400)
+	roots := makeReparentTestTree()
+	sel := ""
+	var got *DragEvent
+
+	// Плоский порядок (itemH = 26, inner.Y = 4):
+	// 0: p1 (Y=4..30)
+	// 1: c1 (Y=30..56)
+	// 2: g1 (Y=56..82)
+	// 3: p2 (Y=82..108)
+	// 4: c2 (Y=108..134)
+	renderTree := func() {
+		ctx.Render(func(c *Context) {
+			c.TreeView("tv_reparent_in", roots, &sel, Width(300), Height(260), Reorderable(), AllowReparent(), OnReorder(func(ev DragEvent) {
+				e := ev
+				got = &e
+			}))
+		})
+	}
+
+	// Захватываем c2 (строка 4, Y=121) и бросаем в середину p1 (строка 0, Y=17 -> DropInside)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 100, Y: 121})
+	renderTree()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 100, Y: 17})
+	renderTree()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 100, Y: 17})
+	renderTree()
+
+	if got == nil {
+		t.Fatal("ожидалось событие OnReorder с DropInside при AllowReparent()")
+	}
+	if got.FromKey != "c2" || got.ToKey != "p1" || got.Drop != DropInside || got.FromIndex != -1 || got.ToIndex != -1 {
+		t.Fatalf("неверные параметры DropInside: %+v", *got)
+	}
+}
+
+func TestTreeViewReorder_AllowReparent_ChangeParentAboveBelow(t *testing.T) {
+	ctx := newTestContext(600, 400)
+	roots := makeReparentTestTree()
+	sel := ""
+	var got *DragEvent
+
+	renderTree := func() {
+		ctx.Render(func(c *Context) {
+			c.TreeView("tv_reparent_ab", roots, &sel, Width(300), Height(260), Reorderable(), AllowReparent(), OnReorder(func(ev DragEvent) {
+				e := ev
+				got = &e
+			}))
+		})
+	}
+
+	// Захватываем c2 (строка 4, Y=121) и бросаем в нижнюю четверть c1 (строка 1, Y=30..56 -> Y=53 -> DropBelow)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 100, Y: 121})
+	renderTree()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 100, Y: 53})
+	renderTree()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 100, Y: 53})
+	renderTree()
+
+	if got == nil {
+		t.Fatal("ожидалось событие смены родителя DropBelow при AllowReparent()")
+	}
+	if got.FromKey != "c2" || got.ToKey != "c1" || got.Drop != DropBelow {
+		t.Fatalf("неверные параметры смены родителя: %+v", *got)
+	}
+}
+
+func TestTreeViewReorder_AllowReparent_CycleProtection(t *testing.T) {
+	// Проверяем два случая цикла: сброс p1 (строка 0) в прямого ребёнка c1 (строка 1) и в глубокого внука g1 (строка 2)
+	cases := []struct {
+		name    string
+		targetY int
+	}{
+		{"direct_child_inside", 43}, // середина c1 (строка 1, Y=30..56)
+		{"direct_child_below", 53},  // нижняя четверть c1
+		{"grandchild_inside", 69},   // середина g1 (строка 2, Y=56..82)
+		{"grandchild_above", 58},    // верхняя четверть g1
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := newTestContext(600, 400)
+			roots := makeReparentTestTree()
+			sel := ""
+			callCount := 0
+
+			renderTree := func() {
+				ctx.Render(func(c *Context) {
+					c.TreeView("tv_cycle_"+tc.name, roots, &sel, Width(300), Height(260), Reorderable(), AllowReparent(), OnReorder(func(ev DragEvent) {
+						callCount++
+					}))
+				})
+			}
+
+			// Захватываем p1 (строка 0, Y=17) и пытаемся бросить в своего потомка
+			ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 100, Y: 17})
+			renderTree()
+
+			ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 100, Y: tc.targetY})
+			renderTree()
+
+			ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 100, Y: tc.targetY})
+			renderTree()
+
+			if callCount != 0 {
+				t.Fatalf("циклический перенос %s должен быть заблокирован, но получено вызовов: %d", tc.name, callCount)
+			}
+		})
+	}
+}
+
+func TestTreeViewReorder_AllowReparent_DropInsideCurrentParentNoOp(t *testing.T) {
+	ctx := newTestContext(600, 400)
+	roots := makeReparentTestTree()
+	sel := ""
+	callCount := 0
+
+	renderTree := func() {
+		ctx.Render(func(c *Context) {
+			c.TreeView("tv_cur_parent", roots, &sel, Width(300), Height(260), Reorderable(), AllowReparent(), OnReorder(func(ev DragEvent) {
+				callCount++
+			}))
+		})
+	}
+
+	// Захватываем c1 (строка 1, Y=43, текущий родитель p1) и бросаем в середину p1 (строка 0, Y=17 -> DropInside)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 100, Y: 43})
+	renderTree()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 100, Y: 17})
+	renderTree()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 100, Y: 17})
+	renderTree()
+
+	if callCount != 0 {
+		t.Fatalf("DropInside в собственного текущего родителя должен быть no-op, вызовов: %d", callCount)
+	}
+}
+
+func TestTreeViewReorder_AllowReparent_ToRootLevel(t *testing.T) {
+	ctx := newTestContext(600, 400)
+	roots := makeReparentTestTree()
+	// Сворачиваем p2, чтобы DropBelow на p2 означал уровень корня ("") после p2
+	roots[1].Expanded = false
+	sel := ""
+	var got *DragEvent
+
+	// Плоский порядок (itemH = 26, inner.Y = 4):
+	// 0: p1 (Y=4..30)
+	// 1: c1 (Y=30..56)
+	// 2: g1 (Y=56..82, глубина 2)
+	// 3: p2 (Y=82..108, корневой узел, свёрнут)
+	renderTree := func() {
+		ctx.Render(func(c *Context) {
+			c.TreeView("tv_to_root", roots, &sel, Width(300), Height(260), Reorderable(), AllowReparent(), OnReorder(func(ev DragEvent) {
+				e := ev
+				got = &e
+			}))
+		})
+	}
+
+	// Тащим g1 (глубина 2, Y=69) в нижнюю четверть корневого p2 (строка 3, Y=88..116 -> Y=114 -> DropBelow)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 100, Y: 69})
+	renderTree()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 100, Y: 114})
+	renderTree()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 100, Y: 114})
+	renderTree()
+
+	if got == nil {
+		t.Fatal("ожидалось событие репарента с глубины 2 на корневой уровень")
+	}
+	if got.FromKey != "g1" || got.ToKey != "p2" || got.Drop != DropBelow {
+		t.Fatalf("неверные параметры репарента на корень: %+v", *got)
+	}
+}
+
+func TestTreeViewReorder_AllowReparent_DropInsideCollapsed(t *testing.T) {
+	ctx := newTestContext(600, 400)
+	roots := makeReparentTestTree()
+	// Сворачиваем p2 (у него внутри скрыт c2)
+	roots[1].Expanded = false
+	sel := ""
+	var got *DragEvent
+
+	renderTree := func() {
+		ctx.Render(func(c *Context) {
+			c.TreeView("tv_collapsed_in", roots, &sel, Width(300), Height(260), Reorderable(), AllowReparent(), OnReorder(func(ev DragEvent) {
+				e := ev
+				got = &e
+				// Приложение раскрывает свёрнутый узел при вложении
+				if ev.ToKey == "p2" && ev.Drop == DropInside {
+					roots[1].Expanded = true
+				}
+			}))
+		})
+	}
+
+	// Тащим g1 (строка 2, Y=69) в середину свёрнутого p2 (строка 3, Y=82..108 -> Y=95 -> DropInside)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 100, Y: 69})
+	renderTree()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 100, Y: 95})
+	renderTree()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 100, Y: 95})
+	renderTree()
+
+	if got == nil {
+		t.Fatal("ожидалось событие DropInside на свёрнутый узел")
+	}
+	if got.FromKey != "g1" || got.ToKey != "p2" || got.Drop != DropInside {
+		t.Fatalf("неверные параметры DropInside на свёрнутый узел: %+v", *got)
+	}
+	if !roots[1].Expanded {
+		t.Fatal("ожидалось, что обработчик раскрыл целевой свёрнутый узел p2")
+	}
+}
+
+func TestTreeViewExReorder_AllowReparent(t *testing.T) {
+	ctx := newTestContext(600, 400)
+	roots := makeReparentTestTree()
+	selected := map[string]bool{}
+	var got *DragEvent
+
+	// В TreeViewEx rowH = 28, viewRect.Y = 1:
+	// 0: p1 (Y=1..29)
+	// 1: c1 (Y=29..57)
+	// 2: g1 (Y=57..85)
+	// 3: p2 (Y=85..113)
+	// 4: c2 (Y=113..141)
+	treeAnchorStore["tvex_reparent"] = 3
+	renderTreeEx := func() {
+		ctx.Render(func(c *Context) {
+			c.TreeViewEx("tvex_reparent", roots, selected, true, Width(300), Height(260), Reorderable(), AllowReparent(), OnReorder(func(ev DragEvent) {
+				e := ev
+				got = &e
+			}))
+		})
+	}
+
+	// Тащим c2 (строка 4, X=120 — правее чекбокса и стрелки, Y=127) в середину p1 (строка 0, Y=15 -> DropInside)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 120, Y: 127})
+	renderTreeEx()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 120, Y: 15})
+	renderTreeEx()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 120, Y: 15})
+	renderTreeEx()
+
+	if got == nil {
+		t.Fatal("ожидалось событие OnReorder с DropInside в TreeViewEx при AllowReparent()")
+	}
+	if got.FromKey != "c2" || got.ToKey != "p1" || got.Drop != DropInside || got.FromIndex != -1 || got.ToIndex != -1 {
+		t.Fatalf("неверные параметры TreeViewEx DropInside: %+v", *got)
+	}
+	if _, hasAnchor := treeAnchorStore["tvex_reparent"]; hasAnchor {
+		t.Fatal("ожидался сброс якоря treeAnchorStore после Reorder в TreeViewEx")
+	}
+}
+
+func TestTreeViewExReorder_SameParentOnlyWithoutAllowReparent(t *testing.T) {
+	ctx := newTestContext(600, 400)
+	roots := makeReparentTestTree()
+	selected := map[string]bool{}
+	callCount := 0
+
+	renderTreeEx := func() {
+		ctx.Render(func(c *Context) {
+			c.TreeViewEx("tvex_same_parent", roots, selected, false, Width(300), Height(260), Reorderable(), OnReorder(func(ev DragEvent) {
+				callCount++
+			}))
+		})
+	}
+
+	// Без AllowReparent тащим c2 (родитель p2, Y=127) на c1 (родитель p1, Y=43) — должно быть отброшено
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 120, Y: 127})
+	renderTreeEx()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 120, Y: 43})
+	renderTreeEx()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 120, Y: 43})
+	renderTreeEx()
+
+	if callCount != 0 {
+		t.Fatalf("TreeViewEx без AllowReparent не должен разрешать межродительский перенос, вызовов: %d", callCount)
+	}
+}
+
+func TestTreeViewExReorder_GroupSelectionAndCheckboxNoDrag(t *testing.T) {
+	ctx := newTestContext(600, 400)
+	roots := makeReparentTestTree()
+	// Предвыделена группа из двух узлов: c1 и c2
+	selected := map[string]bool{"c1": true, "c2": true}
+	var got *DragEvent
+	callCount := 0
+
+	renderTreeEx := func() {
+		ctx.Render(func(c *Context) {
+			c.TreeViewEx("tvex_group", roots, selected, true, Width(300), Height(260), Reorderable(), AllowReparent(), OnReorder(func(ev DragEvent) {
+				e := ev
+				got = &e
+				callCount++
+			}))
+		})
+	}
+
+	// 1. Клик по чекбоксу строки 0 (p1: depth=0 -> curX=1+8=9, arrow=9..27, cbX=27..42, Y=15) и протяжка вниз
+	// не должны вооружать reorder и вызывать OnReorder.
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 34, Y: 15})
+	renderTreeEx()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 34, Y: 95})
+	renderTreeEx()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 34, Y: 95})
+	renderTreeEx()
+
+	if callCount != 0 {
+		t.Fatalf("нажатие и протяжка по чекбоксу не должны запускать Reorder, вызовов: %d", callCount)
+	}
+
+	// 2. Перетаскивание узла c2 (строка 4, Y=127), входящего в группу выделенных {"c1", "c2"},
+	// не должно схлопывать группу и должно перемещать только c2.
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 140, Y: 127})
+	renderTreeEx()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 140, Y: 15})
+	renderTreeEx()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 140, Y: 15})
+	renderTreeEx()
+
+	if callCount != 1 || got == nil || got.FromKey != "c2" || got.ToKey != "p1" || got.Drop != DropInside {
+		t.Fatalf("ожидался перенос только узла c2 в p1, получено calls=%d ev=%+v", callCount, got)
+	}
+	if !selected["c1"] || !selected["c2"] || len(selected) != 2 {
+		t.Fatalf("выделение группы не должно схлопываться при старте драга, selected=%v", selected)
 	}
 }

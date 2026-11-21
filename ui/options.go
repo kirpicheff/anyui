@@ -35,7 +35,7 @@ const (
 
 // DragEvent описывает событие завершения перетаскивания элемента (Reorder).
 //
-// Для списков и таблиц (Table, TableEx, ListView, ListViewEx):
+// Для списков и таблиц (Table, ListView, ListViewEx):
 //   - FromIndex: исходный индекс перемещаемого элемента (>= 0).
 //   - ToIndex: уже вычисленная позиция вставки в списке после удаления перемещаемого элемента (0 <= ToIndex < rowCount).
 //   - FromKey и ToKey строго пусты ("").
@@ -47,11 +47,16 @@ const (
 //   - FromIndex и ToIndex строго равны -1.
 //   - FromKey: ID перемещаемого узла (sourceNode.ID).
 //   - ToKey: ID якорного узла (targetNode.ID), относительно которого применяется Drop; позицию вставки в список детей родителя вычисляет приложение.
-//   - Перетаскивание узлов разрешено только внутри одного родителя (source.Parent == target.Parent). При попытке сброса на узел другого родителя событие отбрасывается.
-//   - Раскрытый и свёрнутый узел: для раскрытого узла DropBelow означает позицию первого ребёнка; для свёрнутого — сразу после всего поддерева (обрабатывается приложением).
-//   - Допустимые зоны Drop: DropAbove и DropBelow (зона DropInside не поддерживается).
-//   - TreeViewEx: при перетаскивании одного узла из группы выделенных перемещается только он.
-//   - При сбросе узла на самого себя (ToKey == FromKey) операция является no-op и событие не генерируется.
+//   - По умолчанию перетаскивание узлов разрешено только внутри одного родителя (source.Parent == target.Parent), зоны DropAbove и DropBelow. При попытке сброса на узел другого родителя событие отбрасывается.
+//   - По умолчанию DropBelow на узле (в том числе раскрытом) вставляет элемент в того же родителя сразу после всего поддерева ToKey; для раскрытого узла с детьми при включённой AllowReparent() — первым ребёнком в ToKey.Children (см. ниже).
+//   - Сброс узла в самого себя (ToKey == FromKey) является no-op и событие не генерирует.
+//   - TreeViewEx: при перетаскивании одного узла из группы выделенных перемещается только он, при этом выделение группы не сбрасывается.
+//
+// Режим AllowReparent() в TreeView и TreeViewEx (смена родителя и вложение):
+//   - DropInside: новым родителем становится сам ToKey (вставка в ToKey.Children).
+//   - DropAbove: новым родителем становится target.ParentID (для корневого узла — "" / верхний уровень), вставка перед ToKey.
+//   - DropBelow: для раскрытого узла с детьми (ToKey.Expanded && len(ToKey.Children) > 0) новым родителем становится сам ToKey (позиция первого ребёнка); для свёрнутого узла или листа — target.ParentID (сразу после поддерева ToKey).
+//   - Защита от циклов и no-op: сброс узла в любого своего потомка и DropInside на собственного текущего родителя являются no-op и событие не генерируют. При этом DropAbove/DropBelow на собственного текущего родителя не являются no-op (перемещают узел на уровень родителя).
 type DragEvent struct {
 	FromWidget string   // ID виджета-источника перетаскивания
 	ToWidget   string   // ID целевого виджета
@@ -59,7 +64,7 @@ type DragEvent struct {
 	ToKey      string   // Ключ якорного целевого узла (для TreeView — node.ID; "" для Table/ListView)
 	FromIndex  int      // Индекс перетаскиваемой строки (для Table/ListView; -1 для TreeView)
 	ToIndex    int      // Позиция вставки в списке после удаления перемещаемого элемента (0 <= ToIndex < rowCount; -1 для TreeView)
-	Drop       DropZone // Зона сброса (DropAbove, DropBelow; DropInside не поддерживается)
+	Drop       DropZone // Зона сброса (DropAbove, DropBelow; DropInside при AllowReparent в TreeView)
 }
 
 // WidgetStyle хранит переопределения оформления и размеров конкретного виджета.
@@ -107,6 +112,7 @@ type WidgetStyle struct {
 	ScrollToIndex    *int
 	ScrollToID       string
 	Reorderable      bool
+	AllowReparent    bool
 	OnReorder        func(ev DragEvent)
 }
 
@@ -529,7 +535,8 @@ func ScrollToID(id string) Option {
 	}
 }
 
-// Reorderable разрешает перетаскивание элементов (строк в Table/ListView или узлов в TreeView) внутри компонента для изменения порядка.
+// Reorderable разрешает перетаскивание элементов внутри компонента для изменения порядка.
+// Действует для Table, ListView, ListViewEx, TreeView, TreeViewEx; TableEx пока не поддерживается.
 // Без опции OnReorder результат перетаскивания отбрасывается.
 func Reorderable(enabled ...bool) Option {
 	return func(s *WidgetStyle) {
@@ -541,7 +548,21 @@ func Reorderable(enabled ...bool) Option {
 	}
 }
 
+// AllowReparent разрешает в TreeView и TreeViewEx смену родителя при перетаскивании узлов
+// (DropAbove/DropBelow между разными родителями) и вложение внутрь целевого узла (DropInside)
+// с автоматической защитой от циклов. Работает совместно с Reorderable() и OnReorder(...).
+func AllowReparent(enabled ...bool) Option {
+	return func(s *WidgetStyle) {
+		if len(enabled) == 0 || enabled[0] {
+			s.AllowReparent = true
+		} else {
+			s.AllowReparent = false
+		}
+	}
+}
+
 // OnReorder регистрирует обработчик события завершения перетаскивания элемента.
+// Действует для Table, ListView, ListViewEx, TreeView, TreeViewEx; TableEx пока не поддерживается.
 func OnReorder(fn func(ev DragEvent)) Option {
 	return func(s *WidgetStyle) {
 		s.OnReorder = fn

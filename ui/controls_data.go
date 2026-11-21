@@ -499,6 +499,22 @@ type FlatTreeItem struct {
 	ParentID string
 }
 
+// isTreeDescendant возвращает true, если узел с идентификатором targetID находится в поддереве root (прямой или глубокий потомок).
+func isTreeDescendant(root *TreeNode, targetID string) bool {
+	if root == nil || targetID == "" {
+		return false
+	}
+	for _, ch := range root.Children {
+		if ch == nil {
+			continue
+		}
+		if ch.ID == targetID || isTreeDescendant(ch, targetID) {
+			return true
+		}
+	}
+	return false
+}
+
 // FlattenTree разворачивает раскрытые узлы дерева в плоский список для отображения.
 func FlattenTree(roots []*TreeNode) []FlatTreeItem {
 	var out []FlatTreeItem
@@ -756,89 +772,9 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 	c.Canvas.PopClip()
 
 	// Обработка перетаскивания (Reorder) узлов дерева
-	if st.Reorderable && c.UpdateReorderDrag(id) {
-		_, fromKey, active := c.ReorderSource(id)
-		if !active {
-			c.ResetReorder()
-		} else {
-			// Поиск исходного узла в flat
-			sourceIdx := -1
-			for idx, it := range flat {
-				if it.Node.ID == fromKey {
-					sourceIdx = idx
-					break
-				}
-			}
-			if sourceIdx < 0 {
-				// Исходный узел исчез из дерева — безопасный сброс
-				c.ResetReorder()
-			} else {
-				sourceItem := flat[sourceIdx]
-
-				// 1. Авто-скролл у верхнего и нижнего краёв
-				c.ApplyReorderAutoScroll(inner.Y, inner.H, si, maxSc)
-
-				// 2. Расчет целевой позиции и индикатора ПОСЛЕ применения автоскролла
-				if !blocked && inner.Contains(c.MouseX, c.MouseY) && c.MouseX < inner.X+contentW {
-					relY := c.MouseY - inner.Y + si.y
-					targetIdx := relY / itemH
-					if targetIdx < 0 {
-						targetIdx = 0
-					}
-					if targetIdx >= len(flat) {
-						targetIdx = len(flat) - 1
-					}
-
-					if targetIdx >= 0 && targetIdx < len(flat) {
-						targetItem := flat[targetIdx]
-						targetNode := targetItem.Node
-						targetRowY := inner.Y + targetIdx*itemH - si.y
-
-						// Правило Фазы 20a: перетаскивание узлов строго между сиблингами одного родителя
-						isValidDrop := targetItem.ParentID == sourceItem.ParentID && targetNode.ID != sourceItem.Node.ID
-
-						zone := DropBelow
-						if c.MouseY < targetRowY+itemH/2 {
-							zone = DropAbove
-						}
-
-						if isValidDrop {
-							// Линия-индикатор Accent толщиной 2 Dp с отступом по глубине целевого узла
-							lineY := targetRowY
-							if zone == DropBelow {
-								lineY += itemH
-							}
-							targetIndent := targetItem.Depth*treeIndentPx + treeInsetPx
-							lineX := inner.X + targetIndent
-							lineW := contentW - targetIndent
-							if lineW > 0 {
-								c.DrawDropLine(lineX, lineY, lineW)
-							}
-
-							// 3. Завершение при MouseReleased
-							if c.MouseReleased {
-								dragEv := DragEvent{
-									FromWidget: id,
-									ToWidget:   id,
-									FromKey:    sourceItem.Node.ID,
-									ToKey:      targetNode.ID,
-									FromIndex:  -1,
-									ToIndex:    -1,
-									Drop:       zone,
-								}
-								if st.OnReorder != nil {
-									st.OnReorder(dragEv)
-								}
-								changed = true
-								c.ResetReorder()
-							}
-						} else if c.MouseReleased {
-							// Дроп на невалидный узел (другой родитель или на самого себя) — молча сбрасываем без события
-							c.ResetReorder()
-						}
-					}
-				}
-			}
+	if st.Reorderable {
+		if c.HandleTreeReorder(id, inner, contentW, itemH, flat, si, maxSc, st.AllowReparent, st.OnReorder, nil) {
+			changed = true
 		}
 	}
 
