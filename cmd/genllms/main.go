@@ -39,13 +39,15 @@ type apiIndex struct {
 	localTypes   map[string]*ast.TypeSpec
 	constGroups  [][]constEntry
 	vars         []string
-	optionFuncs  []string
-	optionNames  map[string]bool
-	otherFuncs   []string
-	methods       map[string][]string // receiverType -> []fullSignature
-	methodNames   map[string]map[string]bool
-	uiBoolMethods map[string]bool // методы UI, возвращающие bool
-	allSymbols    map[string]bool // все экспортированные символы пакета anyui (типы, функции, константы, переменные)
+	optionFuncs    []string
+	optionNames    map[string]bool
+	otherFuncs     []string
+	otherFuncNames map[string]bool
+	methods        map[string][]string // receiverType -> []fullSignature
+	methodNames    map[string]map[string]bool
+	uiBoolMethods  map[string]bool // методы UI, возвращающие bool
+	allTypeNames   map[string]bool // все экспортированные типы пакета anyui
+	allSymbols     map[string]bool // все экспортированные символы пакета anyui (типы, функции, константы, переменные)
 }
 
 func main() {
@@ -169,11 +171,13 @@ func parseAPI(rootDir string) (*apiIndex, error) {
 		subPkgConsts: make(map[string]map[string]string),
 		aliases:      make(map[string]aliasTarget),
 		localTypes:   make(map[string]*ast.TypeSpec),
-		optionNames:  make(map[string]bool),
-		methods:       make(map[string][]string),
-		methodNames:   make(map[string]map[string]bool),
-		uiBoolMethods: make(map[string]bool),
-		allSymbols:    make(map[string]bool),
+		optionNames:    make(map[string]bool),
+		otherFuncNames: make(map[string]bool),
+		methods:        make(map[string][]string),
+		methodNames:    make(map[string]map[string]bool),
+		uiBoolMethods:  make(map[string]bool),
+		allTypeNames:   make(map[string]bool),
+		allSymbols:     make(map[string]bool),
 	}
 
 	rootFiles, err := parseDirNonTest(idx.fset, rootDir)
@@ -302,6 +306,7 @@ func parseAPI(rootDir string) (*apiIndex, error) {
 							continue
 						}
 						idx.allSymbols[ts.Name.Name] = true
+						idx.allTypeNames[ts.Name.Name] = true
 						if ts.Assign.IsValid() {
 							if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
 								if id, ok := sel.X.(*ast.Ident); ok {
@@ -325,6 +330,7 @@ func parseAPI(rootDir string) (*apiIndex, error) {
 						idx.optionNames[d.Name.Name] = true
 					} else {
 						idx.otherFuncs = append(idx.otherFuncs, sig)
+						idx.otherFuncNames[d.Name.Name] = true
 					}
 				} else {
 					recvName := receiverTypeName(d.Recv.List[0].Type)
@@ -508,7 +514,7 @@ func writeCommonHeader(out *bytes.Buffer, version string, isFull bool) {
 	writeBaseTypes(out)
 
 	out.WriteString("## Матрица применимости опций (`Option`)\n\n")
-	out.WriteString("Неприменимые для конкретного виджета опции игнорируются без ошибки. Проверенные по реализации комбинации:\n\n")
+	out.WriteString("Основные поддерживаемые опции (неприменимые игнорируются без ошибки):\n\n")
 	out.WriteString("| Виджет | Поддерживаемые опции |\n")
 	out.WriteString("|---|---|\n")
 	for _, row := range optionMatrixRows {
@@ -610,7 +616,11 @@ func writeBaseTypes(out *bytes.Buffer) {
 	out.WriteString("type ImageScaleMode uint8 // ScaleFit, ScaleFill, ScaleOneToOne\n")
 	out.WriteString("type FontStyle uint8      // FontRegular, FontBold, FontMono\n")
 	out.WriteString("type TextAlign uint8      // AlignTextLeft, AlignTextCenter, AlignTextRight\n")
-	out.WriteString("type HitTestResult uint8  // HitClient, HitCaption, HitLeft/Right/Top/Bottom/TopLeft/TopRight/BottomLeft/BottomRight\n")
+	out.WriteString("type HitTestResult uint8     // HitClient, HitCaption, HitLeft/Right/Top/Bottom/TopLeft/TopRight/BottomLeft/BottomRight\n")
+	out.WriteString("type NotificationIcon uint8  // NotifyNone, NotifyInfo, NotifyWarning, NotifyError\n")
+	out.WriteString("type MessageBoxStyle uint8   // MsgInfo, MsgWarning, MsgError, MsgQuestion\n")
+	out.WriteString("type MessageBoxButtons uint8 // MsgOK, MsgOKCancel, MsgYesNo, MsgYesNoCancel\n")
+	out.WriteString("type MessageBoxResult uint8  // ResNone, ResOK, ResCancel, ResYes, ResNo\n")
 	out.WriteString("```\n\n")
 }
 
@@ -666,16 +676,17 @@ func writeShortLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
 	out.WriteString("```\n\n")
 
 	out.WriteString("## Карта API (полные сигнатуры и структуры — в `llms-full.txt`)\n\n")
-	out.WriteString("- **Приложение и окна:** `anyui.NewApp`, `App.Run`, `App.Dispatch`, `App.OpenWindow`, `App.MainWindow`, `App.Quit`, `App.SetTrayMenu`, `App.SetTrayIcon`, `App.SetTrayTooltip`, `App.ShowNotification`, `Window.SetTitle`, `Window.SetSize`, `Window.SetPosition`, `Window.SetIcon`, `Window.SetTheme`, `Window.Invalidate`, `Window.WakeUp`, `Window.Close`.\n")
+	out.WriteString("- **Приложение (`App`):** `anyui.NewApp`, `App.Run`, `App.Dispatch`, `App.OpenWindow`, `App.MainWindow`, `App.Show`, `App.Quit`, `App.SetStrings`, `App.SetTrayMenu`, `App.SetTrayIcon`, `App.SetTrayTooltip`, `App.ShowNotification`.\n")
+	out.WriteString("- **Окно (`Window`):** `Window.SetTitle`, `Window.SetSize`, `Window.SetPosition`, `Window.Position`, `Window.SetIcon`, `Window.SetTheme`, `Window.SetStrings`, `Window.SetDarkTitle`, `Window.SetTitleBarColors`, `Window.SetHideOnClose`, `Window.SetOnClose`, `Window.SetOnDropFiles`, `Window.Show`, `Window.Hide`, `Window.BringToFront`, `Window.Minimize`, `Window.Maximize`, `Window.Restore`, `Window.IsMinimized`, `Window.IsMaximized`, `Window.IsFullscreen`, `Window.SetFullscreen`, `Window.State`, `Window.RestoreState`, `Window.ClipboardText`, `Window.SetClipboardText`, `Window.ClipboardImage`, `Window.SetClipboardImage`, `Window.Invalidate`, `Window.WakeUp`, `Window.Close`.\n")
 	out.WriteString("- **Раскладка и контейнеры (`UI`):** `Column`, `ColumnCentered`, `ColumnWith`, `ColumnFlex`, `Row`, `RowCentered`, `RowWith`, `RowFlex`, `Grid`, `Flow`, `FormLayout`, `FormRow`, `Padding`, `PaddingXY`, `Spacer`, `FlexSpacer`, `Expand`, `DockTop`, `DockBottom`, `Page`, `Card`, `ScrollView`, `Anchor`, `SplitPane`, `Collapsible`, `Accordion`, `LayoutRect`, `IDScope`, `PushID`, `PopID`.\n")
 	out.WriteString("- **Ввод и формы (`UI`):** `Button`, `IconButton`, `Hyperlink`, `Toggle`, `Checkbox`, `RadioButton`, `RadioGroup`, `TextInput`, `TextArea`, `MaskedInput`, `NumberInput`, `Slider`, `RangeSlider`, `Select`, `MultiSelect`, `TagInput`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`.\n")
 	out.WriteString("- **Списки, деревья, таблицы и графики (`UI`):** `ListView`, `ListViewEx`, `TreeView`, `TreeViewEx`, `Table`, `TableEx`, `LogView`, `VirtualTextView`, `Sparkline`, `LineChart`, `BarChart`.\n")
 	out.WriteString("- **Текст, индикаторы и навигация (`UI`):** `Label`, `SelectableLabel`, `StatusDot`, `Badge`, `Separator`, `ProgressBar`, `Spinner`, `TabBar`, `MenuBar`, `Toolbar`, `StatusBar`, `Breadcrumbs`, `Pagination`, `TitleBar`, `TitleBarHitTest`.\n")
 	out.WriteString("- **Оверлеи и уведомления (`UI`):** `Modal`, `Popover`, `FloatingPanel`, `Drawer`, `ContextMenu`, `Tooltip`, `PushOverlay`, `ShowToast`, `SetToastPosition`, `SetToastOffset`.\n")
-	out.WriteString("- **Графика и холст (`UI`):** `Image`, `CanvasView`, `InteractiveCanvas`, `Canvas`, `DrawText`, `DrawSVG`, `StaticLayer`, `InvalidateStatic`, `RequestRedraw`, `CurrentArea`, `CurrentAreaPx`, `Scale`, `ScaleF`, `PxToDp`, `PxToDpf`.\n")
-	out.WriteString("- **Ввод, буфер обмена и темы (`UI`):** `Shortcut`, `FocusID`, `SetFocus`, `SetCursor`, `RegisterHoverArea`, `MousePosDp`, `MousePosPx`, `MousePressed`, `MouseDown`, `DoubleClicked`, `MiddleClicked`, `ClipboardText`, `SetClipboardText`, `ClipboardImage`, `SetClipboardImage`, `InvalidateRemember`, `ClearRemember`, `Theme`, `SetTheme`, `Strings`, `SetStrings`.\n")
-	out.WriteString("- **Функции пакета (`anyui.*`):** `anyui.Remember` (generic), `anyui.RGB`, `anyui.RGBA`, `anyui.Hex`, `anyui.UniformRadii`, `anyui.NavyTheme`, `anyui.DarkTheme`, `anyui.LightTheme`, `anyui.SystemTheme`, `anyui.RussianStrings`, `anyui.EnglishStrings`, `anyui.TabItems`, `anyui.SelectItems`, `anyui.SetTreeNodeChecked`, `anyui.SyncTreeCheckState`, `anyui.OpenFileDialog`, `anyui.OpenFilesDialog`, `anyui.SaveFileDialog`, `anyui.SelectFolderDialog`, `anyui.MessageBox`, `anyui.OpenURL`, `anyui.RevealInFileManager`, `anyui.AcquireSingleInstance`, `anyui.LoadWindowState`, `anyui.SaveWindowState`.\n")
-	out.WriteString("- **Тестирование (`Headless`):** `anyui.NewHeadless`, `Headless.SetDraw`, `Headless.Step`, `Headless.AdvanceTime`, `Headless.SetScale`, `Headless.InjectMouseMove`, `Headless.InjectMouseClick`, `Headless.InjectMouseWheel`, `Headless.InjectKey`, `Headless.InjectText`, `Headless.InjectFocus`, `Headless.CaptureImage`, `anyui.AssertGolden`, `anyui.DefaultTestFonts`.\n")
+	out.WriteString("- **Графика, слои, кеши и диагностика (`UI`):** `Image`, `CanvasView`, `InteractiveCanvas`, `Canvas`, `DrawText`, `DrawSVG`, `StaticLayer`, `InvalidateStatic`, `LastFrameStaticBlitted`, `LastDirtyRectsPx`, `SetDebugDirtyRect`, `SetSmartMouseMove`, `SkippedMouseMoves`, `GlyphCacheStats`, `ClearGlyphCache`, `ScaledImageCacheStats`, `ClearScaledImageCache`, `RequestRedraw`, `CurrentArea`, `CurrentAreaPx`, `Scale`, `ScaleF`, `PxToDp`, `PxToDpf`.\n")
+	out.WriteString("- **Ввод, буфер обмена, контекст и темы (`UI`):** `App`, `Window`, `Shortcut`, `FocusID`, `SetFocus`, `SetCursor`, `RegisterHoverArea`, `MousePosDp`, `MousePosPx`, `MousePressed`, `MouseDown`, `DoubleClicked`, `MiddleClicked`, `ClipboardText`, `SetClipboardText`, `ClipboardImage`, `SetClipboardImage`, `InvalidateRemember`, `ClearRemember`, `Theme`, `SetTheme`, `Strings`, `SetStrings`.\n")
+	out.WriteString("- **Функции пакета (`anyui.*`):** `anyui.Remember` (generic), `anyui.RGB`, `anyui.RGBA`, `anyui.Hex`, `anyui.UniformRadii`, `anyui.NavyTheme`, `anyui.DarkTheme`, `anyui.LightTheme`, `anyui.SystemTheme`, `anyui.IsSystemDarkTheme`, `anyui.RussianStrings`, `anyui.EnglishStrings`, `anyui.TabItems`, `anyui.SelectItems`, `anyui.SetTreeNodeChecked`, `anyui.SyncTreeCheckState`, `anyui.OpenFileDialog`, `anyui.OpenFilesDialog`, `anyui.SaveFileDialog`, `anyui.SelectFolderDialog`, `anyui.MessageBox`, `anyui.OpenURL`, `anyui.RevealInFileManager`, `anyui.AcquireSingleInstance`, `anyui.LoadWindowState`, `anyui.SaveWindowState`.\n")
+	out.WriteString("- **Тестирование (`Headless`):** `anyui.NewHeadless`, `Headless.SetDraw`, `Headless.Step`, `Headless.AdvanceTime`, `Headless.SetTime`, `Headless.Time`, `Headless.SetScale`, `Headless.InjectMouseMove`, `Headless.InjectMouseMovePx`, `Headless.InjectMouseDown`, `Headless.InjectMouseDownPx`, `Headless.InjectMouseUp`, `Headless.InjectMouseUpPx`, `Headless.InjectMouseClick`, `Headless.InjectMouseClickPx`, `Headless.InjectMouseWheel`, `Headless.InjectMouseWheelPx`, `Headless.InjectKey`, `Headless.InjectKeyDown`, `Headless.InjectKeyUp`, `Headless.InjectText`, `Headless.InjectFocus`, `Headless.FocusID`, `Headless.FocusOrder`, `Headless.CaptureImage`, `Headless.CapturePNG`, `Headless.App`, `Headless.Window`, `Headless.UI`, `Headless.Close`, `anyui.AssertGolden`, `anyui.DefaultTestFonts`.\n")
 }
 
 func writeFullLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
@@ -753,6 +764,10 @@ func writeFullLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
 		"Theme", "Strings", "TestHelper",
 	}
 	out.WriteString("## Структуры и типы данных\n\n```go\n")
+	out.WriteString("// Непрозрачные типы (конструируются только через API пакета):\n")
+	out.WriteString("type Option func(...) // Функциональная опция стилизации/размеров (см. секцию «Опции стилизации»)\n")
+	out.WriteString("type Canvas struct{}  // Программный 2D-холст (возвращается UI.Canvas() и передаётся в CanvasView/InteractiveCanvas)\n")
+	out.WriteString("type SingleInstanceGuard struct{} // Возвращается AcquireSingleInstance; методы: SetCallback(func(args []string)), StartIPC() error, Close() error\n\n")
 	for _, name := range structOrder {
 		if def, ok := idx.formatTypeDef(name); ok {
 			out.WriteString(def)
@@ -851,7 +866,50 @@ func lintOutputs(idx *apiIndex, shortText, fullText string) error {
 		}
 	}
 
-	// 4. Symbol-lint по ручным секциям llms.txt (вне fenced-блоков кода)
+	// 4. Проверка 100% покрытия карты API в llms.txt (ни одна функция пакета и ни один метод UI/App/Window/Headless не потеряны)
+	mapStart := strings.Index(shortText, "## Карта API")
+	if mapStart < 0 {
+		return fmt.Errorf("в llms.txt отсутствует раздел «Карта API»")
+	}
+	mapBlock := shortText[mapStart:]
+	var missing []string
+	for fnName := range idx.otherFuncNames {
+		if !strings.Contains(mapBlock, "`anyui."+fnName+"`") {
+			missing = append(missing, "anyui."+fnName)
+		}
+	}
+	for meth := range idx.methodNames["UI"] {
+		if !strings.Contains(mapBlock, "`"+meth+"`") {
+			missing = append(missing, "UI."+meth)
+		}
+	}
+	for _, recv := range []string{"App", "Window", "Headless"} {
+		for meth := range idx.methodNames[recv] {
+			if !strings.Contains(mapBlock, "`"+recv+"."+meth+"`") {
+				missing = append(missing, recv+"."+meth)
+			}
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		return fmt.Errorf("отсутствуют в карте API llms.txt: %s", strings.Join(missing, ", "))
+	}
+
+	// 5. Проверка 100% покрытия экспортированных типов в llms-full.txt
+	var missingTypes []string
+	for typeName := range idx.allTypeNames {
+		hasTypeDef := strings.Contains(fullText, "type "+typeName+" ")
+		hasMethodsSec := strings.Contains(fullText, "## Методы `"+typeName+"`")
+		if !hasTypeDef && !hasMethodsSec {
+			missingTypes = append(missingTypes, typeName)
+		}
+	}
+	if len(missingTypes) > 0 {
+		sort.Strings(missingTypes)
+		return fmt.Errorf("экспортированные типы не описаны в llms-full.txt: %s", strings.Join(missingTypes, ", "))
+	}
+
+	// 6. Symbol-lint по ручным секциям llms.txt (вне fenced-блоков кода)
 	ignoreSymbols := map[string]bool{
 		// Поля структур, упоминаемые в прозе
 		"WidthDp": true, "IconRGBA": true, "Key": true, "ID": true, "Label": true,

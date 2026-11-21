@@ -70,12 +70,16 @@ type LogLevel uint8       // LogInfo, LogWarn, LogError, LogDebug
 type ImageScaleMode uint8 // ScaleFit, ScaleFill, ScaleOneToOne
 type FontStyle uint8      // FontRegular, FontBold, FontMono
 type TextAlign uint8      // AlignTextLeft, AlignTextCenter, AlignTextRight
-type HitTestResult uint8  // HitClient, HitCaption, HitLeft/Right/Top/Bottom/TopLeft/TopRight/BottomLeft/BottomRight
+type HitTestResult uint8     // HitClient, HitCaption, HitLeft/Right/Top/Bottom/TopLeft/TopRight/BottomLeft/BottomRight
+type NotificationIcon uint8  // NotifyNone, NotifyInfo, NotifyWarning, NotifyError
+type MessageBoxStyle uint8   // MsgInfo, MsgWarning, MsgError, MsgQuestion
+type MessageBoxButtons uint8 // MsgOK, MsgOKCancel, MsgYesNo, MsgYesNoCancel
+type MessageBoxResult uint8  // ResNone, ResOK, ResCancel, ResYes, ResNo
 ```
 
 ## Матрица применимости опций (`Option`)
 
-Неприменимые для конкретного виджета опции игнорируются без ошибки. Проверенные по реализации комбинации:
+Основные поддерживаемые опции (неприменимые игнорируются без ошибки):
 
 | Виджет | Поддерживаемые опции |
 |---|---|
@@ -285,6 +289,11 @@ func WordWrap(enabled ...bool) Option
 ## Структуры и типы данных
 
 ```go
+// Непрозрачные типы (конструируются только через API пакета):
+type Option func(...) // Функциональная опция стилизации/размеров (см. секцию «Опции стилизации»)
+type Canvas struct{}  // Программный 2D-холст (возвращается UI.Canvas() и передаётся в CanvasView/InteractiveCanvas)
+type SingleInstanceGuard struct{} // Возвращается AcquireSingleInstance; методы: SetCallback(func(args []string)), StartIPC() error, Close() error
+
 type Config struct {
 	Title               string
 	Width               int // Начальная ширина окна в физических пикселях ОС (px).
