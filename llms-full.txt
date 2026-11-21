@@ -6,30 +6,36 @@
 
 - Импорт: `import "github.com/kirpicheff/anyui"` (`go get github.com/kirpicheff/anyui`).
 - Проверить установленную версию модуля: `go list -m github.com/kirpicheff/anyui`.
-- При расхождении этого документа с установленным пакетом источник истины — `go doc github.com/kirpicheff/anyui.<Symbol>`.
+- При расхождении этого документа с установленным пакетом источник истины — `go doc github.com/kirpicheff/anyui.UI.<Method>` (для методов `UI`/`App`/`Window`/`Headless`) и `go doc github.com/kirpicheff/anyui.<Symbol>`.
 - Подпакеты являются внутренними; прикладной код импортирует **только** корневой пакет `github.com/kirpicheff/anyui`.
 
 ## Правила работы с API
 
-- **Immediate Mode:** состояние хранится вне `drawFn` (в структурах/переменных приложения), `drawFn(ui *anyui.UI)` перерисовывает весь интерфейс на каждом кадре.
-- **Единицы измерения (`Dp` vs `Px`):** весь API раскладки, опций, оверлеев и ввода Headless (`LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`, `InjectMouse*`, `CurrentArea()`, `MousePosDp()`) работает строго в логических `Dp`. Физические `Px` используются только в колбэках рисования (`CanvasView`, `InteractiveCanvas`, `Table.drawCell`, `ListView.drawItem`), прямых методах (`DrawText`, `DrawSVG`, `CurrentAreaPx()`, `MousePosPx()`, `LastDirtyRectsPx()`, `TitleBarHitTest`, `InjectMouse*Px`) и на границе ОС (`Config`, `Window`).
-- **Единое задание размеров через опции:** `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image`, `ListView`, `Table`, `TextArea`, `LogView` по умолчанию занимают доступное пространство (`Auto`); явные размеры задаются опциями `Width(...)`, `Height(...)`, `FillWidth()`, `FillHeight()`. `Card` по умолчанию подбирает высоту по содержимому (`AutoHeight`); для растягивания передайте `FillHeight()`.
-- **Идентификаторы, ключи и `IDScope`:** `ui.IDScope(key, fn)` (или `PushID`/`PopID`) изолирует `id` виджетов внутри циклов и переиспользуемых компонентов. В `Select`, `MultiSelect`, `TabBar`, `TreeView`, `TreeViewEx` и `Breadcrumbs` ключи элементов (`Key` / `ID`) локальны для конкретного виджета и должны быть уникальны в его пределах — при дублировании ключей в одном списке/дереве выделение и клик совпадут для всех дубликатов.
-- **Выпадающие списки и вкладки:** `ui.Select` с `anyui.Searchable()` заменяет комбобокс; `ui.MultiSelect` работает с `map[string]bool`; `ui.TabBar` и `anyui.TabItems(...)` работают на строковых ключах.
-- **Раскладка и оверлеи:** для типового экрана используйте `ui.Page` или `DockTop` / `DockBottom` / `ColumnFlex`. Для диалогов всегда используйте `ui.Modal` — `PushOverlay(bounds, fn)` предназначен только для небольших всплывающих контролов.
-- **Drag & Drop (Reorder):** `anyui.Reorderable()` + `anyui.OnReorder(func(ev anyui.DragEvent))` работают в `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы `FromIndex`/`ToIndex`) и `TreeView`, `TreeViewEx` (ключи `FromKey`/`ToKey`; с `anyui.AllowReparent()` доступны смена родителя и `DropInside`).
+- **Immediate Mode и многопоточность:** состояние хранится вне `drawFn`; вызовы методов `UI` и чтение/изменение состояния интерфейса выполняются **только в главном потоке** внутри `drawFn`. Для обновления состояния из фоновых горутин всегда используйте `App.Dispatch` (`app.Dispatch(func() { ... })`) или `Remember`.
+- **Единицы измерения (`Dp` vs `Px`):** весь API раскладки, опций, оверлеев и ввода Headless (`LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`, `InjectMouseMove`/`InjectMouseClick`, `CurrentArea`, `MousePosDp`) работает строго в логических `Dp`. Физические `Px` используются только в колбэках рисования (`CanvasView`, `InteractiveCanvas`, `Table`, `ListView`), прямых методах (`DrawText`, `DrawSVG`, `CurrentAreaPx`, `MousePosPx`, `LastDirtyRectsPx`, `TitleBarHitTest`, `InjectMouseMovePx`/`InjectMouseClickPx`) и на границе ОС (`Config`, `Window`).
+- **`Rect` и `PointF` не типизированы по единицам:** `Rect` содержит `int`-поля, `PointF` — `float32`. В `Dp`-API (`CurrentArea`, `LayoutRect`, `PushOverlay`, `Tooltip`, `Popover`, `ContextMenu`, `RegisterHoverArea`) они трактуются как `Dp`, а в колбэках рисования и `CurrentAreaPx`/`LastDirtyRectsPx` — как `Px`.
+- **Единое задание размеров через опции:** `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image`, `ListView`, `Table`, `TextArea`, `LogView` по умолчанию занимают доступное пространство (`Auto`); явные размеры задаются опциями `Width`, `Height`, `FillWidth`, `FillHeight`. `Card` по умолчанию подбирает высоту по содержимому (`AutoHeight`); для растягивания передайте `FillHeight`.
+- **Колонки таблиц:** в `Table` и `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.
+- **Декларативная навигация:** для программной прокрутки используйте `ScrollToIndex` в `ListView` и `Table`, а для `ScrollView` — `ScrollToID` в паре с маркером `Anchor` (или `id` дочернего виджета).
+- **Иконка окна:** подхватывается автоматически из `.syso`-ресурсов, либо задаётся через `Config.IconRGBA` или `Window.SetIcon`.
+- **Идентификаторы, ключи и `IDScope`:** `IDScope` (или `PushID`/`PopID`) изолирует `id` виджетов внутри циклов и переиспользуемых компонентов. В `Select`, `MultiSelect`, `TabBar`, `TreeView`, `TreeViewEx` и `Breadcrumbs` ключи элементов (`Key` / `ID`) локальны для конкретного виджета и должны быть уникальны в его пределах — при дублировании ключей выделение и клик совпадут для всех дубликатов. В `Breadcrumbs`, если у сегмента `ID == ""`, возвращается его `Label`.
+- **Выпадающие списки и вкладки:** `Select` с опцией `Searchable` заменяет комбобокс; `MultiSelect` работает с `map[string]bool`; `TabBar` и `TabItems` работают на строковых ключах.
+- **Раскладка и оверлеи:** для типового экрана используйте `Page` или `DockTop` / `DockBottom` / `ColumnFlex`. Для диалогов всегда используйте `Modal` — `PushOverlay` предназначен только для небольших всплывающих контролов.
+- **Drag & Drop (Reorder):** `Reorderable` + `OnReorder` работают в `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы `FromIndex`/`ToIndex`) и `TreeView`, `TreeViewEx` (ключи `FromKey`/`ToKey`; с `AllowReparent` доступны смена родителя и `DropInside`).
 
 ## Семантика возвращаемых значений
 
 - `Button`, `Hyperlink` → `bool`: `true` **только в кадре нажатия**.
-- `Toggle`, `Checkbox`, `Radio`, `TextInput`, `TextArea`, `MaskedInput`, `Select`, `MultiSelect`, `TagInput`, `Slider`, `RangeSlider`, `NumberInput`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`, `ListView`, `ListViewEx`, `TreeView`, `TreeViewEx`, `Pagination`, `Collapsible`, `Accordion` → `bool`: `true` **только в кадре изменения значения** (не означает «виджет сейчас активен/включён»; текущее состояние хранится в переданном указателе/карте).
-- `Breadcrumbs(...) string`: возвращает `ID` кликнутого сегмента (или `Label`, если `ID == ""`), либо `""` если клика в этом кадре не было.
-- `TabBar(...) TabBarEvent`: `SelectedID` (смена вкладки), `ClosedID` (клик по крестику/СКМ), `Added` (клик по `+`), `MovedFrom`/`MovedTo` (перетаскивание, `-1` если не было), `DetachedID` (отрыв вкладки).
-- `Table` / `TableEx` → `TableEvent`: `RowClicked`, `RowDoubleClicked`, `RowMiddleClicked` (`-1` если события не было), `SortChanged`, `ColumnResized`, `Drag *DragEvent`.
+- `Toggle`, `Checkbox`, `RadioButton`, `RadioGroup`, `TextInput`, `TextArea`, `MaskedInput`, `Select`, `MultiSelect`, `TagInput`, `Slider`, `RangeSlider`, `NumberInput`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`, `ListView`, `ListViewEx`, `TreeView`, `TreeViewEx`, `Pagination`, `Collapsible`, `Accordion` → `bool`: `true` **только в кадре изменения значения** (не означает «виджет сейчас активен/включён»; текущее состояние хранится в переданном указателе/карте).
+- `Breadcrumbs` → `string`: возвращает `ID` кликнутого сегмента (или `Label`, если `ID == ""`), либо `""` если клика в этом кадре не было.
+- `TabBar` → `TabBarEvent`: `SelectedID` (смена вкладки), `ClosedID` (клик по крестику/СКМ), `Added` (клик по `+`), `MovedFrom`/`MovedTo` (перетаскивание, `-1` если не было), `DetachedID` (отрыв вкладки).
+- `Table`, `TableEx` → `TableEvent`: `RowClicked`, `RowDoubleClicked`, `RowMiddleClicked` (`-1` если события не было), `SortChanged`, `ColumnResized`, `Drag`.
 
 ## Асинхронная загрузка данных (`Remember`)
 
-`anyui.Remember[T](ui, key, loader)` запускает `loader` **асинхронно в отдельной горутине** при первом вызове для `key` (пока идёт загрузка, `loading == true`, повторных запусков не происходит). По завершении результат и ошибка кешируются в окне по `key`, и окно автоматически перерисовывается. Для повторного запроса сбросьте кеш через `ui.InvalidateRemember(key)` или `ui.ClearRemember()`.
+`Remember` запускает `loader` **асинхронно в отдельной горутине** при первом вызове для `key` (пока идёт загрузка, `loading == true`, повторных запусков не происходит). По завершении результат и ошибка кешируются по `key`, и окно автоматически перерисовывается.
+- **Внутри `loader` нельзя вызывать методы `UI`** (он выполняется в фоновой горутине; при необходимости побочных обновлений используйте `App.Dispatch`).
+- **Область кеша — конкретное окно (`UI`):** одинаковый `key` в двух разных окнах хранит два независимых кеша. Сброс: `InvalidateRemember` (по ключу) или `ClearRemember` (всё окно).
 
 ```go
 users, loading, err := anyui.Remember(ui, "users_list", func() ([]string, error) {
@@ -43,32 +49,58 @@ if loading {
 }
 ```
 
+## Базовые типы
+
+```go
+type Dp int               // Логические DPI-независимые пиксели (.Int() int)
+type Px int               // Физические пиксели буфера отрисовки (.Int() int)
+const Auto Dp = -1        // Sentinel-значение: занять всё доступное пространство контейнера
+type Key = uint32         // Виртуальный код клавиши (VK-коды, передаётся в Shortcut / InjectKey / KeyEvent.KeyCode)
+type Modifiers struct { Ctrl, Shift, Alt bool }
+type MouseButton uint8    // MouseLeft = 1, MouseRight = 2, MouseMiddle = 3
+type CursorType uint8     // Системный курсор (CursorArrow, CursorHand, CursorIBeam, CursorResizeH/V/NWSE/NESW, CursorNotAllowed, CursorCrosshair, CursorMove)
+type Orientation uint8    // Horizontal, Vertical
+type DropZone uint8       // DropAbove, DropBelow, DropInside (для DragEvent)
+type Align uint8          // AlignStart, AlignCenter, AlignEnd, AlignStretch
+type Justify uint8        // JustifyStart, JustifyCenter, JustifyEnd, JustifySpaceBetween, JustifySpaceAround
+type DrawerSide uint8     // DrawerLeft, DrawerRight, DrawerTop, DrawerBottom
+type ToastKind uint8      // ToastInfo, ToastSuccess, ToastWarning, ToastError
+type ToastPosition uint8  // ToastBottomRight/Left/Center, ToastTopRight/Left/Center
+type LogLevel uint8       // LogInfo, LogWarn, LogError, LogDebug
+type ImageScaleMode uint8 // ScaleFit, ScaleFill, ScaleOneToOne
+type FontStyle uint8      // FontRegular, FontBold, FontMono
+type TextAlign uint8      // AlignTextLeft, AlignTextCenter, AlignTextRight
+type HitTestResult int    // HitClient, HitCaption, HitLeft/Right/Top/Bottom/TopLeft/TopRight/BottomLeft/BottomRight
+```
+
 ## Матрица применимости опций (`Option`)
 
-Неприменимые для виджета опции молча игнорируются. Основные комбинации:
+Неприменимые для конкретного виджета опции игнорируются без ошибки. Проверенные по реализации комбинации:
 
 | Виджет | Поддерживаемые опции |
 |---|---|
-| `Label`, `SelectableLabel`, `StatusDot` | `FontSize`, `Bold`, `Mono`, `TextColor`, `TextAlignLeft/Center/Right`, `LetterSpacing`, `TextShadow`, `WordWrap`, `Ellipsis`, `Width`, `MaxWidth`, `Disabled` |
+| `Label`, `SelectableLabel`, `StatusDot` | `FontSize`, `Bold`, `Mono`, `TextColor`, `TextAlignLeft`, `TextAlignCenter`, `TextAlignRight`, `LetterSpacing`, `TextShadow`, `WordWrap`, `Ellipsis`, `Width`, `MaxWidth`, `Disabled` |
 | `Button`, `Hyperlink` | `Primary`, `Secondary`, `Danger`, `Ghost`, `Icon`, `IconRight`, `Width`, `Height`, `FillWidth`, `Flex`, `Padding`, `Radius`, `FontSize`, `Bold`, `Bg`, `HoverBg`, `TextColor`, `HoverTextColor`, `BorderColor`, `HoverBorderColor`, `Disabled` |
+| `Checkbox`, `Toggle`, `RadioButton` | `Width`, `FillWidth`, `Flex`, `Disabled`, `Indeterminate` (`Checkbox`) |
 | `TextInput`, `MaskedInput` | `Width`, `Height`, `FillWidth`, `Flex`, `FontSize`, `Mono`, `Password`, `PasswordToggle`, `Clearable`, `ReadOnly`, `Disabled`, `InputFilter`, `Error`, `Icon`, `IconRight`, `FocusBorderColor` |
-| `TextArea` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `FontSize`, `Mono`, `LineNumbers`, `ReadOnly`, `Disabled`, `Error`, `FocusBorderColor` |
+| `TextArea` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `Padding`, `FontSize`, `Mono`, `LineNumbers`, `ReadOnly`, `Disabled`, `InputFilter`, `Error`, `Bg`, `BorderColor`, `Radius`, `TextColor` |
 | `Card` | `Width`, `Height`, `FillWidth`, `FillHeight`, `AutoHeight`, `Flex`, `Padding`, `Radius`, `Bg`, `BorderColor` |
-| `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Flex` (+ `ScrollToID` для `ScrollView`) |
-| `Select`, `MultiSelect` | `Width`, `FillWidth`, `Flex`, `Searchable`, `Disabled`, `Error` |
-| `ListView`, `ListViewEx` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `ScrollToIndex`, `Reorderable`, `OnReorder` |
-| `Table`, `TableEx` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `ScrollToIndex`, `Reorderable`, `OnReorder` |
-| `TreeView`, `TreeViewEx` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `Reorderable`, `AllowReparent`, `OnReorder` |
-| `Modal`, `Popover`, `FloatingPanel`, `Drawer` | `Width`, `Height`, `Bg`, `BorderColor`, `Radius`, `Padding` |
+| `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Flex`, `Padding` (`ScrollView`), `ScrollToID` (`ScrollView`) |
+| `Select`, `MultiSelect` | `Width`, `Height`, `FillWidth`, `Flex`, `Searchable` (`Select`), `Bg` (`Select`), `Radius` (`Select`), `Disabled` |
+| `ListView`, `ListViewEx` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `Bg` (`ListView`), `Radius` (`ListView`), `Disabled` (`ListView`), `ScrollToIndex` (`ListView`), `Reorderable`, `OnReorder` |
+| `Table`, `TableEx` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `Radius` (`Table`), `Disabled` (`Table`), `ScrollToIndex` (`Table`), `Reorderable`, `OnReorder` |
+| `TreeView`, `TreeViewEx` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `Radius` (`TreeView`), `Disabled` (`TreeView`), `Reorderable`, `AllowReparent`, `OnReorder` |
+| `Modal`, `Popover`, `FloatingPanel`, `Drawer` | `Width`, `Height` |
 | `ContextMenu`, `Tooltip` | `Width` (`ContextMenu`), `Bg`, `BorderColor`, `Radius`, `FontSize`, `TextColor`, `Padding` (`Tooltip`) |
 
 ## Частые ошибки
 
-1. **Состояние внутри `drawFn`:** объявление `name := ""` внутри `drawFn` сбрасывает значение на каждом кадре. Выносите состояние в структуру приложения выше `app.Run`.
-2. **Значение вместо указателя:** виджеты ввода и выбора (`TextInput`, `Toggle`, `Checkbox`, `Select`, `TabBar`, `Slider`, `ListView`) мутируют состояние по указателю (`&val`), а возвращают лишь факт изменения в кадре.
-3. **`ui.Shortcut` внутри условных веток:** метод регистрирует глобальную горячую клавишу окна — не перерегистрируйте его динамически в циклах.
-4. **Самодельные модалки через `PushOverlay(fullRect)`:** блокирует ввод всего окна на следующих кадрах. Всегда используйте `ui.Modal`.
-5. **Смешивание `Px` и `Dp`:** передача `CurrentAreaPx()` в `PushOverlay`, `LayoutRect`, `Tooltip`, `Popover`, `ContextMenu` или `RegisterHoverArea` ломает координаты при DPI > 100%. Для них всегда берите `ui.CurrentArea()` (`Dp`).
+1. **Состояние внутри `drawFn`:** объявление `name := ""` внутри `drawFn` сбрасывает значение на каждом кадре. Выносите состояние в структуру приложения выше `App.Run`.
+2. **Обновление UI из фоновой горутины напрямую:** вызывает гонки данных. Всегда оборачивайте мутации состояния в `App.Dispatch`.
+3. **Значение вместо указателя:** виджеты ввода и выбора (`TextInput`, `Toggle`, `Checkbox`, `Select`, `TabBar`, `Slider`, `ListView`) мутируют состояние по указателю, а возвращают лишь факт изменения в кадре.
+4. **`Shortcut` внутри условных веток:** метод регистрирует глобальную горячую клавишу окна — не перерегистрируйте его динамически в циклах.
+5. **Самодельные модалки через `PushOverlay` на весь экран:** блокирует ввод всего окна на следующих кадрах. Всегда используйте `Modal`.
+6. **Смешивание `Px` и `Dp`:** передача `CurrentAreaPx` в `PushOverlay`, `LayoutRect`, `Tooltip`, `Popover`, `ContextMenu` или `RegisterHoverArea` ломает координаты при DPI > 100%. Для них всегда берите `CurrentArea` (`Dp`).
 
 ## Минимальный пример
 
@@ -111,6 +143,7 @@ func main() {
 
 ```go
 const Auto Dp = -1
+
 const ( HitClient, HitCaption, HitLeft, HitRight, HitTop, HitBottom, HitTopLeft, HitTopRight, HitBottomLeft, HitBottomRight )
 const ( MsgInfo, MsgWarning, MsgError, MsgQuestion )
 const ( MsgOK, MsgOKCancel, MsgYesNo, MsgYesNoCancel )
@@ -119,8 +152,33 @@ const ( AlignTextLeft, AlignTextCenter, AlignTextRight )
 const ( NotifyNone, NotifyInfo, NotifyWarning, NotifyError )
 const ( ScaleFit, ScaleFill, ScaleOneToOne )
 const ( FontRegular, FontBold, FontMono )
-const ( KeyBackspace, KeyTab, KeyEnter, KeyEscape, KeySpace, KeyPageUp, KeyPageDown, KeyEnd, KeyHome, KeyLeft, KeyUp, KeyRight, KeyDown, KeyDelete, KeyA, KeyC, KeyV, KeyX, KeyY, KeyZ )
-const ( MouseLeft, MouseRight, MouseMiddle )
+const (
+	KeyBackspace   Key = 0x08
+	KeyTab         Key = 0x09
+	KeyEnter       Key = 0x0D
+	KeyEscape      Key = 0x1B
+	KeySpace       Key = 0x20
+	KeyPageUp      Key = 0x21
+	KeyPageDown    Key = 0x22
+	KeyEnd         Key = 0x23
+	KeyHome        Key = 0x24
+	KeyLeft        Key = 0x25
+	KeyUp          Key = 0x26
+	KeyRight       Key = 0x27
+	KeyDown        Key = 0x28
+	KeyDelete      Key = 0x2E
+	KeyA           Key = 0x41
+	KeyC           Key = 0x43
+	KeyV           Key = 0x56
+	KeyX           Key = 0x58
+	KeyY           Key = 0x59
+	KeyZ           Key = 0x5A
+)
+const (
+	MouseLeft      MouseButton = 1
+	MouseRight     MouseButton = 2
+	MouseMiddle    MouseButton = 3
+)
 const ( CursorArrow, CursorHand, CursorIBeam, CursorResizeH, CursorResizeV, CursorResizeNWSE, CursorResizeNESW, CursorNotAllowed, CursorCrosshair, CursorMove )
 const ( AlignStart, AlignCenter, AlignEnd, AlignStretch )
 const ( JustifyStart, JustifyCenter, JustifyEnd, JustifySpaceBetween, JustifySpaceAround )

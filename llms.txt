@@ -2,36 +2,42 @@
 
 Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).
 
-> Полный офлайн-справочник со всеми сигнатурами, опциями и структурами: `llms-full.txt`.
+> Полный офлайн-справочник со всеми сигнатурами, опциями, константами и структурами: `llms-full.txt`.
 
 ## Версия и источник истины
 
 - Импорт: `import "github.com/kirpicheff/anyui"` (`go get github.com/kirpicheff/anyui`).
 - Проверить установленную версию модуля: `go list -m github.com/kirpicheff/anyui`.
-- При расхождении этого документа с установленным пакетом источник истины — `go doc github.com/kirpicheff/anyui.<Symbol>`.
+- При расхождении этого документа с установленным пакетом источник истины — `go doc github.com/kirpicheff/anyui.UI.<Method>` (для методов `UI`/`App`/`Window`/`Headless`) и `go doc github.com/kirpicheff/anyui.<Symbol>`.
 - Подпакеты являются внутренними; прикладной код импортирует **только** корневой пакет `github.com/kirpicheff/anyui`.
 
 ## Правила работы с API
 
-- **Immediate Mode:** состояние хранится вне `drawFn` (в структурах/переменных приложения), `drawFn(ui *anyui.UI)` перерисовывает весь интерфейс на каждом кадре.
-- **Единицы измерения (`Dp` vs `Px`):** весь API раскладки, опций, оверлеев и ввода Headless (`LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`, `InjectMouse*`, `CurrentArea()`, `MousePosDp()`) работает строго в логических `Dp`. Физические `Px` используются только в колбэках рисования (`CanvasView`, `InteractiveCanvas`, `Table.drawCell`, `ListView.drawItem`), прямых методах (`DrawText`, `DrawSVG`, `CurrentAreaPx()`, `MousePosPx()`, `LastDirtyRectsPx()`, `TitleBarHitTest`, `InjectMouse*Px`) и на границе ОС (`Config`, `Window`).
-- **Единое задание размеров через опции:** `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image`, `ListView`, `Table`, `TextArea`, `LogView` по умолчанию занимают доступное пространство (`Auto`); явные размеры задаются опциями `Width(...)`, `Height(...)`, `FillWidth()`, `FillHeight()`. `Card` по умолчанию подбирает высоту по содержимому (`AutoHeight`); для растягивания передайте `FillHeight()`.
-- **Идентификаторы, ключи и `IDScope`:** `ui.IDScope(key, fn)` (или `PushID`/`PopID`) изолирует `id` виджетов внутри циклов и переиспользуемых компонентов. В `Select`, `MultiSelect`, `TabBar`, `TreeView`, `TreeViewEx` и `Breadcrumbs` ключи элементов (`Key` / `ID`) локальны для конкретного виджета и должны быть уникальны в его пределах — при дублировании ключей в одном списке/дереве выделение и клик совпадут для всех дубликатов.
-- **Выпадающие списки и вкладки:** `ui.Select` с `anyui.Searchable()` заменяет комбобокс; `ui.MultiSelect` работает с `map[string]bool`; `ui.TabBar` и `anyui.TabItems(...)` работают на строковых ключах.
-- **Раскладка и оверлеи:** для типового экрана используйте `ui.Page` или `DockTop` / `DockBottom` / `ColumnFlex`. Для диалогов всегда используйте `ui.Modal` — `PushOverlay(bounds, fn)` предназначен только для небольших всплывающих контролов.
-- **Drag & Drop (Reorder):** `anyui.Reorderable()` + `anyui.OnReorder(func(ev anyui.DragEvent))` работают в `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы `FromIndex`/`ToIndex`) и `TreeView`, `TreeViewEx` (ключи `FromKey`/`ToKey`; с `anyui.AllowReparent()` доступны смена родителя и `DropInside`).
+- **Immediate Mode и многопоточность:** состояние хранится вне `drawFn`; вызовы методов `UI` и чтение/изменение состояния интерфейса выполняются **только в главном потоке** внутри `drawFn`. Для обновления состояния из фоновых горутин всегда используйте `App.Dispatch` (`app.Dispatch(func() { ... })`) или `Remember`.
+- **Единицы измерения (`Dp` vs `Px`):** весь API раскладки, опций, оверлеев и ввода Headless (`LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`, `InjectMouseMove`/`InjectMouseClick`, `CurrentArea`, `MousePosDp`) работает строго в логических `Dp`. Физические `Px` используются только в колбэках рисования (`CanvasView`, `InteractiveCanvas`, `Table`, `ListView`), прямых методах (`DrawText`, `DrawSVG`, `CurrentAreaPx`, `MousePosPx`, `LastDirtyRectsPx`, `TitleBarHitTest`, `InjectMouseMovePx`/`InjectMouseClickPx`) и на границе ОС (`Config`, `Window`).
+- **`Rect` и `PointF` не типизированы по единицам:** `Rect` содержит `int`-поля, `PointF` — `float32`. В `Dp`-API (`CurrentArea`, `LayoutRect`, `PushOverlay`, `Tooltip`, `Popover`, `ContextMenu`, `RegisterHoverArea`) они трактуются как `Dp`, а в колбэках рисования и `CurrentAreaPx`/`LastDirtyRectsPx` — как `Px`.
+- **Единое задание размеров через опции:** `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image`, `ListView`, `Table`, `TextArea`, `LogView` по умолчанию занимают доступное пространство (`Auto`); явные размеры задаются опциями `Width`, `Height`, `FillWidth`, `FillHeight`. `Card` по умолчанию подбирает высоту по содержимому (`AutoHeight`); для растягивания передайте `FillHeight`.
+- **Колонки таблиц:** в `Table` и `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.
+- **Декларативная навигация:** для программной прокрутки используйте `ScrollToIndex` в `ListView` и `Table`, а для `ScrollView` — `ScrollToID` в паре с маркером `Anchor` (или `id` дочернего виджета).
+- **Иконка окна:** подхватывается автоматически из `.syso`-ресурсов, либо задаётся через `Config.IconRGBA` или `Window.SetIcon`.
+- **Идентификаторы, ключи и `IDScope`:** `IDScope` (или `PushID`/`PopID`) изолирует `id` виджетов внутри циклов и переиспользуемых компонентов. В `Select`, `MultiSelect`, `TabBar`, `TreeView`, `TreeViewEx` и `Breadcrumbs` ключи элементов (`Key` / `ID`) локальны для конкретного виджета и должны быть уникальны в его пределах — при дублировании ключей выделение и клик совпадут для всех дубликатов. В `Breadcrumbs`, если у сегмента `ID == ""`, возвращается его `Label`.
+- **Выпадающие списки и вкладки:** `Select` с опцией `Searchable` заменяет комбобокс; `MultiSelect` работает с `map[string]bool`; `TabBar` и `TabItems` работают на строковых ключах.
+- **Раскладка и оверлеи:** для типового экрана используйте `Page` или `DockTop` / `DockBottom` / `ColumnFlex`. Для диалогов всегда используйте `Modal` — `PushOverlay` предназначен только для небольших всплывающих контролов.
+- **Drag & Drop (Reorder):** `Reorderable` + `OnReorder` работают в `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы `FromIndex`/`ToIndex`) и `TreeView`, `TreeViewEx` (ключи `FromKey`/`ToKey`; с `AllowReparent` доступны смена родителя и `DropInside`).
 
 ## Семантика возвращаемых значений
 
 - `Button`, `Hyperlink` → `bool`: `true` **только в кадре нажатия**.
-- `Toggle`, `Checkbox`, `Radio`, `TextInput`, `TextArea`, `MaskedInput`, `Select`, `MultiSelect`, `TagInput`, `Slider`, `RangeSlider`, `NumberInput`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`, `ListView`, `ListViewEx`, `TreeView`, `TreeViewEx`, `Pagination`, `Collapsible`, `Accordion` → `bool`: `true` **только в кадре изменения значения** (не означает «виджет сейчас активен/включён»; текущее состояние хранится в переданном указателе/карте).
-- `Breadcrumbs(...) string`: возвращает `ID` кликнутого сегмента (или `Label`, если `ID == ""`), либо `""` если клика в этом кадре не было.
-- `TabBar(...) TabBarEvent`: `SelectedID` (смена вкладки), `ClosedID` (клик по крестику/СКМ), `Added` (клик по `+`), `MovedFrom`/`MovedTo` (перетаскивание, `-1` если не было), `DetachedID` (отрыв вкладки).
-- `Table` / `TableEx` → `TableEvent`: `RowClicked`, `RowDoubleClicked`, `RowMiddleClicked` (`-1` если события не было), `SortChanged`, `ColumnResized`, `Drag *DragEvent`.
+- `Toggle`, `Checkbox`, `RadioButton`, `RadioGroup`, `TextInput`, `TextArea`, `MaskedInput`, `Select`, `MultiSelect`, `TagInput`, `Slider`, `RangeSlider`, `NumberInput`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`, `ListView`, `ListViewEx`, `TreeView`, `TreeViewEx`, `Pagination`, `Collapsible`, `Accordion` → `bool`: `true` **только в кадре изменения значения** (не означает «виджет сейчас активен/включён»; текущее состояние хранится в переданном указателе/карте).
+- `Breadcrumbs` → `string`: возвращает `ID` кликнутого сегмента (или `Label`, если `ID == ""`), либо `""` если клика в этом кадре не было.
+- `TabBar` → `TabBarEvent`: `SelectedID` (смена вкладки), `ClosedID` (клик по крестику/СКМ), `Added` (клик по `+`), `MovedFrom`/`MovedTo` (перетаскивание, `-1` если не было), `DetachedID` (отрыв вкладки).
+- `Table`, `TableEx` → `TableEvent`: `RowClicked`, `RowDoubleClicked`, `RowMiddleClicked` (`-1` если события не было), `SortChanged`, `ColumnResized`, `Drag`.
 
 ## Асинхронная загрузка данных (`Remember`)
 
-`anyui.Remember[T](ui, key, loader)` запускает `loader` **асинхронно в отдельной горутине** при первом вызове для `key` (пока идёт загрузка, `loading == true`, повторных запусков не происходит). По завершении результат и ошибка кешируются в окне по `key`, и окно автоматически перерисовывается. Для повторного запроса сбросьте кеш через `ui.InvalidateRemember(key)` или `ui.ClearRemember()`.
+`Remember` запускает `loader` **асинхронно в отдельной горутине** при первом вызове для `key` (пока идёт загрузка, `loading == true`, повторных запусков не происходит). По завершении результат и ошибка кешируются по `key`, и окно автоматически перерисовывается.
+- **Внутри `loader` нельзя вызывать методы `UI`** (он выполняется в фоновой горутине; при необходимости побочных обновлений используйте `App.Dispatch`).
+- **Область кеша — конкретное окно (`UI`):** одинаковый `key` в двух разных окнах хранит два независимых кеша. Сброс: `InvalidateRemember` (по ключу) или `ClearRemember` (всё окно).
 
 ```go
 users, loading, err := anyui.Remember(ui, "users_list", func() ([]string, error) {
@@ -45,32 +51,58 @@ if loading {
 }
 ```
 
+## Базовые типы
+
+```go
+type Dp int               // Логические DPI-независимые пиксели (.Int() int)
+type Px int               // Физические пиксели буфера отрисовки (.Int() int)
+const Auto Dp = -1        // Sentinel-значение: занять всё доступное пространство контейнера
+type Key = uint32         // Виртуальный код клавиши (VK-коды, передаётся в Shortcut / InjectKey / KeyEvent.KeyCode)
+type Modifiers struct { Ctrl, Shift, Alt bool }
+type MouseButton uint8    // MouseLeft = 1, MouseRight = 2, MouseMiddle = 3
+type CursorType uint8     // Системный курсор (CursorArrow, CursorHand, CursorIBeam, CursorResizeH/V/NWSE/NESW, CursorNotAllowed, CursorCrosshair, CursorMove)
+type Orientation uint8    // Horizontal, Vertical
+type DropZone uint8       // DropAbove, DropBelow, DropInside (для DragEvent)
+type Align uint8          // AlignStart, AlignCenter, AlignEnd, AlignStretch
+type Justify uint8        // JustifyStart, JustifyCenter, JustifyEnd, JustifySpaceBetween, JustifySpaceAround
+type DrawerSide uint8     // DrawerLeft, DrawerRight, DrawerTop, DrawerBottom
+type ToastKind uint8      // ToastInfo, ToastSuccess, ToastWarning, ToastError
+type ToastPosition uint8  // ToastBottomRight/Left/Center, ToastTopRight/Left/Center
+type LogLevel uint8       // LogInfo, LogWarn, LogError, LogDebug
+type ImageScaleMode uint8 // ScaleFit, ScaleFill, ScaleOneToOne
+type FontStyle uint8      // FontRegular, FontBold, FontMono
+type TextAlign uint8      // AlignTextLeft, AlignTextCenter, AlignTextRight
+type HitTestResult int    // HitClient, HitCaption, HitLeft/Right/Top/Bottom/TopLeft/TopRight/BottomLeft/BottomRight
+```
+
 ## Матрица применимости опций (`Option`)
 
-Неприменимые для виджета опции молча игнорируются. Основные комбинации:
+Неприменимые для конкретного виджета опции игнорируются без ошибки. Проверенные по реализации комбинации:
 
 | Виджет | Поддерживаемые опции |
 |---|---|
-| `Label`, `SelectableLabel`, `StatusDot` | `FontSize`, `Bold`, `Mono`, `TextColor`, `TextAlignLeft/Center/Right`, `LetterSpacing`, `TextShadow`, `WordWrap`, `Ellipsis`, `Width`, `MaxWidth`, `Disabled` |
+| `Label`, `SelectableLabel`, `StatusDot` | `FontSize`, `Bold`, `Mono`, `TextColor`, `TextAlignLeft`, `TextAlignCenter`, `TextAlignRight`, `LetterSpacing`, `TextShadow`, `WordWrap`, `Ellipsis`, `Width`, `MaxWidth`, `Disabled` |
 | `Button`, `Hyperlink` | `Primary`, `Secondary`, `Danger`, `Ghost`, `Icon`, `IconRight`, `Width`, `Height`, `FillWidth`, `Flex`, `Padding`, `Radius`, `FontSize`, `Bold`, `Bg`, `HoverBg`, `TextColor`, `HoverTextColor`, `BorderColor`, `HoverBorderColor`, `Disabled` |
+| `Checkbox`, `Toggle`, `RadioButton` | `Width`, `FillWidth`, `Flex`, `Disabled`, `Indeterminate` (`Checkbox`) |
 | `TextInput`, `MaskedInput` | `Width`, `Height`, `FillWidth`, `Flex`, `FontSize`, `Mono`, `Password`, `PasswordToggle`, `Clearable`, `ReadOnly`, `Disabled`, `InputFilter`, `Error`, `Icon`, `IconRight`, `FocusBorderColor` |
-| `TextArea` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `FontSize`, `Mono`, `LineNumbers`, `ReadOnly`, `Disabled`, `Error`, `FocusBorderColor` |
+| `TextArea` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `Padding`, `FontSize`, `Mono`, `LineNumbers`, `ReadOnly`, `Disabled`, `InputFilter`, `Error`, `Bg`, `BorderColor`, `Radius`, `TextColor` |
 | `Card` | `Width`, `Height`, `FillWidth`, `FillHeight`, `AutoHeight`, `Flex`, `Padding`, `Radius`, `Bg`, `BorderColor` |
-| `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Flex` (+ `ScrollToID` для `ScrollView`) |
-| `Select`, `MultiSelect` | `Width`, `FillWidth`, `Flex`, `Searchable`, `Disabled`, `Error` |
-| `ListView`, `ListViewEx` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `ScrollToIndex`, `Reorderable`, `OnReorder` |
-| `Table`, `TableEx` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `ScrollToIndex`, `Reorderable`, `OnReorder` |
-| `TreeView`, `TreeViewEx` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `Reorderable`, `AllowReparent`, `OnReorder` |
-| `Modal`, `Popover`, `FloatingPanel`, `Drawer` | `Width`, `Height`, `Bg`, `BorderColor`, `Radius`, `Padding` |
+| `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Flex`, `Padding` (`ScrollView`), `ScrollToID` (`ScrollView`) |
+| `Select`, `MultiSelect` | `Width`, `Height`, `FillWidth`, `Flex`, `Searchable` (`Select`), `Bg` (`Select`), `Radius` (`Select`), `Disabled` |
+| `ListView`, `ListViewEx` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `Bg` (`ListView`), `Radius` (`ListView`), `Disabled` (`ListView`), `ScrollToIndex` (`ListView`), `Reorderable`, `OnReorder` |
+| `Table`, `TableEx` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `Radius` (`Table`), `Disabled` (`Table`), `ScrollToIndex` (`Table`), `Reorderable`, `OnReorder` |
+| `TreeView`, `TreeViewEx` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `Radius` (`TreeView`), `Disabled` (`TreeView`), `Reorderable`, `AllowReparent`, `OnReorder` |
+| `Modal`, `Popover`, `FloatingPanel`, `Drawer` | `Width`, `Height` |
 | `ContextMenu`, `Tooltip` | `Width` (`ContextMenu`), `Bg`, `BorderColor`, `Radius`, `FontSize`, `TextColor`, `Padding` (`Tooltip`) |
 
 ## Частые ошибки
 
-1. **Состояние внутри `drawFn`:** объявление `name := ""` внутри `drawFn` сбрасывает значение на каждом кадре. Выносите состояние в структуру приложения выше `app.Run`.
-2. **Значение вместо указателя:** виджеты ввода и выбора (`TextInput`, `Toggle`, `Checkbox`, `Select`, `TabBar`, `Slider`, `ListView`) мутируют состояние по указателю (`&val`), а возвращают лишь факт изменения в кадре.
-3. **`ui.Shortcut` внутри условных веток:** метод регистрирует глобальную горячую клавишу окна — не перерегистрируйте его динамически в циклах.
-4. **Самодельные модалки через `PushOverlay(fullRect)`:** блокирует ввод всего окна на следующих кадрах. Всегда используйте `ui.Modal`.
-5. **Смешивание `Px` и `Dp`:** передача `CurrentAreaPx()` в `PushOverlay`, `LayoutRect`, `Tooltip`, `Popover`, `ContextMenu` или `RegisterHoverArea` ломает координаты при DPI > 100%. Для них всегда берите `ui.CurrentArea()` (`Dp`).
+1. **Состояние внутри `drawFn`:** объявление `name := ""` внутри `drawFn` сбрасывает значение на каждом кадре. Выносите состояние в структуру приложения выше `App.Run`.
+2. **Обновление UI из фоновой горутины напрямую:** вызывает гонки данных. Всегда оборачивайте мутации состояния в `App.Dispatch`.
+3. **Значение вместо указателя:** виджеты ввода и выбора (`TextInput`, `Toggle`, `Checkbox`, `Select`, `TabBar`, `Slider`, `ListView`) мутируют состояние по указателю, а возвращают лишь факт изменения в кадре.
+4. **`Shortcut` внутри условных веток:** метод регистрирует глобальную горячую клавишу окна — не перерегистрируйте его динамически в циклах.
+5. **Самодельные модалки через `PushOverlay` на весь экран:** блокирует ввод всего окна на следующих кадрах. Всегда используйте `Modal`.
+6. **Смешивание `Px` и `Dp`:** передача `CurrentAreaPx` в `PushOverlay`, `LayoutRect`, `Tooltip`, `Popover`, `ContextMenu` или `RegisterHoverArea` ломает координаты при DPI > 100%. Для них всегда берите `CurrentArea` (`Dp`).
 
 ## Минимальный пример
 
@@ -109,315 +141,14 @@ func main() {
 }
 ```
 
-## Ключевые структуры (офлайн-минимум)
+## Карта API (полные сигнатуры и структуры — в `llms-full.txt`)
 
-```go
-type Config struct {
-	Title               string
-	Width               int // Начальная ширина окна в физических пикселях ОС (px).
-	Height              int // Начальная высота окна в физических пикселях ОС (px).
-	MinWidth            int // Минимальная ширина окна в физических пикселях ОС (px).
-	MinHeight           int // Минимальная высота окна в физических пикселях ОС (px).
-	DarkTitle           bool
-	TitleBarColor       *Color
-	TitleTextColor      *Color
-	BorderColor         *Color
-	InitialState        *WindowState
-	FollowSystemTheme   bool
-	OnSystemThemeChange func(app *App, dark bool)
-	Theme               Theme
-	FontRegular         []byte
-	FontBold            []byte
-	FontMono            []byte
-	Strings             *Strings
-	SingleInstance      *SingleInstanceConfig
-	Tray                *TrayConfig
-	Parent              *Window
-	Frameless           bool
-	TitleBarHeight      int                              // Высота системного заголовка окна в физических пикселях ОС (px).
-	HitTest             func(xPx, yPx int) HitTestResult // Проверка зон окна Frameless (xPx, yPx — в физических пикселях ОС).
-	AcceptDropFiles     bool
-	IconRGBA            []byte
-	IconWidth           int
-	IconHeight          int
-	HideOnClose         bool
-	OnClose             func(w *Window) bool
-	OnDropFiles         func(files []string, xPx, yPx int)
-}
-
-type PageConfig struct {
-	ID       string // Идентификатор ScrollView тела (по умолчанию "page_body")
-	GapDp    Dp     // Отступ между секциями в dp (по умолчанию 8)
-	HeaderDp Dp     // Высота шапки в dp (по умолчанию 48, если headerFn != nil)
-	FooterDp Dp     // Высота футера в dp (по умолчанию 44, если footerFn != nil)
-	NoScroll bool   // Отключает автоматическую обёртку bodyFn в ScrollView
-}
-
-type FlexItem struct {
-	Weight  float32 // Пропорциональный вес (используется, если FixedDp <= 0)
-	FixedDp Dp      // Фиксированный размер вдоль главной оси в dp (если > 0)
-	Fn      func()  // Функция отрисовки содержимого слота
-}
-
-type TableColumn struct {
-	Title      string
-	WidthDp    Dp
-	MinWidthDp Dp
-	Sortable   bool
-}
-
-type TableEvent struct {
-	RowClicked       int
-	RowDoubleClicked int
-	RowMiddleClicked int
-	SortChanged      bool
-	ColumnResized    bool
-	Drag             *DragEvent
-}
-
-type ListViewExConfig struct {
-	Selected       map[int]bool
-	ShowCheckboxes bool
-	Checked        []bool
-}
-
-type TreeViewExConfig struct {
-	SelectedIDs    map[string]bool
-	ShowCheckboxes bool
-}
-
-type TableExConfig struct {
-	Selected             map[int]bool
-	ShowCheckboxes       bool
-	Checked              []bool
-	FrozenCols           int
-	GetCellText          func(row, col int) string
-	OnCellEdit           func(row, col int, newValue string)
-	AutoFitOnDoubleClick bool
-}
-
-type TabItem struct {
-	ID          string
-	Title       string
-	IconSVG     string
-	StatusColor *Color
-	Closable    bool
-}
-
-type TabBarEvent struct {
-	SelectedID string
-	ClosedID   string
-	Added      bool
-	MovedFrom  int
-	MovedTo    int
-	DetachedID string
-}
-
-type SelectItem struct {
-	Key   string
-	Label string
-	Icon  string
-}
-
-type TreeNode struct {
-	ID            string
-	Label         string
-	IconSVG       string
-	Expanded      bool
-	Checked       bool
-	Indeterminate bool
-	Children      []*TreeNode
-}
-
-type ToolbarItem struct {
-	ID        string
-	Label     string
-	IconSVG   string
-	Tooltip   string
-	Separator bool
-	Disabled  bool
-	Active    bool
-	OnClick   func()
-}
-
-type ContextMenuItem struct {
-	Label     string
-	Shortcut  string
-	IconSVG   string
-	Separator bool
-	Disabled  bool
-	OnClick   func()
-}
-
-type MenuBarItem struct {
-	Label string
-	Items []MenuBarEntry
-}
-
-type MenuBarEntry struct {
-	Label     string
-	Shortcut  string
-	IconSVG   string
-	Separator bool
-	Disabled  bool
-	Checked   bool
-	SubItems  []MenuBarEntry
-	OnClick   func()
-}
-
-type BreadcrumbItem struct {
-	ID       string
-	Label    string
-	IconSVG  string
-	Disabled bool
-}
-
-type DragEvent struct {
-	FromWidget string   // ID виджета-источника перетаскивания
-	ToWidget   string   // ID целевого виджета
-	FromKey    string   // Ключ перетаскиваемого узла (для TreeView — node.ID; "" для Table/ListView)
-	ToKey      string   // Ключ якорного целевого узла (для TreeView — node.ID; "" для Table/ListView)
-	FromIndex  int      // Индекс перетаскиваемой строки (для Table/ListView; -1 для TreeView)
-	ToIndex    int      // Позиция вставки в списке после удаления перемещаемого элемента (0 <= ToIndex < rowCount; -1 для TreeView)
-	Drop       DropZone // Зона сброса (DropAbove, DropBelow; DropInside при AllowReparent в TreeView)
-}
-
-```
-
-## Основные методы `UI` (полные сигнатуры)
-
-```go
-func (u *UI) Accordion(id string, items []AccordionItem, openIDs map[string]bool, opts ...Option) bool
-func (u *UI) Anchor(id string)
-func (u *UI) App() *App
-func (u *UI) Badge(text string, opts ...Option)
-func (u *UI) BarChart(id string, labels []string, series []ChartSeries, opts ...Option)
-func (u *UI) Breadcrumbs(id string, items []BreadcrumbItem, opts ...Option) string
-func (u *UI) Button(id, label string, opts ...Option) bool
-func (u *UI) Canvas() *Canvas
-func (u *UI) CanvasView(drawFn func(canvas *Canvas, areaPx Rect), opts ...Option)
-func (u *UI) Card(fn func(), opts ...Option)
-func (u *UI) Checkbox(id, label string, checked *bool, opts ...Option) bool
-func (u *UI) ClearGlyphCache()
-func (u *UI) ClearRemember()
-func (u *UI) ClearScaledImageCache()
-func (u *UI) ClipboardImage() (image.Image, error)
-func (u *UI) ClipboardText() (string, error)
-func (u *UI) Collapsible(id, title string, expanded *bool, fn func(), opts ...Option) bool
-func (u *UI) ColorPicker(id string, col *Color, opts ...Option) bool
-func (u *UI) Column(gapDp Dp, fn func())
-func (u *UI) ColumnCentered(gapDp Dp, fn func())
-func (u *UI) ColumnFlex(gapDp Dp, items ...FlexItem)
-func (u *UI) ColumnWith(align Align, justify Justify, gapDp Dp, items ...func())
-func (u *UI) ContextMenu(id string, anchor Rect, items []ContextMenuItem, opts ...Option)
-func (u *UI) CurrentArea() Rect
-func (u *UI) CurrentAreaPx() Rect
-func (u *UI) DatePicker(id string, date *time.Time, opts ...Option) bool
-func (u *UI) DateTimePicker(id string, dt *time.Time, opts ...Option) bool
-func (u *UI) DockBottom(gapDp, bottomDp Dp, bodyFn, bottomFn func())
-func (u *UI) DockTop(gapDp, topDp Dp, topFn, bodyFn func())
-func (u *UI) DoubleClicked() bool
-func (u *UI) DrawSVG(svgData string, xPx, yPx Px, sizeDp Dp, tint Color)
-func (u *UI) DrawText(xPx, yPx Px, text string, sizeDp Dp, col Color)
-func (u *UI) Drawer(id string, open *bool, side DrawerSide, fn func(), opts ...Option)
-func (u *UI) Expand(fn func())
-func (u *UI) FlexSpacer(reserveDp Dp)
-func (u *UI) FloatingPanel(id, title string, open *bool, fn func(), opts ...Option)
-func (u *UI) Flow(gapXDp, gapYDp Dp, fn func())
-func (u *UI) FocusID() string
-func (u *UI) FormLayout(labelWidthDp, gapXDp, gapYDp Dp, fn func())
-func (u *UI) FormRow(label string, fn func())
-func (u *UI) GlyphCacheStats() (entries int, bytes int64)
-func (u *UI) Grid(cols int, gapXDp, gapYDp, rowHeightDp Dp, fn func())
-func (u *UI) Hyperlink(id, text string, opts ...Option) bool
-func (u *UI) IDScope(key any, fn func())
-func (u *UI) IconButton(id, svg string, opts ...Option) bool
-func (u *UI) Image(img image.Image, mode ImageScaleMode, opts ...Option)
-func (u *UI) InteractiveCanvas(id string, cb CanvasCallbacks, opts ...Option)
-func (u *UI) InvalidateRemember(key any)
-func (u *UI) InvalidateStatic()
-func (u *UI) Label(text string, opts ...Option)
-func (u *UI) LastDirtyRectsPx() []Rect
-func (u *UI) LastFrameStaticBlitted() bool
-func (u *UI) LayoutRect(rect Rect, fn func())
-func (u *UI) LineChart(id string, labels []string, series []ChartSeries, opts ...Option)
-func (u *UI) ListView(id string, count int, itemHeightDp Dp, selected *int, drawItem func(index int, areaPx Rect, selected bool), opts ...Option) bool
-func (u *UI) ListViewEx(id string, count int, itemHeightDp Dp, cfg *ListViewExConfig, drawItem func(index int, areaPx Rect, isSelected bool), opts ...Option) bool
-func (u *UI) LogView(id string, entries []LogEntry, followTail *bool, opts ...Option)
-func (u *UI) MaskedInput(id string, value *string, mask string, opts ...Option) bool
-func (u *UI) MenuBar(id string, menus []MenuBarItem, opts ...Option)
-func (u *UI) MiddleClicked() bool
-func (u *UI) Modal(id string, open *bool, title string, fn func(), opts ...Option)
-func (u *UI) MouseDown() bool
-func (u *UI) MousePosDp() (Dp, Dp)
-func (u *UI) MousePosPx() (Px, Px)
-func (u *UI) MousePressed() bool
-func (u *UI) MultiSelect(id string, items []SelectItem, selectedIDs map[string]bool, opts ...Option) bool
-func (u *UI) NumberInput(id string, value *float64, minVal, maxVal, step float64, decimals int, opts ...Option) bool
-func (u *UI) Padding(padDp Dp, fn func())
-func (u *UI) PaddingXY(pxDp, pyDp Dp, fn func())
-func (u *UI) Page(cfg PageConfig, headerFn, bodyFn, footerFn func())
-func (u *UI) Pagination(id string, currentPage *int, totalPages int, opts ...Option) bool
-func (u *UI) PopID()
-func (u *UI) Popover(id string, open *bool, anchor Rect, fn func(), opts ...Option)
-func (u *UI) ProgressBar(progress float32, opts ...Option)
-func (u *UI) PushID(key any)
-func (u *UI) PushOverlay(bounds Rect, drawFn func())
-func (u *UI) PxToDp(px Px) Dp
-func (u *UI) PxToDpf(px float32) float32
-func (u *UI) RadioButton(id, label string, selected *string, value string, opts ...Option) bool
-func (u *UI) RadioGroup(id string, items []SelectItem, selected *string, opts ...Option) bool
-func (u *UI) RangeSlider(id string, low, high *float32, minVal, maxVal float32, opts ...Option) bool
-func (u *UI) RegisterHoverArea(id string, rect Rect, cursor CursorType, trackMove bool)
-func (u *UI) RequestRedraw()
-func (u *UI) Row(gapDp, heightDp Dp, fn func())
-func (u *UI) RowCentered(gapDp, heightDp Dp, fn func())
-func (u *UI) RowFlex(gapDp, heightDp Dp, items ...FlexItem)
-func (u *UI) RowWith(align Align, justify Justify, gapDp, heightDp Dp, items ...func())
-func (u *UI) Scale(dp Dp) Px
-func (u *UI) ScaleF(dp float32) float32
-func (u *UI) ScaledImageCacheStats() (entries int, bytes int64)
-func (u *UI) ScrollView(id string, fn func(), opts ...Option)
-func (u *UI) Select(id string, items []SelectItem, selected *string, opts ...Option) bool
-func (u *UI) SelectableLabel(id, text string, opts ...Option)
-func (u *UI) Separator(opts ...Option)
-func (u *UI) SetClipboardImage(img image.Image) error
-func (u *UI) SetClipboardText(text string) error
-func (u *UI) SetCursor(cursor CursorType)
-func (u *UI) SetDebugDirtyRect(enabled bool)
-func (u *UI) SetFocus(id string)
-func (u *UI) SetSmartMouseMove(enabled bool)
-func (u *UI) SetStrings(s Strings)
-func (u *UI) SetTheme(theme Theme)
-func (u *UI) SetToastOffset(xDp, yDp Dp)
-func (u *UI) SetToastPosition(pos ToastPosition)
-func (u *UI) Shortcut(key Key, mods Modifiers, fn func())
-func (u *UI) ShowToast(title, text string, kind ToastKind, duration ...time.Duration)
-func (u *UI) SkippedMouseMoves() uint64
-func (u *UI) Slider(id string, value *float32, minVal, maxVal float32, opts ...Option) bool
-func (u *UI) Spacer(dp Dp)
-func (u *UI) Sparkline(id string, values []float64, opts ...Option)
-func (u *UI) Spinner(id string, sizeDp Dp, opts ...Option)
-func (u *UI) SplitPane(id string, orient Orientation, ratio *float32, firstFn, secondFn func(), opts ...Option)
-func (u *UI) StaticLayer(id string, fn func())
-func (u *UI) StatusBar(id string, sections []StatusBarSection, opts ...Option)
-func (u *UI) StatusDot(dotColor Color, label string, opts ...Option)
-func (u *UI) Strings() Strings
-func (u *UI) TabBar(id string, tabs []TabItem, activeID *string, opts ...Option) TabBarEvent
-func (u *UI) Table(id string, cols []TableColumn, rowCount int, selected *int, sort *TableSort, drawCell func(row, col int, areaPx Rect, isSelected bool), opts ...Option) TableEvent
-func (u *UI) TableEx(id string, cols []TableColumn, rowCount int, cfg *TableExConfig, sort *TableSort, drawCell func(row, col int, areaPx Rect, isSelected bool), opts ...Option) TableEvent
-func (u *UI) TagInput(id string, tags *[]string, placeholder string, opts ...Option) bool
-func (u *UI) TextArea(id string, value *string, placeholder string, opts ...Option) bool
-func (u *UI) TextInput(id string, value *string, placeholder string, opts ...Option) bool
-func (u *UI) Theme() Theme
-func (u *UI) TimePicker(id string, t *time.Time, opts ...Option) bool
-func (u *UI) TitleBar(id, title string, cfg TitleBarConfig, opts ...Option)
-func (u *UI) TitleBarHitTest(xPx, yPx Px) HitTestResult
-func (u *UI) Toggle(id, label string, value *bool, opts ...Option) bool
-func (u *UI) Toolbar(id string, items []ToolbarItem, opts ...Option)
-func (u *UI) Tooltip(text string, anchor Rect, opts ...Option)
-func (u *UI) TreeView(id string, roots []*TreeNode, selectedID *string, opts ...Option) bool
-func (u *UI) TreeViewEx(id string, roots []*TreeNode, cfg *TreeViewExConfig, opts ...Option) bool
-func (u *UI) VirtualTextView(id string, lines []string, opts ...Option)
-func (u *UI) Window() *Window
-```
+- **Приложение и окна:** `NewApp`, `App.Run`, `App.Dispatch`, `App.OpenWindow`, `App.MainWindow`, `App.Quit`, `App.SetTrayMenu`, `App.SetTrayIcon`, `App.SetTrayTooltip`, `App.ShowNotification`, `Window.SetTitle`, `Window.SetSize`, `Window.SetPosition`, `Window.SetIcon`, `Window.SetTheme`, `Window.Invalidate`, `Window.WakeUp`, `Window.Close`.
+- **Раскладка и контейнеры (`UI`):** `Column`, `ColumnCentered`, `ColumnWith`, `ColumnFlex`, `Row`, `RowCentered`, `RowWith`, `RowFlex`, `Grid`, `Flow`, `FormLayout`, `FormRow`, `Padding`, `PaddingXY`, `Spacer`, `FlexSpacer`, `Expand`, `DockTop`, `DockBottom`, `Page`, `Card`, `ScrollView`, `Anchor`, `SplitPane`, `Collapsible`, `Accordion`, `LayoutRect`, `IDScope`, `PushID`, `PopID`.
+- **Ввод и формы (`UI`):** `Button`, `Hyperlink`, `Toggle`, `Checkbox`, `RadioButton`, `RadioGroup`, `TextInput`, `TextArea`, `MaskedInput`, `NumberInput`, `Slider`, `RangeSlider`, `Select`, `MultiSelect`, `TagInput`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`.
+- **Списки, деревья, таблицы и графики (`UI`):** `ListView`, `ListViewEx`, `TreeView`, `TreeViewEx`, `Table`, `TableEx`, `LogView`, `VirtualTextView`, `Sparkline`, `LineChart`, `BarChart`.
+- **Текст, индикаторы и навигация (`UI`):** `Label`, `SelectableLabel`, `StatusDot`, `Badge`, `Separator`, `ProgressBar`, `Spinner`, `TabBar`, `MenuBar`, `Toolbar`, `StatusBar`, `Breadcrumbs`, `Pagination`, `TitleBar`, `TitleBarHitTest`.
+- **Оверлеи и уведомления (`UI`):** `Modal`, `Popover`, `FloatingPanel`, `Drawer`, `ContextMenu`, `Tooltip`, `PushOverlay`, `ShowToast`, `SetToastPosition`, `SetToastOffset`.
+- **Графика и холст (`UI`):** `Image`, `CanvasView`, `InteractiveCanvas`, `Canvas`, `DrawText`, `DrawSVG`, `StaticLayer`, `InvalidateStatic`, `RequestRedraw`, `CurrentArea`, `CurrentAreaPx`, `Scale`, `ScaleF`, `PxToDp`, `PxToDpf`.
+- **Ввод, буфер обмена, темы и система:** `Shortcut`, `FocusID`, `SetFocus`, `SetCursor`, `RegisterHoverArea`, `MousePosDp`, `MousePosPx`, `MousePressed`, `MouseDown`, `DoubleClicked`, `MiddleClicked`, `ClipboardText`, `SetClipboardText`, `ClipboardImage`, `SetClipboardImage`, `Remember`, `InvalidateRemember`, `ClearRemember`, `Theme`, `SetTheme`, `Strings`, `SetStrings`, `OpenFileDialog`, `OpenFilesDialog`, `SaveFileDialog`, `SelectFolderDialog`, `MessageBox`, `OpenURL`, `RevealInFileManager`, `AcquireSingleInstance`, `LoadWindowState`, `SaveWindowState`.
+- **Тестирование (`Headless`):** `NewHeadless`, `Headless.SetDraw`, `Headless.Step`, `Headless.AdvanceTime`, `Headless.SetScale`, `Headless.InjectMouseMove`, `Headless.InjectMouseClick`, `Headless.InjectMouseWheel`, `Headless.InjectKey`, `Headless.InjectText`, `Headless.InjectFocus`, `Headless.CaptureImage`, `AssertGolden`, `DefaultTestFonts`.
