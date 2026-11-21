@@ -16,17 +16,29 @@ var (
 	tableEditBuf     = make(map[string]string)
 )
 
+// ListViewExConfig задаёт расширенные возможности списка ListViewEx:
+// мультивыбор строк и опциональные чекбоксы.
+type ListViewExConfig struct {
+	Selected       map[int]bool
+	ShowCheckboxes bool
+	Checked        []bool
+}
+
 // ListViewEx отрисовывает виртуализированный список с поддержкой мультивыбора
-// (Ctrl+Клик, Shift+Клик, Ctrl+A) и опциональных чекбоксов (если checked != nil).
+// (Ctrl+Клик, Shift+Клик, Ctrl+A) и опциональных чекбоксов.
 func (c *Context) ListViewEx(
 	id string,
 	count int,
 	itemHeightDp Dp,
-	selected map[int]bool,
-	checked []bool,
+	cfg *ListViewExConfig,
 	drawItem func(index int, areaPx render.Rect, isSelected bool),
 	opts ...Option,
 ) bool {
+	if cfg == nil {
+		cfg = &ListViewExConfig{}
+	}
+	selected := cfg.Selected
+	checked := cfg.Checked
 	if itemHeightDp <= 0 {
 		itemHeightDp = 32
 	}
@@ -95,7 +107,7 @@ func (c *Context) ListViewEx(
 		}
 	}
 
-	showCheck := checked != nil && len(checked) >= count
+	showCheck := cfg.ShowCheckboxes && checked != nil && len(checked) >= count
 	mods := c.currentMods()
 
 	contentRect := render.Rect{X: viewRect.X, Y: viewRect.Y, W: contentW, H: viewRect.H}
@@ -246,14 +258,25 @@ func SyncTreeCheckState(roots []*TreeNode) {
 	}
 }
 
+// TreeViewExConfig задаёт расширенные возможности дерева TreeViewEx:
+// мультивыбор узлов и отображение каскадных чекбоксов.
+type TreeViewExConfig struct {
+	SelectedIDs    map[string]bool
+	ShowCheckboxes bool
+}
+
 // TreeViewEx отрисовывает дерево с мультивыбором узлов и опциональными каскадными чекбоксами.
 func (c *Context) TreeViewEx(
 	id string,
 	roots []*TreeNode,
-	selectedIDs map[string]bool,
-	showCheckboxes bool,
+	cfg *TreeViewExConfig,
 	opts ...Option,
 ) bool {
+	if cfg == nil {
+		cfg = &TreeViewExConfig{}
+	}
+	selectedIDs := cfg.SelectedIDs
+	showCheckboxes := cfg.ShowCheckboxes
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
@@ -460,9 +483,9 @@ func (c *Context) TreeViewEx(
 // TableExConfig задаёт расширенные возможности таблицы TableEx:
 // мультивыбор, чекбоксы, закреплённые колонки, inline-редактирование и автоподбор ширины.
 type TableExConfig struct {
-	SelectedRows         map[int]bool
+	Selected             map[int]bool
 	ShowCheckboxes       bool
-	CheckedRows          []bool
+	Checked              []bool
 	FrozenCols           int
 	GetCellText          func(row, col int) string
 	OnCellEdit           func(row, col int, newValue string)
@@ -608,11 +631,11 @@ func (c *Context) TableEx(
 	}
 
 	// Ctrl+A при фокусе
-	if c.FocusID == id && !c.IsInputBlocked() && cfg.SelectedRows != nil {
+	if c.FocusID == id && !c.IsInputBlocked() && cfg.Selected != nil {
 		for _, kp := range c.KeyEvents {
 			if kp.Mods.Ctrl && kp.Code == KeyA {
 				for i := 0; i < rowCount; i++ {
-					cfg.SelectedRows[i] = true
+					cfg.Selected[i] = true
 				}
 				c.RequestRedraw()
 			}
@@ -776,11 +799,11 @@ func (c *Context) TableEx(
 	if frozenW > 0 {
 		c.Canvas.PushClip(render.Rect{X: viewRect.X, Y: hdrRect.Y, W: frozenW, H: hdrRect.H})
 		c.Canvas.FillRect(render.Rect{X: viewRect.X, Y: hdrRect.Y, W: frozenW, H: hdrRect.H - 1}, c.Theme.Surface)
-		if cfg.ShowCheckboxes && cfg.CheckedRows != nil && len(cfg.CheckedRows) >= rowCount {
+		if cfg.ShowCheckboxes && cfg.Checked != nil && len(cfg.Checked) >= rowCount {
 			allChecked := rowCount > 0
 			anyChecked := false
 			for ri := 0; ri < rowCount; ri++ {
-				if cfg.CheckedRows[ri] {
+				if cfg.Checked[ri] {
 					anyChecked = true
 				} else {
 					allChecked = false
@@ -795,7 +818,7 @@ func (c *Context) TableEx(
 				if c.MousePressed {
 					target := !allChecked
 					for ri := 0; ri < rowCount; ri++ {
-						cfg.CheckedRows[ri] = target
+						cfg.Checked[ri] = target
 					}
 					c.RequestRedraw()
 				}
@@ -821,7 +844,7 @@ func (c *Context) TableEx(
 			ry := bodyRect.Y + ri*rowH - si.y
 			rowR := render.Rect{X: clipR.X, Y: ry, W: clipR.W, H: rowH}
 			c.RegisterHit(id+":row:"+strconv.Itoa(ri), clipR.Intersect(rowR), platform.CursorArrow)
-			isSel := cfg.SelectedRows != nil && cfg.SelectedRows[ri]
+			isSel := cfg.Selected != nil && cfg.Selected[ri]
 			hovRow := !c.IsInputBlocked() && render.Rect{X: bodyRect.X, Y: ry, W: bodyRect.W, H: rowH}.Contains(c.MouseX, c.MouseY)
 
 			if isSel {
@@ -838,15 +861,15 @@ func (c *Context) TableEx(
 				c.Canvas.FillRect(rowR, c.Theme.Bg.WithAlpha(160))
 			}
 
-			if colStart == 0 && cfg.ShowCheckboxes && cfg.CheckedRows != nil && len(cfg.CheckedRows) >= rowCount {
+			if colStart == 0 && cfg.ShowCheckboxes && cfg.Checked != nil && len(cfg.Checked) >= rowCount {
 				cbSize := c.Scale(15).Int()
 				cbR := render.Rect{X: viewRect.X + (checkColW-cbSize)/2, Y: ry + (rowH-cbSize)/2, W: cbSize, H: cbSize}
 				c.RegisterHit(id+":rcb:"+strconv.Itoa(ri), clipR.Intersect(cbR), platform.CursorHand)
-				c.drawMiniCheckbox(cbR, cfg.CheckedRows[ri], false)
+				c.drawMiniCheckbox(cbR, cfg.Checked[ri], false)
 				if !c.IsInputBlocked() && cbR.Contains(c.MouseX, c.MouseY) {
 					c.nextCursor = platform.CursorHand
 					if c.MousePressed {
-						cfg.CheckedRows[ri] = !cfg.CheckedRows[ri]
+						cfg.Checked[ri] = !cfg.Checked[ri]
 						c.RequestRedraw()
 						allowRowClick = false
 					}
@@ -889,7 +912,7 @@ func (c *Context) TableEx(
 				if st.Reorderable {
 					c.ArmReorder(id, ri, "")
 				}
-				if cfg.SelectedRows != nil {
+				if cfg.Selected != nil {
 					anchor, hasAnchor := tableAnchorStore[id]
 					if mods.Shift && hasAnchor && anchor >= 0 && anchor < rowCount {
 						lo, hi := anchor, ri
@@ -897,27 +920,27 @@ func (c *Context) TableEx(
 							lo, hi = hi, lo
 						}
 						if !mods.Ctrl {
-							for k := range cfg.SelectedRows {
-								delete(cfg.SelectedRows, k)
+							for k := range cfg.Selected {
+								delete(cfg.Selected, k)
 							}
 						}
 						for k := lo; k <= hi; k++ {
-							cfg.SelectedRows[k] = true
+							cfg.Selected[k] = true
 						}
 					} else if mods.Ctrl {
-						if cfg.SelectedRows[ri] {
-							delete(cfg.SelectedRows, ri)
+						if cfg.Selected[ri] {
+							delete(cfg.Selected, ri)
 						} else {
-							cfg.SelectedRows[ri] = true
+							cfg.Selected[ri] = true
 						}
 						tableAnchorStore[id] = ri
 					} else {
 						// При Reorder клик по строке внутри группы выделенных не схлопывает группу
-						if !(st.Reorderable && cfg.SelectedRows[ri] && len(cfg.SelectedRows) > 1) {
-							for k := range cfg.SelectedRows {
-								delete(cfg.SelectedRows, k)
+						if !(st.Reorderable && cfg.Selected[ri] && len(cfg.Selected) > 1) {
+							for k := range cfg.Selected {
+								delete(cfg.Selected, k)
 							}
-							cfg.SelectedRows[ri] = true
+							cfg.Selected[ri] = true
 						}
 						tableAnchorStore[id] = ri
 					}

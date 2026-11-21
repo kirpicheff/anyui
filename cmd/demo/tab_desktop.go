@@ -187,10 +187,17 @@ func (st *demoState) drawTabDesktop(ui *anyui.UI) {
 			// 5. Мультивыбор в ListViewEx, TreeViewEx и TableEx
 			ui.Label("Мультивыбор (Ctrl+Клик, Shift+Клик, Ctrl+A) и чекбоксы", anyui.FontSize(13), anyui.Bold())
 			ui.Row(12, 190, func() {
-				ui.ListViewEx("demo_lvex", len(deskTab.listMultiChk), 28, deskTab.listMultiSel, deskTab.listMultiChk, func(idx int, area anyui.Rect, isSel bool) {
+				ui.ListViewEx("demo_lvex", len(deskTab.listMultiChk), 28, &anyui.ListViewExConfig{
+					Selected:       deskTab.listMultiSel,
+					ShowCheckboxes: true,
+					Checked:        deskTab.listMultiChk,
+				}, func(idx int, area anyui.Rect, isSel bool) {
 					ui.DrawText(anyui.Px(area.X+6), anyui.Px(area.Y+7), fmt.Sprintf("Элемент #%d", idx+1), 12, th.TextPrimary)
 				}, anyui.Flex(1), anyui.Height(185))
-				ui.TreeViewEx("demo_tvex", ensureDesktopTree(), deskTab.treeMultiSel, true, anyui.Flex(1), anyui.Height(185))
+				ui.TreeViewEx("demo_tvex", ensureDesktopTree(), &anyui.TreeViewExConfig{
+					SelectedIDs:    deskTab.treeMultiSel,
+					ShowCheckboxes: true,
+				}, anyui.Flex(1), anyui.Height(185))
 			})
 
 			cols := []anyui.TableColumn{
@@ -200,9 +207,9 @@ func (st *demoState) drawTabDesktop(ui *anyui.UI) {
 				{Title: "Пинг", WidthDp: 100},
 			}
 			ui.TableEx("demo_tblex", cols, len(deskTab.tableCells), &anyui.TableExConfig{
-				SelectedRows:         deskTab.tableSel,
+				Selected:             deskTab.tableSel,
 				ShowCheckboxes:       true,
-				CheckedRows:          deskTab.tableChk,
+				Checked:              deskTab.tableChk,
 				FrozenCols:           1,
 				AutoFitOnDoubleClick: true,
 				GetCellText: func(row, col int) string {

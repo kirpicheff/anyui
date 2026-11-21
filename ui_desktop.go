@@ -37,6 +37,12 @@ type LogEntry = ui.LogEntry
 // ChartSeries описывает одну серию данных для LineChart и BarChart.
 type ChartSeries = ui.ChartSeries
 
+// ListViewExConfig задаёт расширенные настройки списка ListViewEx.
+type ListViewExConfig = ui.ListViewExConfig
+
+// TreeViewExConfig задаёт расширенные настройки дерева TreeViewEx.
+type TreeViewExConfig = ui.TreeViewExConfig
+
 // TableExConfig задаёт расширенные настройки таблицы TableEx.
 type TableExConfig = ui.TableExConfig
 
@@ -125,13 +131,13 @@ func (u *UI) TagInput(id string, tags *[]string, placeholder string, opts ...Opt
 
 // ListViewEx отрисовывает список с мультивыбором и опциональными чекбоксами.
 // Колбэк drawItem получает координаты элемента areaPx в физических пикселях (Px).
-func (u *UI) ListViewEx(id string, count int, itemHeightDp Dp, selected map[int]bool, checked []bool, drawItem func(index int, areaPx Rect, isSelected bool), opts ...Option) bool {
-	return u.ctx.ListViewEx(id, count, itemHeightDp, selected, checked, drawItem, opts...)
+func (u *UI) ListViewEx(id string, count int, itemHeightDp Dp, cfg *ListViewExConfig, drawItem func(index int, areaPx Rect, isSelected bool), opts ...Option) bool {
+	return u.ctx.ListViewEx(id, count, itemHeightDp, cfg, drawItem, opts...)
 }
 
 // TreeViewEx отрисовывает дерево с мультивыбором узлов и опциональными каскадными чекбоксами.
-func (u *UI) TreeViewEx(id string, roots []*TreeNode, selectedIDs map[string]bool, showCheckboxes bool, opts ...Option) bool {
-	return u.ctx.TreeViewEx(id, roots, selectedIDs, showCheckboxes, opts...)
+func (u *UI) TreeViewEx(id string, roots []*TreeNode, cfg *TreeViewExConfig, opts ...Option) bool {
+	return u.ctx.TreeViewEx(id, roots, cfg, opts...)
 }
 
 // TableEx отрисовывает расширенную таблицу с мультивыбором, чекбоксами, закреплением колонок и inline-редактированием.

@@ -897,7 +897,11 @@ func TestListViewExReorder_HappyPath(t *testing.T) {
 	callCount := 0
 	renderListEx := func() {
 		ctx.Render(func(c *Context) {
-			c.ListViewEx("lvex_test", len(items), 30, selected, checked, func(index int, areaPx render.Rect, isSelected bool) {},
+			c.ListViewEx("lvex_test", len(items), 30, &ListViewExConfig{
+				Selected:       selected,
+				ShowCheckboxes: true,
+				Checked:        checked,
+			}, func(index int, areaPx render.Rect, isSelected bool) {},
 				Width(300), Height(200), Reorderable(), OnReorder(func(ev DragEvent) {
 					receivedDrag = &ev
 					callCount++
@@ -959,7 +963,11 @@ func TestListViewExReorder_ShortCheckedSliceNoPanic(t *testing.T) {
 	callCount := 0
 	renderListEx := func() {
 		ctx.Render(func(c *Context) {
-			c.ListViewEx("lvex_short", len(items), 30, selected, checked, func(index int, areaPx render.Rect, isSelected bool) {},
+			c.ListViewEx("lvex_short", len(items), 30, &ListViewExConfig{
+				Selected:       selected,
+				ShowCheckboxes: true,
+				Checked:        checked,
+			}, func(index int, areaPx render.Rect, isSelected bool) {},
 				Width(300), Height(200), Reorderable(), OnReorder(func(ev DragEvent) {
 					callCount++
 				}))
@@ -1420,7 +1428,10 @@ func TestTreeViewExReorder_AllowReparent(t *testing.T) {
 	treeAnchorStore["tvex_reparent"] = 3
 	renderTreeEx := func() {
 		ctx.Render(func(c *Context) {
-			c.TreeViewEx("tvex_reparent", roots, selected, true, Width(300), Height(260), Reorderable(), AllowReparent(), OnReorder(func(ev DragEvent) {
+			c.TreeViewEx("tvex_reparent", roots, &TreeViewExConfig{
+				SelectedIDs:    selected,
+				ShowCheckboxes: true,
+			}, Width(300), Height(260), Reorderable(), AllowReparent(), OnReorder(func(ev DragEvent) {
 				e := ev
 				got = &e
 			}))
@@ -1456,7 +1467,10 @@ func TestTreeViewExReorder_SameParentOnlyWithoutAllowReparent(t *testing.T) {
 
 	renderTreeEx := func() {
 		ctx.Render(func(c *Context) {
-			c.TreeViewEx("tvex_same_parent", roots, selected, false, Width(300), Height(260), Reorderable(), OnReorder(func(ev DragEvent) {
+			c.TreeViewEx("tvex_same_parent", roots, &TreeViewExConfig{
+				SelectedIDs:    selected,
+				ShowCheckboxes: false,
+			}, Width(300), Height(260), Reorderable(), OnReorder(func(ev DragEvent) {
 				callCount++
 			}))
 		})
@@ -1487,7 +1501,10 @@ func TestTreeViewExReorder_GroupSelectionAndCheckboxNoDrag(t *testing.T) {
 
 	renderTreeEx := func() {
 		ctx.Render(func(c *Context) {
-			c.TreeViewEx("tvex_group", roots, selected, true, Width(300), Height(260), Reorderable(), AllowReparent(), OnReorder(func(ev DragEvent) {
+			c.TreeViewEx("tvex_group", roots, &TreeViewExConfig{
+				SelectedIDs:    selected,
+				ShowCheckboxes: true,
+			}, Width(300), Height(260), Reorderable(), AllowReparent(), OnReorder(func(ev DragEvent) {
 				e := ev
 				got = &e
 				callCount++
@@ -1550,8 +1567,8 @@ func TestTableExReorder_HappyPath(t *testing.T) {
 		ctx.Render(func(c *Context) {
 			res := c.TableEx("tblex_reorder", cols, 5, &TableExConfig{
 				ShowCheckboxes: true,
-				CheckedRows:    checked,
-				SelectedRows:   selected,
+				Checked:        checked,
+				Selected:       selected,
 			}, nil, func(row, col int, area render.Rect, isSel bool) {},
 				Width(320), Height(240), Reorderable(), OnReorder(func(ev DragEvent) {
 					e := ev
@@ -1598,7 +1615,7 @@ func TestTableExReorder_CheckboxNoDrag(t *testing.T) {
 		ctx.Render(func(c *Context) {
 			c.TableEx("tblex_cb", cols, 4, &TableExConfig{
 				ShowCheckboxes: true,
-				CheckedRows:    checked,
+				Checked:        checked,
 			}, nil, func(row, col int, area render.Rect, isSel bool) {},
 				Width(320), Height(240), Reorderable(), OnReorder(func(ev DragEvent) {
 					callCount++

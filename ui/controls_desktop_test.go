@@ -240,12 +240,19 @@ func TestTreeCheckCascadeAndSelectionEx(t *testing.T) {
 
 	ctx.beginFrame()
 	ctx.Column(8, func() {
-		ctx.ListViewEx("lv_ex", 3, 28, listSel, listChk, func(i int, area render.Rect, isSel bool) {})
-		ctx.TreeViewEx("tv_ex", roots, treeSel, true)
-		ctx.TableEx("tbl_ex", cols, 3, &TableExConfig{
-			SelectedRows:   tableSel,
+		ctx.ListViewEx("lv_ex", 3, 28, &ListViewExConfig{
+			Selected:       listSel,
 			ShowCheckboxes: true,
-			CheckedRows:    tableChk,
+			Checked:        listChk,
+		}, func(i int, area render.Rect, isSel bool) {})
+		ctx.TreeViewEx("tv_ex", roots, &TreeViewExConfig{
+			SelectedIDs:    treeSel,
+			ShowCheckboxes: true,
+		})
+		ctx.TableEx("tbl_ex", cols, 3, &TableExConfig{
+			Selected:       tableSel,
+			ShowCheckboxes: true,
+			Checked:        tableChk,
 			FrozenCols:     1,
 		}, &sort, func(row, col int, area render.Rect, isSel bool) {})
 	})
@@ -255,7 +262,11 @@ func TestTreeCheckCascadeAndSelectionEx(t *testing.T) {
 	ctx.beginFrame()
 	ctx.FocusID = "lv_ex"
 	ctx.KeyEvents = []KeyPress{{Code: KeyA, Mods: platform.Modifiers{Ctrl: true}}}
-	changed := ctx.ListViewEx("lv_ex", 3, 28, listSel, listChk, nil)
+	changed := ctx.ListViewEx("lv_ex", 3, 28, &ListViewExConfig{
+		Selected:       listSel,
+		ShowCheckboxes: true,
+		Checked:        listChk,
+	}, nil)
 	ctx.endFrame()
 	if !changed || len(listSel) != 3 {
 		t.Fatalf("ожидалось выделение всех 3 элементов по Ctrl+A, got len=%d changed=%v", len(listSel), changed)
