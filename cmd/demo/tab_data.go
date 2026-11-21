@@ -211,7 +211,7 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 				txt = "msk-dc1 / основной кластер"
 				txtCol = th.TextMuted
 			}
-			ui.DrawText(area.X+ui.Scale(8).Int(), area.Y+ui.Scale(7).Int(), txt, 12, txtCol)
+			ui.DrawText(anyui.Px(area.X)+ui.Scale(8), anyui.Px(area.Y)+ui.Scale(7), txt, 12, txtCol)
 		}, anyui.Height(210), anyui.Reorderable(), anyui.OnReorder(handleTableReorder))
 		if tev.SortChanged {
 			st.sortDemoTable()

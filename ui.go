@@ -260,8 +260,8 @@ func (u *UI) InteractiveCanvas(id string, cb CanvasCallbacks, opts ...Option) {
 }
 
 // DrawSVG рисует SVG-иконку в физических координатах (xPx, yPx) с размером sizeDp и цветом tint.
-func (u *UI) DrawSVG(svgData string, xPx, yPx int, sizeDp Dp, tint Color) {
-	u.ctx.Canvas.DrawSVG(svgData, xPx, yPx, u.ctx.Scale(sizeDp).Int(), tint)
+func (u *UI) DrawSVG(svgData string, xPx, yPx Px, sizeDp Dp, tint Color) {
+	u.ctx.Canvas.DrawSVG(svgData, xPx.Int(), yPx.Int(), u.ctx.Scale(sizeDp).Int(), tint)
 }
 
 // Column располагает дочерние элементы вертикально с отступом gapDp.
@@ -453,7 +453,7 @@ func (u *UI) Shortcut(key Key, mods Modifiers, fn func()) {
 }
 
 // DrawText рисует строку текста в физических координатах (xPx, yPx) с размером sizeDp и цветом col.
-func (u *UI) DrawText(xPx, yPx int, text string, sizeDp Dp, col Color) {
+func (u *UI) DrawText(xPx, yPx Px, text string, sizeDp Dp, col Color) {
 	u.ctx.DrawText(xPx, yPx, text, sizeDp, col)
 }
 

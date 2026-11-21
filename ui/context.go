@@ -317,11 +317,11 @@ func (c *Context) Now() time.Time {
 }
 
 // DrawText рисует строку текста в физических координатах xPx, yPx (для кастомного рисования и ListView).
-func (c *Context) DrawText(xPx, yPx int, text string, sizeDp Dp, col render.Color) {
+func (c *Context) DrawText(xPx, yPx Px, text string, sizeDp Dp, col render.Color) {
 	if c.Font == nil || text == "" {
 		return
 	}
-	c.Font.DrawText(c.Canvas, xPx, yPx, text, c.Scale(sizeDp).Int(), col)
+	c.Font.DrawText(c.Canvas, xPx.Int(), yPx.Int(), text, c.Scale(sizeDp).Int(), col)
 }
 
 // RequestRedraw запрашивает повторную перерисовку после изменения состояния.

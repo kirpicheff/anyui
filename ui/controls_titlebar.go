@@ -223,7 +223,8 @@ func (c *Context) isPointInTitleBarInteractive(x, y int) bool {
 
 // TitleBarHitTest возвращает HitCaption для свободной области последней отрисованной TitleBar
 // и HitClient для кнопок управления окном, вложенных контролов и остальной части окна.
-func (c *Context) TitleBarHitTest(x, y int) platform.HitTestResult {
+func (c *Context) TitleBarHitTest(xPx, yPx Px) platform.HitTestResult {
+	x, y := xPx.Int(), yPx.Int()
 	if c.titleBarRect.Empty() || !c.titleBarRect.Contains(x, y) {
 		return platform.HitClient
 	}

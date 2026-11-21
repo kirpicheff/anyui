@@ -146,6 +146,6 @@ func (u *UI) TitleBar(id, title string, cfg TitleBarConfig, opts ...Option) {
 }
 
 // TitleBarHitTest определяет роль точки для HitTest в безрамочном окне с виджетом TitleBar (xPx, yPx — в физических пикселях окна ОС).
-func (u *UI) TitleBarHitTest(xPx, yPx int) HitTestResult {
+func (u *UI) TitleBarHitTest(xPx, yPx Px) HitTestResult {
 	return u.ctx.TitleBarHitTest(xPx, yPx)
 }

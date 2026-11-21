@@ -152,8 +152,8 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 						OffsetY: ui.ScaleF(4), Blur: ui.ScaleF(12), Color: render.RGBA(0, 0, 0, 130), Radii: render.UniformRadii(ui.ScaleF(8)),
 					})
 					ui.Canvas().DrawRoundedBox(ovRectPx, ui.ScaleF(8), th.Card, 1.5, th.Accent)
-					ui.DrawText(ovRectPx.X+ui.Scale(12).Int(), ovRectPx.Y+ui.Scale(12).Int(), "Overlay Layer поверх Static", 12, th.TextPrimary)
-					ui.DrawText(ovRectPx.X+ui.Scale(12).Int(), ovRectPx.Y+ui.Scale(34).Int(), "Static Layer под ним не перерисовывался", 11, th.TextMuted)
+					ui.DrawText(anyui.Px(ovRectPx.X)+ui.Scale(12), anyui.Px(ovRectPx.Y)+ui.Scale(12), "Overlay Layer поверх Static", 12, th.TextPrimary)
+					ui.DrawText(anyui.Px(ovRectPx.X)+ui.Scale(12), anyui.Px(ovRectPx.Y)+ui.Scale(34), "Static Layer под ним не перерисовывался", 11, th.TextMuted)
 				})
 			}
 
@@ -181,8 +181,8 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 						bg = th.BtnSecondaryHover
 					}
 					c.DrawRoundedBox(r, ui.ScaleF(8), bg, 1.0, th.Border)
-					ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(10).Int(), "Зона без перерисовки внутри (trackMove=false)", 12, th.TextPrimary)
-					ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(28).Int(), "Водите мышью здесь — Render не вызывается", 11, th.TextMuted)
+					ui.DrawText(anyui.Px(r.X)+ui.Scale(12), anyui.Px(r.Y)+ui.Scale(10), "Зона без перерисовки внутри (trackMove=false)", 12, th.TextPrimary)
+					ui.DrawText(anyui.Px(r.X)+ui.Scale(12), anyui.Px(r.Y)+ui.Scale(28), "Водите мышью здесь — Render не вызывается", 11, th.TextMuted)
 				}, anyui.Width(340), anyui.Height(50))
 				rTrack := ui.CurrentArea()
 				rTrack.W = 340
@@ -196,11 +196,11 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 						bg = th.Accent.WithAlpha(45)
 					}
 					c.DrawRoundedBox(r, ui.ScaleF(8), bg, 1.0, th.BorderFocus)
-					ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(10).Int(), "Зона с трекингом (trackMove=true)", 12, th.TextPrimary)
+					ui.DrawText(anyui.Px(r.X)+ui.Scale(12), anyui.Px(r.Y)+ui.Scale(10), "Зона с трекингом (trackMove=true)", 12, th.TextPrimary)
 					if hov {
-						ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(28).Int(), fmt.Sprintf("Курсор внутри: (%d, %d)", mx.Int()-r.X, my.Int()-r.Y), 11, th.Accent)
+						ui.DrawText(anyui.Px(r.X)+ui.Scale(12), anyui.Px(r.Y)+ui.Scale(28), fmt.Sprintf("Курсор внутри: (%d, %d)", mx.Int()-r.X, my.Int()-r.Y), 11, th.Accent)
 					} else {
-						ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(28).Int(), "Наведите для трекинга координат и Crosshair", 11, th.TextMuted)
+						ui.DrawText(anyui.Px(r.X)+ui.Scale(12), anyui.Px(r.Y)+ui.Scale(28), "Наведите для трекинга координат и Crosshair", 11, th.TextMuted)
 					}
 				}, anyui.Width(340), anyui.Height(50))
 			})
@@ -243,7 +243,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 							border = th.Accent
 						}
 						c.DrawRoundedBox(r, ui.ScaleF(6), bg, 1.0, border)
-						ui.DrawText(r.X+ui.Scale(10).Int(), r.Y+ui.Scale(10).Int(), item.label, 12, th.TextPrimary)
+						ui.DrawText(anyui.Px(r.X)+ui.Scale(10), anyui.Px(r.Y)+ui.Scale(10), item.label, 12, th.TextPrimary)
 					}, anyui.Width(134), anyui.Height(34))
 				}
 			})

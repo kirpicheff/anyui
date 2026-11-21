@@ -82,7 +82,7 @@ func (st *demoState) drawTabInputs(ui *anyui.UI) {
 				dotCol = th.Accent
 			}
 			ui.Canvas().FillCircle(float32(area.X+ui.Scale(14).Int()), float32(area.Y+area.H/2), ui.ScaleF(4), dotCol)
-			ui.DrawText(area.X+ui.Scale(26).Int(), area.Y+ui.Scale(8).Int(), st.listItems[idx], 13, col)
+			ui.DrawText(anyui.Px(area.X)+ui.Scale(26), anyui.Px(area.Y)+ui.Scale(8), st.listItems[idx], 13, col)
 		}, anyui.Height(140)) {
 			if st.listSelected >= 0 && st.listSelected < len(st.listItems) {
 				st.statusMsg = fmt.Sprintf("Выбран %s", st.listItems[st.listSelected])

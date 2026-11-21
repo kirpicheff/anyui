@@ -188,7 +188,7 @@ func (st *demoState) drawTabDesktop(ui *anyui.UI) {
 			ui.Label("Мультивыбор (Ctrl+Клик, Shift+Клик, Ctrl+A) и чекбоксы", anyui.FontSize(13), anyui.Bold())
 			ui.Row(12, 190, func() {
 				ui.ListViewEx("demo_lvex", len(deskTab.listMultiChk), 28, deskTab.listMultiSel, deskTab.listMultiChk, func(idx int, area anyui.Rect, isSel bool) {
-					ui.DrawText(area.X+6, area.Y+7, fmt.Sprintf("Элемент #%d", idx+1), 12, th.TextPrimary)
+					ui.DrawText(anyui.Px(area.X+6), anyui.Px(area.Y+7), fmt.Sprintf("Элемент #%d", idx+1), 12, th.TextPrimary)
 				}, anyui.Flex(1), anyui.Height(185))
 				ui.TreeViewEx("demo_tvex", ensureDesktopTree(), deskTab.treeMultiSel, true, anyui.Flex(1), anyui.Height(185))
 			})
@@ -212,7 +212,7 @@ func (st *demoState) drawTabDesktop(ui *anyui.UI) {
 					deskTab.tableCells[row][col] = newVal
 				},
 			}, &deskTab.tableSort, func(row, col int, area anyui.Rect, isSel bool) {
-				ui.DrawText(area.X+8, area.Y+8, deskTab.tableCells[row][col], 12, th.TextPrimary)
+				ui.DrawText(anyui.Px(area.X+8), anyui.Px(area.Y+8), deskTab.tableCells[row][col], 12, th.TextPrimary)
 			}, anyui.Height(175))
 
 			// 6. StatusBar

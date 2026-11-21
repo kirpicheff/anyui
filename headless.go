@@ -249,91 +249,91 @@ func (h *Headless) Step() {
 	})
 }
 
-func (h *Headless) dpToPx(xDp, yDp int) (int, int) {
+func (h *Headless) dpToPx(xDp, yDp Dp) (Px, Px) {
 	h.mu.Lock()
 	sc := h.platWin.Scale()
 	h.mu.Unlock()
 	if sc <= 0 {
 		sc = 1.0
 	}
-	return int(float32(xDp)*sc + 0.5), int(float32(yDp)*sc + 0.5)
+	return Px(float32(xDp)*sc + 0.5), Px(float32(yDp)*sc + 0.5)
 }
 
 // InjectMouseMove добавляет событие перемещения мыши в координатах логических пикселей (Dp).
 // Координаты автоматически масштабируются в физические пиксели ОС через текущий Scale.
-func (h *Headless) InjectMouseMove(xDp, yDp int) {
+func (h *Headless) InjectMouseMove(xDp, yDp Dp) {
 	xPx, yPx := h.dpToPx(xDp, yDp)
 	h.InjectMouseMovePx(xPx, yPx)
 }
 
 // InjectMouseMovePx добавляет событие перемещения мыши напрямую в физических пикселях (Px).
-func (h *Headless) InjectMouseMovePx(xPx, yPx int) {
+func (h *Headless) InjectMouseMovePx(xPx, yPx Px) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.pendingEvs = append(h.pendingEvs, platform.Event{
 		Type: platform.EventMouseMove,
-		X:    xPx,
-		Y:    yPx,
+		X:    xPx.Int(),
+		Y:    yPx.Int(),
 	})
 }
 
 // InjectMouseDown добавляет событие нажатия кнопки мыши в координатах логических пикселей (Dp).
-func (h *Headless) InjectMouseDown(xDp, yDp int, btn MouseButton) {
+func (h *Headless) InjectMouseDown(xDp, yDp Dp, btn MouseButton) {
 	xPx, yPx := h.dpToPx(xDp, yDp)
 	h.InjectMouseDownPx(xPx, yPx, btn)
 }
 
 // InjectMouseDownPx добавляет событие нажатия кнопки мыши напрямую в физических пикселях (Px).
-func (h *Headless) InjectMouseDownPx(xPx, yPx int, btn MouseButton) {
+func (h *Headless) InjectMouseDownPx(xPx, yPx Px, btn MouseButton) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.pendingEvs = append(h.pendingEvs, platform.Event{
 		Type:   platform.EventMouseDown,
-		X:      xPx,
-		Y:      yPx,
+		X:      xPx.Int(),
+		Y:      yPx.Int(),
 		Button: btn,
 	})
 }
 
 // InjectMouseUp добавляет событие отпускания кнопки мыши в координатах логических пикселей (Dp).
-func (h *Headless) InjectMouseUp(xDp, yDp int, btn MouseButton) {
+func (h *Headless) InjectMouseUp(xDp, yDp Dp, btn MouseButton) {
 	xPx, yPx := h.dpToPx(xDp, yDp)
 	h.InjectMouseUpPx(xPx, yPx, btn)
 }
 
 // InjectMouseUpPx добавляет событие отпускания кнопки мыши напрямую в физических пикселях (Px).
-func (h *Headless) InjectMouseUpPx(xPx, yPx int, btn MouseButton) {
+func (h *Headless) InjectMouseUpPx(xPx, yPx Px, btn MouseButton) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.pendingEvs = append(h.pendingEvs, platform.Event{
 		Type:   platform.EventMouseUp,
-		X:      xPx,
-		Y:      yPx,
+		X:      xPx.Int(),
+		Y:      yPx.Int(),
 		Button: btn,
 	})
 }
 
 // InjectMouseClick эмулирует полный клик мышью в координатах логических пикселей (Dp) (MouseMove -> MouseDown -> MouseUp).
-func (h *Headless) InjectMouseClick(xDp, yDp int, btn MouseButton) {
+func (h *Headless) InjectMouseClick(xDp, yDp Dp, btn MouseButton) {
 	h.InjectMouseMove(xDp, yDp)
 	h.InjectMouseDown(xDp, yDp, btn)
 	h.InjectMouseUp(xDp, yDp, btn)
 }
 
 // InjectMouseClickPx эмулирует полный клик мышью напрямую в физических пикселях (Px).
-func (h *Headless) InjectMouseClickPx(xPx, yPx int, btn MouseButton) {
+func (h *Headless) InjectMouseClickPx(xPx, yPx Px, btn MouseButton) {
 	h.InjectMouseMovePx(xPx, yPx)
 	h.InjectMouseDownPx(xPx, yPx, btn)
 	h.InjectMouseUpPx(xPx, yPx, btn)
 }
 
 // InjectMouseWheel добавляет событие вращения колеса мыши в координатах логических шагов (Dp).
-func (h *Headless) InjectMouseWheel(dxDp, dyDp int) {
-	h.InjectMouseWheelPx(dxDp, dyDp)
+func (h *Headless) InjectMouseWheel(dxDp, dyDp Dp) {
+	h.InjectMouseWheelPx(Px(dxDp), Px(dyDp))
 }
 
 // InjectMouseWheelPx добавляет событие вращения колеса мыши напрямую в физических шагах колеса (Px).
-func (h *Headless) InjectMouseWheelPx(dxPx, dyPx int) {
+func (h *Headless) InjectMouseWheelPx(dxPx, dyPx Px) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.pendingEvs = append(h.pendingEvs, platform.Event{

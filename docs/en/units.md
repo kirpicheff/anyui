@@ -18,6 +18,10 @@ This document tracks the status of strict scalar typing in the AnyUI library acc
   - **Suffix `F` Convention**: The `F` suffix strictly denotes a `float32` variant of the same operation.
 - **Sentinel Value**: `const Auto Dp = -1` is the single canonical sentinel value for automatic sizing. Functions like `Auto()` or constants like `AutoSize` are removed.
 - **No mixed overloads**: exactly one form per concept (parallel overloads like `Width(dp int)` alongside `WidthDp(dp Dp)` are prohibited).
+- **Scalar Type Boundary**:
+  - `int` is used only at the OS boundary (`Config`, `Window` window metrics, item counts/indices, column counts).
+  - `float32` is used for subpixel and dimensionless values (`Radius`, `LetterSpacing`, `TextShadow`, `FlexWeight`, `ScaleF`/`PxToDpf`).
+  - `Rect` is the single rectangle type (in `Dp` for layouts/overlays and in `Px` for low-level canvas/table callbacks).
 
 ---
 
