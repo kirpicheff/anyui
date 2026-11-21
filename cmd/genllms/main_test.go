@@ -9,7 +9,7 @@ import (
 
 func TestGenerateAndLintLLMs(t *testing.T) {
 	rootDir := filepath.Join("..", "..")
-	shortBytes, fullBytes, err := generateAll(rootDir, "v0.8.1")
+	shortBytes, fullBytes, err := generateAll(rootDir, detectVersion())
 	if err != nil {
 		t.Fatalf("generateAll завершилась с ошибкой: %v", err)
 	}
@@ -53,3 +53,4 @@ func TestLLMsFilesUpToDate(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+

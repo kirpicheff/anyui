@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"sort"
 	"strings"
 )
@@ -41,9 +42,10 @@ type apiIndex struct {
 	optionFuncs  []string
 	optionNames  map[string]bool
 	otherFuncs   []string
-	methods      map[string][]string // receiverType -> []fullSignature
-	methodNames  map[string]map[string]bool
-	allSymbols   map[string]bool // все экспортированные символы пакета anyui (типы, функции, константы, переменные)
+	methods       map[string][]string // receiverType -> []fullSignature
+	methodNames   map[string]map[string]bool
+	uiBoolMethods map[string]bool // методы UI, возвращающие bool
+	allSymbols    map[string]bool // все экспортированные символы пакета anyui (типы, функции, константы, переменные)
 }
 
 func main() {
@@ -119,18 +121,18 @@ func generateAll(rootDir, version string) ([]byte, []byte, error) {
 	return shortOut.Bytes(), fullOut.Bytes(), nil
 }
 
-// detectVersion возвращает последний git-тег или "dev", если тегов нет.
+// detectVersion возвращает последний git-тег, версию из BuildInfo или "dev".
 func detectVersion() string {
 	cmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
-	raw, err := cmd.Output()
-	if err != nil {
-		return "dev"
+	if raw, err := cmd.Output(); err == nil {
+		if ver := strings.TrimSpace(string(raw)); ver != "" {
+			return ver
+		}
 	}
-	ver := strings.TrimSpace(string(raw))
-	if ver == "" {
-		return "dev"
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		return bi.Main.Version
 	}
-	return ver
+	return "dev"
 }
 
 func parseDirNonTest(fset *token.FileSet, dir string) ([]*ast.File, error) {
@@ -168,9 +170,10 @@ func parseAPI(rootDir string) (*apiIndex, error) {
 		aliases:      make(map[string]aliasTarget),
 		localTypes:   make(map[string]*ast.TypeSpec),
 		optionNames:  make(map[string]bool),
-		methods:      make(map[string][]string),
-		methodNames:  make(map[string]map[string]bool),
-		allSymbols:   make(map[string]bool),
+		methods:       make(map[string][]string),
+		methodNames:   make(map[string]map[string]bool),
+		uiBoolMethods: make(map[string]bool),
+		allSymbols:    make(map[string]bool),
 	}
 
 	rootFiles, err := parseDirNonTest(idx.fset, rootDir)
@@ -331,6 +334,9 @@ func parseAPI(rootDir string) (*apiIndex, error) {
 							idx.methodNames[recvName] = make(map[string]bool)
 						}
 						idx.methodNames[recvName][d.Name.Name] = true
+						if recvName == "UI" && returnsSingleType(d, "bool") {
+							idx.uiBoolMethods[d.Name.Name] = true
+						}
 					}
 				}
 			}
@@ -352,12 +358,16 @@ func exprToString(fset *token.FileSet, expr ast.Expr) string {
 	return strings.TrimSpace(buf.String())
 }
 
-func returnsOption(fn *ast.FuncDecl) bool {
+func returnsSingleType(fn *ast.FuncDecl, typeName string) bool {
 	if fn.Type.Results == nil || len(fn.Type.Results.List) != 1 {
 		return false
 	}
 	id, ok := fn.Type.Results.List[0].Type.(*ast.Ident)
-	return ok && id.Name == "Option"
+	return ok && id.Name == typeName
+}
+
+func returnsOption(fn *ast.FuncDecl) bool {
+	return returnsSingleType(fn, "Option")
 }
 
 func receiverTypeName(expr ast.Expr) string {
@@ -456,12 +466,12 @@ func writeCommonHeader(out *bytes.Buffer, version string, isFull bool) {
 	out.WriteString("## Версия и источник истины\n\n")
 	out.WriteString("- Импорт: `import \"github.com/kirpicheff/anyui\"` (`go get github.com/kirpicheff/anyui`).\n")
 	out.WriteString("- Проверить установленную версию модуля: `go list -m github.com/kirpicheff/anyui`.\n")
-	out.WriteString("- При расхождении этого документа с установленным пакетом источник истины — `go doc github.com/kirpicheff/anyui.UI.<Method>` (для методов `UI`/`App`/`Window`/`Headless`) и `go doc github.com/kirpicheff/anyui.<Symbol>`.\n")
+	out.WriteString("- При расхождении этого документа с установленным пакетом источник истины — `go doc` (например, `go doc github.com/kirpicheff/anyui.UI.Table` или `go doc github.com/kirpicheff/anyui.Config`).\n")
 	out.WriteString("- Подпакеты являются внутренними; прикладной код импортирует **только** корневой пакет `github.com/kirpicheff/anyui`.\n\n")
 
 	out.WriteString("## Правила работы с API\n\n")
-	out.WriteString("- **Immediate Mode и многопоточность:** состояние хранится вне `drawFn`; вызовы методов `UI` и чтение/изменение состояния интерфейса выполняются **только в главном потоке** внутри `drawFn`. Для обновления состояния из фоновых горутин всегда используйте `App.Dispatch` (`app.Dispatch(func() { ... })`) или `Remember`.\n")
-	out.WriteString("- **Единицы измерения (`Dp` vs `Px`):** весь API раскладки, опций, оверлеев и ввода Headless (`LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`, `InjectMouseMove`/`InjectMouseClick`, `CurrentArea`, `MousePosDp`) работает строго в логических `Dp`. Физические `Px` используются только в колбэках рисования (`CanvasView`, `InteractiveCanvas`, `Table`, `ListView`), прямых методах (`DrawText`, `DrawSVG`, `CurrentAreaPx`, `MousePosPx`, `LastDirtyRectsPx`, `TitleBarHitTest`, `InjectMouseMovePx`/`InjectMouseClickPx`) и на границе ОС (`Config`, `Window`).\n")
+	out.WriteString("- **Immediate Mode и многопоточность:** состояние хранится вне `drawFn`; вызовы методов `UI` и чтение/изменение состояния интерфейса выполняются **только в главном потоке** внутри `drawFn`. Для обновления состояния из фоновых горутин всегда используйте `App.Dispatch` (`app.Dispatch(func() { ... })`) или `Remember`. Повторный вызов `App.Run` на уже запущенном приложении возвращает `ErrAlreadyRunning`.\n")
+	out.WriteString("- **Единицы измерения (`Dp` vs `Px`):** весь API раскладки, опций, оверлеев и ввода Headless (`LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`, `InjectMouse*`, `CurrentArea`, `MousePosDp`) работает строго в логических `Dp`. Физические `Px` используются только в колбэках рисования (`CanvasView`, `InteractiveCanvas`, `Table`, `ListView`), прямых методах (`DrawText`, `DrawSVG`, `CurrentAreaPx`, `MousePosPx`, `LastDirtyRectsPx`, `TitleBarHitTest`, `InjectMouse*Px`) и на границе ОС (`Config`, `Window`).\n")
 	out.WriteString("- **`Rect` и `PointF` не типизированы по единицам:** `Rect` содержит `int`-поля, `PointF` — `float32`. В `Dp`-API (`CurrentArea`, `LayoutRect`, `PushOverlay`, `Tooltip`, `Popover`, `ContextMenu`, `RegisterHoverArea`) они трактуются как `Dp`, а в колбэках рисования и `CurrentAreaPx`/`LastDirtyRectsPx` — как `Px`.\n")
 	out.WriteString("- **Единое задание размеров через опции:** `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image`, `ListView`, `Table`, `TextArea`, `LogView` по умолчанию занимают доступное пространство (`Auto`); явные размеры задаются опциями `Width`, `Height`, `FillWidth`, `FillHeight`. `Card` по умолчанию подбирает высоту по содержимому (`AutoHeight`); для растягивания передайте `FillHeight`.\n")
 	out.WriteString("- **Колонки таблиц:** в `Table` и `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.\n")
@@ -473,7 +483,7 @@ func writeCommonHeader(out *bytes.Buffer, version string, isFull bool) {
 	out.WriteString("- **Drag & Drop (Reorder):** `Reorderable` + `OnReorder` работают в `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы `FromIndex`/`ToIndex`) и `TreeView`, `TreeViewEx` (ключи `FromKey`/`ToKey`; с `AllowReparent` доступны смена родителя и `DropInside`).\n\n")
 
 	out.WriteString("## Семантика возвращаемых значений\n\n")
-	out.WriteString("- `Button`, `Hyperlink` → `bool`: `true` **только в кадре нажатия**.\n")
+	out.WriteString("- `Button`, `IconButton`, `Hyperlink` → `bool`: `true` **только в кадре нажатия**.\n")
 	out.WriteString("- `Toggle`, `Checkbox`, `RadioButton`, `RadioGroup`, `TextInput`, `TextArea`, `MaskedInput`, `Select`, `MultiSelect`, `TagInput`, `Slider`, `RangeSlider`, `NumberInput`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`, `ListView`, `ListViewEx`, `TreeView`, `TreeViewEx`, `Pagination`, `Collapsible`, `Accordion` → `bool`: `true` **только в кадре изменения значения** (не означает «виджет сейчас активен/включён»; текущее состояние хранится в переданном указателе/карте).\n")
 	out.WriteString("- `Breadcrumbs` → `string`: возвращает `ID` кликнутого сегмента (или `Label`, если `ID == \"\"`), либо `\"\"` если клика в этом кадре не было.\n")
 	out.WriteString("- `TabBar` → `TabBarEvent`: `SelectedID` (смена вкладки), `ClosedID` (клик по крестику/СКМ), `Added` (клик по `+`), `MovedFrom`/`MovedTo` (перетаскивание, `-1` если не было), `DetachedID` (отрыв вкладки).\n")
@@ -531,7 +541,7 @@ var optionMatrixRows = []optionMatrixRow{
 		"`FontSize`, `Bold`, `Mono`, `TextColor`, `TextAlignLeft`, `TextAlignCenter`, `TextAlignRight`, `LetterSpacing`, `TextShadow`, `WordWrap`, `Ellipsis`, `Width`, `MaxWidth`, `Disabled`",
 	},
 	{
-		"`Button`, `Hyperlink`",
+		"`Button`, `IconButton`, `Hyperlink`",
 		"`Primary`, `Secondary`, `Danger`, `Ghost`, `Icon`, `IconRight`, `Width`, `Height`, `FillWidth`, `Flex`, `Padding`, `Radius`, `FontSize`, `Bold`, `Bg`, `HoverBg`, `TextColor`, `HoverTextColor`, `BorderColor`, `HoverBorderColor`, `Disabled`",
 	},
 	{
@@ -586,7 +596,7 @@ func writeBaseTypes(out *bytes.Buffer) {
 	out.WriteString("type Px int               // Физические пиксели буфера отрисовки (.Int() int)\n")
 	out.WriteString("const Auto Dp = -1        // Sentinel-значение: занять всё доступное пространство контейнера\n")
 	out.WriteString("type Key = uint32         // Виртуальный код клавиши (VK-коды, передаётся в Shortcut / InjectKey / KeyEvent.KeyCode)\n")
-	out.WriteString("type Modifiers struct { Ctrl, Shift, Alt bool }\n")
+	out.WriteString("type Modifiers struct { Shift, Ctrl, Alt, Win bool }\n")
 	out.WriteString("type MouseButton uint8    // MouseLeft = 1, MouseRight = 2, MouseMiddle = 3\n")
 	out.WriteString("type CursorType uint8     // Системный курсор (CursorArrow, CursorHand, CursorIBeam, CursorResizeH/V/NWSE/NESW, CursorNotAllowed, CursorCrosshair, CursorMove)\n")
 	out.WriteString("type Orientation uint8    // Horizontal, Vertical\n")
@@ -600,7 +610,7 @@ func writeBaseTypes(out *bytes.Buffer) {
 	out.WriteString("type ImageScaleMode uint8 // ScaleFit, ScaleFill, ScaleOneToOne\n")
 	out.WriteString("type FontStyle uint8      // FontRegular, FontBold, FontMono\n")
 	out.WriteString("type TextAlign uint8      // AlignTextLeft, AlignTextCenter, AlignTextRight\n")
-	out.WriteString("type HitTestResult int    // HitClient, HitCaption, HitLeft/Right/Top/Bottom/TopLeft/TopRight/BottomLeft/BottomRight\n")
+	out.WriteString("type HitTestResult uint8  // HitClient, HitCaption, HitLeft/Right/Top/Bottom/TopLeft/TopRight/BottomLeft/BottomRight\n")
 	out.WriteString("```\n\n")
 }
 
@@ -646,16 +656,26 @@ func writeShortLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
 	writeCommonHeader(out, version, false)
 	writeQuickStart(out)
 
+	out.WriteString("## Ключевые структуры старта (офлайн-минимум; все структуры — в `llms-full.txt`)\n\n```go\n")
+	for _, name := range []string{"Config", "PageConfig"} {
+		if def, ok := idx.formatTypeDef(name); ok {
+			out.WriteString(def)
+			out.WriteString("\n\n")
+		}
+	}
+	out.WriteString("```\n\n")
+
 	out.WriteString("## Карта API (полные сигнатуры и структуры — в `llms-full.txt`)\n\n")
-	out.WriteString("- **Приложение и окна:** `NewApp`, `App.Run`, `App.Dispatch`, `App.OpenWindow`, `App.MainWindow`, `App.Quit`, `App.SetTrayMenu`, `App.SetTrayIcon`, `App.SetTrayTooltip`, `App.ShowNotification`, `Window.SetTitle`, `Window.SetSize`, `Window.SetPosition`, `Window.SetIcon`, `Window.SetTheme`, `Window.Invalidate`, `Window.WakeUp`, `Window.Close`.\n")
+	out.WriteString("- **Приложение и окна:** `anyui.NewApp`, `App.Run`, `App.Dispatch`, `App.OpenWindow`, `App.MainWindow`, `App.Quit`, `App.SetTrayMenu`, `App.SetTrayIcon`, `App.SetTrayTooltip`, `App.ShowNotification`, `Window.SetTitle`, `Window.SetSize`, `Window.SetPosition`, `Window.SetIcon`, `Window.SetTheme`, `Window.Invalidate`, `Window.WakeUp`, `Window.Close`.\n")
 	out.WriteString("- **Раскладка и контейнеры (`UI`):** `Column`, `ColumnCentered`, `ColumnWith`, `ColumnFlex`, `Row`, `RowCentered`, `RowWith`, `RowFlex`, `Grid`, `Flow`, `FormLayout`, `FormRow`, `Padding`, `PaddingXY`, `Spacer`, `FlexSpacer`, `Expand`, `DockTop`, `DockBottom`, `Page`, `Card`, `ScrollView`, `Anchor`, `SplitPane`, `Collapsible`, `Accordion`, `LayoutRect`, `IDScope`, `PushID`, `PopID`.\n")
-	out.WriteString("- **Ввод и формы (`UI`):** `Button`, `Hyperlink`, `Toggle`, `Checkbox`, `RadioButton`, `RadioGroup`, `TextInput`, `TextArea`, `MaskedInput`, `NumberInput`, `Slider`, `RangeSlider`, `Select`, `MultiSelect`, `TagInput`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`.\n")
+	out.WriteString("- **Ввод и формы (`UI`):** `Button`, `IconButton`, `Hyperlink`, `Toggle`, `Checkbox`, `RadioButton`, `RadioGroup`, `TextInput`, `TextArea`, `MaskedInput`, `NumberInput`, `Slider`, `RangeSlider`, `Select`, `MultiSelect`, `TagInput`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`.\n")
 	out.WriteString("- **Списки, деревья, таблицы и графики (`UI`):** `ListView`, `ListViewEx`, `TreeView`, `TreeViewEx`, `Table`, `TableEx`, `LogView`, `VirtualTextView`, `Sparkline`, `LineChart`, `BarChart`.\n")
 	out.WriteString("- **Текст, индикаторы и навигация (`UI`):** `Label`, `SelectableLabel`, `StatusDot`, `Badge`, `Separator`, `ProgressBar`, `Spinner`, `TabBar`, `MenuBar`, `Toolbar`, `StatusBar`, `Breadcrumbs`, `Pagination`, `TitleBar`, `TitleBarHitTest`.\n")
 	out.WriteString("- **Оверлеи и уведомления (`UI`):** `Modal`, `Popover`, `FloatingPanel`, `Drawer`, `ContextMenu`, `Tooltip`, `PushOverlay`, `ShowToast`, `SetToastPosition`, `SetToastOffset`.\n")
 	out.WriteString("- **Графика и холст (`UI`):** `Image`, `CanvasView`, `InteractiveCanvas`, `Canvas`, `DrawText`, `DrawSVG`, `StaticLayer`, `InvalidateStatic`, `RequestRedraw`, `CurrentArea`, `CurrentAreaPx`, `Scale`, `ScaleF`, `PxToDp`, `PxToDpf`.\n")
-	out.WriteString("- **Ввод, буфер обмена, темы и система:** `Shortcut`, `FocusID`, `SetFocus`, `SetCursor`, `RegisterHoverArea`, `MousePosDp`, `MousePosPx`, `MousePressed`, `MouseDown`, `DoubleClicked`, `MiddleClicked`, `ClipboardText`, `SetClipboardText`, `ClipboardImage`, `SetClipboardImage`, `Remember`, `InvalidateRemember`, `ClearRemember`, `Theme`, `SetTheme`, `Strings`, `SetStrings`, `OpenFileDialog`, `OpenFilesDialog`, `SaveFileDialog`, `SelectFolderDialog`, `MessageBox`, `OpenURL`, `RevealInFileManager`, `AcquireSingleInstance`, `LoadWindowState`, `SaveWindowState`.\n")
-	out.WriteString("- **Тестирование (`Headless`):** `NewHeadless`, `Headless.SetDraw`, `Headless.Step`, `Headless.AdvanceTime`, `Headless.SetScale`, `Headless.InjectMouseMove`, `Headless.InjectMouseClick`, `Headless.InjectMouseWheel`, `Headless.InjectKey`, `Headless.InjectText`, `Headless.InjectFocus`, `Headless.CaptureImage`, `AssertGolden`, `DefaultTestFonts`.\n")
+	out.WriteString("- **Ввод, буфер обмена и темы (`UI`):** `Shortcut`, `FocusID`, `SetFocus`, `SetCursor`, `RegisterHoverArea`, `MousePosDp`, `MousePosPx`, `MousePressed`, `MouseDown`, `DoubleClicked`, `MiddleClicked`, `ClipboardText`, `SetClipboardText`, `ClipboardImage`, `SetClipboardImage`, `InvalidateRemember`, `ClearRemember`, `Theme`, `SetTheme`, `Strings`, `SetStrings`.\n")
+	out.WriteString("- **Функции пакета (`anyui.*`):** `anyui.Remember` (generic), `anyui.RGB`, `anyui.RGBA`, `anyui.Hex`, `anyui.UniformRadii`, `anyui.NavyTheme`, `anyui.DarkTheme`, `anyui.LightTheme`, `anyui.SystemTheme`, `anyui.RussianStrings`, `anyui.EnglishStrings`, `anyui.TabItems`, `anyui.SelectItems`, `anyui.SetTreeNodeChecked`, `anyui.SyncTreeCheckState`, `anyui.OpenFileDialog`, `anyui.OpenFilesDialog`, `anyui.SaveFileDialog`, `anyui.SelectFolderDialog`, `anyui.MessageBox`, `anyui.OpenURL`, `anyui.RevealInFileManager`, `anyui.AcquireSingleInstance`, `anyui.LoadWindowState`, `anyui.SaveWindowState`.\n")
+	out.WriteString("- **Тестирование (`Headless`):** `anyui.NewHeadless`, `Headless.SetDraw`, `Headless.Step`, `Headless.AdvanceTime`, `Headless.SetScale`, `Headless.InjectMouseMove`, `Headless.InjectMouseClick`, `Headless.InjectMouseWheel`, `Headless.InjectKey`, `Headless.InjectText`, `Headless.InjectFocus`, `Headless.CaptureImage`, `anyui.AssertGolden`, `anyui.DefaultTestFonts`.\n")
 }
 
 func writeFullLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
@@ -663,7 +683,8 @@ func writeFullLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
 	writeQuickStart(out)
 
 	out.WriteString("## Константы и переменные пакета `anyui`\n\n```go\n")
-	out.WriteString("const Auto Dp = -1\n\n")
+	out.WriteString("// Значения важны для Key и MouseButton; порядковые enum-ы используются по имени.\n")
+	out.WriteString("// Константа Auto Dp = -1 описана выше в разделе «Базовые типы».\n\n")
 	for _, grp := range idx.constGroups {
 		if len(grp) == 1 && grp[0].name == "Auto" {
 			continue
@@ -697,7 +718,11 @@ func writeFullLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
 		out.WriteString(" )\n")
 	}
 	for _, v := range idx.vars {
-		out.WriteString("var " + v + "\n")
+		if strings.HasPrefix(v, "Err") {
+			out.WriteString("var " + v + " error\n")
+		} else {
+			out.WriteString("var " + v + "\n")
+		}
 	}
 	out.WriteString("```\n\n")
 
@@ -749,13 +774,15 @@ var (
 	reBacktick = regexp.MustCompile("`([^`]+)`")
 	reIdent    = regexp.MustCompile(`^[A-Z][A-Za-z0-9_]*$`)
 	reRecvSym  = regexp.MustCompile(`^(UI|App|Window|Headless)\.([A-Z][A-Za-z0-9_]*)$`)
+	rePkgSym   = regexp.MustCompile(`^anyui\.([A-Z][A-Za-z0-9_]*)$`)
 )
 
 // lintOutputs проверяет сгенерированные llms.txt и llms-full.txt на:
 // 1. отсутствие утечек внутренних подпакетов (ui., platform., render.);
-// 2. корректность всех упомянутых символов в ручных секциях (symbol-lint);
-// 3. валидность всех опций в матрице применимости;
-// 4. наличие ссылки на llms-full.txt в llms.txt.
+// 2. двустороннюю консистентность матрицы опций (матрица <-> AST);
+// 3. покрытие всех bool-виджетов UI в разделе «Семантика возвращаемых значений»;
+// 4. корректность всех упомянутых символов в ручных секциях (symbol-lint);
+// 5. наличие ссылки на llms-full.txt в llms.txt.
 func lintOutputs(idx *apiIndex, shortText, fullText string) error {
 	if !strings.Contains(shortText, "`llms-full.txt`") {
 		return fmt.Errorf("llms.txt не содержит ссылку на llms-full.txt")
@@ -777,22 +804,54 @@ func lintOutputs(idx *apiIndex, shortText, fullText string) error {
 		}
 	}
 
-	// 2. Проверка матрицы опций: каждое имя в колонке опций должно быть реальной Option-функцией (или именем виджета в скобках)
+	// 2. Двусторонняя проверка матрицы опций
+	seenOptions := make(map[string]bool)
 	for _, row := range optionMatrixRows {
 		for _, m := range reBacktick.FindAllStringSubmatch(row.options, -1) {
 			tok := m[1]
 			if idx.optionNames[tok] {
+				seenOptions[tok] = true
 				continue
 			}
-			// Допускаются пояснения вида (`Checkbox`), (`ScrollView`), (`Select`), (`ListView`), (`Table`), (`TreeView`), (`ContextMenu`), (`Tooltip`)
+			// Допускаются уточнения виджета в скобках (`Checkbox`, `ScrollView` и т. д.)
 			if idx.methodNames["UI"][tok] {
 				continue
 			}
 			return fmt.Errorf("матрица опций содержит неизвестную опцию %q", tok)
 		}
 	}
+	for optName := range idx.optionNames {
+		if !seenOptions[optName] {
+			return fmt.Errorf("экспортированная опция %q не упомянута в матрице опций", optName)
+		}
+	}
 
-	// 3. Symbol-lint по ручным секциям llms.txt (вне fenced-блоков кода)
+	// 3. Проверка покрытия всех bool-виджетов UI в разделе «Семантика возвращаемых значений»
+	stateGetters := map[string]bool{
+		"MousePressed":           true,
+		"MouseDown":              true,
+		"DoubleClicked":          true,
+		"MiddleClicked":          true,
+		"LastFrameStaticBlitted": true,
+	}
+	semStart := strings.Index(shortText, "## Семантика возвращаемых значений")
+	if semStart < 0 {
+		return fmt.Errorf("в llms.txt отсутствует раздел «Семантика возвращаемых значений»")
+	}
+	semBlock := shortText[semStart:]
+	if nextSec := strings.Index(semBlock[3:], "\n## "); nextSec >= 0 {
+		semBlock = semBlock[:nextSec+3]
+	}
+	for meth := range idx.uiBoolMethods {
+		if stateGetters[meth] {
+			continue
+		}
+		if !strings.Contains(semBlock, "`"+meth+"`") {
+			return fmt.Errorf("метод UI.%s (возвращает bool) не упомянут в разделе «Семантика возвращаемых значений»", meth)
+		}
+	}
+
+	// 4. Symbol-lint по ручным секциям llms.txt (вне fenced-блоков кода)
 	ignoreSymbols := map[string]bool{
 		// Поля структур, упоминаемые в прозе
 		"WidthDp": true, "IconRGBA": true, "Key": true, "ID": true, "Label": true,
@@ -817,6 +876,13 @@ func lintOutputs(idx *apiIndex, shortText, fullText string) error {
 				recv, meth := rm[1], rm[2]
 				if !idx.methodNames[recv][meth] {
 					return fmt.Errorf("llms.txt:%d: метод %s.%s не найден в пакете anyui", lineNo+1, recv, meth)
+				}
+				continue
+			}
+			if pm := rePkgSym.FindStringSubmatch(tok); pm != nil {
+				sym := pm[1]
+				if !idx.allSymbols[sym] {
+					return fmt.Errorf("llms.txt:%d: символ пакета anyui.%s не найден", lineNo+1, sym)
 				}
 				continue
 			}

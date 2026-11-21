@@ -8,13 +8,13 @@
 
 - Импорт: `import "github.com/kirpicheff/anyui"` (`go get github.com/kirpicheff/anyui`).
 - Проверить установленную версию модуля: `go list -m github.com/kirpicheff/anyui`.
-- При расхождении этого документа с установленным пакетом источник истины — `go doc github.com/kirpicheff/anyui.UI.<Method>` (для методов `UI`/`App`/`Window`/`Headless`) и `go doc github.com/kirpicheff/anyui.<Symbol>`.
+- При расхождении этого документа с установленным пакетом источник истины — `go doc` (например, `go doc github.com/kirpicheff/anyui.UI.Table` или `go doc github.com/kirpicheff/anyui.Config`).
 - Подпакеты являются внутренними; прикладной код импортирует **только** корневой пакет `github.com/kirpicheff/anyui`.
 
 ## Правила работы с API
 
-- **Immediate Mode и многопоточность:** состояние хранится вне `drawFn`; вызовы методов `UI` и чтение/изменение состояния интерфейса выполняются **только в главном потоке** внутри `drawFn`. Для обновления состояния из фоновых горутин всегда используйте `App.Dispatch` (`app.Dispatch(func() { ... })`) или `Remember`.
-- **Единицы измерения (`Dp` vs `Px`):** весь API раскладки, опций, оверлеев и ввода Headless (`LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`, `InjectMouseMove`/`InjectMouseClick`, `CurrentArea`, `MousePosDp`) работает строго в логических `Dp`. Физические `Px` используются только в колбэках рисования (`CanvasView`, `InteractiveCanvas`, `Table`, `ListView`), прямых методах (`DrawText`, `DrawSVG`, `CurrentAreaPx`, `MousePosPx`, `LastDirtyRectsPx`, `TitleBarHitTest`, `InjectMouseMovePx`/`InjectMouseClickPx`) и на границе ОС (`Config`, `Window`).
+- **Immediate Mode и многопоточность:** состояние хранится вне `drawFn`; вызовы методов `UI` и чтение/изменение состояния интерфейса выполняются **только в главном потоке** внутри `drawFn`. Для обновления состояния из фоновых горутин всегда используйте `App.Dispatch` (`app.Dispatch(func() { ... })`) или `Remember`. Повторный вызов `App.Run` на уже запущенном приложении возвращает `ErrAlreadyRunning`.
+- **Единицы измерения (`Dp` vs `Px`):** весь API раскладки, опций, оверлеев и ввода Headless (`LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`, `InjectMouse*`, `CurrentArea`, `MousePosDp`) работает строго в логических `Dp`. Физические `Px` используются только в колбэках рисования (`CanvasView`, `InteractiveCanvas`, `Table`, `ListView`), прямых методах (`DrawText`, `DrawSVG`, `CurrentAreaPx`, `MousePosPx`, `LastDirtyRectsPx`, `TitleBarHitTest`, `InjectMouse*Px`) и на границе ОС (`Config`, `Window`).
 - **`Rect` и `PointF` не типизированы по единицам:** `Rect` содержит `int`-поля, `PointF` — `float32`. В `Dp`-API (`CurrentArea`, `LayoutRect`, `PushOverlay`, `Tooltip`, `Popover`, `ContextMenu`, `RegisterHoverArea`) они трактуются как `Dp`, а в колбэках рисования и `CurrentAreaPx`/`LastDirtyRectsPx` — как `Px`.
 - **Единое задание размеров через опции:** `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image`, `ListView`, `Table`, `TextArea`, `LogView` по умолчанию занимают доступное пространство (`Auto`); явные размеры задаются опциями `Width`, `Height`, `FillWidth`, `FillHeight`. `Card` по умолчанию подбирает высоту по содержимому (`AutoHeight`); для растягивания передайте `FillHeight`.
 - **Колонки таблиц:** в `Table` и `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.
@@ -27,7 +27,7 @@
 
 ## Семантика возвращаемых значений
 
-- `Button`, `Hyperlink` → `bool`: `true` **только в кадре нажатия**.
+- `Button`, `IconButton`, `Hyperlink` → `bool`: `true` **только в кадре нажатия**.
 - `Toggle`, `Checkbox`, `RadioButton`, `RadioGroup`, `TextInput`, `TextArea`, `MaskedInput`, `Select`, `MultiSelect`, `TagInput`, `Slider`, `RangeSlider`, `NumberInput`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`, `ListView`, `ListViewEx`, `TreeView`, `TreeViewEx`, `Pagination`, `Collapsible`, `Accordion` → `bool`: `true` **только в кадре изменения значения** (не означает «виджет сейчас активен/включён»; текущее состояние хранится в переданном указателе/карте).
 - `Breadcrumbs` → `string`: возвращает `ID` кликнутого сегмента (или `Label`, если `ID == ""`), либо `""` если клика в этом кадре не было.
 - `TabBar` → `TabBarEvent`: `SelectedID` (смена вкладки), `ClosedID` (клик по крестику/СКМ), `Added` (клик по `+`), `MovedFrom`/`MovedTo` (перетаскивание, `-1` если не было), `DetachedID` (отрыв вкладки).
@@ -58,7 +58,7 @@ type Dp int               // Логические DPI-независимые п�
 type Px int               // Физические пиксели буфера отрисовки (.Int() int)
 const Auto Dp = -1        // Sentinel-значение: занять всё доступное пространство контейнера
 type Key = uint32         // Виртуальный код клавиши (VK-коды, передаётся в Shortcut / InjectKey / KeyEvent.KeyCode)
-type Modifiers struct { Ctrl, Shift, Alt bool }
+type Modifiers struct { Shift, Ctrl, Alt, Win bool }
 type MouseButton uint8    // MouseLeft = 1, MouseRight = 2, MouseMiddle = 3
 type CursorType uint8     // Системный курсор (CursorArrow, CursorHand, CursorIBeam, CursorResizeH/V/NWSE/NESW, CursorNotAllowed, CursorCrosshair, CursorMove)
 type Orientation uint8    // Horizontal, Vertical
@@ -72,7 +72,7 @@ type LogLevel uint8       // LogInfo, LogWarn, LogError, LogDebug
 type ImageScaleMode uint8 // ScaleFit, ScaleFill, ScaleOneToOne
 type FontStyle uint8      // FontRegular, FontBold, FontMono
 type TextAlign uint8      // AlignTextLeft, AlignTextCenter, AlignTextRight
-type HitTestResult int    // HitClient, HitCaption, HitLeft/Right/Top/Bottom/TopLeft/TopRight/BottomLeft/BottomRight
+type HitTestResult uint8  // HitClient, HitCaption, HitLeft/Right/Top/Bottom/TopLeft/TopRight/BottomLeft/BottomRight
 ```
 
 ## Матрица применимости опций (`Option`)
@@ -82,7 +82,7 @@ type HitTestResult int    // HitClient, HitCaption, HitLeft/Right/Top/Bottom/Top
 | Виджет | Поддерживаемые опции |
 |---|---|
 | `Label`, `SelectableLabel`, `StatusDot` | `FontSize`, `Bold`, `Mono`, `TextColor`, `TextAlignLeft`, `TextAlignCenter`, `TextAlignRight`, `LetterSpacing`, `TextShadow`, `WordWrap`, `Ellipsis`, `Width`, `MaxWidth`, `Disabled` |
-| `Button`, `Hyperlink` | `Primary`, `Secondary`, `Danger`, `Ghost`, `Icon`, `IconRight`, `Width`, `Height`, `FillWidth`, `Flex`, `Padding`, `Radius`, `FontSize`, `Bold`, `Bg`, `HoverBg`, `TextColor`, `HoverTextColor`, `BorderColor`, `HoverBorderColor`, `Disabled` |
+| `Button`, `IconButton`, `Hyperlink` | `Primary`, `Secondary`, `Danger`, `Ghost`, `Icon`, `IconRight`, `Width`, `Height`, `FillWidth`, `Flex`, `Padding`, `Radius`, `FontSize`, `Bold`, `Bg`, `HoverBg`, `TextColor`, `HoverTextColor`, `BorderColor`, `HoverBorderColor`, `Disabled` |
 | `Checkbox`, `Toggle`, `RadioButton` | `Width`, `FillWidth`, `Flex`, `Disabled`, `Indeterminate` (`Checkbox`) |
 | `TextInput`, `MaskedInput` | `Width`, `Height`, `FillWidth`, `Flex`, `FontSize`, `Mono`, `Password`, `PasswordToggle`, `Clearable`, `ReadOnly`, `Disabled`, `InputFilter`, `Error`, `Icon`, `IconRight`, `FocusBorderColor` |
 | `TextArea` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `Padding`, `FontSize`, `Mono`, `LineNumbers`, `ReadOnly`, `Disabled`, `InputFilter`, `Error`, `Bg`, `BorderColor`, `Radius`, `TextColor` |
@@ -141,14 +141,61 @@ func main() {
 }
 ```
 
+## Ключевые структуры старта (офлайн-минимум; все структуры — в `llms-full.txt`)
+
+```go
+type Config struct {
+	Title               string
+	Width               int // Начальная ширина окна в физических пикселях ОС (px).
+	Height              int // Начальная высота окна в физических пикселях ОС (px).
+	MinWidth            int // Минимальная ширина окна в физических пикселях ОС (px).
+	MinHeight           int // Минимальная высота окна в физических пикселях ОС (px).
+	DarkTitle           bool
+	TitleBarColor       *Color
+	TitleTextColor      *Color
+	BorderColor         *Color
+	InitialState        *WindowState
+	FollowSystemTheme   bool
+	OnSystemThemeChange func(app *App, dark bool)
+	Theme               Theme
+	FontRegular         []byte
+	FontBold            []byte
+	FontMono            []byte
+	Strings             *Strings
+	SingleInstance      *SingleInstanceConfig
+	Tray                *TrayConfig
+	Parent              *Window
+	Frameless           bool
+	TitleBarHeight      int                              // Высота системного заголовка окна в физических пикселях ОС (px).
+	HitTest             func(xPx, yPx int) HitTestResult // Проверка зон окна Frameless (xPx, yPx — в физических пикселях ОС).
+	AcceptDropFiles     bool
+	IconRGBA            []byte
+	IconWidth           int
+	IconHeight          int
+	HideOnClose         bool
+	OnClose             func(w *Window) bool
+	OnDropFiles         func(files []string, xPx, yPx int)
+}
+
+type PageConfig struct {
+	ID       string // Идентификатор ScrollView тела (по умолчанию "page_body")
+	GapDp    Dp     // Отступ между секциями в dp (по умолчанию 8)
+	HeaderDp Dp     // Высота шапки в dp (по умолчанию 48, если headerFn != nil)
+	FooterDp Dp     // Высота футера в dp (по умолчанию 44, если footerFn != nil)
+	NoScroll bool   // Отключает автоматическую обёртку bodyFn в ScrollView
+}
+
+```
+
 ## Карта API (полные сигнатуры и структуры — в `llms-full.txt`)
 
-- **Приложение и окна:** `NewApp`, `App.Run`, `App.Dispatch`, `App.OpenWindow`, `App.MainWindow`, `App.Quit`, `App.SetTrayMenu`, `App.SetTrayIcon`, `App.SetTrayTooltip`, `App.ShowNotification`, `Window.SetTitle`, `Window.SetSize`, `Window.SetPosition`, `Window.SetIcon`, `Window.SetTheme`, `Window.Invalidate`, `Window.WakeUp`, `Window.Close`.
+- **Приложение и окна:** `anyui.NewApp`, `App.Run`, `App.Dispatch`, `App.OpenWindow`, `App.MainWindow`, `App.Quit`, `App.SetTrayMenu`, `App.SetTrayIcon`, `App.SetTrayTooltip`, `App.ShowNotification`, `Window.SetTitle`, `Window.SetSize`, `Window.SetPosition`, `Window.SetIcon`, `Window.SetTheme`, `Window.Invalidate`, `Window.WakeUp`, `Window.Close`.
 - **Раскладка и контейнеры (`UI`):** `Column`, `ColumnCentered`, `ColumnWith`, `ColumnFlex`, `Row`, `RowCentered`, `RowWith`, `RowFlex`, `Grid`, `Flow`, `FormLayout`, `FormRow`, `Padding`, `PaddingXY`, `Spacer`, `FlexSpacer`, `Expand`, `DockTop`, `DockBottom`, `Page`, `Card`, `ScrollView`, `Anchor`, `SplitPane`, `Collapsible`, `Accordion`, `LayoutRect`, `IDScope`, `PushID`, `PopID`.
-- **Ввод и формы (`UI`):** `Button`, `Hyperlink`, `Toggle`, `Checkbox`, `RadioButton`, `RadioGroup`, `TextInput`, `TextArea`, `MaskedInput`, `NumberInput`, `Slider`, `RangeSlider`, `Select`, `MultiSelect`, `TagInput`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`.
+- **Ввод и формы (`UI`):** `Button`, `IconButton`, `Hyperlink`, `Toggle`, `Checkbox`, `RadioButton`, `RadioGroup`, `TextInput`, `TextArea`, `MaskedInput`, `NumberInput`, `Slider`, `RangeSlider`, `Select`, `MultiSelect`, `TagInput`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`.
 - **Списки, деревья, таблицы и графики (`UI`):** `ListView`, `ListViewEx`, `TreeView`, `TreeViewEx`, `Table`, `TableEx`, `LogView`, `VirtualTextView`, `Sparkline`, `LineChart`, `BarChart`.
 - **Текст, индикаторы и навигация (`UI`):** `Label`, `SelectableLabel`, `StatusDot`, `Badge`, `Separator`, `ProgressBar`, `Spinner`, `TabBar`, `MenuBar`, `Toolbar`, `StatusBar`, `Breadcrumbs`, `Pagination`, `TitleBar`, `TitleBarHitTest`.
 - **Оверлеи и уведомления (`UI`):** `Modal`, `Popover`, `FloatingPanel`, `Drawer`, `ContextMenu`, `Tooltip`, `PushOverlay`, `ShowToast`, `SetToastPosition`, `SetToastOffset`.
 - **Графика и холст (`UI`):** `Image`, `CanvasView`, `InteractiveCanvas`, `Canvas`, `DrawText`, `DrawSVG`, `StaticLayer`, `InvalidateStatic`, `RequestRedraw`, `CurrentArea`, `CurrentAreaPx`, `Scale`, `ScaleF`, `PxToDp`, `PxToDpf`.
-- **Ввод, буфер обмена, темы и система:** `Shortcut`, `FocusID`, `SetFocus`, `SetCursor`, `RegisterHoverArea`, `MousePosDp`, `MousePosPx`, `MousePressed`, `MouseDown`, `DoubleClicked`, `MiddleClicked`, `ClipboardText`, `SetClipboardText`, `ClipboardImage`, `SetClipboardImage`, `Remember`, `InvalidateRemember`, `ClearRemember`, `Theme`, `SetTheme`, `Strings`, `SetStrings`, `OpenFileDialog`, `OpenFilesDialog`, `SaveFileDialog`, `SelectFolderDialog`, `MessageBox`, `OpenURL`, `RevealInFileManager`, `AcquireSingleInstance`, `LoadWindowState`, `SaveWindowState`.
-- **Тестирование (`Headless`):** `NewHeadless`, `Headless.SetDraw`, `Headless.Step`, `Headless.AdvanceTime`, `Headless.SetScale`, `Headless.InjectMouseMove`, `Headless.InjectMouseClick`, `Headless.InjectMouseWheel`, `Headless.InjectKey`, `Headless.InjectText`, `Headless.InjectFocus`, `Headless.CaptureImage`, `AssertGolden`, `DefaultTestFonts`.
+- **Ввод, буфер обмена и темы (`UI`):** `Shortcut`, `FocusID`, `SetFocus`, `SetCursor`, `RegisterHoverArea`, `MousePosDp`, `MousePosPx`, `MousePressed`, `MouseDown`, `DoubleClicked`, `MiddleClicked`, `ClipboardText`, `SetClipboardText`, `ClipboardImage`, `SetClipboardImage`, `InvalidateRemember`, `ClearRemember`, `Theme`, `SetTheme`, `Strings`, `SetStrings`.
+- **Функции пакета (`anyui.*`):** `anyui.Remember` (generic), `anyui.RGB`, `anyui.RGBA`, `anyui.Hex`, `anyui.UniformRadii`, `anyui.NavyTheme`, `anyui.DarkTheme`, `anyui.LightTheme`, `anyui.SystemTheme`, `anyui.RussianStrings`, `anyui.EnglishStrings`, `anyui.TabItems`, `anyui.SelectItems`, `anyui.SetTreeNodeChecked`, `anyui.SyncTreeCheckState`, `anyui.OpenFileDialog`, `anyui.OpenFilesDialog`, `anyui.SaveFileDialog`, `anyui.SelectFolderDialog`, `anyui.MessageBox`, `anyui.OpenURL`, `anyui.RevealInFileManager`, `anyui.AcquireSingleInstance`, `anyui.LoadWindowState`, `anyui.SaveWindowState`.
+- **Тестирование (`Headless`):** `anyui.NewHeadless`, `Headless.SetDraw`, `Headless.Step`, `Headless.AdvanceTime`, `Headless.SetScale`, `Headless.InjectMouseMove`, `Headless.InjectMouseClick`, `Headless.InjectMouseWheel`, `Headless.InjectKey`, `Headless.InjectText`, `Headless.InjectFocus`, `Headless.CaptureImage`, `anyui.AssertGolden`, `anyui.DefaultTestFonts`.
