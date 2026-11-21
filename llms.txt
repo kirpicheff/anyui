@@ -2,30 +2,75 @@
 
 Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).
 
-## Инструкция для ИИ-агента
+> Полный офлайн-справочник со всеми сигнатурами, опциями и структурами: `llms-full.txt`.
+
+## Версия и источник истины
 
 - Импорт: `import "github.com/kirpicheff/anyui"` (`go get github.com/kirpicheff/anyui`).
-- Подпакеты `ui/`, `platform/`, `render/` — внутренние; прикладной код использует только корневой пакет `anyui`.
-- Для уточнения сигнатур любого типа или метода используй `go doc github.com/kirpicheff/anyui.<Symbol>` вместо чтения исходников.
-- Модель Immediate Mode: состояние хранится в переменных/структурах приложения, `drawFn(ui *anyui.UI)` перерисовывает UI на каждом кадре.
-- Идентификаторы виджетов: передавайте уникальный `id`, либо `""` для автогенерации по счётчику в скоупе; в циклах и компонентах используйте `ui.IDScope(key, fn)` (или `PushID`/`PopID`).
-- Все размеры, координаты и отступы задаются в `dp` и масштабируются под DPI автоматически.
-- Обновление UI из фоновых горутин выполняется через `app.Dispatch(func() { ... })`, либо через `anyui.Remember(ui, key, loader)` прямо внутри `drawFn`.
-- Иконка окна подхватывается автоматически из `.syso`-ресурсов или задаётся через `Config.IconRGBA` / `win.SetIcon(...)`.
-- Единицы измерения (Dp vs Px, полный контракт в `docs/ru/units.md`): весь публичный API раскладки, оверлеев и виджетов (`LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`, `InjectMouse*`, `CurrentArea()`, `MousePosDp()`) принимает и возвращает логические единицы `Dp`. Физические пиксели `Px` используются строго в низкоуровневых колбэках рисования в Canvas (`CanvasView`, `Table.drawCell`, `ListView.drawItem`), прямых системных методах (`DrawText`, `DrawSVG`, `CurrentAreaPx()`, `MousePosPx()`, `LastDirtyRectsPx()`, `InjectMouse*Px`), метриках окна (`Config.HitTest`, `TitleBarHitTest`, `Window.Position()`, `SetPosition()`, `SetSize()`, `OnDropFiles`) и установке иконок (`SetIcon`, `SetTrayIcon`).
-- Выпадающие списки: используйте `ui.Select(id, items, selected, opts...)` на строковых ключах. Комбобокс со строкой поиска/фильтрации = `ui.Select(..., anyui.Searchable())` (отдельной функции `ComboBox` нет).
-- Множественный выбор: используйте `ui.MultiSelect(id, items, selectedIDs, opts...)` на `map[string]bool` (дублирующий псевдоним `CheckComboBox` удалён).
-- Вкладки: используйте `ui.TabBar(id, tabs, activeID, opts...)` на строковых ключах и хелпер `anyui.TabItems(labels...)` (устаревший `Tabs` удалён).
-- Ориентация: используйте `anyui.Horizontal` и `anyui.Vertical` типа `Orientation` (устаревший `SplitOrientation` удалён).
-- Раскладка без обрезания: для экранов с шапкой/телом/футером используйте `ui.Page(cfg, headerFn, bodyFn, footerFn)` или `ui.DockBottom` / `ui.DockTop` / `ui.ColumnFlex` и `anyui.FillHeight()`.
-- Модальные окна и диалоги: всегда используйте `ui.Modal(id, open, title, fn, opts...)`, который сам затемняет фон, центрирует окно, изолирует ввод и обрабатывает Escape/крестик. Запрещено создавать самодельные модалки через `PushOverlay(fullRect)` — передача полноэкранного прямоугольника в `PushOverlay` заблокирует весь экран на последующих кадрах.
-- `PushOverlay(bounds, fn)` предназначен только для всплывающих контролов (кастомных выпадающих списков, меню, тултипов), которым нужно отрисоваться поверх родительских контейнеров без обрезания клипом.
-- Горячие клавиши: `ui.Shortcut` регистрирует глобальный шорткат окна; не вызывайте его повторно на каждом кадре внутри циклических веток UI.
-- `Card(fn, ...)` по умолчанию подбирает высоту по содержимому (`AutoHeight`); чтобы растянуть карточку на весь остаток высоты, передайте `anyui.FillHeight()`.
-- Автозаполнение контейнеров (Auto-Fill): `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image` и `ListView` по умолчанию занимают доступное пространство; явные размеры задаются единообразно через опции `anyui.Width(...)`, `anyui.Height(...)`, `anyui.FillWidth()`, `anyui.FillHeight()` (или `anyui.Auto`). `ui.CurrentArea()` возвращает геометрию строго в Dp; для низкоуровневых операций с `Canvas` используйте `ui.CurrentAreaPx()`.
-- В `Table` / `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.
-- Декларативная навигация: используйте `anyui.ScrollToIndex(idx)` для программной прокрутки в `ListView` и `Table`, и `anyui.ScrollToID(id)` / `ui.Anchor(id)` для навигации в `ScrollView`.
-- Drag & Drop (Reorder): `anyui.OnReorder(func(ev anyui.DragEvent))` вместе с `anyui.Reorderable()` — для `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы) и `TreeView`, `TreeViewEx` (ключи). По умолчанию в деревьях разрешён перенос внутри одного родителя (`DropAbove`/`DropBelow`); с `anyui.AllowReparent()` поддерживаются смена родителя и вложение `DropInside` с защитой от циклов.
+- Проверить установленную версию модуля: `go list -m github.com/kirpicheff/anyui`.
+- При расхождении этого документа с установленным пакетом источник истины — `go doc github.com/kirpicheff/anyui.<Symbol>`.
+- Подпакеты являются внутренними; прикладной код импортирует **только** корневой пакет `github.com/kirpicheff/anyui`.
+
+## Правила работы с API
+
+- **Immediate Mode:** состояние хранится вне `drawFn` (в структурах/переменных приложения), `drawFn(ui *anyui.UI)` перерисовывает весь интерфейс на каждом кадре.
+- **Единицы измерения (`Dp` vs `Px`):** весь API раскладки, опций, оверлеев и ввода Headless (`LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`, `InjectMouse*`, `CurrentArea()`, `MousePosDp()`) работает строго в логических `Dp`. Физические `Px` используются только в колбэках рисования (`CanvasView`, `InteractiveCanvas`, `Table.drawCell`, `ListView.drawItem`), прямых методах (`DrawText`, `DrawSVG`, `CurrentAreaPx()`, `MousePosPx()`, `LastDirtyRectsPx()`, `TitleBarHitTest`, `InjectMouse*Px`) и на границе ОС (`Config`, `Window`).
+- **Единое задание размеров через опции:** `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image`, `ListView`, `Table`, `TextArea`, `LogView` по умолчанию занимают доступное пространство (`Auto`); явные размеры задаются опциями `Width(...)`, `Height(...)`, `FillWidth()`, `FillHeight()`. `Card` по умолчанию подбирает высоту по содержимому (`AutoHeight`); для растягивания передайте `FillHeight()`.
+- **Идентификаторы, ключи и `IDScope`:** `ui.IDScope(key, fn)` (или `PushID`/`PopID`) изолирует `id` виджетов внутри циклов и переиспользуемых компонентов. В `Select`, `MultiSelect`, `TabBar`, `TreeView`, `TreeViewEx` и `Breadcrumbs` ключи элементов (`Key` / `ID`) локальны для конкретного виджета и должны быть уникальны в его пределах — при дублировании ключей в одном списке/дереве выделение и клик совпадут для всех дубликатов.
+- **Выпадающие списки и вкладки:** `ui.Select` с `anyui.Searchable()` заменяет комбобокс; `ui.MultiSelect` работает с `map[string]bool`; `ui.TabBar` и `anyui.TabItems(...)` работают на строковых ключах.
+- **Раскладка и оверлеи:** для типового экрана используйте `ui.Page` или `DockTop` / `DockBottom` / `ColumnFlex`. Для диалогов всегда используйте `ui.Modal` — `PushOverlay(bounds, fn)` предназначен только для небольших всплывающих контролов.
+- **Drag & Drop (Reorder):** `anyui.Reorderable()` + `anyui.OnReorder(func(ev anyui.DragEvent))` работают в `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы `FromIndex`/`ToIndex`) и `TreeView`, `TreeViewEx` (ключи `FromKey`/`ToKey`; с `anyui.AllowReparent()` доступны смена родителя и `DropInside`).
+
+## Семантика возвращаемых значений
+
+- `Button`, `Hyperlink` → `bool`: `true` **только в кадре нажатия**.
+- `Toggle`, `Checkbox`, `Radio`, `TextInput`, `TextArea`, `MaskedInput`, `Select`, `MultiSelect`, `TagInput`, `Slider`, `RangeSlider`, `NumberInput`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`, `ListView`, `ListViewEx`, `TreeView`, `TreeViewEx`, `Pagination`, `Collapsible`, `Accordion` → `bool`: `true` **только в кадре изменения значения** (не означает «виджет сейчас активен/включён»; текущее состояние хранится в переданном указателе/карте).
+- `Breadcrumbs(...) string`: возвращает `ID` кликнутого сегмента (или `Label`, если `ID == ""`), либо `""` если клика в этом кадре не было.
+- `TabBar(...) TabBarEvent`: `SelectedID` (смена вкладки), `ClosedID` (клик по крестику/СКМ), `Added` (клик по `+`), `MovedFrom`/`MovedTo` (перетаскивание, `-1` если не было), `DetachedID` (отрыв вкладки).
+- `Table` / `TableEx` → `TableEvent`: `RowClicked`, `RowDoubleClicked`, `RowMiddleClicked` (`-1` если события не было), `SortChanged`, `ColumnResized`, `Drag *DragEvent`.
+
+## Асинхронная загрузка данных (`Remember`)
+
+`anyui.Remember[T](ui, key, loader)` запускает `loader` **асинхронно в отдельной горутине** при первом вызове для `key` (пока идёт загрузка, `loading == true`, повторных запусков не происходит). По завершении результат и ошибка кешируются в окне по `key`, и окно автоматически перерисовывается. Для повторного запроса сбросьте кеш через `ui.InvalidateRemember(key)` или `ui.ClearRemember()`.
+
+```go
+users, loading, err := anyui.Remember(ui, "users_list", func() ([]string, error) {
+	return api.FetchUsers()
+})
+if loading {
+	ui.Spinner("load_users", 20)
+} else if err != nil {
+	ui.Label("Ошибка: "+err.Error(), anyui.TextColor(ui.Theme().Danger))
+	if ui.Button("retry", "Повторить") { ui.InvalidateRemember("users_list") }
+}
+```
+
+## Матрица применимости опций (`Option`)
+
+Неприменимые для виджета опции молча игнорируются. Основные комбинации:
+
+| Виджет | Поддерживаемые опции |
+|---|---|
+| `Label`, `SelectableLabel`, `StatusDot` | `FontSize`, `Bold`, `Mono`, `TextColor`, `TextAlignLeft/Center/Right`, `LetterSpacing`, `TextShadow`, `WordWrap`, `Ellipsis`, `Width`, `MaxWidth`, `Disabled` |
+| `Button`, `Hyperlink` | `Primary`, `Secondary`, `Danger`, `Ghost`, `Icon`, `IconRight`, `Width`, `Height`, `FillWidth`, `Flex`, `Padding`, `Radius`, `FontSize`, `Bold`, `Bg`, `HoverBg`, `TextColor`, `HoverTextColor`, `BorderColor`, `HoverBorderColor`, `Disabled` |
+| `TextInput`, `MaskedInput` | `Width`, `Height`, `FillWidth`, `Flex`, `FontSize`, `Mono`, `Password`, `PasswordToggle`, `Clearable`, `ReadOnly`, `Disabled`, `InputFilter`, `Error`, `Icon`, `IconRight`, `FocusBorderColor` |
+| `TextArea` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `FontSize`, `Mono`, `LineNumbers`, `ReadOnly`, `Disabled`, `Error`, `FocusBorderColor` |
+| `Card` | `Width`, `Height`, `FillWidth`, `FillHeight`, `AutoHeight`, `Flex`, `Padding`, `Radius`, `Bg`, `BorderColor` |
+| `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Flex` (+ `ScrollToID` для `ScrollView`) |
+| `Select`, `MultiSelect` | `Width`, `FillWidth`, `Flex`, `Searchable`, `Disabled`, `Error` |
+| `ListView`, `ListViewEx` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `ScrollToIndex`, `Reorderable`, `OnReorder` |
+| `Table`, `TableEx` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `ScrollToIndex`, `Reorderable`, `OnReorder` |
+| `TreeView`, `TreeViewEx` | `Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `Reorderable`, `AllowReparent`, `OnReorder` |
+| `Modal`, `Popover`, `FloatingPanel`, `Drawer` | `Width`, `Height`, `Bg`, `BorderColor`, `Radius`, `Padding` |
+| `ContextMenu`, `Tooltip` | `Width` (`ContextMenu`), `Bg`, `BorderColor`, `Radius`, `FontSize`, `TextColor`, `Padding` (`Tooltip`) |
+
+## Частые ошибки
+
+1. **Состояние внутри `drawFn`:** объявление `name := ""` внутри `drawFn` сбрасывает значение на каждом кадре. Выносите состояние в структуру приложения выше `app.Run`.
+2. **Значение вместо указателя:** виджеты ввода и выбора (`TextInput`, `Toggle`, `Checkbox`, `Select`, `TabBar`, `Slider`, `ListView`) мутируют состояние по указателю (`&val`), а возвращают лишь факт изменения в кадре.
+3. **`ui.Shortcut` внутри условных веток:** метод регистрирует глобальную горячую клавишу окна — не перерегистрируйте его динамически в циклах.
+4. **Самодельные модалки через `PushOverlay(fullRect)`:** блокирует ввод всего окна на следующих кадрах. Всегда используйте `ui.Modal`.
+5. **Смешивание `Px` и `Dp`:** передача `CurrentAreaPx()` в `PushOverlay`, `LayoutRect`, `Tooltip`, `Popover`, `ContextMenu` или `RegisterHoverArea` ломает координаты при DPI > 100%. Для них всегда берите `ui.CurrentArea()` (`Dp`).
 
 ## Минимальный пример
 
@@ -64,225 +109,9 @@ func main() {
 }
 ```
 
-## Корневой пакет (константы, функции, типы, опции)
+## Ключевые структуры (офлайн-минимум)
 
 ```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-Package anyui предоставляет лёгкий кроссплатформенный UI-фреймворк на Go с
-программным 2D-рендерингом (без WebView2 и без зависимости от OpenGL/GPU).
-
-Корневой пакет anyui является основной точкой входа для прикладного кода и
-объединяет управление жизненным циклом приложения (App, Window), Immediate Mode
-API интерфейса (UI), темы оформления (Theme) и функциональные опции стилизации
-(Option).
-
-# Модель работы
-
-Фреймворк использует подход Immediate Mode UI: функция отрисовки drawFn
-вызывается при событиях ОС, анимациях или вызове App.Dispatch. В простое цикл
-событий ожидает сообщения ОС без нагрузки на CPU.
-
-Все размеры и отступы в виджетах и раскладках задаются в dp (device-independent
-pixels) и автоматически масштабируются под текущий DPI монитора.
-
-# Многопоточность
-
-Вызовы методов UI и чтение/изменение состояния интерфейса должны выполняться в
-главном потоке UI (внутри drawFn). Для обновления состояния из фоновых горутин
-используйте App.Dispatch.
-
-# Архитектура подпакетов
-
-  - github.com/kirpicheff/anyui/ui — внутренний движок раскладки, фокуса,
-    анимаций и виджетов.
-  - github.com/kirpicheff/anyui/render — программный 2D-рендерер (BGRA),
-    SDF-примитивы и кеш шрифтов.
-  - github.com/kirpicheff/anyui/platform — абстракция окна ОС, диалоги, трей и
-    цикл событий.
-
-const HitClient = platform.HitClient ...
-const MsgInfo = platform.MsgInfo ...
-const MsgOK = platform.MsgOK ...
-const ResNone = platform.ResNone ...
-const AlignTextLeft = ui.AlignTextLeft ...
-const NotifyNone = platform.NotifyNone ...
-const ScaleFit = render.ScaleFit ...
-const FontRegular = render.FontRegular ...
-const MouseLeft = platform.MouseLeft ...
-const CursorArrow = platform.CursorArrow ...
-const AlignStart = ui.AlignStart ...
-const JustifyStart = ui.JustifyStart ...
-const DrawerLeft = ui.DrawerLeft ...
-const DropAbove = ui.DropAbove ...
-const Horizontal = ui.Horizontal ...
-const ToastInfo = ui.ToastInfo ...
-const ToastBottomRight = ui.ToastBottomRight ...
-const LogInfo = ui.LogInfo ...
-var ErrAlreadyRunning = errors.New("application is already running")
-func AssertGolden(t TestHelper, h *Headless, goldenName string)
-func DefaultTestFonts() (regular, bold, mono []byte)
-func IsSystemDarkTheme() bool
-func OpenFileDialog(opts FileDialogOptions) (string, bool, error)
-func OpenFilesDialog(opts FileDialogOptions) ([]string, bool, error)
-func OpenURL(rawURL string) error
-func Remember[T any](u *UI, key any, loader func() (T, error)) (val T, loading bool, err error)
-func RevealInFileManager(path string) error
-func SaveFileDialog(opts FileDialogOptions) (string, bool, error)
-func SaveWindowState(path string, state WindowState) error
-func SelectFolderDialog(opts FolderDialogOptions) (string, bool, error)
-func SetTreeNodeChecked(node *TreeNode, checked bool)
-func SyncTreeCheckState(roots []*TreeNode)
-type AccordionItem = ui.AccordionItem
-type Align = ui.Align
-type App struct{ ... }
-    func NewApp(cfg Config) *App
-type BoxShadow = render.BoxShadow
-type BreadcrumbItem = ui.BreadcrumbItem
-type Canvas = render.Canvas
-type CanvasCallbacks = ui.CanvasCallbacks
-type ChartSeries = ui.ChartSeries
-type Color = render.Color
-    func Hex(rgb uint32) Color
-    func RGB(r, g, b uint8) Color
-    func RGBA(r, g, b, a uint8) Color
-type Config struct{ ... }
-type ContextMenuItem = ui.ContextMenuItem
-type CornerRadii = render.CornerRadii
-    func UniformRadii(r float32) CornerRadii
-type CursorType = platform.CursorType
-type Dp = ui.Dp
-    const Auto Dp = ui.Auto
-type DragEvent = ui.DragEvent
-type DrawerSide = ui.DrawerSide
-type DropZone = ui.DropZone
-type FileDialogOptions struct{ ... }
-type FileFilter = platform.FileFilter
-type FlexItem = ui.FlexItem
-type FolderDialogOptions struct{ ... }
-type FontStyle = render.FontStyle
-type GradientStop = render.GradientStop
-type Headless struct{ ... }
-    func NewHeadless(cfg Config, drawFn ...func(*UI)) (*Headless, error)
-type HitTestResult = platform.HitTestResult
-type ImageScaleMode = render.ImageScaleMode
-type Justify = ui.Justify
-type Key = uint32
-    const KeyBackspace Key = ui.KeyBackspace ...
-type KeyEvent = ui.RawKeyEvent
-type LinearGradient = render.LinearGradient
-type ListViewExConfig = ui.ListViewExConfig
-type LogEntry = ui.LogEntry
-type LogLevel = ui.LogLevel
-type MenuBarEntry = ui.MenuBarEntry
-type MenuBarItem = ui.MenuBarItem
-type MenuItem struct{ ... }
-type MessageBoxButtons = platform.MessageBoxButtons
-type MessageBoxResult = platform.MessageBoxResult
-    func MessageBox(owner *Window, title, text string, style MessageBoxStyle, ...) MessageBoxResult
-type MessageBoxStyle = platform.MessageBoxStyle
-type Modifiers = platform.Modifiers
-type MouseButton = platform.MouseButton
-type Notification = platform.TrayNotification
-type NotificationIcon = platform.NotificationIcon
-type Option = ui.Option
-    func AllowReparent(enabled ...bool) Option
-    func AutoHeight(enabled ...bool) Option
-    func Bg(c Color) Option
-    func Bold(enabled ...bool) Option
-    func BorderColor(c Color) Option
-    func Clearable(enabled ...bool) Option
-    func Danger(enabled ...bool) Option
-    func Disabled(enabled ...bool) Option
-    func Ellipsis(enabled ...bool) Option
-    func Error(text string) Option
-    func FillHeight(enabled ...bool) Option
-    func FillWidth(enabled ...bool) Option
-    func Flex(weight float32) Option
-    func FocusBorderColor(c Color) Option
-    func FontSize(dp Dp) Option
-    func Ghost(enabled ...bool) Option
-    func Height(dp Dp) Option
-    func HoverBg(c Color) Option
-    func HoverBorderColor(c Color) Option
-    func HoverTextColor(c Color) Option
-    func Icon(svg string) Option
-    func IconRight(svg string) Option
-    func Indeterminate(enabled ...bool) Option
-    func InputFilter(fn func(rune) bool) Option
-    func LetterSpacing(dp float32) Option
-    func LineNumbers(enabled ...bool) Option
-    func MaxHeight(dp Dp) Option
-    func MaxWidth(dp Dp) Option
-    func MinHeight(dp Dp) Option
-    func MinWidth(dp Dp) Option
-    func Mono(enabled ...bool) Option
-    func OnReorder(fn func(ev DragEvent)) Option
-    func Padding(dp Dp) Option
-    func Password(enabled ...bool) Option
-    func PasswordToggle(visible ...*bool) Option
-    func Primary(enabled ...bool) Option
-    func Radius(dp float32) Option
-    func ReadOnly(enabled ...bool) Option
-    func Reorderable(enabled ...bool) Option
-    func ScrollToID(id string) Option
-    func ScrollToIndex(idx int) Option
-    func Searchable(enabled ...bool) Option
-    func Secondary(enabled ...bool) Option
-    func TextAlignCenter(enabled ...bool) Option
-    func TextAlignLeft(enabled ...bool) Option
-    func TextAlignRight(enabled ...bool) Option
-    func TextColor(c Color) Option
-    func TextShadow(offsetX, offsetY, blur float32, c Color) Option
-    func Width(dp Dp) Option
-    func WordWrap(enabled ...bool) Option
-type Orientation = ui.Orientation
-type PageConfig = ui.PageConfig
-type PointF = render.PointF
-type Px = ui.Px
-type RadialGradient = render.RadialGradient
-type Rect = render.Rect
-type SelectItem = ui.SelectItem
-    func SelectItems(labels ...string) []SelectItem
-type SingleInstanceConfig struct{ ... }
-type SingleInstanceGuard = platform.SingleInstanceGuard
-    func AcquireSingleInstance(appID string, args []string) (*SingleInstanceGuard, bool, error)
-type StatusBarSection = ui.StatusBarSection
-type Strings = ui.Strings
-    func EnglishStrings() Strings
-    func RussianStrings() Strings
-type TabBarEvent = ui.TabBarEvent
-type TabItem = ui.TabItem
-    func TabItems(labels ...string) []TabItem
-type TableColumn = ui.TableColumn
-type TableEvent = ui.TableEvent
-type TableExConfig = ui.TableExConfig
-type TableSort = ui.TableSort
-type TestHelper interface{ ... }
-type TextAlign = ui.TextAlign
-type Theme = ui.Theme
-    func DarkTheme() Theme
-    func LightTheme() Theme
-    func NavyTheme() Theme
-    func SystemTheme() Theme
-type TitleBarConfig = ui.TitleBarConfig
-type ToastKind = ui.ToastKind
-type ToastPosition = ui.ToastPosition
-type ToolbarItem = ui.ToolbarItem
-type TrayConfig struct{ ... }
-type TreeNode = ui.TreeNode
-type TreeViewExConfig = ui.TreeViewExConfig
-type UI struct{ ... }
-type Window struct{ ... }
-type WindowState = platform.WindowState
-    func LoadWindowState(path string) (WindowState, error)
-```
-
-## Config
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
 type Config struct {
 	Title               string
 	Width               int // Начальная ширина окна в физических пикселях ОС (px).
@@ -315,309 +144,149 @@ type Config struct {
 	OnClose             func(w *Window) bool
 	OnDropFiles         func(files []string, xPx, yPx int)
 }
-    Config задаёт параметры создания приложения или окна.
-```
 
-## PageConfig
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type PageConfig = ui.PageConfig
-    PageConfig задаёт параметры типовой разметки страницы с шапкой,
-    прокручиваемым телом и футером.
-```
-
-## TrayConfig
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type TrayConfig struct {
-	Tooltip             string
-	IconRGBA            []byte
-	IconWidth           int
-	IconHeight          int
-	Menu                []MenuItem
-	OnClick             func(app *App)
-	OnDoubleClick       func(app *App)
-	OnRightClick        func(app *App)
-	OnNotificationClick func(app *App)
+type PageConfig struct {
+	ID       string // Идентификатор ScrollView тела (по умолчанию "page_body")
+	GapDp    Dp     // Отступ между секциями в dp (по умолчанию 8)
+	HeaderDp Dp     // Высота шапки в dp (по умолчанию 48, если headerFn != nil)
+	FooterDp Dp     // Высота футера в dp (по умолчанию 44, если footerFn != nil)
+	NoScroll bool   // Отключает автоматическую обёртку bodyFn в ScrollView
 }
-    TrayConfig задаёт настройки иконки в системном трее.
-```
 
-## FlexItem
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type FlexItem = ui.FlexItem
-    FlexItem описывает элемент для пропорционального деления пространства в
-    RowFlex / ColumnFlex.
-```
-
-## TableColumn
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type TableColumn = ui.TableColumn
-    TableColumn описывает колонку таблицы.
-```
-
-## ListViewExConfig
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type ListViewExConfig = ui.ListViewExConfig
-    ListViewExConfig задаёт расширенные настройки списка ListViewEx.
-```
-
-## TreeViewExConfig
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type TreeViewExConfig = ui.TreeViewExConfig
-    TreeViewExConfig задаёт расширенные настройки дерева TreeViewEx.
-```
-
-## TableExConfig
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type TableExConfig = ui.TableExConfig
-    TableExConfig задаёт расширенные настройки таблицы TableEx.
-```
-
-## TabItem
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type TabItem = ui.TabItem
-    TabItem описывает вкладку в динамическом TabBar.
-
-func TabItems(labels ...string) []TabItem
-```
-
-## StatusBarSection
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type StatusBarSection = ui.StatusBarSection
-    StatusBarSection описывает секцию нижней строки состояния StatusBar.
-```
-
-## CanvasCallbacks
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type CanvasCallbacks = ui.CanvasCallbacks
-    CanvasCallbacks задаёт обработчики рисования и сырого ввода для
-    InteractiveCanvas.
-```
-
-## KeyEvent
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type KeyEvent = ui.RawKeyEvent
-    KeyEvent описывает сырое событие нажатия или отпускания клавиши для
-    InteractiveCanvas.
-```
-
-## DragEvent
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type DragEvent = ui.DragEvent
-    DragEvent описывает событие завершения перетаскивания элемента (Reorder).
-
-    Для списков и таблиц (Table, TableEx, ListView, ListViewEx):
-      - FromIndex: исходный индекс перемещаемого элемента (>= 0).
-      - ToIndex: уже вычисленная позиция вставки в списке после удаления
-        перемещаемого элемента (0 <= ToIndex < rowCount).
-      - FromKey и ToKey строго пусты ("").
-      - Допустимые зоны Drop: только DropAbove и DropBelow.
-      - Если ToIndex == FromIndex, операция является no-op и событие не
-        генерируется.
-      - ListViewEx / TableEx: при Reorder приложение обязано синхронно
-        переставлять элементы в срезе чекбоксов и карте выделения, иначе отметки
-        сохранятся за исходными числовыми индексами.
-
-    Для иерархических деревьев (TreeView, TreeViewEx):
-      - FromIndex и ToIndex строго равны -1.
-      - FromKey: ID перемещаемого узла (sourceNode.ID).
-      - ToKey: ID якорного узла (targetNode.ID), относительно которого
-        применяется Drop; позицию вставки в список детей родителя вычисляет
-        приложение.
-      - По умолчанию перетаскивание узлов разрешено только внутри одного
-        родителя (source.Parent == target.Parent), зоны DropAbove и DropBelow.
-        При попытке сброса на узел другого родителя событие отбрасывается.
-      - По умолчанию DropBelow на узле (в том числе раскрытом) вставляет элемент
-        в того же родителя сразу после всего поддерева ToKey; для раскрытого
-        узла с детьми при включённой AllowReparent() — первым ребёнком в
-        ToKey.Children (см. ниже).
-      - Сброс узла в самого себя (ToKey == FromKey) является no-op и событие не
-        генерирует.
-      - TreeViewEx: при перетаскивании одного узла из группы выделенных
-        перемещается только он, при этом выделение группы не сбрасывается.
-
-    Режим AllowReparent() в TreeView и TreeViewEx (смена родителя и вложение):
-      - DropInside: новым родителем становится сам ToKey (вставка в
-        ToKey.Children).
-      - DropAbove: новым родителем становится target.ParentID (для корневого
-        узла — "" / верхний уровень), вставка перед ToKey.
-      - DropBelow: для раскрытого узла с детьми (ToKey.Expanded &&
-        len(ToKey.Children) > 0) новым родителем становится сам ToKey (позиция
-        первого ребёнка); для свёрнутого узла или листа — target.ParentID (сразу
-        после поддерева ToKey).
-      - Защита от циклов и no-op: сброс узла в любого своего потомка и
-        DropInside на собственного текущего родителя являются no-op и событие
-        не генерируют. При этом DropAbove/DropBelow на собственного текущего
-        родителя не являются no-op (перемещают узел на уровень родителя).
-```
-
-## Notification
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type Notification = platform.TrayNotification
-    Notification описывает нативное системное уведомление (Balloon / Toast).
-```
-
-## Headless (автоматизация, пошаговый цикл, инъекция ввода)
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type Headless struct {
-	// Has unexported fields.
+type FlexItem struct {
+	Weight  float32 // Пропорциональный вес (используется, если FixedDp <= 0)
+	FixedDp Dp      // Фиксированный размер вдоль главной оси в dp (если > 0)
+	Fn      func()  // Функция отрисовки содержимого слота
 }
-    Headless представляет изолированный рантайм AnyUI для тестирования и
-    рендеринга без создания окон ОС.
 
-func NewHeadless(cfg Config, drawFn ...func(*UI)) (*Headless, error)
-func (h *Headless) AdvanceTime(d time.Duration)
-func (h *Headless) App() *App
-func (h *Headless) CaptureImage() image.Image
-func (h *Headless) CapturePNG(path string) error
-func (h *Headless) Close()
-func (h *Headless) FocusID() string
-func (h *Headless) FocusOrder() []string
-func (h *Headless) InjectFocus(id string)
-func (h *Headless) InjectKey(key Key, mod Modifiers)
-func (h *Headless) InjectKeyDown(key Key, mod Modifiers)
-func (h *Headless) InjectKeyUp(key Key, mod Modifiers)
-func (h *Headless) InjectMouseClick(xDp, yDp Dp, btn MouseButton)
-func (h *Headless) InjectMouseClickPx(xPx, yPx Px, btn MouseButton)
-func (h *Headless) InjectMouseDown(xDp, yDp Dp, btn MouseButton)
-func (h *Headless) InjectMouseDownPx(xPx, yPx Px, btn MouseButton)
-func (h *Headless) InjectMouseMove(xDp, yDp Dp)
-func (h *Headless) InjectMouseMovePx(xPx, yPx Px)
-func (h *Headless) InjectMouseUp(xDp, yDp Dp, btn MouseButton)
-func (h *Headless) InjectMouseUpPx(xPx, yPx Px, btn MouseButton)
-func (h *Headless) InjectMouseWheel(dxDp, dyDp Dp)
-func (h *Headless) InjectMouseWheelPx(dxPx, dyPx Px)
-func (h *Headless) InjectText(text string)
-func (h *Headless) SetDraw(drawFn func(*UI))
-func (h *Headless) SetScale(scale float32)
-func (h *Headless) SetTime(t time.Time)
-func (h *Headless) Step()
-func (h *Headless) Time() time.Time
-func (h *Headless) UI() *UI
-func (h *Headless) Window() *Window
+type TableColumn struct {
+	Title      string
+	WidthDp    Dp
+	MinWidthDp Dp
+	Sortable   bool
+}
+
+type TableEvent struct {
+	RowClicked       int
+	RowDoubleClicked int
+	RowMiddleClicked int
+	SortChanged      bool
+	ColumnResized    bool
+	Drag             *DragEvent
+}
+
+type ListViewExConfig struct {
+	Selected       map[int]bool
+	ShowCheckboxes bool
+	Checked        []bool
+}
+
+type TreeViewExConfig struct {
+	SelectedIDs    map[string]bool
+	ShowCheckboxes bool
+}
+
+type TableExConfig struct {
+	Selected             map[int]bool
+	ShowCheckboxes       bool
+	Checked              []bool
+	FrozenCols           int
+	GetCellText          func(row, col int) string
+	OnCellEdit           func(row, col int, newValue string)
+	AutoFitOnDoubleClick bool
+}
+
+type TabItem struct {
+	ID          string
+	Title       string
+	IconSVG     string
+	StatusColor *Color
+	Closable    bool
+}
+
+type TabBarEvent struct {
+	SelectedID string
+	ClosedID   string
+	Added      bool
+	MovedFrom  int
+	MovedTo    int
+	DetachedID string
+}
+
+type SelectItem struct {
+	Key   string
+	Label string
+	Icon  string
+}
+
+type TreeNode struct {
+	ID            string
+	Label         string
+	IconSVG       string
+	Expanded      bool
+	Checked       bool
+	Indeterminate bool
+	Children      []*TreeNode
+}
+
+type ToolbarItem struct {
+	ID        string
+	Label     string
+	IconSVG   string
+	Tooltip   string
+	Separator bool
+	Disabled  bool
+	Active    bool
+	OnClick   func()
+}
+
+type ContextMenuItem struct {
+	Label     string
+	Shortcut  string
+	IconSVG   string
+	Separator bool
+	Disabled  bool
+	OnClick   func()
+}
+
+type MenuBarItem struct {
+	Label string
+	Items []MenuBarEntry
+}
+
+type MenuBarEntry struct {
+	Label     string
+	Shortcut  string
+	IconSVG   string
+	Separator bool
+	Disabled  bool
+	Checked   bool
+	SubItems  []MenuBarEntry
+	OnClick   func()
+}
+
+type BreadcrumbItem struct {
+	ID       string
+	Label    string
+	IconSVG  string
+	Disabled bool
+}
+
+type DragEvent struct {
+	FromWidget string   // ID виджета-источника перетаскивания
+	ToWidget   string   // ID целевого виджета
+	FromKey    string   // Ключ перетаскиваемого узла (для TreeView — node.ID; "" для Table/ListView)
+	ToKey      string   // Ключ якорного целевого узла (для TreeView — node.ID; "" для Table/ListView)
+	FromIndex  int      // Индекс перетаскиваемой строки (для Table/ListView; -1 для TreeView)
+	ToIndex    int      // Позиция вставки в списке после удаления перемещаемого элемента (0 <= ToIndex < rowCount; -1 для TreeView)
+	Drop       DropZone // Зона сброса (DropAbove, DropBelow; DropInside при AllowReparent в TreeView)
+}
+
 ```
 
-## App
+## Основные методы `UI` (полные сигнатуры)
 
 ```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type App struct {
-	// Has unexported fields.
-}
-    App управляет единым циклом событий ОС, реестром окон и потокобезопасной
-    очередью Dispatch.
-
-func NewApp(cfg Config) *App
-func (a *App) Dispatch(fn func())
-func (a *App) MainWindow() *Window
-func (a *App) OpenWindow(cfg Config, drawFn func(ui *UI)) (*Window, error)
-func (a *App) Quit()
-func (a *App) Run(drawFn func(ui *UI)) error
-func (a *App) SetStrings(s Strings)
-func (a *App) SetTrayIcon(rgba []byte, widthPx, heightPx int) error
-func (a *App) SetTrayMenu(items []MenuItem)
-func (a *App) SetTrayTooltip(tooltip string) error
-func (a *App) Show()
-func (a *App) ShowNotification(n Notification) error
-```
-
-## Window
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type Window struct {
-	// Has unexported fields.
-}
-    Window представляет независимое нативное окно с собственным холстом, фокусом
-    и анимациями.
-
-func (w *Window) BringToFront()
-func (w *Window) ClipboardImage() (image.Image, error)
-func (w *Window) ClipboardText() (string, error)
-func (w *Window) Close()
-func (w *Window) Hide()
-func (w *Window) Invalidate()
-func (w *Window) IsFullscreen() bool
-func (w *Window) IsMaximized() bool
-func (w *Window) IsMinimized() bool
-func (w *Window) Maximize()
-func (w *Window) Minimize()
-func (w *Window) Position() (xPx, yPx int)
-func (w *Window) Restore()
-func (w *Window) RestoreState(state WindowState)
-func (w *Window) SetClipboardImage(img image.Image) error
-func (w *Window) SetClipboardText(text string) error
-func (w *Window) SetDarkTitle(dark bool)
-func (w *Window) SetFullscreen(fullscreen bool)
-func (w *Window) SetHideOnClose(hide bool)
-func (w *Window) SetIcon(rgba []byte, widthPx, heightPx int) error
-func (w *Window) SetOnClose(fn func(*Window) bool)
-func (w *Window) SetOnDropFiles(fn func(files []string, xPx, yPx int))
-func (w *Window) SetPosition(xPx, yPx int)
-func (w *Window) SetSize(widthPx, heightPx int)
-func (w *Window) SetStrings(s Strings)
-func (w *Window) SetTheme(theme Theme)
-func (w *Window) SetTitle(title string)
-func (w *Window) SetTitleBarColors(caption, text, border *Color)
-func (w *Window) Show()
-func (w *Window) State() WindowState
-func (w *Window) WakeUp()
-```
-
-## UI (Immediate Mode API)
-
-```go
-package anyui // import "github.com/kirpicheff/anyui"
-
-type UI struct {
-	// Has unexported fields.
-}
-    UI предоставляет публичный Immediate Mode API для построения интерфейса в
-    окне.
-
 func (u *UI) Accordion(id string, items []AccordionItem, openIDs map[string]bool, opts ...Option) bool
 func (u *UI) Anchor(id string)
 func (u *UI) App() *App
@@ -672,8 +341,8 @@ func (u *UI) LastDirtyRectsPx() []Rect
 func (u *UI) LastFrameStaticBlitted() bool
 func (u *UI) LayoutRect(rect Rect, fn func())
 func (u *UI) LineChart(id string, labels []string, series []ChartSeries, opts ...Option)
-func (u *UI) ListView(id string, count int, itemHeightDp Dp, selected *int, ...) bool
-func (u *UI) ListViewEx(id string, count int, itemHeightDp Dp, cfg *ListViewExConfig, ...) bool
+func (u *UI) ListView(id string, count int, itemHeightDp Dp, selected *int, drawItem func(index int, areaPx Rect, selected bool), opts ...Option) bool
+func (u *UI) ListViewEx(id string, count int, itemHeightDp Dp, cfg *ListViewExConfig, drawItem func(index int, areaPx Rect, isSelected bool), opts ...Option) bool
 func (u *UI) LogView(id string, entries []LogEntry, followTail *bool, opts ...Option)
 func (u *UI) MaskedInput(id string, value *string, mask string, opts ...Option) bool
 func (u *UI) MenuBar(id string, menus []MenuBarItem, opts ...Option)
@@ -684,7 +353,7 @@ func (u *UI) MousePosDp() (Dp, Dp)
 func (u *UI) MousePosPx() (Px, Px)
 func (u *UI) MousePressed() bool
 func (u *UI) MultiSelect(id string, items []SelectItem, selectedIDs map[string]bool, opts ...Option) bool
-func (u *UI) NumberInput(id string, value *float64, minVal, maxVal, step float64, decimals int, ...) bool
+func (u *UI) NumberInput(id string, value *float64, minVal, maxVal, step float64, decimals int, opts ...Option) bool
 func (u *UI) Padding(padDp Dp, fn func())
 func (u *UI) PaddingXY(pxDp, pyDp Dp, fn func())
 func (u *UI) Page(cfg PageConfig, headerFn, bodyFn, footerFn func())
@@ -729,14 +398,14 @@ func (u *UI) Slider(id string, value *float32, minVal, maxVal float32, opts ...O
 func (u *UI) Spacer(dp Dp)
 func (u *UI) Sparkline(id string, values []float64, opts ...Option)
 func (u *UI) Spinner(id string, sizeDp Dp, opts ...Option)
-func (u *UI) SplitPane(id string, orient Orientation, ratio *float32, firstFn, secondFn func(), ...)
+func (u *UI) SplitPane(id string, orient Orientation, ratio *float32, firstFn, secondFn func(), opts ...Option)
 func (u *UI) StaticLayer(id string, fn func())
 func (u *UI) StatusBar(id string, sections []StatusBarSection, opts ...Option)
 func (u *UI) StatusDot(dotColor Color, label string, opts ...Option)
 func (u *UI) Strings() Strings
 func (u *UI) TabBar(id string, tabs []TabItem, activeID *string, opts ...Option) TabBarEvent
-func (u *UI) Table(id string, cols []TableColumn, rowCount int, selected *int, sort *TableSort, ...) TableEvent
-func (u *UI) TableEx(id string, cols []TableColumn, rowCount int, cfg *TableExConfig, ...) TableEvent
+func (u *UI) Table(id string, cols []TableColumn, rowCount int, selected *int, sort *TableSort, drawCell func(row, col int, areaPx Rect, isSelected bool), opts ...Option) TableEvent
+func (u *UI) TableEx(id string, cols []TableColumn, rowCount int, cfg *TableExConfig, sort *TableSort, drawCell func(row, col int, areaPx Rect, isSelected bool), opts ...Option) TableEvent
 func (u *UI) TagInput(id string, tags *[]string, placeholder string, opts ...Option) bool
 func (u *UI) TextArea(id string, value *string, placeholder string, opts ...Option) bool
 func (u *UI) TextInput(id string, value *string, placeholder string, opts ...Option) bool
@@ -752,4 +421,3 @@ func (u *UI) TreeViewEx(id string, roots []*TreeNode, cfg *TreeViewExConfig, opt
 func (u *UI) VirtualTextView(id string, lines []string, opts ...Option)
 func (u *UI) Window() *Window
 ```
-
