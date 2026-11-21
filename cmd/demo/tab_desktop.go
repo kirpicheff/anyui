@@ -91,12 +91,12 @@ func (st *demoState) drawTabDesktop(ui *anyui.UI) {
 			ui.MenuBar("demo_menubar", []anyui.MenuBarItem{
 				{
 					Label: "Файл",
-					Items: []anyui.BarMenuItem{
+					Items: []anyui.MenuBarEntry{
 						{Label: "Новый проект", Shortcut: "Ctrl+N", OnClick: func() { st.statusMsg = "MenuBar: Новый проект" }},
 						{Label: "Открыть...", Shortcut: "Ctrl+O", OnClick: func() { st.statusMsg = "MenuBar: Открыть" }},
 						{Separator: true},
 						{Label: "Автосохранение", Checked: true, OnClick: func() { st.statusMsg = "MenuBar: Автосохранение" }},
-						{Label: "Экспорт", SubItems: []anyui.BarMenuItem{
+						{Label: "Экспорт", SubItems: []anyui.MenuBarEntry{
 							{Label: "В PNG", OnClick: func() { st.statusMsg = "Экспорт в PNG" }},
 							{Label: "В SVG", OnClick: func() { st.statusMsg = "Экспорт в SVG" }},
 						}},
@@ -104,7 +104,7 @@ func (st *demoState) drawTabDesktop(ui *anyui.UI) {
 				},
 				{
 					Label: "Вид",
-					Items: []anyui.BarMenuItem{
+					Items: []anyui.MenuBarEntry{
 						{Label: "Добавить лог", OnClick: func() {
 							deskTab.logs = append(deskTab.logs, anyui.LogEntry{
 								Level:     anyui.LogInfo,
@@ -137,14 +137,14 @@ func (st *demoState) drawTabDesktop(ui *anyui.UI) {
 			})
 
 			// Breadcrumbs и Pagination
-			bcIdx := ui.Breadcrumbs("demo_bc", []anyui.BreadcrumbItem{
-				{Label: "Главная"},
-				{Label: "Кластер"},
-				{Label: "Узлы"},
-				{Label: "Мониторинг"},
+			bcID := ui.Breadcrumbs("demo_bc", []anyui.BreadcrumbItem{
+				{ID: "home", Label: "Главная"},
+				{ID: "cluster", Label: "Кластер"},
+				{ID: "nodes", Label: "Узлы"},
+				{ID: "monitoring", Label: "Мониторинг"},
 			})
-			if bcIdx >= 0 {
-				deskTab.lastBreadcrumb = fmt.Sprintf("Клик по сегменту #%d", bcIdx)
+			if bcID != "" {
+				deskTab.lastBreadcrumb = fmt.Sprintf("Клик по сегменту %q", bcID)
 			}
 			ui.RowCentered(12, 32, func() {
 				ui.Pagination("demo_pag", &deskTab.page, 12, anyui.Width(340))

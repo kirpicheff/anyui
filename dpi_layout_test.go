@@ -423,3 +423,36 @@ func TestUnifiedOptionsAndSizing(t *testing.T) {
 		t.Error("ContextMenu с опциями не обработал клик по пункту")
 	}
 }
+
+// TestUIClipboardImage проверяет методы UI.SetClipboardImage и UI.ClipboardImage в Headless-режиме.
+func TestUIClipboardImage(t *testing.T) {
+	reg, bold, mono := DefaultTestFonts()
+	h, err := NewHeadless(Config{
+		Width:       200,
+		Height:      200,
+		FontRegular: reg,
+		FontBold:    bold,
+		FontMono:    mono,
+	})
+	if err != nil {
+		t.Fatalf("NewHeadless error: %v", err)
+	}
+	defer h.Close()
+
+	src := image.NewRGBA(image.Rect(0, 0, 8, 8))
+	var got image.Image
+	var setErr, getErr error
+
+	h.SetDraw(func(u *UI) {
+		setErr = u.SetClipboardImage(src)
+		got, getErr = u.ClipboardImage()
+	})
+	h.Step()
+
+	if setErr != nil || getErr != nil {
+		t.Fatalf("ошибки буфера обмена изображений: setErr=%v getErr=%v", setErr, getErr)
+	}
+	if got == nil || got.Bounds() != src.Bounds() {
+		t.Fatalf("ожидалось изображение %v, получено %v", src.Bounds(), got)
+	}
+}

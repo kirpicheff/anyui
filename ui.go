@@ -140,6 +140,40 @@ func (u *UI) SetClipboardText(text string) error {
 	return errors.New("окно не инициализировано")
 }
 
+// ClipboardImage возвращает изображение из системного буфера обмена ОС.
+func (u *UI) ClipboardImage() (image.Image, error) {
+	if u == nil {
+		return nil, errors.New("контекст не инициализирован")
+	}
+	if u.win != nil {
+		return u.win.ClipboardImage()
+	}
+	if u.ctx != nil && u.ctx.Win != nil {
+		if ci, ok := u.ctx.Win.(platform.ClipboardImager); ok {
+			return ci.ClipboardImage()
+		}
+		return nil, errors.New("буфер обмена для изображений не поддерживается")
+	}
+	return nil, errors.New("окно не инициализировано")
+}
+
+// SetClipboardImage записывает изображение в системный буфер обмена ОС.
+func (u *UI) SetClipboardImage(img image.Image) error {
+	if u == nil {
+		return errors.New("контекст не инициализирован")
+	}
+	if u.win != nil {
+		return u.win.SetClipboardImage(img)
+	}
+	if u.ctx != nil && u.ctx.Win != nil {
+		if ci, ok := u.ctx.Win.(platform.ClipboardImager); ok {
+			return ci.SetClipboardImage(img)
+		}
+		return errors.New("буфер обмена для изображений не поддерживается")
+	}
+	return errors.New("окно не инициализировано")
+}
+
 // App возвращает экземпляр приложения.
 func (u *UI) App() *App {
 	return u.app

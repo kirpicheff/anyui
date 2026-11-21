@@ -6,8 +6,8 @@ import (
 	"github.com/kirpicheff/anyui/ui"
 )
 
-// BarMenuItem описывает пункт выпадающего меню в MenuBar.
-type BarMenuItem = ui.BarMenuItem
+// MenuBarEntry описывает пункт выпадающего меню в MenuBar.
+type MenuBarEntry = ui.MenuBarEntry
 
 // MenuBarItem описывает раздел верхнего уровня в MenuBar.
 type MenuBarItem = ui.MenuBarItem
@@ -74,8 +74,9 @@ func (u *UI) StatusBar(id string, sections []StatusBarSection, opts ...Option) {
 	u.ctx.StatusBar(id, sections, opts...)
 }
 
-// Breadcrumbs отрисовывает навигационную цепочку и возвращает индекс кликнутого сегмента (-1 если клика не было).
-func (u *UI) Breadcrumbs(id string, items []BreadcrumbItem, opts ...Option) int {
+// Breadcrumbs отрисовывает навигационную цепочку и возвращает ID кликнутого сегмента
+// (пустая строка, если клика не было).
+func (u *UI) Breadcrumbs(id string, items []BreadcrumbItem, opts ...Option) string {
 	return u.ctx.Breadcrumbs(id, items, opts...)
 }
 

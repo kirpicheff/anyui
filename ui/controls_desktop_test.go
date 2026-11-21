@@ -15,7 +15,7 @@ func TestMenuBarToolbarStatusBarBreadcrumbsPagination(t *testing.T) {
 	menus := []MenuBarItem{
 		{
 			Label: "Файл",
-			Items: []BarMenuItem{
+			Items: []MenuBarEntry{
 				{Label: "Новый", Shortcut: "Ctrl+N", OnClick: func() { menuClicked = true }},
 				{Separator: true},
 				{Label: "Выход", Disabled: true},
@@ -39,19 +39,19 @@ func TestMenuBarToolbarStatusBarBreadcrumbsPagination(t *testing.T) {
 	}
 
 	page := 2
-	bcClicked := -1
+	bcClicked := ""
 
 	renderFrame := func() {
 		ctx.beginFrame()
 		ctx.Column(8, func() {
 			ctx.MenuBar("mb1", menus)
 			ctx.Toolbar("tb1", tools)
-			if idx := ctx.Breadcrumbs("bc1", []BreadcrumbItem{
-				{Label: "Главная"},
-				{Label: "Проекты"},
-				{Label: "Детали"},
-			}); idx >= 0 {
-				bcClicked = idx
+			if key := ctx.Breadcrumbs("bc1", []BreadcrumbItem{
+				{ID: "home", Label: "Главная"},
+				{ID: "projects", Label: "Проекты"},
+				{ID: "details", Label: "Детали"},
+			}); key != "" {
+				bcClicked = key
 			}
 			ctx.Pagination("pg1", &page, 10)
 			ctx.StatusBar("sb1", sections)
@@ -97,8 +97,8 @@ func TestMenuBarToolbarStatusBarBreadcrumbsPagination(t *testing.T) {
 	renderFrame()
 	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 4, Y: 90})
 	renderFrame()
-	if bcClicked != 0 {
-		t.Fatalf("ожидался клик по сегменту 0 Breadcrumbs, получено %d", bcClicked)
+	if bcClicked != "home" {
+		t.Fatalf("ожидался клик по сегменту \"home\" Breadcrumbs, получено %q", bcClicked)
 	}
 
 	// Клик по кнопке ">" в Pagination (y ≈ 124, 5-я или 6-я кнопка)

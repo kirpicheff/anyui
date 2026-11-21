@@ -7,22 +7,22 @@ import (
 	"github.com/kirpicheff/anyui/render"
 )
 
-// BarMenuItem описывает пункт выпадающего меню в MenuBar (поддерживает вложенные подменю).
-type BarMenuItem struct {
+// MenuBarEntry описывает пункт выпадающего меню в MenuBar (поддерживает вложенные подменю).
+type MenuBarEntry struct {
 	Label     string
 	Shortcut  string
 	IconSVG   string
 	Separator bool
 	Disabled  bool
 	Checked   bool
-	SubItems  []BarMenuItem
+	SubItems  []MenuBarEntry
 	OnClick   func()
 }
 
 // MenuBarItem описывает раздел верхнего уровня в MenuBar (например, «Файл», «Правка»).
 type MenuBarItem struct {
 	Label string
-	Items []BarMenuItem
+	Items []MenuBarEntry
 }
 
 // ToolbarItem описывает элемент панели инструментов Toolbar.
@@ -49,6 +49,7 @@ type StatusBarSection struct {
 
 // BreadcrumbItem описывает сегмент навигационной цепочки Breadcrumbs.
 type BreadcrumbItem struct {
+	ID       string
 	Label    string
 	IconSVG  string
 	Disabled bool
@@ -185,7 +186,7 @@ func (c *Context) MenuBar(id string, menus []MenuBarItem, opts ...Option) {
 	menuRect := c.calcMenuPopupRect(anchor.X, anchor.Y+anchor.H+c.Scale(2).Int(), items)
 
 	var subRect render.Rect
-	var subItems []BarMenuItem
+	var subItems []MenuBarEntry
 	if hoverSubIdx, ok := menuBarHoverSub[id]; ok && hoverSubIdx >= 0 && hoverSubIdx < len(items) {
 		if len(items[hoverSubIdx].SubItems) > 0 && !items[hoverSubIdx].Disabled {
 			subItems = items[hoverSubIdx].SubItems
@@ -225,7 +226,7 @@ func (c *Context) MenuBar(id string, menus []MenuBarItem, opts ...Option) {
 	}
 }
 
-func (c *Context) calcMenuPopupRect(x, y int, items []BarMenuItem) render.Rect {
+func (c *Context) calcMenuPopupRect(x, y int, items []MenuBarEntry) render.Rect {
 	w := c.Scale(220).Int()
 	itemH := c.Scale(28).Int()
 	sepH := c.Scale(9).Int()
@@ -252,7 +253,7 @@ func (c *Context) calcMenuPopupRect(x, y int, items []BarMenuItem) render.Rect {
 	return render.Rect{X: x, Y: y, W: w, H: totalH}
 }
 
-func (c *Context) calcMenuItemY(menuRect render.Rect, items []BarMenuItem, targetIdx int) int {
+func (c *Context) calcMenuItemY(menuRect render.Rect, items []MenuBarEntry, targetIdx int) int {
 	curY := menuRect.Y + c.Scale(4).Int()
 	itemH := c.Scale(28).Int()
 	sepH := c.Scale(9).Int()
@@ -269,7 +270,7 @@ func (c *Context) calcMenuItemY(menuRect render.Rect, items []BarMenuItem, targe
 	return curY
 }
 
-func (c *Context) drawMenuPopup(barID string, menuRect render.Rect, items []BarMenuItem, isRoot bool) {
+func (c *Context) drawMenuPopup(barID string, menuRect render.Rect, items []MenuBarEntry, isRoot bool) {
 	c.drawDropShadow(menuRect, c.Theme.RadiusSm, 12, 120)
 	c.Canvas.DrawRoundedBox(menuRect, c.ScaleF(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
 
@@ -557,8 +558,9 @@ func (c *Context) StatusBar(id string, sections []StatusBarSection, opts ...Opti
 	}
 }
 
-// Breadcrumbs отрисовывает навигационную цепочку и возвращает индекс кликнутого сегмента (-1 если клика не было).
-func (c *Context) Breadcrumbs(id string, items []BreadcrumbItem, opts ...Option) int {
+// Breadcrumbs отрисовывает навигационную цепочку и возвращает ID кликнутого сегмента
+// (или его Label, если ID не задан; пустая строка, если клика не было).
+func (c *Context) Breadcrumbs(id string, items []BreadcrumbItem, opts ...Option) string {
 	id = c.ResolveID("bc", id)
 	st := ApplyOptions(opts)
 	hDp := Dp(28)
@@ -567,10 +569,10 @@ func (c *Context) Breadcrumbs(id string, items []BreadcrumbItem, opts ...Option)
 	}
 	r := c.allocWidth(hDp, st)
 	if len(items) == 0 {
-		return -1
+		return ""
 	}
 
-	clicked := -1
+	clicked := ""
 	pxSize := c.Scale(13).Int()
 	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
 		pxSize = c.Scale(*st.FontSizeDp).Int()
@@ -611,7 +613,11 @@ func (c *Context) Breadcrumbs(id string, items []BreadcrumbItem, opts ...Option)
 			c.nextCursor = platform.CursorHand
 			c.Canvas.FillRoundedRect(sr, c.ScaleF(4), c.Theme.Surface)
 			if c.MousePressed {
-				clicked = i
+				if it.ID != "" {
+					clicked = it.ID
+				} else {
+					clicked = it.Label
+				}
 				c.RequestRedraw()
 			}
 		}
