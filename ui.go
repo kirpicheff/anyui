@@ -146,7 +146,7 @@ func (u *UI) App() *App {
 }
 
 // Canvas возвращает низкоуровневый холст окна для кастомного рисования.
-func (u *UI) Canvas() *render.Canvas {
+func (u *UI) Canvas() *Canvas {
 	return u.ctx.Canvas
 }
 
@@ -245,7 +245,7 @@ func (u *UI) Image(img image.Image, wDp, hDp Dp, mode ImageScaleMode) {
 
 // CanvasView выделяет область wDp x hDp для кастомного рисования (графики, видеокадры, градиенты).
 // Колбэк drawFn получает координаты области areaPx строго в физических пикселях (Px) для прямого вывода в Canvas.
-func (u *UI) CanvasView(wDp, hDp Dp, drawFn func(canvas *render.Canvas, areaPx Rect)) {
+func (u *UI) CanvasView(wDp, hDp Dp, drawFn func(canvas *Canvas, areaPx Rect)) {
 	u.ctx.CanvasView(wDp, hDp, drawFn)
 }
 

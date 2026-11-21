@@ -8,6 +8,9 @@ import (
 // Color описывает цвет в формате RGBA.
 type Color = render.Color
 
+// Canvas представляет программный 2D-холст для кастомного рисования.
+type Canvas = render.Canvas
+
 // Rect описывает прямоугольник в пиксельных координатах.
 type Rect = render.Rect
 

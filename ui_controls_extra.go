@@ -3,7 +3,6 @@ package anyui
 import (
 	"time"
 
-	"github.com/kirpicheff/anyui/render"
 	"github.com/kirpicheff/anyui/ui"
 )
 
@@ -131,7 +130,7 @@ func (u *UI) RangeSlider(id string, low, high *float32, minVal, maxVal float32, 
 }
 
 // ColorPicker рисует выбор цвета с выпадающей палитрой и HEX-полем.
-func (u *UI) ColorPicker(id string, col *render.Color, opts ...Option) bool {
+func (u *UI) ColorPicker(id string, col *Color, opts ...Option) bool {
 	return u.ctx.ColorPicker(id, col, opts...)
 }
 
