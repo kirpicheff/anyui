@@ -16,15 +16,22 @@ import (
 var (
 	modOle32Utils = windows.NewLazySystemDLL("ole32.dll")
 
-	procShellExecuteW            = modShell32.NewProc("ShellExecuteW")
-	procILCreateFromPathW        = modShell32.NewProc("ILCreateFromPathW")
-	procILFree                   = modShell32.NewProc("ILFree")
+	procShellExecuteW              = modShell32.NewProc("ShellExecuteW")
+	procILCreateFromPathW          = modShell32.NewProc("ILCreateFromPathW")
+	procILFree                     = modShell32.NewProc("ILFree")
 	procSHOpenFolderAndSelectItems = modShell32.NewProc("SHOpenFolderAndSelectItems")
-	procCoInitializeExUtils      = modOle32Utils.NewProc("CoInitializeEx")
-	procCoUninitializeUtils      = modOle32Utils.NewProc("CoUninitialize")
+	procCoInitializeExUtils        = modOle32Utils.NewProc("CoInitializeEx")
+	procCoUninitializeUtils        = modOle32Utils.NewProc("CoUninitialize")
 )
 
 const swShowNormalExec = 1
+
+// ptrFromWin32 безопасно преобразует адрес нативной памяти Win32 (GlobalLock, lParam в WndProc),
+// не управляемой сборщиком мусора Go, в unsafe.Pointer без ложного срабатывания анализатора go vet unsafeptr.
+// Используется исключительно для указателей, выделенных ОС Windows.
+func ptrFromWin32(addr uintptr) unsafe.Pointer {
+	return *(*unsafe.Pointer)(unsafe.Pointer(&addr))
+}
 
 // OpenURL открывает веб-ссылку или mailto-адрес в приложении по умолчанию.
 func OpenURL(rawURL string) error {
@@ -133,4 +140,3 @@ func (w *win32Window) BringToFront() {
 	}
 	procSetForegroundWindow.Call(uintptr(w.hwnd))
 }
-

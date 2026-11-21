@@ -8,16 +8,16 @@ import (
 )
 
 var (
-	procGetWindowRect       = modUser32.NewProc("GetWindowRect")
-	procSetWindowPos        = modUser32.NewProc("SetWindowPos")
-	procGetWindowLongPtrW   = modUser32.NewProc("GetWindowLongPtrW")
-	procSetWindowLongPtrW   = modUser32.NewProc("SetWindowLongPtrW")
-	procIsZoomed            = modUser32.NewProc("IsZoomed")
-	procIsIconic            = modUser32.NewProc("IsIconic")
-	procScreenToClient      = modUser32.NewProc("ScreenToClient")
-	procMonitorFromWindow   = modUser32.NewProc("MonitorFromWindow")
-	procGetMonitorInfoW     = modUser32.NewProc("GetMonitorInfoW")
-	procDwmExtendFrame      = modDwmapi.NewProc("DwmExtendFrameIntoClientArea")
+	procGetWindowRect     = modUser32.NewProc("GetWindowRect")
+	procSetWindowPos      = modUser32.NewProc("SetWindowPos")
+	procGetWindowLongPtrW = modUser32.NewProc("GetWindowLongPtrW")
+	procSetWindowLongPtrW = modUser32.NewProc("SetWindowLongPtrW")
+	procIsZoomed          = modUser32.NewProc("IsZoomed")
+	procIsIconic          = modUser32.NewProc("IsIconic")
+	procScreenToClient    = modUser32.NewProc("ScreenToClient")
+	procMonitorFromWindow = modUser32.NewProc("MonitorFromWindow")
+	procGetMonitorInfoW   = modUser32.NewProc("GetMonitorInfoW")
+	procDwmExtendFrame    = modDwmapi.NewProc("DwmExtendFrameIntoClientArea")
 )
 
 const (
@@ -118,7 +118,7 @@ func (w *win32Window) handleNCCalcSize(wParam, lParam uintptr) uintptr {
 		return 0
 	}
 	if w.IsMaximized() {
-		params := (*ncCalcSizeParams)(unsafe.Pointer(lParam))
+		params := (*ncCalcSizeParams)(ptrFromWin32(lParam))
 		hMon, _, _ := procMonitorFromWindow.Call(uintptr(w.hwnd), monitorDefaultToNearest)
 		if hMon != 0 {
 			var mi monitorInfo

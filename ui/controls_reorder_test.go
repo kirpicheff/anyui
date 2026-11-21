@@ -1528,3 +1528,95 @@ func TestTreeViewExReorder_GroupSelectionAndCheckboxNoDrag(t *testing.T) {
 		t.Fatalf("выделение группы не должно схлопываться при старте драга, selected=%v", selected)
 	}
 }
+
+func TestTableExReorder_HappyPath(t *testing.T) {
+	ctx := newTestContext(600, 400)
+	cols := []TableColumn{
+		{Title: "ID", WidthDp: 80},
+		{Title: "Name", WidthDp: 160},
+	}
+	selected := map[int]bool{0: true, 1: true}
+	checked := []bool{true, false, true, false, false}
+	var got *DragEvent
+	var lastEv TableEvent
+
+	// В TableEx: viewRect.Y = 1, hdrH = 32 -> bodyRect.Y = 33, rowH = 30:
+	// 0: Y=33..63 (mid 48)
+	// 1: Y=63..93 (mid 78)
+	// 2: Y=93..123 (mid 108)
+	// 3: Y=123..153 (mid 138, lower half -> Y=145 -> DropBelow)
+	tableAnchorStore["tblex_reorder"] = 2
+	renderTableEx := func() {
+		ctx.Render(func(c *Context) {
+			res := c.TableEx("tblex_reorder", cols, 5, &TableExConfig{
+				ShowCheckboxes: true,
+				CheckedRows:    checked,
+				SelectedRows:   selected,
+			}, nil, func(row, col int, area render.Rect, isSel bool) {},
+				Width(320), Height(240), Reorderable(), OnReorder(func(ev DragEvent) {
+					e := ev
+					got = &e
+				}))
+			if res.Drag != nil {
+				lastEv = res
+			}
+		})
+	}
+
+	// Тащим строку 1 (X=120 — правее колонки чекбоксов 34px, Y=78) в нижнюю половину строки 3 (Y=145 -> DropBelow -> toIdx=3)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 120, Y: 78})
+	renderTableEx()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 120, Y: 145})
+	renderTableEx()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 120, Y: 145})
+	renderTableEx()
+
+	if got == nil || lastEv.Drag == nil {
+		t.Fatalf("ожидались OnReorder и ev.Drag в TableEx, got=%v ev.Drag=%v", got, lastEv.Drag)
+	}
+	if got.FromIndex != 1 || got.ToIndex != 3 || got.Drop != DropBelow || got.FromKey != "" || got.ToKey != "" {
+		t.Fatalf("неверные параметры Reorder в TableEx: %+v", *got)
+	}
+	if _, hasAnchor := tableAnchorStore["tblex_reorder"]; hasAnchor {
+		t.Fatal("ожидался сброс якоря tableAnchorStore после Reorder в TableEx")
+	}
+	// Выделение группы {0, 1} не должно было схлопнуться при захвате строки 1
+	if !selected[0] || !selected[1] || len(selected) != 2 {
+		t.Fatalf("выделение группы в TableEx не должно схлопываться при старте драга, selected=%v", selected)
+	}
+}
+
+func TestTableExReorder_CheckboxNoDrag(t *testing.T) {
+	ctx := newTestContext(600, 400)
+	cols := []TableColumn{{Title: "Name", WidthDp: 160}}
+	checked := []bool{false, false, false, false}
+	callCount := 0
+
+	renderTableEx := func() {
+		ctx.Render(func(c *Context) {
+			c.TableEx("tblex_cb", cols, 4, &TableExConfig{
+				ShowCheckboxes: true,
+				CheckedRows:    checked,
+			}, nil, func(row, col int, area render.Rect, isSel bool) {},
+				Width(320), Height(240), Reorderable(), OnReorder(func(ev DragEvent) {
+					callCount++
+				}))
+		})
+	}
+
+	// Клик в центр чекбокса строки 0 (checkColW=34 -> X=18, Y=48) и протяжка вниз не должны запускать Reorder
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 18, Y: 48})
+	renderTableEx()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 18, Y: 138})
+	renderTableEx()
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 18, Y: 138})
+	renderTableEx()
+
+	if callCount != 0 {
+		t.Fatalf("нажатие и протяжка по чекбоксу в TableEx не должны запускать Reorder, вызовов: %d", callCount)
+	}
+}

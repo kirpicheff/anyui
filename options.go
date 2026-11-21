@@ -161,7 +161,7 @@ func ScrollToIndex(idx int) Option { return ui.ScrollToIndex(idx) }
 func ScrollToID(id string) Option { return ui.ScrollToID(id) }
 
 // Reorderable разрешает перетаскивание элементов внутри компонента для изменения порядка.
-// Действует для Table, ListView, ListViewEx, TreeView, TreeViewEx; TableEx пока не поддерживается.
+// Действует для Table, TableEx, ListView, ListViewEx, TreeView, TreeViewEx.
 // Без опции OnReorder результат перетаскивания отбрасывается.
 func Reorderable(enabled ...bool) Option { return ui.Reorderable(enabled...) }
 
@@ -171,5 +171,5 @@ func Reorderable(enabled ...bool) Option { return ui.Reorderable(enabled...) }
 func AllowReparent(enabled ...bool) Option { return ui.AllowReparent(enabled...) }
 
 // OnReorder регистрирует обработчик события завершения перетаскивания элемента.
-// Действует для Table, ListView, ListViewEx, TreeView, TreeViewEx; TableEx пока не поддерживается.
+// Действует для Table, TableEx, ListView, ListViewEx, TreeView, TreeViewEx.
 func OnReorder(fn func(ev DragEvent)) Option { return ui.OnReorder(fn) }

@@ -25,7 +25,7 @@
 - Автозаполнение контейнеров (Auto-Fill): для `ScrollView`, `ListView`, `CanvasView` передавайте `anyui.Auto` (либо `anyui.FillWidth()` / `anyui.FillHeight()`), чтобы занять весь доступный остаток области без ручного вычисления размеров. `ui.CurrentArea()` возвращает геометрию строго в Dp; для низкоуровневых операций с `Canvas` используйте `ui.CurrentAreaPx()`.
 - В `Table` / `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.
 - Декларативная навигация: используйте `anyui.ScrollToIndex(idx)` для программной прокрутки в `ListView` и `Table`, и `anyui.ScrollToID(id)` / `ui.Anchor(id)` для навигации в `ScrollView`.
-- Drag & Drop (Reorder): `anyui.OnReorder(func(ev anyui.DragEvent))` вместе с `anyui.Reorderable()` — для `Table`, `ListView`, `ListViewEx` (индексы) и `TreeView`, `TreeViewEx` (ключи); `TableEx` пока не поддерживается. По умолчанию в деревьях разрешён перенос внутри одного родителя (`DropAbove`/`DropBelow`); с `anyui.AllowReparent()` поддерживаются смена родителя и вложение `DropInside` с защитой от циклов.
+- Drag & Drop (Reorder): `anyui.OnReorder(func(ev anyui.DragEvent))` вместе с `anyui.Reorderable()` — для `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы) и `TreeView`, `TreeViewEx` (ключи). По умолчанию в деревьях разрешён перенос внутри одного родителя (`DropAbove`/`DropBelow`); с `anyui.AllowReparent()` поддерживаются смена родителя и вложение `DropInside` с защитой от циклов.
 
 ## Минимальный пример
 
@@ -411,7 +411,7 @@ package anyui // import "github.com/kirpicheff/anyui"
 type DragEvent = ui.DragEvent
     DragEvent описывает событие завершения перетаскивания элемента (Reorder).
 
-    Для списков и таблиц (Table, ListView, ListViewEx):
+    Для списков и таблиц (Table, TableEx, ListView, ListViewEx):
       - FromIndex: исходный индекс перемещаемого элемента (>= 0).
       - ToIndex: уже вычисленная позиция вставки в списке после удаления
         перемещаемого элемента (0 <= ToIndex < rowCount).
@@ -419,8 +419,8 @@ type DragEvent = ui.DragEvent
       - Допустимые зоны Drop: только DropAbove и DropBelow.
       - Если ToIndex == FromIndex, операция является no-op и событие не
         генерируется.
-      - ListViewEx: при Reorder приложение обязано синхронно переставлять
-        элементы в checked []bool и selected map[int]bool, иначе отметки
+      - ListViewEx / TableEx: при Reorder приложение обязано синхронно
+        переставлять элементы в срезе чекбоксов и карте выделения, иначе отметки
         сохранятся за исходными числовыми индексами.
 
     Для иерархических деревьев (TreeView, TreeViewEx):

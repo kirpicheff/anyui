@@ -114,7 +114,7 @@ func writeHeader(out *bytes.Buffer, version string) {
 	out.WriteString("- Автозаполнение контейнеров (Auto-Fill): для `ScrollView`, `ListView`, `CanvasView` передавайте `anyui.Auto` (либо `anyui.FillWidth()` / `anyui.FillHeight()`), чтобы занять весь доступный остаток области без ручного вычисления размеров. `ui.CurrentArea()` возвращает геометрию строго в Dp; для низкоуровневых операций с `Canvas` используйте `ui.CurrentAreaPx()`.\n")
 	out.WriteString("- В `Table` / `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.\n")
 	out.WriteString("- Декларативная навигация: используйте `anyui.ScrollToIndex(idx)` для программной прокрутки в `ListView` и `Table`, и `anyui.ScrollToID(id)` / `ui.Anchor(id)` для навигации в `ScrollView`.\n")
-	out.WriteString("- Drag & Drop (Reorder): `anyui.OnReorder(func(ev anyui.DragEvent))` вместе с `anyui.Reorderable()` — для `Table`, `ListView`, `ListViewEx` (индексы) и `TreeView`, `TreeViewEx` (ключи); `TableEx` пока не поддерживается. По умолчанию в деревьях разрешён перенос внутри одного родителя (`DropAbove`/`DropBelow`); с `anyui.AllowReparent()` поддерживаются смена родителя и вложение `DropInside` с защитой от циклов.\n\n")
+	out.WriteString("- Drag & Drop (Reorder): `anyui.OnReorder(func(ev anyui.DragEvent))` вместе с `anyui.Reorderable()` — для `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы) и `TreeView`, `TreeViewEx` (ключи). По умолчанию в деревьях разрешён перенос внутри одного родителя (`DropAbove`/`DropBelow`); с `anyui.AllowReparent()` поддерживаются смена родителя и вложение `DropInside` с защитой от циклов.\n\n")
 }
 
 func writeQuickStart(out *bytes.Buffer) {

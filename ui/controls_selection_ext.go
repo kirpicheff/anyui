@@ -832,6 +832,12 @@ func (c *Context) TableEx(
 				c.Canvas.FillRect(rowR, c.Theme.Surface.WithAlpha(60))
 			}
 
+			// Приглушение перемещаемой строки во время Reorder
+			fromIdx, _, reorderActive := c.ReorderSource(id)
+			if reorderActive && fromIdx == ri {
+				c.Canvas.FillRect(rowR, c.Theme.Bg.WithAlpha(160))
+			}
+
 			if colStart == 0 && cfg.ShowCheckboxes && cfg.CheckedRows != nil && len(cfg.CheckedRows) >= rowCount {
 				cbSize := c.Scale(15).Int()
 				cbR := render.Rect{X: viewRect.X + (checkColW-cbSize)/2, Y: ry + (rowH-cbSize)/2, W: cbSize, H: cbSize}
@@ -880,6 +886,9 @@ func (c *Context) TableEx(
 			if allowRowClick && hovRow && c.MousePressed {
 				ev.RowClicked = ri
 				c.FocusID = id
+				if st.Reorderable {
+					c.ArmReorder(id, ri, "")
+				}
 				if cfg.SelectedRows != nil {
 					anchor, hasAnchor := tableAnchorStore[id]
 					if mods.Shift && hasAnchor && anchor >= 0 && anchor < rowCount {
@@ -903,10 +912,13 @@ func (c *Context) TableEx(
 						}
 						tableAnchorStore[id] = ri
 					} else {
-						for k := range cfg.SelectedRows {
-							delete(cfg.SelectedRows, k)
+						// При Reorder клик по строке внутри группы выделенных не схлопывает группу
+						if !(st.Reorderable && cfg.SelectedRows[ri] && len(cfg.SelectedRows) > 1) {
+							for k := range cfg.SelectedRows {
+								delete(cfg.SelectedRows, k)
+							}
+							cfg.SelectedRows[ri] = true
 						}
-						cfg.SelectedRows[ri] = true
 						tableAnchorStore[id] = ri
 					}
 				}
@@ -922,6 +934,18 @@ func (c *Context) TableEx(
 	if frozenW > 0 {
 		drawRowRange(0, frozenCols, render.Rect{X: bodyRect.X, Y: bodyRect.Y, W: frozenW, H: bodyH}, true)
 		c.Canvas.FillRect(render.Rect{X: bodyRect.X + frozenW - 1, Y: viewRect.Y, W: 1, H: viewRect.H}, c.Theme.Border)
+	}
+
+	// Обработка перетаскивания (Reorder) строк TableEx
+	if st.Reorderable {
+		c.HandleLinearReorder(id, bodyRect, bodyRect.X, contentW, rowH, rowCount, si, maxScrollY, func(dragEv DragEvent) {
+			ev.Drag = &dragEv
+			if st.OnReorder != nil {
+				st.OnReorder(dragEv)
+			}
+		}, func() {
+			delete(tableAnchorStore, id)
+		})
 	}
 
 	if needVScroll {

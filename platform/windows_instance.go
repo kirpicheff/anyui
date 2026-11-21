@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	procCreateMutexW            = modKernel32.NewProc("CreateMutexW")
-	procFindWindowW             = modUser32.NewProc("FindWindowW")
-	procSendMessageW            = modUser32.NewProc("SendMessageW")
+	procCreateMutexW             = modKernel32.NewProc("CreateMutexW")
+	procFindWindowW              = modUser32.NewProc("FindWindowW")
+	procSendMessageW             = modUser32.NewProc("SendMessageW")
 	procGetWindowThreadProcessId = modUser32.NewProc("GetWindowThreadProcessId")
 	procAllowSetForegroundWindow = modUser32.NewProc("AllowSetForegroundWindow")
 )
@@ -266,11 +266,11 @@ func win32IPCWndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) ui
 		ipcMapMu.RUnlock()
 
 		if g != nil {
-			cds := (*copyDataStruct)(unsafe.Pointer(lParam))
+			cds := (*copyDataStruct)(ptrFromWin32(lParam))
 			if cds.dwData == singleInstanceMagic {
 				var raw []byte
 				if cds.cbData > 0 && cds.lpData != 0 {
-					src := unsafe.Slice((*byte)(unsafe.Pointer(cds.lpData)), cds.cbData)
+					src := unsafe.Slice((*byte)(ptrFromWin32(cds.lpData)), cds.cbData)
 					raw = make([]byte, len(src))
 					copy(raw, src)
 				}
@@ -285,4 +285,3 @@ func win32IPCWndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) ui
 	ret, _, _ := procDefWindowProcW.Call(uintptr(hwnd), uintptr(msg), wParam, lParam)
 	return ret
 }
-

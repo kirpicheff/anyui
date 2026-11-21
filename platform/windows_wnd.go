@@ -93,26 +93,26 @@ const (
 	wmSetCursor     = 0x0020
 	wmSetIcon       = 0x0080
 
-	iconSmall = 0
-	iconBig   = 1
-	wmKeyDown       = 0x0100
-	wmKeyUp         = 0x0101
-	wmChar          = 0x0102
-	wmSysKeyDown    = 0x0104
-	wmSysKeyUp      = 0x0105
-	wmMouseMove     = 0x0200
-	wmLButtonDown   = 0x0201
-	wmLButtonUp     = 0x0202
-	wmRButtonDown   = 0x0204
-	wmRButtonUp     = 0x0205
-	wmMButtonDown   = 0x0207
-	wmMButtonUp     = 0x0208
+	iconSmall        = 0
+	iconBig          = 1
+	wmKeyDown        = 0x0100
+	wmKeyUp          = 0x0101
+	wmChar           = 0x0102
+	wmSysKeyDown     = 0x0104
+	wmSysKeyUp       = 0x0105
+	wmMouseMove      = 0x0200
+	wmLButtonDown    = 0x0201
+	wmLButtonUp      = 0x0202
+	wmRButtonDown    = 0x0204
+	wmRButtonUp      = 0x0205
+	wmMButtonDown    = 0x0207
+	wmMButtonUp      = 0x0208
 	wmMouseWheel     = 0x020A
 	wmMouseHWheel    = 0x020E
 	wmCaptureChanged = 0x0215
 	wmDropFiles      = 0x0233
-	wmDPIChanged    = 0x02E0
-	wmAppWakeUp     = 0x8001
+	wmDPIChanged     = 0x02E0
+	wmAppWakeUp      = 0x8001
 
 	htClient = 1
 
@@ -210,15 +210,15 @@ type win32Window struct {
 	scale  float32
 	cursor CursorType
 
-	mu         sync.Mutex
-	pixels     []byte
-	memDC      windows.Handle
-	hBitmap    windows.Handle
-	oldBitmap  windows.Handle
-	bufW       int
-	bufH       int
-	closing          bool
-	onClose          func() bool
+	mu                sync.Mutex
+	pixels            []byte
+	memDC             windows.Handle
+	hBitmap           windows.Handle
+	oldBitmap         windows.Handle
+	bufW              int
+	bufH              int
+	closing           bool
+	onClose           func() bool
 	fullscreen        bool
 	savedStyle        uintptr
 	savedRect         rect
@@ -724,7 +724,7 @@ func (w *win32Window) ClipboardText() (string, error) {
 	}
 	defer procGlobalUnlock.Call(hData)
 
-	return windows.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr))), nil
+	return windows.UTF16PtrToString((*uint16)(ptrFromWin32(ptr))), nil
 }
 
 func (w *win32Window) SetClipboardText(text string) error {
@@ -739,7 +739,7 @@ func (w *win32Window) SetClipboardText(text string) error {
 	if ptr == 0 {
 		return errors.New("ошибка блокировки памяти для буфера обмена")
 	}
-	dst := unsafe.Slice((*uint16)(unsafe.Pointer(ptr)), len(encoded))
+	dst := unsafe.Slice((*uint16)(ptrFromWin32(ptr)), len(encoded))
 	copy(dst, encoded)
 	procGlobalUnlock.Call(hMem)
 
@@ -816,7 +816,7 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 
 	case wmGetMinMaxInfo:
 		if w.cfg.MinWidth > 0 || w.cfg.MinHeight > 0 {
-			mmi := (*minMaxInfo)(unsafe.Pointer(lParam))
+			mmi := (*minMaxInfo)(ptrFromWin32(lParam))
 			minRect := rect{
 				right:  int32(float32(w.cfg.MinWidth) * w.scale),
 				bottom: int32(float32(w.cfg.MinHeight) * w.scale),
@@ -904,7 +904,7 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 
 	case wmSettingChange:
 		if lParam != 0 {
-			section := windows.UTF16PtrToString((*uint16)(unsafe.Pointer(lParam)))
+			section := windows.UTF16PtrToString((*uint16)(ptrFromWin32(lParam)))
 			if section == "ImmersiveColorSet" {
 				w.emit(Event{
 					Type:      EventThemeChange,
@@ -990,7 +990,7 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 		return 0
 
 	case wmMouseWheel:
-		delta := float32(int16(uint16((wParam >> 16) & 0xFFFF))) / 120.0
+		delta := float32(int16(uint16((wParam>>16)&0xFFFF))) / 120.0
 		w.emit(Event{
 			Type:   EventMouseWheel,
 			WheelY: delta,
@@ -999,7 +999,7 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 		return 0
 
 	case wmMouseHWheel:
-		delta := float32(int16(uint16((wParam >> 16) & 0xFFFF))) / 120.0
+		delta := float32(int16(uint16((wParam>>16)&0xFFFF))) / 120.0
 		w.emit(Event{
 			Type:   EventMouseWheel,
 			WheelX: delta,
@@ -1139,4 +1139,3 @@ func (w *win32Window) SetIcon(rgba []byte, width, height int) error {
 	w.hIcon = hIcon
 	return nil
 }
-

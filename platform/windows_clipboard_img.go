@@ -39,7 +39,7 @@ func (w *win32Window) ClipboardImage() (image.Image, error) {
 	}
 	defer procGlobalUnlock.Call(hData)
 
-	raw := unsafe.Slice((*byte)(unsafe.Pointer(ptr)), size)
+	raw := unsafe.Slice((*byte)(ptrFromWin32(ptr)), size)
 	buf := make([]byte, len(raw))
 	copy(buf, raw)
 	return decodeDIBToImage(buf)
@@ -60,7 +60,7 @@ func (w *win32Window) SetClipboardImage(img image.Image) error {
 	if ptr == 0 {
 		return errors.New("ошибка блокировки памяти буфера обмена")
 	}
-	dst := unsafe.Slice((*byte)(unsafe.Pointer(ptr)), len(dib))
+	dst := unsafe.Slice((*byte)(ptrFromWin32(ptr)), len(dib))
 	copy(dst, dib)
 	procGlobalUnlock.Call(hMem)
 

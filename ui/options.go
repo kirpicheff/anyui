@@ -35,13 +35,13 @@ const (
 
 // DragEvent описывает событие завершения перетаскивания элемента (Reorder).
 //
-// Для списков и таблиц (Table, ListView, ListViewEx):
+// Для списков и таблиц (Table, TableEx, ListView, ListViewEx):
 //   - FromIndex: исходный индекс перемещаемого элемента (>= 0).
 //   - ToIndex: уже вычисленная позиция вставки в списке после удаления перемещаемого элемента (0 <= ToIndex < rowCount).
 //   - FromKey и ToKey строго пусты ("").
 //   - Допустимые зоны Drop: только DropAbove и DropBelow.
 //   - Если ToIndex == FromIndex, операция является no-op и событие не генерируется.
-//   - ListViewEx: при Reorder приложение обязано синхронно переставлять элементы в checked []bool и selected map[int]bool, иначе отметки сохранятся за исходными числовыми индексами.
+//   - ListViewEx / TableEx: при Reorder приложение обязано синхронно переставлять элементы в срезе чекбоксов и карте выделения, иначе отметки сохранятся за исходными числовыми индексами.
 //
 // Для иерархических деревьев (TreeView, TreeViewEx):
 //   - FromIndex и ToIndex строго равны -1.
@@ -536,7 +536,7 @@ func ScrollToID(id string) Option {
 }
 
 // Reorderable разрешает перетаскивание элементов внутри компонента для изменения порядка.
-// Действует для Table, ListView, ListViewEx, TreeView, TreeViewEx; TableEx пока не поддерживается.
+// Действует для Table, TableEx, ListView, ListViewEx, TreeView, TreeViewEx.
 // Без опции OnReorder результат перетаскивания отбрасывается.
 func Reorderable(enabled ...bool) Option {
 	return func(s *WidgetStyle) {
@@ -562,7 +562,7 @@ func AllowReparent(enabled ...bool) Option {
 }
 
 // OnReorder регистрирует обработчик события завершения перетаскивания элемента.
-// Действует для Table, ListView, ListViewEx, TreeView, TreeViewEx; TableEx пока не поддерживается.
+// Действует для Table, TableEx, ListView, ListViewEx, TreeView, TreeViewEx.
 func OnReorder(fn func(ev DragEvent)) Option {
 	return func(s *WidgetStyle) {
 		s.OnReorder = fn

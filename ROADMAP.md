@@ -310,11 +310,11 @@ func main() {
 - [ ] **Фаза 20b. Вложенность и кросс-виджетный перенос:**
   - [x] Зона `DropInside` и смена родителя узла в `TreeView` и `TreeViewEx` с обязательной валидацией циклов (`target` не является потомком `source`).
   - [x] Опция явного разрешения межродительского переноса `AllowReparent()` для сохранения детерминизма и безопасности 20a.
-  - [ ] Поддержка `Reorderable()` / `OnReorder(...)` в `TableEx`.
-  - [ ] Синхронизация списка поддерживаемых виджетов в docstring `Reorderable()` / `OnReorder()` / `AllowReparent()` тестом по аналогии с `TestDocstringSyncDragEvent`.
+  - [x] Поддержка `Reorderable()` / `OnReorder(...)` в `TableEx`.
+  - [x] Синхронизация списка поддерживаемых виджетов в docstring `Reorderable()` / `OnReorder()` / `AllowReparent()` тестом `TestDocstringSyncReorderOptions`.
   - [ ] Типизированный `DragPayload` для кросс-виджетного переноса между компонентами (`TreeView -> Table`).
-- [ ] **Технический долг сборки / CI (`go vet`):**
-  - [ ] В `platform/windows_*.go` (`windows_clipboard_img.go`, `windows_frameless.go`, `windows_instance.go`, `windows_wnd.go`) есть 9 предсуществующих срабатываний анализатора `unsafeptr` (`unsafe.Pointer(uintptr)` для Win32-указателей из `GlobalLock`/`lParam`). До их устранения проверка выполняется командой `go vet . ./ui ./render ./cmd/...` (а не `go vet ./...`).
+- [x] **Технический долг сборки / CI (`go vet`):**
+  - [x] Устранены 9 срабатываний анализатора `unsafeptr` в `platform/windows_*.go` через внутренний хелпер `ptrFromWin32`; `go vet ./...` проходит чисто по всему репозиторию.
 
 ---
 
