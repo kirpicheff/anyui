@@ -2,12 +2,21 @@
 
 # Трекер типизации единиц измерения (Dp / Px)
 
-Данный документ фиксирует статус строгой скалярной типизации в библиотеке AnyUI согласно Фазе 18b.
+Данный документ фиксирует статус строгой скалярной типизации в библиотеке AnyUI согласно Фазе 18b (синхронизировано с [docs/en/units.md](../en/units.md)).
 
 ## Контракт единиц измерения
-- **`Dp` (`type Dp int`)** — логические аппаратно-независимые пиксели (Density-independent Pixels). Используются во всем высокоуровневом публичном API раскладки, контейнеров, опций и виджетов.
-- **`Px` (`type Px int`)** — физические пиксели буфера отрисовки (Device Pixels). Используются в низкоуровневом рисовании (`render.Canvas`), низкоуровневых колбэках (`CanvasCallbacks`), системных размерах окна и при выводе на экран.
-- **Масштабирование**: функции `Scale(dp Dp) Px` и `ScaleF(dp float32) float32` преобразуют логические единицы в физические. Обратное преобразование — `PxToDp(px Px) Dp`.
+- **`Dp` (`type Dp int`)** — логические аппаратно-независимые пиксели (Density-independent Pixels). Используются во всем высокоуровневом публичном API раскладки, контейнеров, опций, оверлеев и виджетов:
+  - Все публичные методы раскладки и оверлеев принимают геометрию строго в `Dp`: `LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`. Прямоугольники из `ui.CurrentArea()` имеют единицы `Dp` и могут передаваться напрямую без масштабирования.
+- **`Px` (`type Px int`)** — физические пиксели буфера отрисовки (Device Pixels). Сохранены исключительно для низкоуровневого рисования (`render.Canvas`), низкоуровневых колбэков холста и таблиц (`CanvasView` area, `Table.drawCell` area), системных метрик окна и вывода на экран (`LastDirtyRects`, `Config.HitTest`, `TitleBarHitTest`).
+- **Ориентация**: константы `Horizontal` и `Vertical` являются единственными допустимыми значениями типа `Orientation`. Устаревший `SplitOrientation` полностью удалён.
+- **Правило масштабирования и конвертации**:
+  - `Scale(dp Dp) Px` преобразует логические единицы в физические пиксели (частый hot-path в прикладном коде).
+  - `ScaleF(dp float32) float32` масштабирует вещественные логические величины.
+  - `PxToDp(px Px) Dp` преобразует физические пиксели в логические (обратная проекция для колбэков Canvas, hit-test).
+  - `PxToDpf(px float32) float32` обратная проекция для вещественных значений.
+  - **Правило**: Допустима только каноническая четвёрка `Scale` / `ScaleF` / `PxToDp` / `PxToDpf`. Введение имён вроде `DpToPx` или `DpToPxf` строго запрещено.
+  - **Конвенция суффикса `F`**: суффикс `F` строго обозначает `float32`-вариант той же операции.
+- **Sentinel-значение**: `const Auto Dp = -1` является единым каноническим sentinel-значением автоматического размера. Функции вроде `Auto()` и константы вроде `AutoSize` удалены.
 - **Запрет на смешанные перегрузки**: ровно одна форма на одну концепцию (запрещено создавать параллельные `Width(dp int)` и `WidthDp(dp Dp)`).
 
 ---
@@ -20,11 +29,27 @@
 | `func (u *UI) Scale(dp Dp) Px` | | ✓ | Перевод логических пикселей в физические |
 | `func (u *UI) ScaleF(dp float32) float32` | | ✓ | Масштабирование вещественных логических величин |
 | `func (u *UI) PxToDp(px Px) Dp` | | ✓ | Перевод физических пикселей в логические |
+| `func (u *UI) PxToDpf(px float32) float32` | | ✓ | Обратная проекция вещественных физических пикселей |
 | `func (u *UI) CurrentArea() Rect` | | ✓ | Контракт области текущего контейнера в Dp |
 | `func (u *UI) CurrentAreaPx() Rect` | | ✓ | Область текущего контейнера в физических Px |
 | `func (u *UI) MousePosDp() (Dp, Dp)` | | ✓ | Координаты курсора мыши в окне в Dp |
-| `func (u *UI) MousePosPx() (int, int)` | ✓ | | Оставлено осознанно: системные координаты мыши в физических пикселях |
-| `func Auto() Dp` / `const AutoSize Dp = -1` | | ✓ | Sentinel-значение автоматического размера |
+| `func (u *UI) MousePosPx() (Px, Px)` | | ✓ | Координаты курсора мыши в физических пикселях буфера |
+| `const Auto Dp = -1` | | ✓ | Каноническое sentinel-значение автоматического размера |
+| **Оверлеи и интерактивные зоны (все строго в Dp)** | | | |
+| `func (u *UI) PushOverlay(bounds Rect, drawFn func())` | | ✓ | Границы оверлея в Dp (масштабируются в Px на границе) |
+| `func (u *UI) LayoutRect(rect Rect, fn func())` | | ✓ | Область явной раскладки строго в Dp |
+| `func (u *UI) Tooltip(text string, anchor Rect)` | | ✓ | Якорь всплывающей подсказки строго в Dp |
+| `func (u *UI) Popover(id string, open *bool, anchor Rect, fn func(), opts ...Option)` | | ✓ | Якорь поповера строго в Dp |
+| `func (u *UI) ContextMenu(id string, anchor Rect, items []ContextMenuItem)` | | ✓ | Якорь контекстного меню строго в Dp |
+| `func (u *UI) RegisterHoverArea(id string, rect Rect, cursor CursorType, trackMove bool)` | | ✓ | Интерактивная зона курсора строго в Dp |
+| `func (u *UI) LastDirtyRectsPx() []Rect` | | ✓ | Изменённые области окна в физических Px (не передавать в методы оверлеев Dp) |
+| **Тестирование (Headless)** | | | |
+| `func (h *Headless) InjectMouseMove(xDp, yDp int)` | | ✓ | Перемещение мыши в логических Dp (масштабируется по Scale) |
+| `func (h *Headless) InjectMouseClick(xDp, yDp int, btn MouseButton)` | | ✓ | Полный клик мыши в логических Dp (масштабируется по Scale) |
+| `func (h *Headless) InjectMouseWheel(dxDp, dyDp int)` | | ✓ | Прокрутка колеса мыши в логических шагах (Dp) |
+| `func (h *Headless) InjectMouseMovePx(xPx, yPx int)` | ✓ | | Прямое перемещение мыши в физических пикселях Px |
+| `func (h *Headless) InjectMouseClickPx(xPx, yPx int, btn MouseButton)` | ✓ | | Прямой клик мыши в физических пикселях Px |
+| `func (h *Headless) InjectMouseWheelPx(dxPx, dyPx int)` | ✓ | | Прямая прокрутка колеса мыши в физических шагах (Px) |
 | **Опции стилизации (Options)** | | | |
 | `Width(dp Dp) Option` | | ✓ | Фиксированная ширина виджета |
 | `Height(dp Dp) Option` | | ✓ | Фиксированная высота виджета |
@@ -75,11 +100,11 @@
 | `Card(wDp, hDp, padDp Dp, fn func())` | | ✓ | Скруглённая карточка |
 | `Button(id, label string, primary bool, widthDp Dp) bool` | | ✓ | Кнопка с шириной |
 | `Image(img image.Image, wDp, hDp Dp, mode ImageScaleMode)` | | ✓ | Вывод изображения |
-| `CanvasView(wDp, hDp Dp, drawFn func(canvas *render.Canvas, area Rect))` | | ✓ | Область кастомного рисования |
+| `CanvasView(wDp, hDp Dp, drawFn func(canvas *render.Canvas, areaPx Rect))` | | ✓ | Область кастомного рисования (areaPx в физических Px) |
 | `InteractiveCanvas(id string, wDp, hDp Dp, cb CanvasCallbacks, opts ...Option)` | | ✓ | Интерактивный холст |
 | `ScrollView(id string, wDp, hDp Dp, fn func(), opts ...Option)` | | ✓ | Прокручиваемый контейнер |
-| `ListView(id string, count int, itemHeightDp Dp, selected *int, drawItem func(...), opts ...Option)` | | ✓ | Виртуализированный список (count, selected — int индексы) |
-| `ListViewEx(id string, count int, itemHeightDp Dp, selected map[int]bool, checked []bool, drawItem func(...), opts ...Option)` | | ✓ | Расширенный список (count — int число элементов) |
+| `ListView(id string, count int, itemHeightDp Dp, selected *int, drawItem func(idx int, areaPx Rect, sel bool), opts ...Option)` | | ✓ | Виртуализированный список (areaPx в Px буфера; count, selected — int индексы) |
+| `ListViewEx(id string, count int, itemHeightDp Dp, selected map[int]bool, checked []bool, drawItem func(idx int, areaPx Rect, sel bool), opts ...Option)` | | ✓ | Расширенный список (areaPx в Px буфера; count — int число элементов) |
 | `TableColumn.WidthDp Dp` | | ✓ | Базовая ширина колонки таблицы |
 | `TableColumn.MinWidthDp Dp` | | ✓ | Минимальная ширина колонки таблицы |
 | `StatusBarSection.WidthDp Dp` | | ✓ | Ширина секции строки состояния |

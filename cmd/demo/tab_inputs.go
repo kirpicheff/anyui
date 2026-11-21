@@ -58,7 +58,7 @@ func (st *demoState) drawTabInputs(ui *anyui.UI) {
 		}, anyui.AutoHeight(), anyui.Padding(12))
 
 		ui.Separator()
-		ui.Label("Выпадающие списки (Select и ComboBox с поиском)", anyui.FontSize(16), anyui.Bold())
+		ui.Label("Выпадающие списки (Select и Select с anyui.Searchable())", anyui.FontSize(16), anyui.Bold())
 		opts := []anyui.SelectItem{
 			{Key: "win11", Label: "Windows 11"},
 			{Key: "win2022", Label: "Windows Server 2022"},
@@ -69,7 +69,7 @@ func (st *demoState) drawTabInputs(ui *anyui.UI) {
 		}
 		ui.Row(14, 38, func() {
 			ui.Select("sel_os", opts, &st.selectKey, anyui.Width(220))
-			ui.ComboBox("cmb_os", opts, &st.comboKey, anyui.Width(240))
+			ui.Select("cmb_os", opts, &st.comboKey, anyui.Searchable(), anyui.Width(240))
 		})
 
 		ui.Separator()

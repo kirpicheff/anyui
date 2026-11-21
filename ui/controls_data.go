@@ -77,7 +77,7 @@ func (c *Context) Table(
 	rowCount int,
 	selected *int,
 	sort *TableSort,
-	drawCell func(row, col int, area render.Rect, isSelected bool),
+	drawCell func(row, col int, areaPx render.Rect, isSelected bool),
 	opts ...Option,
 ) TableEvent {
 	ev := TableEvent{RowClicked: -1, RowDoubleClicked: -1, RowMiddleClicked: -1}
@@ -381,18 +381,18 @@ func (c *Context) Table(
 	startRow, endRow := ComputeVisibleRange(si.y, viewH, rowH, rowCount)
 
 	c.Canvas.PushClip(render.Rect{X: bodyRect.X, Y: bodyRect.Y, W: contentW, H: viewH})
-	for r := startRow; r < endRow; r++ {
-		ry := bodyRect.Y + r*rowH - si.y
+	for row := startRow; row < endRow; row++ {
+		ry := bodyRect.Y + row*rowH - si.y
 		rowRect := render.Rect{X: bodyRect.X, Y: ry, W: contentW, H: rowH}
-		c.RegisterHit(id+":row:"+strconv.Itoa(r), bodyRect.Intersect(rowRect), platform.CursorHand)
-		isSel := selected != nil && *selected == r
+		c.RegisterHit(id+":row:"+strconv.Itoa(row), bodyRect.Intersect(rowRect), platform.CursorHand)
+		isSel := selected != nil && *selected == row
 		rowHover := !blocked && bodyRect.Contains(c.MouseX, c.MouseY) && c.MouseY < bodyRect.Y+viewH && rowRect.Contains(c.MouseX, c.MouseY) && c.MouseX < bodyRect.X+contentW
 
 		if isSel {
 			c.Canvas.FillRect(rowRect, c.Theme.Accent.WithAlpha(45))
 		} else if rowHover {
 			c.Canvas.FillRect(rowRect, c.Theme.Surface.WithAlpha(180))
-		} else if r%2 == 1 {
+		} else if row%2 == 1 {
 			c.Canvas.FillRect(rowRect, c.Theme.Surface.WithAlpha(60))
 		}
 
@@ -400,26 +400,21 @@ func (c *Context) Table(
 			c.nextCursor = platform.CursorHand
 			if c.MousePressed {
 				if selected != nil {
-					*selected = r
+					*selected = row
 				}
-				ev.RowClicked = r
+				ev.RowClicked = row
 				if c.DoubleClicked() {
-					ev.RowDoubleClicked = r
+					ev.RowDoubleClicked = row
 				}
-				if st.Reorderable || st.OnReorder != nil {
-					c.reorderWidgetID = id
-					c.reorderSourceKey = strconv.Itoa(r)
-					c.reorderGhostText = "Строка #" + strconv.Itoa(r+1)
-					c.reorderStartX = c.MouseX
-					c.reorderStartY = c.MouseY
-					c.reorderActive = false
+				if st.Reorderable {
+					c.ArmReorder(id, row, "")
 				}
 				c.RequestRedraw()
 			} else if c.MiddleMousePressed {
 				if selected != nil {
-					*selected = r
+					*selected = row
 				}
-				ev.RowMiddleClicked = r
+				ev.RowMiddleClicked = row
 				c.RequestRedraw()
 			}
 		}
@@ -431,10 +426,16 @@ func (c *Context) Table(
 			cellRect := render.Rect{X: cellX, Y: ry, W: cw, H: rowH}
 			if drawCell != nil && cellRect.X+cellRect.W > bodyRect.X && cellRect.X < bodyRect.X+contentW {
 				c.Canvas.PushClip(cellRect)
-				drawCell(r, ci, cellRect, isSel)
+				drawCell(row, ci, cellRect, isSel)
 				c.Canvas.PopClip()
 			}
 			cellX += cw
+		}
+
+		// Приглушение исходной перемещаемой строки во время Reorder
+		fromIdx, _, reorderActive := c.ReorderSource(id)
+		if reorderActive && fromIdx == row {
+			c.Canvas.FillRect(rowRect, c.Theme.Bg.WithAlpha(160))
 		}
 
 		c.Canvas.DrawLine(float32(rowRect.X), float32(ry+rowH-1), float32(rowRect.X+rowRect.W), float32(ry+rowH-1), 1.0, c.Theme.Border.WithAlpha(80))
@@ -442,70 +443,14 @@ func (c *Context) Table(
 	c.Canvas.PopClip()
 
 	// Обработка перетаскивания (Reorder) строк таблицы
-	if c.reorderWidgetID == id && c.MouseDown && !c.reorderActive {
-		dx := c.MouseX - c.reorderStartX
-		dy := c.MouseY - c.reorderStartY
-		if dx < 0 {
-			dx = -dx
-		}
-		if dy < 0 {
-			dy = -dy
-		}
-		if dx > c.Scale(4).Int() || dy > c.Scale(4).Int() {
-			c.reorderActive = true
-		}
-	}
-	if c.reorderActive && c.reorderWidgetID == id {
-		c.nextCursor = platform.CursorHand
-	}
-
-	if (st.Reorderable || st.OnReorder != nil) && c.reorderActive && !blocked && bodyRect.Contains(c.MouseX, c.MouseY) && c.MouseY < bodyRect.Y+viewH && c.MouseX < bodyRect.X+contentW {
-		c.nextCursor = platform.CursorHand
-		relY := c.MouseY - bodyRect.Y + si.y
-		targetRow := relY / rowH
-		if targetRow < 0 {
-			targetRow = 0
-		}
-		if targetRow >= rowCount {
-			targetRow = rowCount - 1
-		}
-		targetKey := strconv.Itoa(targetRow)
-		targetRowY := bodyRect.Y + targetRow*rowH - si.y
-		zone := DropBelow
-		if c.MouseY < targetRowY+rowH/2 {
-			zone = DropAbove
-		}
-
-		// Визуальный индикатор позиции вставки (горизонтальная черта цвета Accent)
-		lineY := targetRowY + rowH - c.Scale(1).Int()
-		if zone == DropAbove {
-			lineY = targetRowY - c.Scale(1).Int()
-		}
-		c.Canvas.FillRect(render.Rect{
-			X: bodyRect.X,
-			Y: lineY,
-			W: contentW,
-			H: c.Scale(2).Int(),
-		}, c.Theme.Accent)
-
-		if c.MouseReleased {
-			dragEv := DragEvent{
-				FromWidget: c.reorderWidgetID,
-				ToWidget:   id,
-				FromKey:    c.reorderSourceKey,
-				ToKey:      targetKey,
-				Drop:       zone,
-			}
+	if st.Reorderable {
+		viewRect := render.Rect{X: bodyRect.X, Y: bodyRect.Y, W: contentW, H: viewH}
+		c.HandleLinearReorder(id, viewRect, bodyRect.X, contentW, rowH, rowCount, si, maxSc, func(dragEv DragEvent) {
 			ev.Drag = &dragEv
 			if st.OnReorder != nil {
 				st.OnReorder(dragEv)
 			}
-			c.reorderActive = false
-			c.reorderWidgetID = ""
-			c.reorderSourceKey = ""
-			c.reorderGhostText = ""
-			c.RequestRedraw()
-		}
+		}, nil)
 	}
 
 	// Вертикальный скроллбар
@@ -541,28 +486,35 @@ type TreeNode struct {
 	Children      []*TreeNode
 }
 
-// FlatTreeItem представляет видимый узел дерева с глубиной вложенности.
+// TreeIndent задаёт отступ вложенных узлов в дереве TreeView.
+const TreeIndent Dp = 18
+
+// TreeIndicatorInset задаёт отступ линии-индикатора от края контента узла.
+const TreeIndicatorInset Dp = 4
+
+// FlatTreeItem представляет видимый узел дерева с глубиной вложенности и идентификатором родительского узла.
 type FlatTreeItem struct {
-	Node  *TreeNode
-	Depth int
+	Node     *TreeNode
+	Depth    int
+	ParentID string
 }
 
 // FlattenTree разворачивает раскрытые узлы дерева в плоский список для отображения.
 func FlattenTree(roots []*TreeNode) []FlatTreeItem {
 	var out []FlatTreeItem
-	var walk func(nodes []*TreeNode, depth int)
-	walk = func(nodes []*TreeNode, depth int) {
+	var walk func(nodes []*TreeNode, depth int, parentID string)
+	walk = func(nodes []*TreeNode, depth int, parentID string) {
 		for _, n := range nodes {
 			if n == nil {
 				continue
 			}
-			out = append(out, FlatTreeItem{Node: n, Depth: depth})
+			out = append(out, FlatTreeItem{Node: n, Depth: depth, ParentID: parentID})
 			if n.Expanded && len(n.Children) > 0 {
-				walk(n.Children, depth+1)
+				walk(n.Children, depth+1, n.ID)
 			}
 		}
 	}
-	walk(roots, 0)
+	walk(roots, 0, "")
 	return out
 }
 
@@ -602,6 +554,8 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 
 	flat := FlattenTree(roots)
 	itemH := c.Scale(28).Int()
+	treeIndentPx := c.Scale(TreeIndent).Int()
+	treeInsetPx := c.Scale(TreeIndicatorInset).Int()
 	inner := render.Rect{X: rect.X + c.Scale(4).Int(), Y: rect.Y + c.Scale(4).Int(), W: rect.W - c.Scale(8).Int(), H: rect.H - c.Scale(8).Int()}
 	si := c.getScrollInfo("tree:" + id)
 	totalH := len(flat) * itemH
@@ -731,8 +685,14 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 			c.Canvas.FillRoundedRect(rowR, c.ScaleF(4), c.Theme.Surface)
 		}
 
-		indent := item.Depth * c.Scale(18).Int()
-		toggleR := render.Rect{X: rowR.X + indent + c.Scale(4).Int(), Y: rowR.Y + (rowR.H-c.Scale(18).Int())/2, W: c.Scale(18).Int(), H: c.Scale(18).Int()}
+		// Приглушение исходного узла во время Reorder
+		_, fromKey, reorderActive := c.ReorderSource(id)
+		if reorderActive && fromKey == node.ID {
+			c.Canvas.FillRoundedRect(rowR, c.ScaleF(4), c.Theme.Bg.WithAlpha(160))
+		}
+
+		indent := item.Depth * treeIndentPx
+		toggleR := render.Rect{X: rowR.X + indent + treeInsetPx, Y: rowR.Y + (rowR.H-treeIndentPx)/2, W: treeIndentPx, H: treeIndentPx}
 		hasChildren := len(node.Children) > 0
 
 		if rowHover {
@@ -753,13 +713,8 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 						changed = true
 						c.RequestRedraw()
 					}
-					if st.Reorderable || st.OnReorder != nil {
-						c.reorderWidgetID = id
-						c.reorderSourceKey = node.ID
-						c.reorderGhostText = node.Label
-						c.reorderStartX = c.MouseX
-						c.reorderStartY = c.MouseY
-						c.reorderActive = false
+					if st.Reorderable {
+						c.ArmReorder(id, -1, node.ID)
 					}
 				}
 			}
@@ -801,106 +756,88 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 	c.Canvas.PopClip()
 
 	// Обработка перетаскивания (Reorder) узлов дерева
-	if c.reorderWidgetID == id && c.MouseDown && !c.reorderActive {
-		dx := c.MouseX - c.reorderStartX
-		dy := c.MouseY - c.reorderStartY
-		if dx < 0 {
-			dx = -dx
-		}
-		if dy < 0 {
-			dy = -dy
-		}
-		if dx > c.Scale(4).Int() || dy > c.Scale(4).Int() {
-			c.reorderActive = true
-		}
-	}
-	if c.reorderActive && c.reorderWidgetID == id {
-		c.nextCursor = platform.CursorHand
-	}
-
-	if (st.Reorderable || st.OnReorder != nil) && c.reorderActive && !blocked && inner.Contains(c.MouseX, c.MouseY) && c.MouseX < inner.X+contentW {
-		c.nextCursor = platform.CursorHand
-		relY := c.MouseY - inner.Y + si.y
-		targetIdx := relY / itemH
-		if targetIdx < 0 {
-			targetIdx = 0
-		}
-		if targetIdx >= len(flat) {
-			targetIdx = len(flat) - 1
-		}
-		if targetIdx >= 0 && targetIdx < len(flat) {
-			targetNode := flat[targetIdx].Node
-			targetRowY := inner.Y + targetIdx*itemH - si.y
-			offsetY := c.MouseY - targetRowY
-
-			zone := DropInside
-			if offsetY < itemH/4 {
-				zone = DropAbove
-			} else if offsetY >= itemH*3/4 {
-				zone = DropBelow
+	if st.Reorderable && c.UpdateReorderDrag(id) {
+		_, fromKey, active := c.ReorderSource(id)
+		if !active {
+			c.ResetReorder()
+		} else {
+			// Поиск исходного узла в flat
+			sourceIdx := -1
+			for idx, it := range flat {
+				if it.Node.ID == fromKey {
+					sourceIdx = idx
+					break
+				}
 			}
+			if sourceIdx < 0 {
+				// Исходный узел исчез из дерева — безопасный сброс
+				c.ResetReorder()
+			} else {
+				sourceItem := flat[sourceIdx]
 
-			// Визуальный индикатор позиции вставки (горизонтальная черта / подсветка строки)
-			switch zone {
-			case DropAbove:
-				c.Canvas.FillRect(render.Rect{
-					X: inner.X,
-					Y: targetRowY - c.Scale(1).Int(),
-					W: contentW,
-					H: c.Scale(2).Int(),
-				}, c.Theme.Accent)
-			case DropBelow:
-				c.Canvas.FillRect(render.Rect{
-					X: inner.X,
-					Y: targetRowY + itemH - c.Scale(1).Int(),
-					W: contentW,
-					H: c.Scale(2).Int(),
-				}, c.Theme.Accent)
-			case DropInside:
-				// Подсветка строки каталога/узла
-				targetRect := render.Rect{X: inner.X, Y: targetRowY, W: contentW, H: itemH}
-				c.Canvas.DrawRoundedBox(targetRect, c.ScaleF(4), c.Theme.Accent.WithAlpha(45), 1.5, c.Theme.Accent)
-			}
+				// 1. Авто-скролл у верхнего и нижнего краёв
+				c.ApplyReorderAutoScroll(inner.Y, inner.H, si, maxSc)
 
-			if c.MouseReleased {
-				dragEv := DragEvent{
-					FromWidget: c.reorderWidgetID,
-					ToWidget:   id,
-					FromKey:    c.reorderSourceKey,
-					ToKey:      targetNode.ID,
-					Drop:       zone,
+				// 2. Расчет целевой позиции и индикатора ПОСЛЕ применения автоскролла
+				if !blocked && inner.Contains(c.MouseX, c.MouseY) && c.MouseX < inner.X+contentW {
+					relY := c.MouseY - inner.Y + si.y
+					targetIdx := relY / itemH
+					if targetIdx < 0 {
+						targetIdx = 0
+					}
+					if targetIdx >= len(flat) {
+						targetIdx = len(flat) - 1
+					}
+
+					if targetIdx >= 0 && targetIdx < len(flat) {
+						targetItem := flat[targetIdx]
+						targetNode := targetItem.Node
+						targetRowY := inner.Y + targetIdx*itemH - si.y
+
+						// Правило Фазы 20a: перетаскивание узлов строго между сиблингами одного родителя
+						isValidDrop := targetItem.ParentID == sourceItem.ParentID && targetNode.ID != sourceItem.Node.ID
+
+						zone := DropBelow
+						if c.MouseY < targetRowY+itemH/2 {
+							zone = DropAbove
+						}
+
+						if isValidDrop {
+							// Линия-индикатор Accent толщиной 2 Dp с отступом по глубине целевого узла
+							lineY := targetRowY
+							if zone == DropBelow {
+								lineY += itemH
+							}
+							targetIndent := targetItem.Depth*treeIndentPx + treeInsetPx
+							lineX := inner.X + targetIndent
+							lineW := contentW - targetIndent
+							if lineW > 0 {
+								c.DrawDropLine(lineX, lineY, lineW)
+							}
+
+							// 3. Завершение при MouseReleased
+							if c.MouseReleased {
+								dragEv := DragEvent{
+									FromWidget: id,
+									ToWidget:   id,
+									FromKey:    sourceItem.Node.ID,
+									ToKey:      targetNode.ID,
+									FromIndex:  -1,
+									ToIndex:    -1,
+									Drop:       zone,
+								}
+								if st.OnReorder != nil {
+									st.OnReorder(dragEv)
+								}
+								changed = true
+								c.ResetReorder()
+							}
+						} else if c.MouseReleased {
+							// Дроп на невалидный узел (другой родитель или на самого себя) — молча сбрасываем без события
+							c.ResetReorder()
+						}
+					}
 				}
-				if st.OnReorder != nil {
-					st.OnReorder(dragEv)
-				}
-				changed = true
-				c.reorderActive = false
-				c.reorderWidgetID = ""
-				c.reorderSourceKey = ""
-				c.reorderGhostText = ""
-				c.RequestRedraw()
-			}
-		} else if len(flat) == 0 {
-			// Сброс в пустое дерево
-			dropR := render.Rect{X: inner.X, Y: inner.Y, W: contentW, H: c.Scale(36).Int()}
-			c.Canvas.DrawRoundedBox(dropR, c.ScaleF(4), c.Theme.Accent.WithAlpha(35), 1.5, c.Theme.Accent)
-			if c.MouseReleased {
-				dragEv := DragEvent{
-					FromWidget: c.reorderWidgetID,
-					ToWidget:   id,
-					FromKey:    c.reorderSourceKey,
-					ToKey:      "",
-					Drop:       DropInside,
-				}
-				if st.OnReorder != nil {
-					st.OnReorder(dragEv)
-				}
-				changed = true
-				c.reorderActive = false
-				c.reorderWidgetID = ""
-				c.reorderSourceKey = ""
-				c.reorderGhostText = ""
-				c.RequestRedraw()
 			}
 		}
 	}

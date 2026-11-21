@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"testing"
 	"time"
 
 	"github.com/kirpicheff/anyui/platform"
@@ -50,14 +49,14 @@ func (m *headlessWindow) Present(pixels []byte, width, height int) {
 func (m *headlessWindow) PresentRect(pixels []byte, width, height, rx, ry, rw, rh int) {
 	m.Present(pixels, width, height)
 }
-func (m *headlessWindow) Invalidate()                             {}
-func (m *headlessWindow) WakeUp()                                 {}
-func (m *headlessWindow) Show()                                   {}
-func (m *headlessWindow) Hide()                                   {}
-func (m *headlessWindow) Close()                                  {}
-func (m *headlessWindow) SetTitle(string)                         {}
-func (m *headlessWindow) SetCursor(c platform.CursorType)         { m.cursor = c }
-func (m *headlessWindow) Size() (int, int)                        { return m.w, m.h }
+func (m *headlessWindow) Invalidate()                     {}
+func (m *headlessWindow) WakeUp()                         {}
+func (m *headlessWindow) Show()                           {}
+func (m *headlessWindow) Hide()                           {}
+func (m *headlessWindow) Close()                          {}
+func (m *headlessWindow) SetTitle(string)                 {}
+func (m *headlessWindow) SetCursor(c platform.CursorType) { m.cursor = c }
+func (m *headlessWindow) Size() (int, int)                { return m.w, m.h }
 func (m *headlessWindow) Scale() float32 {
 	if m.scale > 0 {
 		return m.scale
@@ -65,7 +64,7 @@ func (m *headlessWindow) Scale() float32 {
 	return 1.0
 }
 func (m *headlessWindow) ClipboardText() (string, error)          { return m.clipboard, nil }
-func (m *headlessWindow) SetClipboardText(text string) error     { m.clipboard = text; return nil }
+func (m *headlessWindow) SetClipboardText(text string) error      { m.clipboard = text; return nil }
 func (m *headlessWindow) ClipboardImage() (image.Image, error)    { return m.clipImg, nil }
 func (m *headlessWindow) SetClipboardImage(img image.Image) error { m.clipImg = img; return nil }
 func (m *headlessWindow) Minimize()                               {}
@@ -250,56 +249,97 @@ func (h *Headless) Step() {
 	})
 }
 
-// InjectMouseMove добавляет событие перемещения мыши в очередь следующего шага.
-func (h *Headless) InjectMouseMove(x, y int) {
+func (h *Headless) dpToPx(xDp, yDp int) (int, int) {
+	h.mu.Lock()
+	sc := h.platWin.Scale()
+	h.mu.Unlock()
+	if sc <= 0 {
+		sc = 1.0
+	}
+	return int(float32(xDp)*sc + 0.5), int(float32(yDp)*sc + 0.5)
+}
+
+// InjectMouseMove добавляет событие перемещения мыши в координатах логических пикселей (Dp).
+// Координаты автоматически масштабируются в физические пиксели ОС через текущий Scale.
+func (h *Headless) InjectMouseMove(xDp, yDp int) {
+	xPx, yPx := h.dpToPx(xDp, yDp)
+	h.InjectMouseMovePx(xPx, yPx)
+}
+
+// InjectMouseMovePx добавляет событие перемещения мыши напрямую в физических пикселях (Px).
+func (h *Headless) InjectMouseMovePx(xPx, yPx int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.pendingEvs = append(h.pendingEvs, platform.Event{
 		Type: platform.EventMouseMove,
-		X:    x,
-		Y:    y,
+		X:    xPx,
+		Y:    yPx,
 	})
 }
 
-// InjectMouseDown добавляет событие нажатия кнопки мыши в очередь следующего шага.
-func (h *Headless) InjectMouseDown(x, y int, btn MouseButton) {
+// InjectMouseDown добавляет событие нажатия кнопки мыши в координатах логических пикселей (Dp).
+func (h *Headless) InjectMouseDown(xDp, yDp int, btn MouseButton) {
+	xPx, yPx := h.dpToPx(xDp, yDp)
+	h.InjectMouseDownPx(xPx, yPx, btn)
+}
+
+// InjectMouseDownPx добавляет событие нажатия кнопки мыши напрямую в физических пикселях (Px).
+func (h *Headless) InjectMouseDownPx(xPx, yPx int, btn MouseButton) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.pendingEvs = append(h.pendingEvs, platform.Event{
 		Type:   platform.EventMouseDown,
-		X:      x,
-		Y:      y,
+		X:      xPx,
+		Y:      yPx,
 		Button: btn,
 	})
 }
 
-// InjectMouseUp добавляет событие отпускания кнопки мыши в очередь следующего шага.
-func (h *Headless) InjectMouseUp(x, y int, btn MouseButton) {
+// InjectMouseUp добавляет событие отпускания кнопки мыши в координатах логических пикселей (Dp).
+func (h *Headless) InjectMouseUp(xDp, yDp int, btn MouseButton) {
+	xPx, yPx := h.dpToPx(xDp, yDp)
+	h.InjectMouseUpPx(xPx, yPx, btn)
+}
+
+// InjectMouseUpPx добавляет событие отпускания кнопки мыши напрямую в физических пикселях (Px).
+func (h *Headless) InjectMouseUpPx(xPx, yPx int, btn MouseButton) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.pendingEvs = append(h.pendingEvs, platform.Event{
 		Type:   platform.EventMouseUp,
-		X:      x,
-		Y:      y,
+		X:      xPx,
+		Y:      yPx,
 		Button: btn,
 	})
 }
 
-// InjectMouseClick эмулирует полный клик мышью (MouseMove -> MouseDown -> MouseUp).
-func (h *Headless) InjectMouseClick(x, y int, btn MouseButton) {
-	h.InjectMouseMove(x, y)
-	h.InjectMouseDown(x, y, btn)
-	h.InjectMouseUp(x, y, btn)
+// InjectMouseClick эмулирует полный клик мышью в координатах логических пикселей (Dp) (MouseMove -> MouseDown -> MouseUp).
+func (h *Headless) InjectMouseClick(xDp, yDp int, btn MouseButton) {
+	h.InjectMouseMove(xDp, yDp)
+	h.InjectMouseDown(xDp, yDp, btn)
+	h.InjectMouseUp(xDp, yDp, btn)
 }
 
-// InjectMouseWheel добавляет событие вращения колеса мыши в очередь следующего шага.
-func (h *Headless) InjectMouseWheel(dx, dy int) {
+// InjectMouseClickPx эмулирует полный клик мышью напрямую в физических пикселях (Px).
+func (h *Headless) InjectMouseClickPx(xPx, yPx int, btn MouseButton) {
+	h.InjectMouseMovePx(xPx, yPx)
+	h.InjectMouseDownPx(xPx, yPx, btn)
+	h.InjectMouseUpPx(xPx, yPx, btn)
+}
+
+// InjectMouseWheel добавляет событие вращения колеса мыши в координатах логических шагов (Dp).
+func (h *Headless) InjectMouseWheel(dxDp, dyDp int) {
+	h.InjectMouseWheelPx(dxDp, dyDp)
+}
+
+// InjectMouseWheelPx добавляет событие вращения колеса мыши напрямую в физических шагах колеса (Px).
+func (h *Headless) InjectMouseWheelPx(dxPx, dyPx int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.pendingEvs = append(h.pendingEvs, platform.Event{
 		Type:   platform.EventMouseWheel,
-		WheelX: float32(dx),
-		WheelY: float32(dy),
+		WheelX: float32(dxPx),
+		WheelY: float32(dyPx),
 	})
 }
 
@@ -413,9 +453,16 @@ func (h *Headless) CapturePNG(path string) error {
 	return png.Encode(f, img)
 }
 
+// TestHelper описывает минимальный интерфейс тестирования, совместимый с testing.TB (*testing.T / *testing.B).
+type TestHelper interface {
+	Helper()
+	Fatalf(format string, args ...any)
+	Logf(format string, args ...any)
+}
+
 // AssertGolden сравнивает текущий снимок Headless с эталонным файлом testdata/<goldenName>.png.
 // Если передан флаг -update (go test -update), файл создаётся или обновляется.
-func AssertGolden(t testing.TB, h *Headless, goldenName string) {
+func AssertGolden(t TestHelper, h *Headless, goldenName string) {
 	t.Helper()
 	dir := "testdata"
 	goldenPath := filepath.Join(dir, goldenName+".png")
@@ -531,4 +578,3 @@ func (h *Headless) Close() {
 		h.win.Close()
 	}
 }
-

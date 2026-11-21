@@ -127,12 +127,56 @@ func TestBooleanOptionsUnification(t *testing.T) {
 	stOnReorder := ui.ApplyOptions([]ui.Option{OnReorder(func(ev DragEvent) {
 		calledEvent = ev
 	})})
-	if !stOnReorder.Reorderable || stOnReorder.OnReorder == nil {
-		t.Error("OnReorder: expected Reorderable=true and non-nil callback")
+	if stOnReorder.Reorderable {
+		t.Error("OnReorder: Reorderable should be false by default without explicit Reorderable() option")
+	}
+	if stOnReorder.OnReorder == nil {
+		t.Error("OnReorder: expected non-nil callback")
 	}
 	stOnReorder.OnReorder(DragEvent{FromKey: "k1", ToKey: "k2", Drop: DropAbove})
 	if calledEvent.FromKey != "k1" || calledEvent.ToKey != "k2" || calledEvent.Drop != DropAbove {
 		t.Errorf("OnReorder callback failed: %+v", calledEvent)
 	}
-}
 
+	// 12. Secondary & Danger
+	stSecDef := ui.ApplyOptions([]ui.Option{Secondary()})
+	if stSecDef.Variant != ui.VariantSecondary {
+		t.Errorf("Secondary(): expected VariantSecondary, got %v", stSecDef.Variant)
+	}
+	stSecFalse := ui.ApplyOptions([]ui.Option{Secondary(false)})
+	if stSecFalse.Variant != ui.VariantDefault {
+		t.Errorf("Secondary(false): expected VariantDefault, got %v", stSecFalse.Variant)
+	}
+	stDanDef := ui.ApplyOptions([]ui.Option{Danger()})
+	if stDanDef.Variant != ui.VariantDanger {
+		t.Errorf("Danger(): expected VariantDanger, got %v", stDanDef.Variant)
+	}
+	stDanFalse := ui.ApplyOptions([]ui.Option{Danger(false)})
+	if stDanFalse.Variant != ui.VariantDefault {
+		t.Errorf("Danger(false): expected VariantDefault, got %v", stDanFalse.Variant)
+	}
+
+	// 13. Password, Searchable, Ellipsis, LineNumbers
+	if !ui.ApplyOptions([]ui.Option{Password()}).Password || ui.ApplyOptions([]ui.Option{Password(false)}).Password {
+		t.Error("Password unification failed")
+	}
+	if !ui.ApplyOptions([]ui.Option{Searchable()}).Searchable || ui.ApplyOptions([]ui.Option{Searchable(false)}).Searchable {
+		t.Error("Searchable unification failed")
+	}
+	if !ui.ApplyOptions([]ui.Option{Ellipsis()}).Ellipsis || ui.ApplyOptions([]ui.Option{Ellipsis(false)}).Ellipsis {
+		t.Error("Ellipsis unification failed")
+	}
+	if !ui.ApplyOptions([]ui.Option{LineNumbers()}).LineNumbers || ui.ApplyOptions([]ui.Option{LineNumbers(false)}).LineNumbers {
+		t.Error("LineNumbers unification failed")
+	}
+
+	// 14. TextAlign
+	if ui.ApplyOptions([]ui.Option{TextAlignCenter()}).TextAlign != ui.AlignTextCenter ||
+		ui.ApplyOptions([]ui.Option{TextAlignCenter(false)}).TextAlign != ui.AlignTextLeft {
+		t.Error("TextAlignCenter unification failed")
+	}
+	if ui.ApplyOptions([]ui.Option{TextAlignRight()}).TextAlign != ui.AlignTextRight ||
+		ui.ApplyOptions([]ui.Option{TextAlignRight(false)}).TextAlign != ui.AlignTextLeft {
+		t.Error("TextAlignRight unification failed")
+	}
+}

@@ -163,34 +163,18 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 		}
 
 		handleTableReorder := func(ev anyui.DragEvent) {
-			var fromIdx, toIdx int
-			fmt.Sscanf(ev.FromKey, "%d", &fromIdx)
-			fmt.Sscanf(ev.ToKey, "%d", &toIdx)
-			if fromIdx >= 0 && fromIdx < len(st.tableRows) && toIdx >= 0 && toIdx < len(st.tableRows) {
-				row := st.tableRows[fromIdx]
+			if ev.FromIndex >= 0 && ev.FromIndex < len(st.tableRows) && ev.ToIndex >= 0 && ev.ToIndex < len(st.tableRows) {
+				row := st.tableRows[ev.FromIndex]
 				tmp := make([]demoTableRow, 0, len(st.tableRows)-1)
-				tmp = append(tmp, st.tableRows[:fromIdx]...)
-				tmp = append(tmp, st.tableRows[fromIdx+1:]...)
+				tmp = append(tmp, st.tableRows[:ev.FromIndex]...)
+				tmp = append(tmp, st.tableRows[ev.FromIndex+1:]...)
 
-				ins := toIdx
-				if fromIdx < toIdx {
-					ins--
-				}
-				if ev.Drop == anyui.DropBelow {
-					ins++
-				}
-				if ins < 0 {
-					ins = 0
-				}
-				if ins > len(tmp) {
-					ins = len(tmp)
-				}
-				res := make([]demoTableRow, 0, len(tmp)+1)
-				res = append(res, tmp[:ins]...)
+				res := make([]demoTableRow, 0, len(st.tableRows))
+				res = append(res, tmp[:ev.ToIndex]...)
 				res = append(res, row)
-				res = append(res, tmp[ins:]...)
+				res = append(res, tmp[ev.ToIndex:]...)
 				st.tableRows = res
-				st.statusMsg = fmt.Sprintf("Строка перенесена: %s -> %s", ev.FromKey, ev.ToKey)
+				st.statusMsg = fmt.Sprintf("Строка перенесена: %d -> %d", ev.FromIndex, ev.ToIndex)
 				ui.ShowToast("Таблица: Reorder", st.statusMsg, anyui.ToastInfo)
 			}
 		}
@@ -265,14 +249,14 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 		}
 
 		ui.Spacer(12)
-		ui.Label("SplitPane + TreeView (вложенность DropInside, кросс-виджетный перенос) + Collapsible & Accordion", anyui.FontSize(16), anyui.Bold())
-		ui.SplitPane("split_main", anyui.SplitHorizontal, &st.splitRatio, func() {
-			ui.Label("TreeView Проект (drag узлов, вложенность в папки)", anyui.FontSize(13), anyui.Bold())
+		ui.Label("SplitPane + TreeView (Drag-Reorder узлов внутри родителя) + Collapsible & Accordion", anyui.FontSize(16), anyui.Bold())
+		ui.SplitPane("split_main", anyui.Horizontal, &st.splitRatio, func() {
+			ui.Label("TreeView Проект (перестановка узлов внутри одного родителя)", anyui.FontSize(13), anyui.Bold())
 			if ui.TreeView("tree_proj", st.treeRoots, &st.treeSelected, anyui.Height(170), anyui.Reorderable(), anyui.OnReorder(handleTreeDrop)) {
 				st.statusMsg = fmt.Sprintf("TreeView: %s", st.treeSelected)
 			}
 			ui.Spacer(6)
-			ui.Label("TreeView Избранное (кросс-виджетный перенос между деревьями)", anyui.FontSize(12), anyui.Bold())
+			ui.Label("TreeView Избранное (перестановка корневых узлов)", anyui.FontSize(12), anyui.Bold())
 			if ui.TreeView("tree_fav", st.treeFavRoots, &st.treeFavSelected, anyui.Height(100), anyui.Reorderable(), anyui.OnReorder(handleTreeDrop)) {
 				st.statusMsg = fmt.Sprintf("TreeView Избранное: %s", st.treeFavSelected)
 			}

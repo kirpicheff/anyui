@@ -26,22 +26,21 @@ func TestMousePosDpAndPx(t *testing.T) {
 	}
 }
 
-func TestTabsOrientation(t *testing.T) {
+func TestOrientationAndSplitPane(t *testing.T) {
 	mw := &stylerMockWindow{w: 600, h: 400, scale: 1.0}
 	ctx := ui.NewContext(mw, nil)
 	u := &UI{ctx: ctx}
 
-	activeH := 0
-	activeV := 1
-	items := []string{"Tab1", "Tab2"}
+	ratioH := float32(0.5)
+	ratioV := float32(0.3)
 
 	ctx.Render(func(_ *ui.Context) {
-		u.Tabs("tabs_h", items, &activeH, Horizontal)
-		u.Tabs("tabs_v", items, &activeV, Vertical)
+		u.SplitPane("sp_h", Horizontal, &ratioH, func() {}, func() {})
+		u.SplitPane("sp_v", Vertical, &ratioV, func() {}, func() {})
 	})
 
-	if activeH != 0 || activeV != 1 {
-		t.Errorf("unexpected active tabs: h=%d, v=%d", activeH, activeV)
+	if ratioH != 0.5 || ratioV != 0.3 {
+		t.Errorf("unexpected split ratios: h=%v, v=%v", ratioH, ratioV)
 	}
 }
 
@@ -51,4 +50,3 @@ func TestNavyTheme(t *testing.T) {
 		t.Fatalf("unexpected NavyTheme Bg: %v", th.Bg)
 	}
 }
-

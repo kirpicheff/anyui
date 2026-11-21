@@ -48,7 +48,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 	th := ui.Theme()
 	perfTab.renderCount++
 
-	dirtyList := ui.LastDirtyRects()
+	dirtyList := ui.LastDirtyRectsPx()
 	if len(dirtyList) > 0 {
 		u := dirtyList[0]
 		for _, r := range dirtyList[1:] {
@@ -134,20 +134,26 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 			})
 
 			if perfTab.showOverlayTest {
-				area := ui.CurrentAreaPx()
+				area := ui.CurrentArea()
 				ovRect := anyui.Rect{
-					X: area.X + ui.Scale(24).Int(),
-					Y: area.Y + ui.Scale(90).Int(),
-					W: ui.Scale(260).Int(),
-					H: ui.Scale(64).Int(),
+					X: area.X + 24,
+					Y: area.Y + 90,
+					W: 260,
+					H: 64,
 				}
 				ui.PushOverlay(ovRect, func() {
-					ui.Canvas().DrawBoxShadow(ovRect, render.BoxShadow{
+					ovRectPx := anyui.Rect{
+						X: ui.Scale(anyui.Dp(ovRect.X)).Int(),
+						Y: ui.Scale(anyui.Dp(ovRect.Y)).Int(),
+						W: ui.Scale(anyui.Dp(ovRect.W)).Int(),
+						H: ui.Scale(anyui.Dp(ovRect.H)).Int(),
+					}
+					ui.Canvas().DrawBoxShadow(ovRectPx, render.BoxShadow{
 						OffsetY: ui.ScaleF(4), Blur: ui.ScaleF(12), Color: render.RGBA(0, 0, 0, 130), Radii: render.UniformRadii(ui.ScaleF(8)),
 					})
-					ui.Canvas().DrawRoundedBox(ovRect, ui.ScaleF(8), th.Card, 1.5, th.Accent)
-					ui.DrawText(ovRect.X+ui.Scale(12).Int(), ovRect.Y+ui.Scale(12).Int(), "Overlay Layer поверх Static", 12, th.TextPrimary)
-					ui.DrawText(ovRect.X+ui.Scale(12).Int(), ovRect.Y+ui.Scale(34).Int(), "Static Layer под ним не перерисовывался", 11, th.TextMuted)
+					ui.Canvas().DrawRoundedBox(ovRectPx, ui.ScaleF(8), th.Card, 1.5, th.Accent)
+					ui.DrawText(ovRectPx.X+ui.Scale(12).Int(), ovRectPx.Y+ui.Scale(12).Int(), "Overlay Layer поверх Static", 12, th.TextPrimary)
+					ui.DrawText(ovRectPx.X+ui.Scale(12).Int(), ovRectPx.Y+ui.Scale(34).Int(), "Static Layer под ним не перерисовывался", 11, th.TextMuted)
 				})
 			}
 
@@ -163,10 +169,13 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 					anyui.FontSize(12), anyui.TextColor(th.Accent))
 			})
 			ui.Row(12, 54, func() {
+				rStatic := ui.CurrentArea()
+				rStatic.W = 340
+				rStatic.H = 50
+				ui.RegisterHoverArea("perf_hover_static", rStatic, anyui.CursorHand, false)
 				ui.CanvasView(340, 50, func(c *render.Canvas, r anyui.Rect) {
-					ui.RegisterHoverArea("perf_hover_static", r, anyui.CursorHand, false)
 					mx, my := ui.MousePosPx()
-					hov := r.Contains(mx, my)
+					hov := r.Contains(mx.Int(), my.Int())
 					bg := th.Surface
 					if hov {
 						bg = th.BtnSecondaryHover
@@ -175,10 +184,13 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 					ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(10).Int(), "Зона без перерисовки внутри (trackMove=false)", 12, th.TextPrimary)
 					ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(28).Int(), "Водите мышью здесь — Render не вызывается", 11, th.TextMuted)
 				})
+				rTrack := ui.CurrentArea()
+				rTrack.W = 340
+				rTrack.H = 50
+				ui.RegisterHoverArea("perf_hover_track", rTrack, anyui.CursorCrosshair, true)
 				ui.CanvasView(340, 50, func(c *render.Canvas, r anyui.Rect) {
-					ui.RegisterHoverArea("perf_hover_track", r, anyui.CursorCrosshair, true)
 					mx, my := ui.MousePosPx()
-					hov := r.Contains(mx, my)
+					hov := r.Contains(mx.Int(), my.Int())
 					bg := th.Surface
 					if hov {
 						bg = th.Accent.WithAlpha(45)
@@ -186,7 +198,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 					c.DrawRoundedBox(r, ui.ScaleF(8), bg, 1.0, th.BorderFocus)
 					ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(10).Int(), "Зона с трекингом (trackMove=true)", 12, th.TextPrimary)
 					if hov {
-						ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(28).Int(), fmt.Sprintf("Курсор внутри: (%d, %d)", mx-r.X, my-r.Y), 11, th.Accent)
+						ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(28).Int(), fmt.Sprintf("Курсор внутри: (%d, %d)", mx.Int()-r.X, my.Int()-r.Y), 11, th.Accent)
 					} else {
 						ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(28).Int(), "Наведите для трекинга координат и Crosshair", 11, th.TextMuted)
 					}
@@ -216,10 +228,13 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 			ui.Flow(8, 8, func() {
 				for _, ci := range cursorItems {
 					item := ci
+					itemRect := ui.CurrentArea()
+					itemRect.W = 134
+					itemRect.H = 34
+					ui.RegisterHoverArea("perf_"+item.id, itemRect, item.cursor, false)
 					ui.CanvasView(134, 34, func(c *render.Canvas, r anyui.Rect) {
-						ui.RegisterHoverArea("perf_"+item.id, r, item.cursor, false)
 						mx, my := ui.MousePosPx()
-						hov := r.Contains(mx, my)
+						hov := r.Contains(mx.Int(), my.Int())
 						bg := th.Surface
 						border := th.Border
 						if hov {

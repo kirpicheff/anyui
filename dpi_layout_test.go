@@ -30,7 +30,7 @@ func TestCurrentAreaAndMousePosDPI(t *testing.T) {
 		var capturedAreaDp Rect
 		var capturedAreaPx Rect
 		var mouseDpX, mouseDpY Dp
-		var mousePxX, mousePxY int
+		var mousePxX, mousePxY Px
 
 		h.SetDraw(func(ui *UI) {
 			capturedAreaDp = ui.CurrentArea()
@@ -52,7 +52,7 @@ func TestCurrentAreaAndMousePosDPI(t *testing.T) {
 		})
 
 		// Имитируем физические координаты мыши (300, 150)
-		h.InjectMouseMove(300, 150)
+		h.InjectMouseMovePx(300, 150)
 		h.Step()
 
 		// Проверяем CurrentAreaPx: строго физические пиксели окна
@@ -108,8 +108,8 @@ func TestAdaptiveContainersAutoFill(t *testing.T) {
 				ui.Label("Верхняя панель")
 			}, Height(100), FillWidth())
 
-			// 2. ScrollView с Auto(), должен занять оставшиеся 500 dp
-			ui.ScrollView("sv_auto", Auto(), Auto(), func() {
+			// 2. ScrollView с Auto, должен занять оставшиеся 500 dp
+			ui.ScrollView("sv_auto", Auto, Auto, func() {
 				svArea = ui.CurrentArea()
 				ui.Label("Контент внутри ScrollView")
 			})
@@ -118,17 +118,17 @@ func TestAdaptiveContainersAutoFill(t *testing.T) {
 	h.Step()
 
 	if svArea.H < 490 || svArea.H > 500 {
-		t.Errorf("ScrollView с Auto() должен занять остаток высоты ~500dp, получено %d", svArea.H)
+		t.Errorf("ScrollView с Auto должен занять остаток высоты ~500dp, получено %d", svArea.H)
 	}
 
-	// Проверяем CanvasView с sentinel-значением Auto()
+	// Проверяем CanvasView с sentinel-значением Auto
 	h.SetDraw(func(ui *UI) {
 		ui.Column(0, func() {
 			ui.Card(func() {
 				ui.Label("Шапка")
 			}, Height(50), FillWidth())
 
-			ui.CanvasView(Auto(), Auto(), func(canvas *render.Canvas, area Rect) {
+			ui.CanvasView(Auto, Auto, func(canvas *render.Canvas, area Rect) {
 				cvArea = area
 			})
 		})
@@ -136,10 +136,10 @@ func TestAdaptiveContainersAutoFill(t *testing.T) {
 	h.Step()
 
 	if cvArea.H < 545 || cvArea.H > 550 {
-		t.Errorf("CanvasView с Auto() должен занять остаток высоты ~550px, получено %d", cvArea.H)
+		t.Errorf("CanvasView с Auto должен занять остаток высоты ~550px, получено %d", cvArea.H)
 	}
 
-	// Проверяем ListView с Auto()
+	// Проверяем ListView с Auto
 	selected := 0
 	h.SetDraw(func(ui *UI) {
 		ui.Column(0, func() {
@@ -149,7 +149,7 @@ func TestAdaptiveContainersAutoFill(t *testing.T) {
 
 			ui.ListView("lv_auto", 50, 30, &selected, func(index int, area Rect, isSelected bool) {
 				lvCountDrawn++
-			}, Height(Auto()))
+			}, Height(Auto))
 		})
 	})
 	h.Step()
@@ -196,17 +196,17 @@ func TestNestedContainersScrollViewInsideSplitPaneInsidePage(t *testing.T) {
 				pageBodyH = bodyArea.H
 
 				// SplitPane внутри тела Page с заполнением доступной высоты
-				ui.SplitPane("test_sp", SplitHorizontal, &ratio, func() {
-					// Первая панель: ScrollView с Auto()
-					ui.ScrollView("sv_panel1", Auto(), Auto(), func() {
+				ui.SplitPane("test_sp", Horizontal, &ratio, func() {
+					// Первая панель: ScrollView с Auto
+					ui.ScrollView("sv_panel1", Auto, Auto, func() {
 						sv1Area = ui.CurrentArea()
 						for i := 0; i < 20; i++ {
 							ui.Label("Панель 1 Строка")
 						}
 					})
 				}, func() {
-					// Вторая панель: ScrollView с Auto()
-					ui.ScrollView("sv_panel2", Auto(), Auto(), func() {
+					// Вторая панель: ScrollView с Auto
+					ui.ScrollView("sv_panel2", Auto, Auto, func() {
 						sv2Area = ui.CurrentArea()
 						for i := 0; i < 20; i++ {
 							ui.Label("Панель 2 Строка")
@@ -243,3 +243,114 @@ func TestNestedContainersScrollViewInsideSplitPaneInsidePage(t *testing.T) {
 	}
 }
 
+// TestOverlaysAndLayoutRectDPI проверяет контракт передачи Dp в LayoutRect, PushOverlay, Tooltip, Popover и RegisterHoverArea
+// при масштабе 150% DPI.
+func TestOverlaysAndLayoutRectDPI(t *testing.T) {
+	reg, bold, mono := DefaultTestFonts()
+	h, err := NewHeadless(Config{
+		Width:       900,
+		Height:      600,
+		FontRegular: reg,
+		FontBold:    bold,
+		FontMono:    mono,
+	})
+	if err != nil {
+		t.Fatalf("NewHeadless error: %v", err)
+	}
+
+	const sc = float32(1.5)
+	h.SetScale(sc)
+
+	var layoutInnerRect Rect
+	popOpen := true
+
+	h.SetDraw(func(ui *UI) {
+		dpArea := ui.CurrentArea()
+		if dpArea.W != 600 || dpArea.H != 400 {
+			t.Fatalf("expected CurrentArea 600x400 at 1.5x DPI, got %+v", dpArea)
+		}
+
+		// 1. LayoutRect с передачей Dp (200x100 Dp должно дать 300x150 Px в контексте)
+		customBoxDp := Rect{X: 50, Y: 40, W: 200, H: 100}
+		ui.LayoutRect(customBoxDp, func() {
+			layoutInnerRect = ui.CurrentArea()
+		})
+
+		// 2. PushOverlay с Dp
+		ui.PushOverlay(Rect{X: 100, Y: 100, W: 150, H: 80}, func() {
+			ui.Label("Overlay text")
+		})
+
+		// 3. Tooltip и Popover с Dp
+		ui.Tooltip("Подсказка", Rect{X: 10, Y: 10, W: 100, H: 30})
+		ui.Popover("test_pop", &popOpen, Rect{X: 20, Y: 50, W: 120, H: 40}, func() {
+			ui.Label("Popover content")
+		})
+
+		// 4. RegisterHoverArea с Dp
+		ui.RegisterHoverArea("test_hover", Rect{X: 200, Y: 200, W: 80, H: 40}, CursorHand, false)
+	})
+
+	h.Step()
+
+	// Внутри LayoutRect CurrentArea() в Dp должна отражать переданные 200x100
+	if layoutInnerRect.W != 200 || layoutInnerRect.H != 100 {
+		t.Errorf("LayoutRect inner area Dp mismatch: got (%d, %d), want (200, 100)", layoutInnerRect.W, layoutInnerRect.H)
+	}
+}
+
+// TestPushOverlayDPI2xCoveringArea проверяет, что PushOverlay(ui.CurrentArea(), ...) при 2.0x DPI
+// масштабирует логическую область 400x300 Dp на полные 800x600 Px и блокирует ввод по всему экрану,
+// а InjectMouseClick(xDp, yDp) автоматически масштабируется из Dp в Px.
+func TestPushOverlayDPI2xCoveringArea(t *testing.T) {
+	reg, bold, mono := DefaultTestFonts()
+	h, err := NewHeadless(Config{
+		Width:       800,
+		Height:      600,
+		FontRegular: reg,
+		FontBold:    bold,
+		FontMono:    mono,
+	})
+	if err != nil {
+		t.Fatalf("NewHeadless error: %v", err)
+	}
+
+	h.SetScale(2.0)
+
+	btnClicked := false
+	overlayDrawn := false
+
+	h.SetDraw(func(ui *UI) {
+		// Кнопка в правом нижнем углу: в Dp она лежит в интервале X=[250, 350], Y=[200, 250]
+		// В физических пикселях (scale=2.0) это X=[500, 700], Y=[400, 500]
+		ui.LayoutRect(Rect{X: 250, Y: 200, W: 100, H: 50}, func() {
+			if ui.Button("btn_test", "Click", Primary(), Width(100)) {
+				btnClicked = true
+			}
+		})
+
+		// Оверлей накрывает всю область окна в Dp (CurrentArea: 400x300)
+		fullDp := ui.CurrentArea()
+		if fullDp.W != 400 || fullDp.H != 300 {
+			t.Fatalf("expected CurrentArea 400x300 at 2.0x, got %+v", fullDp)
+		}
+		ui.PushOverlay(fullDp, func() {
+			overlayDrawn = true
+		})
+	})
+
+	// Кадр 1: регистрируется оверлей
+	h.Step()
+	if !overlayDrawn {
+		t.Fatal("оверлей не был отрисован")
+	}
+
+	// Кадр 2: кликаем в кнопку через InjectMouseClick в координатах Dp (300, 225).
+	// Внутри оверлей должен заблокировать этот клик, так как накрывает 400x300 Dp = 800x600 Px.
+	h.InjectMouseClick(300, 225, MouseLeft)
+	h.Step()
+
+	if btnClicked {
+		t.Fatal("кнопка под оверлеем сработала! Оверлей при 2.0x DPI не накрыл область в правом нижнем углу")
+	}
+}

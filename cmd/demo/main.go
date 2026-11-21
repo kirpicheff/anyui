@@ -54,8 +54,8 @@ const (
 
 type demoState struct {
 	app         *anyui.App
-	activeNav   int
-	activeTab   int
+	activeNav   string
+	activeTab   string
 	tabs        []anyui.TabItem
 	nextTabNum  int
 	statusMsg   string
@@ -65,7 +65,7 @@ type demoState struct {
 	chk1        bool
 	chk2        bool
 	chkIndet    bool
-	radioIdx    int
+	radioMode   string
 	toggleVal   bool
 	progressVal float32
 	clickCount  int
@@ -138,37 +138,40 @@ func newDemoState() *demoState {
 	warnCol := anyui.NavyTheme().Warning
 
 	return &demoState{
+		activeNav: "controls",
+		activeTab: "t1",
 		tabs: []anyui.TabItem{
 			{ID: "t1", Title: "Витрина", StatusColor: &okCol, Closable: false},
 			{ID: "t2", Title: "Логи системы", StatusColor: &warnCol, Closable: true},
 			{ID: "t3", Title: "Настройки", IconSVG: svgGear, Closable: true},
 		},
-		nextTabNum:      4,
-		statusMsg:       "Готово к работе",
-		droppedInfo:     "Перетащите файлы из проводника в окно",
-		chk1:            true,
-		chkIndet:        true,
-		toggleVal:       true,
-		progressVal:     0.65,
-		textVal:         "Привет, AnyUI!",
-		digitsVal:       "12345",
-		readOnlyVal:     "Только чтение (можно выделить и скопировать)",
-		notesVal:        "Многострочный редактор TextArea с нумерацией строк.\nПоддерживает перенос строк, скролл колесом мыши,\nнавигацию Up/Down, Undo/Redo (Ctrl+Z/Ctrl+Y),\nвыделение по словам (Ctrl+Left/Right) и ПКМ-меню.",
-		emailVal:        "bad-email",
-		phoneMaskVal:    "+7 (999) 123-45-67",
-		dateMaskVal:     "17.11.2026",
-		ipMaskVal:       "192.168.001.010",
-		selectKey:       "win11",
-		comboKey:        "win10",
-		listItems:       listItems,
-		sampleImg:       makeSampleImage(96, 96),
-		contextLog:      "Нажмите ПКМ по области ниже для ContextMenu",
-		dialogLog:       "Нажмите любую кнопку диалога",
-		tableRows:       makeDemoTableRows(),
-		tableSelected:   -1,
-		tableSort:       anyui.TableSort{Column: 0, Desc: false},
-		treeRoots:       makeDemoTree(),
-		treeSelected:    "f_data",
+		nextTabNum:    4,
+		statusMsg:     "Готово к работе",
+		droppedInfo:   "Перетащите файлы из проводника в окно",
+		chk1:          true,
+		chkIndet:      true,
+		radioMode:     "Производительность",
+		toggleVal:     true,
+		progressVal:   0.65,
+		textVal:       "Привет, AnyUI!",
+		digitsVal:     "12345",
+		readOnlyVal:   "Только чтение (можно выделить и скопировать)",
+		notesVal:      "Многострочный редактор TextArea с нумерацией строк.\nПоддерживает перенос строк, скролл колесом мыши,\nнавигацию Up/Down, Undo/Redo (Ctrl+Z/Ctrl+Y),\nвыделение по словам (Ctrl+Left/Right) и ПКМ-меню.",
+		emailVal:      "bad-email",
+		phoneMaskVal:  "+7 (999) 123-45-67",
+		dateMaskVal:   "17.11.2026",
+		ipMaskVal:     "192.168.001.010",
+		selectKey:     "win11",
+		comboKey:      "win10",
+		listItems:     listItems,
+		sampleImg:     makeSampleImage(96, 96),
+		contextLog:    "Нажмите ПКМ по области ниже для ContextMenu",
+		dialogLog:     "Нажмите любую кнопку диалога",
+		tableRows:     makeDemoTableRows(),
+		tableSelected: -1,
+		tableSort:     anyui.TableSort{Column: 0, Desc: false},
+		treeRoots:     makeDemoTree(),
+		treeSelected:  "f_data",
 		treeFavRoots: []*anyui.TreeNode{
 			{ID: "fav_root", Label: "Избранное (drag сюда)", Expanded: true, Children: []*anyui.TreeNode{
 				{ID: "fav_item", Label: "Быстрый доступ.go"},
@@ -248,16 +251,19 @@ func main() {
 	})
 	st.app = app
 
-	navItems := []string{
-		"1. Кнопки и переключатели",
-		"2. Ввод и списки",
-		"3. Оверлеи и контейнеры",
-		"4. Графика и система",
-		"5. Данные и структура",
-		"6. Расширенный ввод и Toast",
-		"7. Продвинутая раскладка",
-		"8. Десктоп и графики (7.1)",
-		"9. Слои, кеш и курсоры (7.2)",
+	navSections := []struct {
+		Key   string
+		Label string
+	}{
+		{"controls", "1. Кнопки и переключатели"},
+		{"inputs", "2. Ввод и списки"},
+		{"overlays", "3. Оверлеи и контейнеры"},
+		{"graphics", "4. Графика и система"},
+		{"data", "5. Данные и структура"},
+		{"ext_input", "6. Расширенный ввод и Toast"},
+		{"layout", "7. Продвинутая раскладка"},
+		{"desktop", "8. Десктоп и графики (7.1)"},
+		{"perf", "9. Слои, кеш и курсоры (7.2)"},
 	}
 
 	err := app.Run(func(ui *anyui.UI) {
@@ -304,18 +310,32 @@ func main() {
 
 				ev := ui.TabBar("main_tabbar", st.tabs, &st.activeTab)
 				if ev.Added {
+					newID := fmt.Sprintf("t%d", st.nextTabNum)
 					st.tabs = append(st.tabs, anyui.TabItem{
-						ID:       fmt.Sprintf("t%d", st.nextTabNum),
+						ID:       newID,
 						Title:    fmt.Sprintf("Вкладка %d", st.nextTabNum),
 						Closable: true,
 					})
-					st.activeTab = len(st.tabs) - 1
+					st.activeTab = newID
 					st.nextTabNum++
 				}
-				if ev.Closed >= 0 && ev.Closed < len(st.tabs) {
-					st.tabs = append(st.tabs[:ev.Closed], st.tabs[ev.Closed+1:]...)
-					if st.activeTab >= len(st.tabs) {
-						st.activeTab = len(st.tabs) - 1
+				if ev.ClosedID != "" {
+					for i, t := range st.tabs {
+						if t.ID == ev.ClosedID {
+							st.tabs = append(st.tabs[:i], st.tabs[i+1:]...)
+							if st.activeTab == ev.ClosedID {
+								if len(st.tabs) > 0 {
+									idx := i
+									if idx >= len(st.tabs) {
+										idx = len(st.tabs) - 1
+									}
+									st.activeTab = st.tabs[idx].ID
+								} else {
+									st.activeTab = ""
+								}
+							}
+							break
+						}
 					}
 				}
 				if ev.MovedFrom >= 0 && ev.MovedTo >= 0 && ev.MovedFrom < len(st.tabs) && ev.MovedTo < len(st.tabs) {
@@ -324,27 +344,40 @@ func main() {
 					st.tabs = append(st.tabs[:ev.MovedTo], append([]anyui.TabItem{item}, st.tabs[ev.MovedTo:]...)...)
 					st.statusMsg = fmt.Sprintf("Вкладка '%s' перемещена", item.Title)
 				}
-				if ev.Detached >= 0 && ev.Detached < len(st.tabs) && len(st.tabs) > 1 {
-					detachedTab := st.tabs[ev.Detached]
-					st.tabs = append(st.tabs[:ev.Detached], st.tabs[ev.Detached+1:]...)
-					if st.activeTab >= len(st.tabs) {
-						st.activeTab = len(st.tabs) - 1
-					}
-					st.statusMsg = fmt.Sprintf("Откреплена вкладка: %s", detachedTab.Title)
-					_, _ = st.app.OpenWindow(anyui.Config{
-						Title:  "Откреплённая вкладка — " + detachedTab.Title,
-						Width:  460,
-						Height: 300,
-						Theme:  ui.Theme(),
-					}, func(wui *anyui.UI) {
-						wui.Padding(20, func() {
-							wui.Column(10, func() {
-								wui.Label(detachedTab.Title, anyui.FontSize(18), anyui.Bold())
-								wui.Label("Это отдельное окно, созданное при вытягивании вкладки из TabBar (app.OpenWindow).", anyui.FontSize(13), anyui.TextColor(wui.Theme().TextMuted))
-								wui.Spinner("det_spin", 28)
+				if ev.DetachedID != "" && len(st.tabs) > 1 {
+					for i, t := range st.tabs {
+						if t.ID == ev.DetachedID {
+							detachedTab := t
+							st.tabs = append(st.tabs[:i], st.tabs[i+1:]...)
+							if st.activeTab == ev.DetachedID {
+								if len(st.tabs) > 0 {
+									idx := i
+									if idx >= len(st.tabs) {
+										idx = len(st.tabs) - 1
+									}
+									st.activeTab = st.tabs[idx].ID
+								} else {
+									st.activeTab = ""
+								}
+							}
+							st.statusMsg = fmt.Sprintf("Откреплена вкладка: %s", detachedTab.Title)
+							_, _ = st.app.OpenWindow(anyui.Config{
+								Title:  "Откреплённая вкладка — " + detachedTab.Title,
+								Width:  460,
+								Height: 300,
+								Theme:  ui.Theme(),
+							}, func(wui *anyui.UI) {
+								wui.Padding(20, func() {
+									wui.Column(10, func() {
+										wui.Label(detachedTab.Title, anyui.FontSize(18), anyui.Bold())
+										wui.Label("Это отдельное окно, созданное при вытягивании вкладки из TabBar (app.OpenWindow).", anyui.FontSize(13), anyui.TextColor(wui.Theme().TextMuted))
+										wui.Spinner("det_spin", 28)
+									})
+								})
 							})
-						})
-					})
+							break
+						}
+					}
 				}
 			})
 		})
@@ -364,7 +397,19 @@ func main() {
 						ui.StaticLayer("demo_nav_title", func() {
 							ui.Label("Разделы", anyui.FontSize(12), anyui.TextColor(th.TextMuted), anyui.Bold())
 						})
-						ui.Tabs("nav_tabs", navItems, &st.activeNav, anyui.Vertical, anyui.Width(210))
+						for _, sec := range navSections {
+							isAct := st.activeNav == sec.Key
+							var btnOpts []anyui.Option
+							if isAct {
+								btnOpts = append(btnOpts, anyui.Primary())
+							} else {
+								btnOpts = append(btnOpts, anyui.Ghost())
+							}
+							btnOpts = append(btnOpts, anyui.Width(210))
+							if ui.Button("nav_"+sec.Key, sec.Label, btnOpts...) {
+								st.activeNav = sec.Key
+							}
+						}
 						ui.Spacer(12)
 						ui.Separator()
 						ui.Spacer(6)
@@ -374,23 +419,23 @@ func main() {
 
 				ui.Card(func() {
 					switch st.activeNav {
-					case 0:
+					case "controls":
 						st.drawTabControls(ui)
-					case 1:
+					case "inputs":
 						st.drawTabInputs(ui)
-					case 2:
+					case "overlays":
 						st.drawTabOverlays(ui)
-					case 3:
+					case "graphics":
 						st.drawTabGraphicsSystem(ui)
-					case 4:
+					case "data":
 						st.drawTabData(ui)
-					case 5:
+					case "ext_input":
 						st.drawTabAdvanced(ui)
-					case 6:
+					case "layout":
 						st.drawTabLayout(ui)
-					case 7:
+					case "desktop":
 						st.drawTabDesktop(ui)
-					case 8:
+					case "perf":
 						st.drawTabPerf(ui)
 					}
 				}, anyui.Padding(16), anyui.FillHeight())

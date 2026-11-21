@@ -82,7 +82,7 @@ func (c *Context) processFocusAndShortcuts() {
 		}
 
 		// Сброс фокуса по Escape, если не в оверлее
-		if kp.Code == KeyEscape && c.FocusID != "" {
+		if kp.Code == KeyEscape && c.FocusID != "" && !c.Overlays.HasActive() {
 			c.FocusID = ""
 			c.RequestRedraw()
 			continue
@@ -223,4 +223,3 @@ func (c *Context) handleNavigable(id string, nav Navigable, onActivate func(inde
 
 	return changed
 }
-

@@ -51,10 +51,10 @@ type TrayConfig struct {
 // Config задаёт параметры создания приложения или окна.
 type Config struct {
 	Title               string
-	Width               int
-	Height              int
-	MinWidth            int
-	MinHeight           int
+	Width               int // Начальная ширина окна в физических пикселях ОС (px).
+	Height              int // Начальная высота окна в физических пикселях ОС (px).
+	MinWidth            int // Минимальная ширина окна в физических пикселях ОС (px).
+	MinHeight           int // Минимальная высота окна в физических пикселях ОС (px).
 	DarkTitle           bool
 	TitleBarColor       *Color
 	TitleTextColor      *Color
@@ -71,15 +71,15 @@ type Config struct {
 	Tray                *TrayConfig
 	Parent              *Window
 	Frameless           bool
-	TitleBarHeight      int
-	HitTest             func(x, y int) HitTestResult
+	TitleBarHeight      int                              // Высота системного заголовка окна в физических пикселях ОС (px).
+	HitTest             func(xPx, yPx int) HitTestResult // Проверка зон окна Frameless (xPx, yPx — в физических пикселях ОС).
 	AcceptDropFiles     bool
 	IconRGBA            []byte
 	IconWidth           int
 	IconHeight          int
 	HideOnClose         bool
 	OnClose             func(w *Window) bool
-	OnDropFiles         func(files []string, x, y int)
+	OnDropFiles         func(files []string, xPx, yPx int)
 }
 
 // App управляет единым циклом событий ОС, реестром окон и потокобезопасной очередью Dispatch.
@@ -456,15 +456,15 @@ func (a *App) SetTrayTooltip(tooltip string) error {
 	return tray.SetTooltip(tooltip)
 }
 
-// SetTrayIcon обновляет изображение иконки в трее из буфера RGBA.
-func (a *App) SetTrayIcon(rgba []byte, width, height int) error {
+// SetTrayIcon обновляет изображение иконки в трее из буфера RGBA (widthPx * heightPx * 4).
+func (a *App) SetTrayIcon(rgba []byte, widthPx, heightPx int) error {
 	a.mu.Lock()
 	tray := a.tray
 	a.mu.Unlock()
 	if tray == nil {
 		return nil
 	}
-	return tray.SetIconRGBA(rgba, width, height)
+	return tray.SetIconRGBA(rgba, widthPx, heightPx)
 }
 
 // SetTrayMenu обновляет контекстное меню иконки в трее.
@@ -561,4 +561,3 @@ func (a *App) handleSystemThemeChange(dark bool) {
 		a.cfg.OnSystemThemeChange(a, dark)
 	}
 }
-

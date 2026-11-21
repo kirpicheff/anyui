@@ -10,10 +10,10 @@ type overlayItem struct {
 // OverlayLayer управляет отложенной отрисовкой всплывающих элементов поверх основного UI
 // и блокирует клики по виджетам под активными оверлеями.
 type OverlayLayer struct {
-	prevBlocks   []render.Rect
-	nextBlocks   []render.Rect
-	items        []overlayItem
-	inOverlay    bool
+	prevBlocks []render.Rect
+	nextBlocks []render.Rect
+	items      []overlayItem
+	inOverlay  bool
 }
 
 // BeginFrame подготавливает слой оверлеев к новому кадру.
@@ -52,9 +52,9 @@ func (o *OverlayLayer) IsBlocked(x, y int) bool {
 	return false
 }
 
-// HasActive возвращает true, если в последнем отрендеренном кадре были активные оверлеи (меню, попапы, модалки).
+// HasActive возвращает true, если в текущем или предыдущем кадре были активные оверлеи (меню, попапы, модалки).
 func (o *OverlayLayer) HasActive() bool {
-	return len(o.nextBlocks) > 0 || len(o.items) > 0
+	return len(o.prevBlocks) > 0 || len(o.nextBlocks) > 0 || len(o.items) > 0
 }
 
 // Flush отрисовывает все накопленные оверлеи поверх основного интерфейса.
@@ -76,4 +76,3 @@ func (o *OverlayLayer) FlushWithHook(onItem func(bounds render.Rect)) {
 	}
 	o.inOverlay = false
 }
-

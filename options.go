@@ -5,11 +5,8 @@ import "github.com/kirpicheff/anyui/ui"
 // Option настраивает стиль, размеры или поведение отдельного виджета.
 type Option = ui.Option
 
-// AutoSize — константа sentinel-значения для автоматического подбора размера по остатку доступной области.
-const AutoSize = ui.AutoSize
-
-// Auto возвращает sentinel-значение (-1) для автоматического занятия доступного остатка области контейнера.
-func Auto() Dp { return ui.Auto() }
+// Auto — константа sentinel-значения для автоматического занятия доступного остатка области контейнера.
+const Auto Dp = ui.Auto
 
 // Bg переопределяет цвет фона виджета.
 func Bg(c Color) Option { return ui.Bg(c) }
@@ -45,10 +42,10 @@ func Disabled(enabled ...bool) Option { return ui.Disabled(enabled...) }
 func Primary(enabled ...bool) Option { return ui.Primary(enabled...) }
 
 // Secondary задаёт второстепенный стиль виджета.
-func Secondary() Option { return ui.Secondary() }
+func Secondary(enabled ...bool) Option { return ui.Secondary(enabled...) }
 
 // Danger задаёт стиль предупреждения об опасном действии.
-func Danger() Option { return ui.Danger() }
+func Danger(enabled ...bool) Option { return ui.Danger(enabled...) }
 
 // Ghost задаёт прозрачный стиль без заливки фона в покое.
 func Ghost(enabled ...bool) Option { return ui.Ghost(enabled...) }
@@ -63,7 +60,7 @@ func Mono(enabled ...bool) Option { return ui.Mono(enabled...) }
 func IconRight(svg string) Option { return ui.IconRight(svg) }
 
 // Password включает режим пароля для поля ввода.
-func Password() Option { return ui.Password() }
+func Password(enabled ...bool) Option { return ui.Password(enabled...) }
 
 // PasswordToggle включает режим пароля со встроенной кнопкой-глазиком справа.
 func PasswordToggle(visible ...*bool) Option { return ui.PasswordToggle(visible...) }
@@ -78,7 +75,7 @@ func Clearable(enabled ...bool) Option { return ui.Clearable(enabled...) }
 func Indeterminate(enabled ...bool) Option { return ui.Indeterminate(enabled...) }
 
 // Searchable включает поиск в выпадающем списке.
-func Searchable(v bool) Option { return ui.Searchable(v) }
+func Searchable(enabled ...bool) Option { return ui.Searchable(enabled...) }
 
 // InputFilter задаёт фильтр допустимых символов для ввода.
 func InputFilter(fn func(rune) bool) Option { return ui.InputFilter(fn) }
@@ -96,13 +93,13 @@ func MinHeight(dp Dp) Option { return ui.MinHeight(dp) }
 func MaxHeight(dp Dp) Option { return ui.MaxHeight(dp) }
 
 // FillWidth растягивает виджет на всю доступную ширину контейнера.
-func FillWidth() Option { return ui.FillWidth() }
+func FillWidth(enabled ...bool) Option { return ui.FillWidth(enabled...) }
 
 // FillHeight растягивает виджет на всю доступную высоту контейнера.
-func FillHeight() Option { return ui.FillHeight() }
+func FillHeight(enabled ...bool) Option { return ui.FillHeight(enabled...) }
 
 // AutoHeight включает автоматический подбор высоты контейнера по содержимому.
-func AutoHeight() Option { return ui.AutoHeight() }
+func AutoHeight(enabled ...bool) Option { return ui.AutoHeight(enabled...) }
 
 // Flex задаёт пропорциональный вес виджета при делении пространства.
 func Flex(weight float32) Option { return ui.Flex(weight) }
@@ -111,10 +108,10 @@ func Flex(weight float32) Option { return ui.Flex(weight) }
 func WordWrap(enabled ...bool) Option { return ui.WordWrap(enabled...) }
 
 // Ellipsis включает обрезку текста с многоточием при нехватке ширины (для Label).
-func Ellipsis(v bool) Option { return ui.Ellipsis(v) }
+func Ellipsis(enabled ...bool) Option { return ui.Ellipsis(enabled...) }
 
 // LineNumbers включает отображение номеров строк в TextArea.
-func LineNumbers(v bool) Option { return ui.LineNumbers(v) }
+func LineNumbers(enabled ...bool) Option { return ui.LineNumbers(enabled...) }
 
 // Error задаёт текст ошибки валидации и подсвечивает рамку поля ввода.
 func Error(text string) Option { return ui.Error(text) }
@@ -141,13 +138,13 @@ func HoverBorderColor(c Color) Option { return ui.HoverBorderColor(c) }
 func FocusBorderColor(c Color) Option { return ui.FocusBorderColor(c) }
 
 // TextAlignCenter выравнивает текст и placeholder по центру (для TextInput и Label).
-func TextAlignCenter() Option { return ui.TextAlignCenter() }
+func TextAlignCenter(enabled ...bool) Option { return ui.TextAlignCenter(enabled...) }
 
 // TextAlignLeft выравнивает текст и placeholder по левому краю (для TextInput и Label).
-func TextAlignLeft() Option { return ui.TextAlignLeft() }
+func TextAlignLeft(enabled ...bool) Option { return ui.TextAlignLeft(enabled...) }
 
 // TextAlignRight выравнивает текст и placeholder по правому краю (для TextInput и Label).
-func TextAlignRight() Option { return ui.TextAlignRight() }
+func TextAlignRight(enabled ...bool) Option { return ui.TextAlignRight(enabled...) }
 
 // LetterSpacing задаёт межбуквенный интервал в логических пикселях (для Label и Button).
 func LetterSpacing(dp float32) Option { return ui.LetterSpacing(dp) }
@@ -163,11 +160,9 @@ func ScrollToIndex(idx int) Option { return ui.ScrollToIndex(idx) }
 // ScrollToID задаёт строковый идентификатор дочернего элемента или якоря для программной прокрутки в ScrollView.
 func ScrollToID(id string) Option { return ui.ScrollToID(id) }
 
-// Reorderable разрешает перетаскивание элементов (строк или узлов) внутри компонента для изменения порядка.
+// Reorderable разрешает перетаскивание элементов (строк в Table/ListView или узлов в TreeView) внутри компонента для изменения порядка.
+// Без опции OnReorder результат перетаскивания отбрасывается.
 func Reorderable(enabled ...bool) Option { return ui.Reorderable(enabled...) }
 
 // OnReorder регистрирует обработчик события завершения перетаскивания элемента.
 func OnReorder(fn func(ev DragEvent)) Option { return ui.OnReorder(fn) }
-
-
-

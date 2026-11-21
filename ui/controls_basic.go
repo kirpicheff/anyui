@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"strconv"
-
 	"github.com/kirpicheff/anyui/platform"
 	"github.com/kirpicheff/anyui/render"
 )
@@ -242,20 +240,17 @@ func (c *Context) RadioButton(id, label string, selected *string, value string, 
 	return clicked
 }
 
-// RadioGroup рисует вертикальную группу радиокнопок и обновляет selected при выборе.
-func (c *Context) RadioGroup(id string, options []string, selected *int, opts ...Option) bool {
-	if selected == nil || len(options) == 0 {
+// RadioGroup рисует вертикальную группу радиокнопок с выбором по строковому ключу (selected *string).
+func (c *Context) RadioGroup(id string, items []SelectItem, selected *string, opts ...Option) bool {
+	if selected == nil || len(items) == 0 {
 		return false
 	}
 	id = c.nextLocalID("rgrp", id)
 	changed := false
 	c.Column(8, func() {
-		for i, label := range options {
-			itemID := id + "_" + string(rune('0'+i))
-			val := strconv.Itoa(i)
-			curVal := strconv.Itoa(*selected)
-			if c.RadioButton(itemID, label, &curVal, val, opts...) {
-				*selected = i
+		for _, item := range items {
+			itemID := id + "_" + item.Key
+			if c.RadioButton(itemID, item.Label, selected, item.Key, opts...) {
 				changed = true
 			}
 		}

@@ -43,7 +43,7 @@ func (st *demoState) drawTabControls(ui *anyui.UI) {
 			})
 			ui.Column(8, func() {
 				ui.Label("Режим работы:", anyui.FontSize(13), anyui.TextColor(th.TextMuted))
-				ui.RadioGroup("rg_mode", []string{"Производительность", "Баланс", "Энергосбережение"}, &st.radioIdx)
+				ui.RadioGroup("rg_mode", anyui.SelectItems("Производительность", "Баланс", "Энергосбережение"), &st.radioMode)
 			})
 		})
 
@@ -76,4 +76,3 @@ func (st *demoState) drawTabControls(ui *anyui.UI) {
 		})
 	})
 }
-

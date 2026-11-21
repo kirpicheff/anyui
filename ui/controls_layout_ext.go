@@ -15,16 +15,6 @@ const (
 	Vertical
 )
 
-// SplitOrientation задаёт направление разделения в SplitPane (псевдоним Orientation).
-type SplitOrientation = Orientation
-
-const (
-	// SplitHorizontal разделяет область на левую и правую панели с вертикальным разделителем.
-	SplitHorizontal = Horizontal
-	// SplitVertical разделяет область на верхнюю и нижнюю панели с горизонтальным разделителем.
-	SplitVertical = Vertical
-)
-
 // SplitPane делит область на 2 панели с перетаскиваемым разделителем.
 // ratio задаёт долю первой панели в диапазоне [0.1, 0.9].
 func (c *Context) SplitPane(id string, orient Orientation, ratio *float32, firstFn, secondFn func(), opts ...Option) {
@@ -67,7 +57,7 @@ func (c *Context) SplitPane(id string, orient Orientation, ratio *float32, first
 	blocked := c.IsInputBlocked()
 	var firstR, splitR, secondR render.Rect
 
-	if orient == SplitHorizontal {
+	if orient == Horizontal {
 		availW := rect.W - splitterThick - 2
 		if availW < c.Scale(40).Int() {
 			availW = c.Scale(40).Int()
@@ -138,7 +128,7 @@ func (c *Context) SplitPane(id string, orient Orientation, ratio *float32, first
 
 	// Отрисовка разделителя
 	splitCur := platform.CursorResizeV
-	if orient == SplitHorizontal {
+	if orient == Horizontal {
 		splitCur = platform.CursorResizeH
 	}
 	c.RegisterHit(id+":split", splitR, splitCur)
@@ -149,7 +139,7 @@ func (c *Context) SplitPane(id string, orient Orientation, ratio *float32, first
 		gripCol = c.Theme.Accent
 	}
 	c.Canvas.FillRect(splitR, splitBg)
-	if orient == SplitHorizontal {
+	if orient == Horizontal {
 		cx := float32(splitR.X + splitR.W/2)
 		cy := float32(splitR.Y + splitR.H/2)
 		c.Canvas.DrawLine(cx, cy-c.ScaleF(14), cx, cy+c.ScaleF(14), c.ScaleF(2), gripCol)

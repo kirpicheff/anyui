@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,7 +14,13 @@ import (
 const modulePath = "github.com/kirpicheff/anyui"
 
 func main() {
-	version := detectVersion()
+	versionFlag := flag.String("version", "", "переопределить версию в шапке llms.txt (по умолчанию берётся из git describe)")
+	flag.Parse()
+
+	version := strings.TrimSpace(*versionFlag)
+	if version == "" {
+		version = detectVersion()
+	}
 
 	var out bytes.Buffer
 	writeHeader(&out, version)
@@ -35,6 +42,7 @@ func main() {
 		{"KeyEvent", modulePath + ".KeyEvent"},
 		{"DragEvent", modulePath + ".DragEvent"},
 		{"Notification", modulePath + ".Notification"},
+		{"Headless (автоматизация, пошаговый цикл, инъекция ввода)", modulePath + ".Headless"},
 		{"App", modulePath + ".App"},
 		{"Window", modulePath + ".Window"},
 		{"UI (Immediate Mode API)", modulePath + ".UI"},
@@ -93,15 +101,20 @@ func writeHeader(out *bytes.Buffer, version string) {
 	out.WriteString("- Все размеры, координаты и отступы задаются в `dp` и масштабируются под DPI автоматически.\n")
 	out.WriteString("- Обновление UI из фоновых горутин выполняется через `app.Dispatch(func() { ... })`, либо через `anyui.Remember(ui, key, loader)` прямо внутри `drawFn`.\n")
 	out.WriteString("- Иконка окна подхватывается автоматически из `.syso`-ресурсов или задаётся через `Config.IconRGBA` / `win.SetIcon(...)`.\n")
+	out.WriteString("- Единицы измерения (Dp vs Px, полный контракт в `docs/ru/units.md`): весь публичный API раскладки, оверлеев и виджетов (`LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`, `InjectMouse*`, `CurrentArea()`, `MousePosDp()`) принимает и возвращает логические единицы `Dp`. Физические пиксели `Px` используются строго в низкоуровневых колбэках рисования в Canvas (`CanvasView`, `Table.drawCell`, `ListView.drawItem`), прямых системных методах (`DrawText`, `DrawSVG`, `CurrentAreaPx()`, `MousePosPx()`, `LastDirtyRectsPx()`, `InjectMouse*Px`), метриках окна (`Config.HitTest`, `TitleBarHitTest`, `Window.Position()`, `SetPosition()`, `SetSize()`, `OnDropFiles`) и установке иконок (`SetIcon`, `SetTrayIcon`).\n")
+	out.WriteString("- Выпадающие списки: используйте `ui.Select(id, items, selected, opts...)` на строковых ключах. Комбобокс со строкой поиска/фильтрации = `ui.Select(..., anyui.Searchable())` (отдельной функции `ComboBox` нет).\n")
+	out.WriteString("- Множественный выбор: используйте `ui.MultiSelect(id, items, selectedIDs, opts...)` на `map[string]bool` (дублирующий псевдоним `CheckComboBox` удалён).\n")
+	out.WriteString("- Вкладки: используйте `ui.TabBar(id, tabs, activeID, opts...)` на строковых ключах и хелпер `anyui.TabItems(labels...)` (устаревший `Tabs` удалён).\n")
+	out.WriteString("- Ориентация: используйте `anyui.Horizontal` и `anyui.Vertical` типа `Orientation` (устаревший `SplitOrientation` удалён).\n")
 	out.WriteString("- Раскладка без обрезания: для экранов с шапкой/телом/футером используйте `ui.Page(cfg, headerFn, bodyFn, footerFn)` или `ui.DockBottom` / `ui.DockTop` / `ui.ColumnFlex` и `anyui.FillHeight()`.\n")
 	out.WriteString("- Модальные окна и диалоги: всегда используйте `ui.Modal(id, open, title, fn, opts...)`, который сам затемняет фон, центрирует окно, изолирует ввод и обрабатывает Escape/крестик. Запрещено создавать самодельные модалки через `PushOverlay(fullRect)` — передача полноэкранного прямоугольника в `PushOverlay` заблокирует весь экран на последующих кадрах.\n")
 	out.WriteString("- `PushOverlay(bounds, fn)` предназначен только для всплывающих контролов (кастомных выпадающих списков, меню, тултипов), которым нужно отрисоваться поверх родительских контейнеров без обрезания клипом.\n")
 	out.WriteString("- Горячие клавиши: `ui.Shortcut` регистрирует глобальный шорткат окна; не вызывайте его повторно на каждом кадре внутри циклических веток UI.\n")
 	out.WriteString("- `Card(fn, ...)` по умолчанию подбирает высоту по содержимому (`AutoHeight`); чтобы растянуть карточку на весь остаток высоты, передайте `anyui.FillHeight()`.\n")
-	out.WriteString("- Автозаполнение контейнеров (Auto-Fill): для `ScrollView`, `ListView`, `CanvasView` передавайте `anyui.Auto()` или `-1` (либо `anyui.FillWidth()` / `anyui.FillHeight()`), чтобы занять весь доступный остаток области без ручного вычисления размеров. `ui.CurrentArea()` возвращает геометрию строго в Dp; для низкоуровневых операций с `Canvas` используйте `ui.CurrentAreaPx()`.\n")
+	out.WriteString("- Автозаполнение контейнеров (Auto-Fill): для `ScrollView`, `ListView`, `CanvasView` передавайте `anyui.Auto` (либо `anyui.FillWidth()` / `anyui.FillHeight()`), чтобы занять весь доступный остаток области без ручного вычисления размеров. `ui.CurrentArea()` возвращает геометрию строго в Dp; для низкоуровневых операций с `Canvas` используйте `ui.CurrentAreaPx()`.\n")
 	out.WriteString("- В `Table` / `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.\n")
 	out.WriteString("- Декларативная навигация: используйте `anyui.ScrollToIndex(idx)` для программной прокрутки в `ListView` и `Table`, и `anyui.ScrollToID(id)` / `ui.Anchor(id)` для навигации в `ScrollView`.\n")
-	out.WriteString("- Drag & Drop перетаскивание (Reorder): опция `anyui.OnReorder(func(ev anyui.DragEvent))` для изменения порядка строк в `Table` и узлов в `TreeView` с поддержкой `DropZone` (`DropAbove`, `DropBelow`, `DropInside`).\n\n")
+	out.WriteString("- Drag & Drop (Reorder): `anyui.OnReorder(func(ev anyui.DragEvent))` вместе с `anyui.Reorderable()` — для `Table`, `ListView`, `ListViewEx` (индексы) и `TreeView` (ключи, только внутри одного родителя). Зоны: `DropAbove`/`DropBelow`; `DropInside` и смена родителя не поддерживаются.\n\n")
 }
 
 func writeQuickStart(out *bytes.Buffer) {
@@ -141,4 +154,3 @@ func main() {
 `)
 	out.WriteString("```\n\n")
 }
-

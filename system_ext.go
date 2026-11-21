@@ -12,7 +12,7 @@ import (
 
 // ErrAlreadyRunning возвращается из App.Run, если включён режим SingleInstance
 // и другой экземпляр приложения уже запущен.
-var ErrAlreadyRunning = errors.New("приложение уже запущено")
+var ErrAlreadyRunning = errors.New("application is already running")
 
 // NotificationIcon задаёт иконку нативного системного уведомления.
 type NotificationIcon = platform.NotificationIcon
@@ -123,4 +123,3 @@ func toPlatformWindowColor(c *Color) *platform.WindowColor {
 func isThemeDark(t Theme) bool {
 	return t.Bg.R < 128 && t.Bg.G < 128 && t.Bg.B < 128
 }
-

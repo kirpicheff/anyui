@@ -24,7 +24,7 @@ func (c *Context) ListViewEx(
 	itemHeightDp Dp,
 	selected map[int]bool,
 	checked []bool,
-	drawItem func(index int, area render.Rect, isSelected bool),
+	drawItem func(index int, areaPx render.Rect, isSelected bool),
 	opts ...Option,
 ) bool {
 	if itemHeightDp <= 0 {
@@ -115,6 +115,12 @@ func (c *Context) ListViewEx(
 			c.Canvas.FillRect(ir, c.Theme.Surface)
 		}
 
+		// Приглушение перемещаемой строки в ListViewEx
+		fromIdx, _, reorderActive := c.ReorderSource(id)
+		if reorderActive && fromIdx == i {
+			c.Canvas.FillRect(ir, c.Theme.Bg.WithAlpha(160))
+		}
+
 		itemArea := ir
 		if showCheck {
 			cbSize := c.Scale(16).Int()
@@ -134,38 +140,43 @@ func (c *Context) ListViewEx(
 			itemArea = render.Rect{X: cbR.X + cbR.W + c.Scale(6).Int(), Y: ir.Y, W: ir.W - (cbR.X + cbR.W + c.Scale(6).Int() - ir.X), H: ir.H}
 		}
 
-		if hov && c.MousePressed && selected != nil {
-			c.FocusID = id
-			anchor, hasAnchor := listAnchorStore[id]
-			if mods.Shift && hasAnchor && anchor >= 0 && anchor < count {
-				lo, hi := anchor, i
-				if lo > hi {
-					lo, hi = hi, lo
-				}
-				if !mods.Ctrl {
+		if hov && c.MousePressed {
+			if st.Reorderable {
+				c.ArmReorder(id, i, "")
+			}
+			if selected != nil {
+				c.FocusID = id
+				anchor, hasAnchor := listAnchorStore[id]
+				if mods.Shift && hasAnchor && anchor >= 0 && anchor < count {
+					lo, hi := anchor, i
+					if lo > hi {
+						lo, hi = hi, lo
+					}
+					if !mods.Ctrl {
+						for k := range selected {
+							delete(selected, k)
+						}
+					}
+					for k := lo; k <= hi; k++ {
+						selected[k] = true
+					}
+				} else if mods.Ctrl {
+					if selected[i] {
+						delete(selected, i)
+					} else {
+						selected[i] = true
+					}
+					listAnchorStore[id] = i
+				} else {
 					for k := range selected {
 						delete(selected, k)
 					}
-				}
-				for k := lo; k <= hi; k++ {
-					selected[k] = true
-				}
-			} else if mods.Ctrl {
-				if selected[i] {
-					delete(selected, i)
-				} else {
 					selected[i] = true
+					listAnchorStore[id] = i
 				}
-				listAnchorStore[id] = i
-			} else {
-				for k := range selected {
-					delete(selected, k)
-				}
-				selected[i] = true
-				listAnchorStore[id] = i
+				changed = true
+				c.RequestRedraw()
 			}
-			changed = true
-			c.RequestRedraw()
 		}
 
 		if drawItem != nil {
@@ -174,6 +185,15 @@ func (c *Context) ListViewEx(
 	}
 
 	c.Canvas.PopClip()
+
+	// Обработка перетаскивания (Reorder) строк ListViewEx
+	if st.Reorderable {
+		if c.HandleLinearReorder(id, viewRect, viewRect.X, contentW, rowH, count, si, maxScroll, st.OnReorder, func() {
+			delete(listAnchorStore, id)
+		}) {
+			changed = true
+		}
+	}
 
 	if hasScroll {
 		sbTrack := render.Rect{X: viewRect.X + contentW, Y: viewRect.Y, W: sbW, H: viewRect.H}
@@ -433,7 +453,7 @@ func (c *Context) TableEx(
 	rowCount int,
 	cfg *TableExConfig,
 	sort *TableSort,
-	drawCell func(row, col int, area render.Rect, isSelected bool),
+	drawCell func(row, col int, areaPx render.Rect, isSelected bool),
 	opts ...Option,
 ) TableEvent {
 	ev := TableEvent{RowClicked: -1, RowDoubleClicked: -1, RowMiddleClicked: -1}

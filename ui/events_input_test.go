@@ -51,35 +51,35 @@ func TestTabBarMiddleClickCloseAndWheelX(t *testing.T) {
 		{ID: "t1", Title: "Pinned", Closable: false},
 		{ID: "t2", Title: "Closable", Closable: true},
 	}
-	active := 0
+	active := "t1"
 
 	// Первый кадр для раскладки
 	ctx.Render(func(c *Context) {
 		c.TabBar("tb", tabs, &active)
 	})
 
-	// Средний клик по первой (незакрываемой) вкладке -> Closed == -1
+	// Средний клик по первой (незакрываемой) вкладке -> ClosedID == ""
 	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseMiddle, X: 40, Y: 18})
 	var ev1 TabBarEvent
 	ctx.Render(func(c *Context) {
 		ev1 = c.TabBar("tb", tabs, &active)
 	})
-	if ev1.Closed != -1 {
-		t.Fatalf("незакрываемая вкладка не должна закрываться по СКМ, получено Closed=%d", ev1.Closed)
+	if ev1.ClosedID != "" {
+		t.Fatalf("незакрываемая вкладка не должна закрываться по СКМ, получено ClosedID=%q", ev1.ClosedID)
 	}
 
-	// Средний клик по второй (закрываемой) вкладке -> Closed == 1
+	// Средний клик по второй (закрываемой) вкладке -> ClosedID == "t2"
 	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseMiddle, X: 40, Y: 18})
 	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseMiddle, X: 200, Y: 18})
-	closedIdx := -1
+	closedID := ""
 	ctx.Render(func(c *Context) {
 		ev2 := c.TabBar("tb", tabs, &active)
-		if ev2.Closed >= 0 {
-			closedIdx = ev2.Closed
+		if ev2.ClosedID != "" {
+			closedID = ev2.ClosedID
 		}
 	})
-	if closedIdx != 1 {
-		t.Fatalf("ожидалось закрытие вкладки 1 по СКМ, получено Closed=%d", closedIdx)
+	if closedID != "t2" {
+		t.Fatalf("ожидалось закрытие вкладки t2 по СКМ, получено ClosedID=%q", closedID)
 	}
 }
 

@@ -17,14 +17,24 @@ type TabItem struct {
 	Closable    bool
 }
 
+// TabItems создаёт срез TabItem из списка строк, где ID и Title совпадают.
+// Метки должны быть уникальны, поскольку они же служат ключами вкладок.
+func TabItems(labels ...string) []TabItem {
+	items := make([]TabItem, len(labels))
+	for i, l := range labels {
+		items[i] = TabItem{ID: l, Title: l}
+	}
+	return items
+}
+
 // TabBarEvent сообщает о действиях пользователя в TabBar за текущий кадр.
 type TabBarEvent struct {
-	Selected  int
-	Closed    int
-	Added     bool
-	MovedFrom int
-	MovedTo   int
-	Detached  int
+	SelectedID string
+	ClosedID   string
+	Added      bool
+	MovedFrom  int
+	MovedTo    int
+	DetachedID string
 }
 
 // ComputeVisibleRange вычисляет диапазон [start, end) видимых элементов для виртуализации списка.
@@ -62,7 +72,7 @@ func SelectItems(labels ...string) []SelectItem {
 	return items
 }
 
-// Select рисует выпадающий список (при Searchable(true) — ComboBox с фильтром поиска)
+// Select рисует выпадающий список (при опции Searchable(true) — со встроенным поиском/фильтрацией)
 // и возвращает true при изменении выбранного ключа.
 func (c *Context) Select(id string, items []SelectItem, selected *string, opts ...Option) bool {
 	if selected == nil {
@@ -421,7 +431,7 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 }
 
 // ListView рисует виртуализированный прокручиваемый список элементов.
-func (c *Context) ListView(id string, count int, itemHeightDp Dp, selected *int, drawItem func(index int, area render.Rect, isSelected bool), opts ...Option) bool {
+func (c *Context) ListView(id string, count int, itemHeightDp Dp, selected *int, drawItem func(index int, areaPx render.Rect, isSelected bool), opts ...Option) bool {
 	id = c.ResolveID("list", id)
 	if itemHeightDp <= 0 {
 		itemHeightDp = 36
@@ -537,12 +547,15 @@ func (c *Context) ListView(id string, count int, itemHeightDp Dp, selected *int,
 		itemHover := hovered && ir.Contains(c.MouseX, c.MouseY)
 		if itemHover {
 			c.nextCursor = platform.CursorHand
-			if c.MousePressed && selected != nil {
-				if *selected != i {
+			if c.MousePressed {
+				if selected != nil && *selected != i {
 					*selected = i
 					changed = true
-					c.RequestRedraw()
 				}
+				if st.Reorderable {
+					c.ArmReorder(id, i, "")
+				}
+				c.RequestRedraw()
 			}
 		}
 		if isSel {
@@ -550,11 +563,31 @@ func (c *Context) ListView(id string, count int, itemHeightDp Dp, selected *int,
 		} else if itemHover {
 			c.Canvas.FillRoundedRect(ir, c.ScaleF(4), c.Theme.Surface)
 		}
+
+		// Приглушение перемещаемого элемента во время Reorder
+		fromIdx, _, reorderActive := c.ReorderSource(id)
+		if reorderActive && fromIdx == i {
+			c.Canvas.FillRoundedRect(ir, c.ScaleF(4), c.Theme.Bg.WithAlpha(160))
+		}
+
 		if drawItem != nil {
 			drawItem(i, ir, isSel)
 		}
 	}
 	c.Canvas.PopClip()
+
+	// Обработка перетаскивания (Reorder) элементов ListView
+	if st.Reorderable {
+		contentW := r.W
+		if maxSc > 0 {
+			contentW -= c.Scale(8).Int()
+		}
+		lineX := r.X + c.Scale(2).Int()
+		lineW := contentW - c.Scale(4).Int()
+		if c.HandleLinearReorder(id, r, lineX, lineW, itemH, count, si, maxSc, st.OnReorder, nil) {
+			changed = true
+		}
+	}
 
 	// Вертикальный скроллбар при переполнении
 	if maxSc > 0 {
@@ -575,95 +608,11 @@ func (c *Context) ListView(id string, count int, itemHeightDp Dp, selected *int,
 	return changed
 }
 
-// Tabs рисует статические горизонтальные вкладки или вертикальное боковое меню.
-func (c *Context) Tabs(id string, items []string, active *int, orient Orientation, opts ...Option) bool {
-	if active == nil || len(items) == 0 {
-		return false
-	}
-	vertical := orient == Vertical
-	id = c.ResolveID("tabs", id)
-	st := ApplyOptions(opts)
-	changed := false
-	pxSize := c.Scale(14).Int()
-	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
-		pxSize = c.Scale(*st.FontSizeDp).Int()
-	}
-
-	drawOne := func(i int, label string) {
-		isAct := *active == i
-		tw, th := 60, c.Scale(18).Int()
-		if c.Font != nil {
-			tw, th = c.Font.MeasureTextStyled(label, pxSize, st.FontStyle)
-		}
-		w := tw + c.Scale(24).Int()
-		if vertical {
-			w = c.RemainingWidth()
-			if st.WidthDp != nil && *st.WidthDp > 0 {
-				w = c.Scale(*st.WidthDp).Int()
-			}
-		}
-		h := th + c.Scale(14).Int()
-		r := c.allocRect(w, h)
-		if !st.Disabled {
-			c.RegisterHit(id+":tab:"+strconv.Itoa(i), r, platform.CursorHand)
-		}
-		hovered := !st.Disabled && !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)
-		if hovered {
-			c.nextCursor = platform.CursorHand
-			if c.MousePressed && *active != i {
-				*active = i
-				changed = true
-				c.RequestRedraw()
-			}
-		}
-
-		bg := c.Theme.Bg.WithAlpha(0)
-		textCol := c.Theme.TextMuted
-		if isAct {
-			bg = c.Theme.Surface
-			textCol = c.Theme.TextPrimary
-		} else if hovered {
-			bg = c.Theme.Surface.WithAlpha(120)
-			textCol = c.Theme.TextPrimary
-		}
-		c.Canvas.FillRoundedRect(r, c.ScaleF(c.Theme.RadiusSm), bg)
-		if isAct {
-			if vertical {
-				c.Canvas.FillRect(render.Rect{X: r.X, Y: r.Y + c.Scale(6).Int(), W: c.Scale(3).Int(), H: r.H - c.Scale(12).Int()}, c.Theme.Accent)
-			} else {
-				c.Canvas.FillRect(render.Rect{X: r.X + c.Scale(8).Int(), Y: r.Y + r.H - c.Scale(3).Int(), W: r.W - c.Scale(16).Int(), H: c.Scale(3).Int()}, c.Theme.Accent)
-			}
-		}
-		if c.Font != nil {
-			tx := r.X + (r.W-tw)/2
-			if vertical {
-				tx = r.X + c.Scale(14).Int()
-			}
-			c.Font.DrawTextStyled(c.Canvas, tx, r.Y+(r.H-th)/2, label, pxSize, textCol, st.FontStyle)
-		}
-	}
-
-	if vertical {
-		c.Column(4, func() {
-			for i, item := range items {
-				drawOne(i, item)
-			}
-		})
-	} else {
-		c.Row(4, 36, func() {
-			for i, item := range items {
-				drawOne(i, item)
-			}
-		})
-	}
-	return changed
-}
-
 // TabBar рисует динамические закрываемые вкладки (как в браузере/IDE) с кнопками '×' и '+',
 // а также поддержкой перетаскивания (drag-reorder) и открепления вкладки за пределы панели.
-func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option) TabBarEvent {
-	ev := TabBarEvent{Selected: -1, Closed: -1, MovedFrom: -1, MovedTo: -1, Detached: -1}
-	if active == nil {
+func (c *Context) TabBar(id string, tabs []TabItem, activeID *string, opts ...Option) TabBarEvent {
+	ev := TabBarEvent{MovedFrom: -1, MovedTo: -1}
+	if activeID == nil {
 		return ev
 	}
 	id = c.ResolveID("tbar", id)
@@ -717,7 +666,7 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 			continue
 		}
 
-		isAct := *active == i
+		isAct := *activeID == tab.ID
 		visTab := tabsArea.Intersect(tr)
 		c.RegisterHit(id+":tab:"+strconv.Itoa(i), visTab, platform.CursorHand)
 		hovered := !c.IsInputBlocked() && tabsArea.Contains(c.MouseX, c.MouseY) && tr.Contains(c.MouseX, c.MouseY)
@@ -731,16 +680,16 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 		if hovered {
 			c.nextCursor = platform.CursorHand
 			if c.MiddleMousePressed && tab.Closable {
-				ev.Closed = i
+				ev.ClosedID = tab.ID
 				c.RequestRedraw()
 			} else if c.MousePressed {
 				if closeHover {
-					ev.Closed = i
+					ev.ClosedID = tab.ID
 					c.RequestRedraw()
 				} else {
-					if *active != i {
-						*active = i
-						ev.Selected = i
+					if *activeID != tab.ID {
+						*activeID = tab.ID
+						ev.SelectedID = tab.ID
 						c.RequestRedraw()
 					}
 					c.tabDragID = id
@@ -835,7 +784,6 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 							ev.MovedFrom = c.tabDragIndex
 							ev.MovedTo = targetIdx
 							c.tabDragIndex = targetIdx
-							*active = targetIdx
 							c.RequestRedraw()
 						}
 					}
@@ -854,7 +802,7 @@ func (c *Context) TabBar(id string, tabs []TabItem, active *int, opts ...Option)
 			}
 		} else if c.MouseReleased {
 			if c.tabDragging && dy > c.Scale(48).Int() {
-				ev.Detached = c.tabDragIndex
+				ev.DetachedID = tabs[c.tabDragIndex].ID
 				c.RequestRedraw()
 			}
 			c.tabDragID = ""

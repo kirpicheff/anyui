@@ -17,7 +17,7 @@ type Window struct {
 	drawFn      func(*UI)
 	hideOnClose bool
 	onClose     func(*Window) bool
-	onDropFiles func(files []string, x, y int)
+	onDropFiles func(files []string, xPx, yPx int)
 }
 
 // SetTitle меняет заголовок окна.
@@ -27,11 +27,11 @@ func (w *Window) SetTitle(title string) {
 	}
 }
 
-// SetIcon программно устанавливает иконку окна из RGBA-буфера (width * height * 4).
+// SetIcon программно устанавливает иконку окна из RGBA-буфера (widthPx * heightPx * 4).
 // Передача пустого буфера и нулевых размеров сбрасывает программную иконку к иконке класса окна.
-func (w *Window) SetIcon(rgba []byte, width, height int) error {
+func (w *Window) SetIcon(rgba []byte, widthPx, heightPx int) error {
 	if setter, ok := w.platWin.(platform.WindowIconSetter); ok {
-		return setter.SetIcon(rgba, width, height)
+		return setter.SetIcon(rgba, widthPx, heightPx)
 	}
 	return errors.New("установка иконки окна не поддерживается")
 }
@@ -230,25 +230,25 @@ func (w *Window) IsFullscreen() bool {
 	return false
 }
 
-// Position возвращает экранные координаты верхнего левого угла окна.
-func (w *Window) Position() (int, int) {
+// Position возвращает экранные координаты верхнего левого угла окна в физических пикселях (xPx, yPx).
+func (w *Window) Position() (xPx, yPx int) {
 	if w.platWin != nil {
 		return w.platWin.Position()
 	}
 	return 0, 0
 }
 
-// SetPosition перемещает окно в указанные экранные координаты.
-func (w *Window) SetPosition(x, y int) {
+// SetPosition перемещает окно в указанные экранные координаты в физических пикселях (xPx, yPx).
+func (w *Window) SetPosition(xPx, yPx int) {
 	if w.platWin != nil {
-		w.platWin.SetPosition(x, y)
+		w.platWin.SetPosition(xPx, yPx)
 	}
 }
 
-// SetSize изменяет логический размер клиентской области окна.
-func (w *Window) SetSize(width, height int) {
+// SetSize изменяет физический размер клиентской области окна (widthPx, heightPx).
+func (w *Window) SetSize(widthPx, heightPx int) {
 	if w.platWin != nil {
-		w.platWin.SetSize(width, height)
+		w.platWin.SetSize(widthPx, heightPx)
 	}
 }
 
@@ -262,8 +262,8 @@ func (w *Window) SetOnClose(fn func(*Window) bool) {
 	w.onClose = fn
 }
 
-// SetOnDropFiles задаёт обработчик перетаскивания файлов из проводника ОС.
-func (w *Window) SetOnDropFiles(fn func(files []string, x, y int)) {
+// SetOnDropFiles задаёт обработчик перетаскивания файлов из проводника ОС (xPx, yPx — координаты в физических пикселях).
+func (w *Window) SetOnDropFiles(fn func(files []string, xPx, yPx int)) {
 	w.onDropFiles = fn
 }
 
@@ -331,4 +331,3 @@ func (w *Window) handleEvent(ev platform.Event) {
 		w.WakeUp()
 	}
 }
-

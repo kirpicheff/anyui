@@ -5,9 +5,18 @@
 This document tracks the status of strict scalar typing in the AnyUI library according to Phase 18b.
 
 ## Units Contract
-- **`Dp` (`type Dp int`)** — density-independent logical pixels. Used across the entire high-level public API for layouts, containers, options, and widgets.
-- **`Px` (`type Px int`)** — device physical pixels of the render buffer. Used in low-level drawing (`render.Canvas`), low-level callbacks (`CanvasCallbacks`), system window metrics, and screen presentation.
-- **DPI Scaling**: `Scale(dp Dp) Px` and `ScaleF(dp float32) float32` convert logical units to physical device pixels. Reverse conversion is performed via `PxToDp(px Px) Dp`.
+- **`Dp` (`type Dp int`)** — density-independent logical pixels. Used across the entire high-level public API for layouts, containers, options, overlays, and widgets:
+  - All public layout and overlay methods accept geometry strictly in `Dp`: `LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`. Coordinates from `ui.CurrentArea()` are in `Dp` and can be passed directly.
+- **`Px` (`type Px int`)** — device physical pixels of the render buffer. Kept strictly for low-level drawing (`render.Canvas`), low-level canvas/table callbacks (`CanvasView` area, `Table.drawCell` area), system window metrics, and screen presentation (`LastDirtyRects`, `Config.HitTest`, `TitleBarHitTest`).
+- **Orientation**: `Horizontal` and `Vertical` are the only valid enum constants of type `Orientation`. Legacy `SplitOrientation` is completely removed.
+- **DPI Scaling & Conversion Rule**:
+  - `Scale(dp Dp) Px` converts logical units to physical device pixels (frequent hot-path in application code).
+  - `ScaleF(dp float32) float32` scales floating-point logical units.
+  - `PxToDp(px Px) Dp` converts physical pixels to logical units (reverse projection for Canvas callbacks, hit-testing).
+  - `PxToDpf(px float32) float32` reverse projection for floating-point values.
+  - **Rule**: Only the canonical quartet `Scale` / `ScaleF` / `PxToDp` / `PxToDpf` is permitted. Introducing aliases such as `DpToPx` or `DpToPxf` is strictly prohibited.
+  - **Suffix `F` Convention**: The `F` suffix strictly denotes a `float32` variant of the same operation.
+- **Sentinel Value**: `const Auto Dp = -1` is the single canonical sentinel value for automatic sizing. Functions like `Auto()` or constants like `AutoSize` are removed.
 - **No mixed overloads**: exactly one form per concept (parallel overloads like `Width(dp int)` alongside `WidthDp(dp Dp)` are prohibited).
 
 ---
@@ -20,11 +29,27 @@ This document tracks the status of strict scalar typing in the AnyUI library acc
 | `func (u *UI) Scale(dp Dp) Px` | | ✓ | Converts logical pixels to physical device pixels |
 | `func (u *UI) ScaleF(dp float32) float32` | | ✓ | Scales floating-point logical values |
 | `func (u *UI) PxToDp(px Px) Dp` | | ✓ | Converts physical pixels to logical pixels |
+| `func (u *UI) PxToDpf(px float32) float32` | | ✓ | Reverse projection for floating-point values |
 | `func (u *UI) CurrentArea() Rect` | | ✓ | Current container bounds in Dp |
 | `func (u *UI) CurrentAreaPx() Rect` | | ✓ | Current container bounds in physical Px |
 | `func (u *UI) MousePosDp() (Dp, Dp)` | | ✓ | Window mouse cursor coordinates in Dp |
-| `func (u *UI) MousePosPx() (int, int)` | ✓ | | Kept intentionally: OS mouse coordinates in physical pixels |
-| `func Auto() Dp` / `const AutoSize Dp = -1` | | ✓ | Sentinel value for automatic sizing |
+| `func (u *UI) MousePosPx() (Px, Px)` | | ✓ | Window mouse cursor coordinates in physical Px |
+| `const Auto Dp = -1` | | ✓ | Canonical sentinel value for automatic sizing |
+| **Overlays and Interaction (All in Dp)** | | | |
+| `func (u *UI) PushOverlay(bounds Rect, drawFn func())` | | ✓ | Overlay bounds strictly in Dp (scaled to Px at boundary) |
+| `func (u *UI) LayoutRect(rect Rect, fn func())` | | ✓ | Direct layout box strictly in Dp |
+| `func (u *UI) Tooltip(text string, anchor Rect)` | | ✓ | Tooltip anchor strictly in Dp |
+| `func (u *UI) Popover(id string, open *bool, anchor Rect, fn func(), opts ...Option)` | | ✓ | Popover anchor strictly in Dp |
+| `func (u *UI) ContextMenu(id string, anchor Rect, items []ContextMenuItem)` | | ✓ | Context menu anchor strictly in Dp |
+| `func (u *UI) RegisterHoverArea(id string, rect Rect, cursor CursorType, trackMove bool)` | | ✓ | Interactive hover area strictly in Dp |
+| `func (u *UI) LastDirtyRectsPx() []Rect` | | ✓ | Window damage rectangles in device Px (do NOT pass to Dp overlay APIs) |
+| **Testing (Headless)** | | | |
+| `func (h *Headless) InjectMouseMove(xDp, yDp int)` | | ✓ | Mouse move event in logical Dp (auto-scaled by Scale) |
+| `func (h *Headless) InjectMouseClick(xDp, yDp int, btn MouseButton)` | | ✓ | Full mouse click in logical Dp (auto-scaled by Scale) |
+| `func (h *Headless) InjectMouseWheel(dxDp, dyDp int)` | | ✓ | Mouse wheel delta in logical steps (Dp) |
+| `func (h *Headless) InjectMouseMovePx(xPx, yPx int)` | ✓ | | Raw mouse move event in physical device Px |
+| `func (h *Headless) InjectMouseClickPx(xPx, yPx int, btn MouseButton)` | ✓ | | Raw mouse click event in physical device Px |
+| `func (h *Headless) InjectMouseWheelPx(dxPx, dyPx int)` | ✓ | | Raw mouse wheel delta in physical device steps (Px) |
 | **Styling Options** | | | |
 | `Width(dp Dp) Option` | | ✓ | Fixed widget width |
 | `Height(dp Dp) Option` | | ✓ | Fixed widget height |
@@ -75,11 +100,11 @@ This document tracks the status of strict scalar typing in the AnyUI library acc
 | `Card(wDp, hDp, padDp Dp, fn func())` | | ✓ | Rounded card |
 | `Button(id, label string, primary bool, widthDp Dp) bool` | | ✓ | Button with width |
 | `Image(img image.Image, wDp, hDp Dp, mode ImageScaleMode)` | | ✓ | Image display |
-| `CanvasView(wDp, hDp Dp, drawFn func(canvas *render.Canvas, area Rect))` | | ✓ | Custom canvas drawing area |
+| `CanvasView(wDp, hDp Dp, drawFn func(canvas *render.Canvas, areaPx Rect))` | | ✓ | Custom canvas drawing area (areaPx in device Px) |
 | `InteractiveCanvas(id string, wDp, hDp Dp, cb CanvasCallbacks, opts ...Option)` | | ✓ | Interactive custom canvas |
 | `ScrollView(id string, wDp, hDp Dp, fn func(), opts ...Option)` | | ✓ | Scrollable container |
-| `ListView(id string, count int, itemHeightDp Dp, selected *int, drawItem func(...), opts ...Option)` | | ✓ | Virtualized list (count, selected — int indices) |
-| `ListViewEx(id string, count int, itemHeightDp Dp, selected map[int]bool, checked []bool, drawItem func(...), opts ...Option)` | | ✓ | Extended list (count — int item count) |
+| `ListView(id string, count int, itemHeightDp Dp, selected *int, drawItem func(idx int, areaPx Rect, sel bool), opts ...Option)` | | ✓ | Virtualized list (areaPx in device Px; count, selected — int indices) |
+| `ListViewEx(id string, count int, itemHeightDp Dp, selected map[int]bool, checked []bool, drawItem func(idx int, areaPx Rect, sel bool), opts ...Option)` | | ✓ | Extended list (areaPx in device Px; count — int item count) |
 | `TableColumn.WidthDp Dp` | | ✓ | Table column base width |
 | `TableColumn.MinWidthDp Dp` | | ✓ | Table column min width |
 | `StatusBarSection.WidthDp Dp` | | ✓ | Status bar section width |

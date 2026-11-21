@@ -184,6 +184,14 @@ func (u *UI) PxToDp(px Px) Dp {
 	return u.ctx.PxToDp(px)
 }
 
+// PxToDpf переводит физические пиксели (px) в дробные логические пиксели (dp).
+func (u *UI) PxToDpf(px float32) float32 {
+	if u.ctx == nil {
+		return 0
+	}
+	return u.ctx.PxToDpf(px)
+}
+
 // CurrentArea возвращает прямоугольник текущего контейнера в логических пикселях (Dp).
 func (u *UI) CurrentArea() Rect {
 	if u.ctx == nil {
@@ -236,19 +244,21 @@ func (u *UI) Image(img image.Image, wDp, hDp Dp, mode ImageScaleMode) {
 }
 
 // CanvasView выделяет область wDp x hDp для кастомного рисования (графики, видеокадры, градиенты).
-func (u *UI) CanvasView(wDp, hDp Dp, drawFn func(canvas *render.Canvas, area Rect)) {
+// Колбэк drawFn получает координаты области areaPx строго в физических пикселях (Px) для прямого вывода в Canvas.
+func (u *UI) CanvasView(wDp, hDp Dp, drawFn func(canvas *render.Canvas, areaPx Rect)) {
 	u.ctx.CanvasView(wDp, hDp, drawFn)
 }
 
 // InteractiveCanvas выделяет интерактивную область wDp x hDp с поддержкой фокуса,
 // захвата перетаскивания мыши и передачи сырых событий клавиатуры (со ScanCode/Extended) и мыши/колеса.
+// Методы cb (включая OnDraw) работают с областью area в физических пикселях (Px).
 func (u *UI) InteractiveCanvas(id string, wDp, hDp Dp, cb CanvasCallbacks, opts ...Option) {
 	u.ctx.InteractiveCanvas(id, wDp, hDp, cb, opts...)
 }
 
-// DrawSVG рисует SVG-иконку по координатам (x, y) с размером sizeDp и цветом tint.
-func (u *UI) DrawSVG(svgData string, x, y int, sizeDp Dp, tint Color) {
-	u.ctx.Canvas.DrawSVG(svgData, x, y, u.ctx.Scale(sizeDp).Int(), tint)
+// DrawSVG рисует SVG-иконку в физических координатах (xPx, yPx) с размером sizeDp и цветом tint.
+func (u *UI) DrawSVG(svgData string, xPx, yPx int, sizeDp Dp, tint Color) {
+	u.ctx.Canvas.DrawSVG(svgData, xPx, yPx, u.ctx.Scale(sizeDp).Int(), tint)
 }
 
 // Column располагает дочерние элементы вертикально с отступом gapDp.
@@ -393,16 +403,34 @@ func (u *UI) Flow(gapXDp, gapYDp Dp, fn func()) {
 	u.ctx.Flow(gapXDp, gapYDp, fn)
 }
 
+func (u *UI) scaleRect(r Rect) render.Rect {
+	if r.Empty() || u.ctx == nil {
+		return render.Rect{}
+	}
+	return render.Rect{
+		X: u.ctx.Scale(Dp(r.X)).Int(),
+		Y: u.ctx.Scale(Dp(r.Y)).Int(),
+		W: u.ctx.Scale(Dp(r.W)).Int(),
+		H: u.ctx.Scale(Dp(r.H)).Int(),
+	}
+}
+
 // PushOverlay регистрирует отложенную отрисовку элемента поверх основного интерфейса.
-// Прямоугольник bounds блокирует клики по виджетам под оверлеем.
+// Прямоугольник bounds задаётся в логических пикселях (Dp / CurrentArea()) и блокирует клики по виджетам под оверлеем.
 func (u *UI) PushOverlay(bounds Rect, drawFn func()) {
-	u.ctx.PushOverlay(bounds, drawFn)
+	if u.ctx == nil {
+		return
+	}
+	u.ctx.PushOverlay(u.scaleRect(bounds), drawFn)
 }
 
 // LayoutRect создаёт область раскладки (колонку без отступов) строго по заданному прямоугольнику rect
-// с клиппингом содержимого. Удобно для размещения виджетов внутри PushOverlay.
+// (в логических пикселях Dp / CurrentArea()) с клиппингом содержимого. Удобно для размещения виджетов внутри PushOverlay.
 func (u *UI) LayoutRect(rect Rect, fn func()) {
-	u.ctx.LayoutRect(rect, fn)
+	if u.ctx == nil {
+		return
+	}
+	u.ctx.LayoutRect(u.scaleRect(rect), fn)
 }
 
 // FocusID возвращает идентификатор виджета, находящегося в фокусе.
@@ -417,13 +445,13 @@ func (u *UI) SetFocus(id string) {
 }
 
 // Shortcut регистрирует глобальную горячую клавишу для текущего окна.
-func (u *UI) Shortcut(keyCode uint32, mods Modifiers, fn func()) {
-	u.ctx.RegisterShortcut(keyCode, mods, fn)
+func (u *UI) Shortcut(key Key, mods Modifiers, fn func()) {
+	u.ctx.RegisterShortcut(key, mods, fn)
 }
 
-// DrawText рисует строку текста в произвольных физических координатах (для ListView и CanvasView).
-func (u *UI) DrawText(x, y int, text string, sizeDp Dp, col Color) {
-	u.ctx.DrawText(x, y, text, sizeDp, col)
+// DrawText рисует строку текста в физических координатах (xPx, yPx) с размером sizeDp и цветом col.
+func (u *UI) DrawText(xPx, yPx int, text string, sizeDp Dp, col Color) {
+	u.ctx.DrawText(xPx, yPx, text, sizeDp, col)
 }
 
 // StaticLayer кеширует статический блок интерфейса (фон, неизменяемый текст) в отдельный Static Layer.
@@ -449,12 +477,17 @@ func (u *UI) SetCursor(cursor CursorType) {
 	u.ctx.SetCursor(cursor)
 }
 
-// RegisterHoverArea регистрирует кастомную интерактивную область для умной фильтрации EventMouseMove.
+// RegisterHoverArea регистрирует кастомную интерактивную область rect (в логических пикселях Dp / CurrentArea())
+// для смены курсора мыши и умной фильтрации перемещений.
 func (u *UI) RegisterHoverArea(id string, rect Rect, cursor CursorType, trackMove bool) {
+	if u.ctx == nil {
+		return
+	}
+	rPx := u.scaleRect(rect)
 	if trackMove {
-		u.ctx.RegisterHitTrack(id, rect, cursor)
+		u.ctx.RegisterHitTrack(id, rPx, cursor)
 	} else {
-		u.ctx.RegisterHit(id, rect, cursor)
+		u.ctx.RegisterHit(id, rPx, cursor)
 	}
 }
 
@@ -473,8 +506,9 @@ func (u *UI) LastFrameStaticBlitted() bool {
 	return u.ctx.LastFrameStaticBlitted()
 }
 
-// LastDirtyRects возвращает список изменённых областей последнего выведенного кадра.
-func (u *UI) LastDirtyRects() []Rect {
+// LastDirtyRectsPx возвращает список изменённых областей последнего выведенного кадра в физических пикселях окна (Px).
+// Внимание: метод возвращает физические пиксели (Px) устройства. Не передавайте их напрямую в методы раскладки и оверлеев (LayoutRect, PushOverlay и др.), работающие строго в Dp.
+func (u *UI) LastDirtyRectsPx() []Rect {
 	return u.ctx.LastDirtyRects()
 }
 
@@ -483,12 +517,12 @@ func (u *UI) SetDebugDirtyRect(enabled bool) {
 	u.ctx.SetDebugDirtyRect(enabled)
 }
 
-// MousePosPx возвращает текущие физические координаты курсора мыши в окне (в пикселях).
-func (u *UI) MousePosPx() (int, int) {
+// MousePosPx возвращает текущие физические координаты курсора мыши в окне (в Px).
+func (u *UI) MousePosPx() (Px, Px) {
 	if u.ctx == nil {
 		return 0, 0
 	}
-	return u.ctx.MouseX, u.ctx.MouseY
+	return Px(u.ctx.MouseX), Px(u.ctx.MouseY)
 }
 
 // MousePosDp возвращает текущие логические координаты курсора мыши в окне (в dp).
@@ -535,4 +569,3 @@ func (u *UI) ClearScaledImageCache() {
 	render.ClearScaledImageCache()
 	u.ctx.RequestRedraw()
 }
-

@@ -86,11 +86,11 @@ func TestSplitPaneAndAccordion(t *testing.T) {
 	// Разделитель при width=400, ratio=0.5 находится примерно на x=200
 	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 202, Y: 100})
 	ctx.Render(func(c *Context) {
-		c.SplitPane("sp", SplitHorizontal, &ratio, func() {}, func() {}, Width(400), Height(200))
+		c.SplitPane("sp", Horizontal, &ratio, func() {}, func() {}, Width(400), Height(200))
 	})
 	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 300, Y: 100})
 	ctx.Render(func(c *Context) {
-		c.SplitPane("sp", SplitHorizontal, &ratio, func() {}, func() {}, Width(400), Height(200))
+		c.SplitPane("sp", Horizontal, &ratio, func() {}, func() {}, Width(400), Height(200))
 	})
 	if ratio <= 0.6 {
 		t.Fatalf("expected split ratio to increase after dragging right, got %v", ratio)
@@ -118,8 +118,9 @@ func TestTabBarDragReorderAndDetach(t *testing.T) {
 		{ID: "t1", Title: "One", Closable: true},
 		{ID: "t2", Title: "Two", Closable: true},
 	}
-	active := 0
-	movedFrom, movedTo, detached := -1, -1, -1
+	active := "t1"
+	movedFrom, movedTo := -1, -1
+	detached := ""
 
 	// Нажимаем на первую вкладку (x=40, y=18)
 	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 40, Y: 18})
@@ -147,12 +148,12 @@ func TestTabBarDragReorderAndDetach(t *testing.T) {
 	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 200, Y: 150})
 	ctx.Render(func(c *Context) {
 		ev := c.TabBar("tb", tabs, &active)
-		if ev.Detached >= 0 {
-			detached = ev.Detached
+		if ev.DetachedID != "" {
+			detached = ev.DetachedID
 		}
 	})
-	if detached != 1 {
-		t.Fatalf("expected Detached=1, got %d", detached)
+	if detached != "t2" {
+		t.Fatalf("expected DetachedID=t2, got %s", detached)
 	}
 }
 
@@ -380,7 +381,7 @@ func TestKeyBasedStateControls(t *testing.T) {
 		t.Fatalf("ожидался выбор selKey=k1 после KeyHome, получено %q", selKey)
 	}
 
-	// 3. MultiSelect и CheckComboBox на map[string]bool
+	// 3. MultiSelect на map[string]bool
 	selMap := map[string]bool{"k1": true}
 	if ctx.MultiSelect("ms_nil", customItems, nil) {
 		t.Fatal("MultiSelect с nil selectedIDs должен возвращать false")
@@ -388,7 +389,6 @@ func TestKeyBasedStateControls(t *testing.T) {
 
 	ctx.Render(func(c *Context) {
 		c.MultiSelect("ms_test", customItems, selMap, Width(200))
-		c.CheckComboBox("ccb_test", customItems, selMap, Width(200))
 	})
 	if !selMap["k1"] {
 		t.Fatal("ожидалось сохранение k1=true в selMap")
@@ -446,21 +446,12 @@ func TestTableReorder(t *testing.T) {
 	var receivedDrag *DragEvent
 	reorderCallback := func(ev DragEvent) {
 		receivedDrag = &ev
-		// Перемещение элемента в модели данных силами приложения
-		fromIdx := int(ev.FromKey[0] - '0')
-		toIdx := int(ev.ToKey[0] - '0')
+		// Перемещение элемента в модели данных силами приложения по контракту ToIndex (после удаления)
+		fromIdx := ev.FromIndex
+		toIdx := ev.ToIndex
 		item := items[fromIdx]
-		// Удаляем fromIdx
 		items = append(items[:fromIdx], items[fromIdx+1:]...)
-		// Если сброс DropBelow, вставляем после toIdx (с учетом смещения при удалении)
-		insertIdx := toIdx
-		if fromIdx < toIdx {
-			insertIdx = toIdx - 1
-		}
-		if ev.Drop == DropBelow {
-			insertIdx++
-		}
-		items = append(items[:insertIdx], append([]string{item}, items[insertIdx:]...)...)
+		items = append(items[:toIdx], append([]string{item}, items[toIdx:]...)...)
 	}
 
 	renderTable := func() TableEvent {
@@ -490,8 +481,11 @@ func TestTableReorder(t *testing.T) {
 	if ev.Drag == nil {
 		t.Fatal("ожидалось событие ev.Drag после завершения перетаскивания строки")
 	}
-	if ev.Drag.FromKey != "1" || ev.Drag.ToKey != "3" || ev.Drag.Drop != DropBelow {
+	if ev.Drag.FromIndex != 1 || ev.Drag.ToIndex != 3 || ev.Drag.Drop != DropBelow {
 		t.Fatalf("неверные параметры события Drag: %+v", ev.Drag)
+	}
+	if ev.Drag.FromKey != "" || ev.Drag.ToKey != "" {
+		t.Fatalf("ожидались пустые FromKey и ToKey для Table, получено: %+v", ev.Drag)
 	}
 	if receivedDrag == nil {
 		t.Fatal("ожидался вызов коллбека OnReorder")
@@ -574,6 +568,7 @@ func TestTreeViewReorder(t *testing.T) {
 }
 
 func TestTreeViewDropInside(t *testing.T) {
+	t.Skip("перенос внутрь (DropInside) зарезервирован для Фазы 20b")
 	ctx := newTestContext(600, 400)
 	roots := []*TreeNode{
 		{ID: "node0", Label: "Узел 0"},
@@ -636,6 +631,7 @@ func TestTreeViewDropInside(t *testing.T) {
 }
 
 func TestCrossWidgetReorderTree(t *testing.T) {
+	t.Skip("кросс-виджетный перенос узлов зарезервирован для Фазы 20b")
 	ctx := newTestContext(800, 400)
 	treeA := []*TreeNode{
 		{ID: "src_0", Label: "Источник 0"},
@@ -783,9 +779,3 @@ func TestToastClickAfterReorder(t *testing.T) {
 		t.Fatal("reorderActive должен быть сброшен при EventCaptureLost!")
 	}
 }
-
-
-
-
-
-

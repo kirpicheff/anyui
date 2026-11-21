@@ -13,35 +13,35 @@ type mockWindow struct {
 	clip  string
 }
 
-func (m *mockWindow) Run(func(platform.Event)) error          { return nil }
-func (m *mockWindow) Open(func(platform.Event)) error         { return nil }
-func (m *mockWindow) Present([]byte, int, int)                {}
-func (m *mockWindow) Invalidate()                             {}
-func (m *mockWindow) WakeUp()                                 {}
-func (m *mockWindow) Show()                                   {}
-func (m *mockWindow) Hide()                                   {}
-func (m *mockWindow) Close()                                  {}
-func (m *mockWindow) SetTitle(string)                         {}
-func (m *mockWindow) SetCursor(platform.CursorType)           {}
-func (m *mockWindow) Size() (int, int)                        { return m.w, m.h }
-func (m *mockWindow) Scale() float32                          { return m.scale }
-func (m *mockWindow) ClipboardText() (string, error)          { return m.clip, nil }
-func (m *mockWindow) SetClipboardText(s string) error         { m.clip = s; return nil }
-func (m *mockWindow) Minimize()                               {}
-func (m *mockWindow) Maximize()                               {}
-func (m *mockWindow) Restore()                                {}
-func (m *mockWindow) IsMaximized() bool                       { return false }
-func (m *mockWindow) IsMinimized() bool                       { return false }
-func (m *mockWindow) SetFullscreen(bool)                      {}
-func (m *mockWindow) IsFullscreen() bool                      { return false }
-func (m *mockWindow) Position() (int, int)                    { return 0, 0 }
-func (m *mockWindow) SetPosition(int, int)                    {}
-func (m *mockWindow) SetSize(int, int)                        {}
-func (m *mockWindow) SetOnClose(func() bool)                  {}
-func (m *mockWindow) NativeHandle() uintptr                   { return 0 }
-func (m *mockWindow) SetCapture()                             {}
-func (m *mockWindow) ReleaseCapture()                         {}
-func (m *mockWindow) DoubleClickTimeMs() int                  { return 500 }
+func (m *mockWindow) Run(func(platform.Event)) error  { return nil }
+func (m *mockWindow) Open(func(platform.Event)) error { return nil }
+func (m *mockWindow) Present([]byte, int, int)        {}
+func (m *mockWindow) Invalidate()                     {}
+func (m *mockWindow) WakeUp()                         {}
+func (m *mockWindow) Show()                           {}
+func (m *mockWindow) Hide()                           {}
+func (m *mockWindow) Close()                          {}
+func (m *mockWindow) SetTitle(string)                 {}
+func (m *mockWindow) SetCursor(platform.CursorType)   {}
+func (m *mockWindow) Size() (int, int)                { return m.w, m.h }
+func (m *mockWindow) Scale() float32                  { return m.scale }
+func (m *mockWindow) ClipboardText() (string, error)  { return m.clip, nil }
+func (m *mockWindow) SetClipboardText(s string) error { m.clip = s; return nil }
+func (m *mockWindow) Minimize()                       {}
+func (m *mockWindow) Maximize()                       {}
+func (m *mockWindow) Restore()                        {}
+func (m *mockWindow) IsMaximized() bool               { return false }
+func (m *mockWindow) IsMinimized() bool               { return false }
+func (m *mockWindow) SetFullscreen(bool)              {}
+func (m *mockWindow) IsFullscreen() bool              { return false }
+func (m *mockWindow) Position() (int, int)            { return 0, 0 }
+func (m *mockWindow) SetPosition(int, int)            {}
+func (m *mockWindow) SetSize(int, int)                {}
+func (m *mockWindow) SetOnClose(func() bool)          {}
+func (m *mockWindow) NativeHandle() uintptr           { return 0 }
+func (m *mockWindow) SetCapture()                     {}
+func (m *mockWindow) ReleaseCapture()                 {}
+func (m *mockWindow) DoubleClickTimeMs() int          { return 500 }
 
 func newTestContext(w, h int) *Context {
 	win := &mockWindow{w: w, h: h, scale: 1.0}
@@ -152,6 +152,19 @@ func TestCheckboxAndRadioGroup(t *testing.T) {
 	if !changed || radioSel != "opt2" {
 		t.Fatalf("ожидалось radioSel=opt2, получено %q (changed=%v)", radioSel, changed)
 	}
+
+	// Проверка RadioGroup с выбором по строковому ключу
+	rgSel := "val1"
+	rgItems := []SelectItem{
+		{Key: "val1", Label: "Label 1"},
+		{Key: "val2", Label: "Label 2"},
+	}
+	ctx.beginFrame()
+	ctx.RadioGroup("rg", rgItems, &rgSel)
+	ctx.endFrame()
+	if rgSel != "val1" {
+		t.Fatalf("ожидалось rgSel=val1, получено %q", rgSel)
+	}
 }
 
 func TestTabBarEvents(t *testing.T) {
@@ -160,7 +173,7 @@ func TestTabBarEvents(t *testing.T) {
 		{ID: "t1", Title: "Первая", Closable: true},
 		{ID: "t2", Title: "Вторая", Closable: true},
 	}
-	active := 0
+	active := "t1"
 
 	// Клик по второй вкладке (tabW = 160 -> вторая вкладка начинается примерно с x=162)
 	ctx.MouseX, ctx.MouseY = 200, 15
@@ -169,8 +182,8 @@ func TestTabBarEvents(t *testing.T) {
 	ev := ctx.TabBar("tb", tabs, &active, Width(600))
 	ctx.endFrame()
 
-	if ev.Selected != 1 || active != 1 {
-		t.Fatalf("ожидался выбор вкладки 1, получено Selected=%d active=%d", ev.Selected, active)
+	if ev.SelectedID != "t2" || active != "t2" {
+		t.Fatalf("ожидался выбор вкладки t2, получено SelectedID=%q active=%q", ev.SelectedID, active)
 	}
 
 	// Клик по кнопке '+' (правый край: 600 - 16 = 584)
@@ -214,4 +227,3 @@ func TestScrollViewWheel(t *testing.T) {
 	}
 	_ = render.Rect{}
 }
-

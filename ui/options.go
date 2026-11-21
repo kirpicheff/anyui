@@ -26,18 +26,40 @@ const (
 type DropZone uint8
 
 const (
-	DropAbove DropZone = iota // Сброс выше/перед целевым элементом
-	DropBelow                 // Сброс ниже/после целевого элемента
-	DropInside                // Сброс внутрь целевого элемента (для папок/контейнеров)
+	DropAbove  DropZone = iota // Сброс выше/перед целевым элементом
+	DropBelow                  // Сброс ниже/после целевого элемента
+	DropInside                 // Сброс внутрь целевого элемента (для папок/контейнеров)
 )
 
+// ВАЖНО: данный docstring должен быть строго синхронизирован с ui_controls_extra.go (anyui.DragEvent).
+
 // DragEvent описывает событие завершения перетаскивания элемента (Reorder).
+//
+// Для списков и таблиц (Table, TableEx, ListView, ListViewEx):
+//   - FromIndex: исходный индекс перемещаемого элемента (>= 0).
+//   - ToIndex: уже вычисленная позиция вставки в списке после удаления перемещаемого элемента (0 <= ToIndex < rowCount).
+//   - FromKey и ToKey строго пусты ("").
+//   - Допустимые зоны Drop: только DropAbove и DropBelow.
+//   - Если ToIndex == FromIndex, операция является no-op и событие не генерируется.
+//   - ListViewEx: при Reorder приложение обязано синхронно переставлять элементы в checked []bool и selected map[int]bool, иначе отметки сохранятся за исходными числовыми индексами.
+//
+// Для иерархических деревьев (TreeView, TreeViewEx):
+//   - FromIndex и ToIndex строго равны -1.
+//   - FromKey: ID перемещаемого узла (sourceNode.ID).
+//   - ToKey: ID якорного узла (targetNode.ID), относительно которого применяется Drop; позицию вставки в список детей родителя вычисляет приложение.
+//   - Перетаскивание узлов разрешено только внутри одного родителя (source.Parent == target.Parent). При попытке сброса на узел другого родителя событие отбрасывается.
+//   - Раскрытый и свёрнутый узел: для раскрытого узла DropBelow означает позицию первого ребёнка; для свёрнутого — сразу после всего поддерева (обрабатывается приложением).
+//   - Допустимые зоны Drop: DropAbove и DropBelow (зона DropInside не поддерживается).
+//   - TreeViewEx: при перетаскивании одного узла из группы выделенных перемещается только он.
+//   - При сбросе узла на самого себя (ToKey == FromKey) операция является no-op и событие не генерируется.
 type DragEvent struct {
-	FromWidget string
-	ToWidget   string
-	FromKey    string
-	ToKey      string
-	Drop       DropZone
+	FromWidget string   // ID виджета-источника перетаскивания
+	ToWidget   string   // ID целевого виджета
+	FromKey    string   // Ключ перетаскиваемого узла (для TreeView — node.ID; "" для Table/ListView)
+	ToKey      string   // Ключ якорного целевого узла (для TreeView — node.ID; "" для Table/ListView)
+	FromIndex  int      // Индекс перетаскиваемой строки (для Table/ListView; -1 для TreeView)
+	ToIndex    int      // Позиция вставки в списке после удаления перемещаемого элемента (0 <= ToIndex < rowCount; -1 для TreeView)
+	Drop       DropZone // Зона сброса (DropAbove, DropBelow; DropInside не поддерживается)
 }
 
 // WidgetStyle хранит переопределения оформления и размеров конкретного виджета.
@@ -88,13 +110,8 @@ type WidgetStyle struct {
 	OnReorder        func(ev DragEvent)
 }
 
-// AutoSize — константа sentinel-значения для автоматического подбора размера по остатку доступной области.
-const AutoSize Dp = -1
-
-// Auto возвращает sentinel-значение (-1) для автоматического занятия доступного остатка области контейнера.
-func Auto() Dp {
-	return AutoSize
-}
+// Auto — константа sentinel-значения для автоматического занятия доступного остатка области контейнера.
+const Auto Dp = -1
 
 // Option настраивает стиль или поведение отдельного виджета.
 type Option func(*WidgetStyle)
@@ -201,16 +218,26 @@ func Primary(enabled ...bool) Option {
 }
 
 // Secondary задаёт второстепенный стиль виджета.
-func Secondary() Option {
+func Secondary(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.Variant = VariantSecondary
+		if val {
+			s.Variant = VariantSecondary
+		} else {
+			s.Variant = VariantDefault
+		}
 	}
 }
 
 // Danger задаёт стиль предупреждения об опасном действии.
-func Danger() Option {
+func Danger(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.Variant = VariantDanger
+		if val {
+			s.Variant = VariantDanger
+		} else {
+			s.Variant = VariantDefault
+		}
 	}
 }
 
@@ -258,9 +285,10 @@ func IconRight(svg string) Option {
 }
 
 // Password включает режим маскировки вводимых символов (звёздочки/точки).
-func Password() Option {
+func Password(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.Password = true
+		s.Password = val
 	}
 }
 
@@ -301,10 +329,11 @@ func Indeterminate(enabled ...bool) Option {
 	}
 }
 
-// Searchable включает строку поиска/фильтрации внутри выпадающего списка Select/ComboBox.
-func Searchable(v bool) Option {
+// Searchable включает строку поиска/фильтрации внутри выпадающего списка Select.
+func Searchable(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.Searchable = v
+		s.Searchable = val
 	}
 }
 
@@ -344,23 +373,26 @@ func MaxHeight(dp Dp) Option {
 }
 
 // FillWidth растягивает виджет на всю доступную ширину контейнера.
-func FillWidth() Option {
+func FillWidth(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.FillWidth = true
+		s.FillWidth = val
 	}
 }
 
 // FillHeight растягивает виджет на всю доступную высоту контейнера.
-func FillHeight() Option {
+func FillHeight(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.FillHeight = true
+		s.FillHeight = val
 	}
 }
 
 // AutoHeight включает автоматический подбор высоты контейнера (например, Card) по содержимому.
-func AutoHeight() Option {
+func AutoHeight(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.AutoHeight = true
+		s.AutoHeight = val
 	}
 }
 
@@ -380,16 +412,18 @@ func WordWrap(enabled ...bool) Option {
 }
 
 // Ellipsis включает обрезку текста с многоточием при нехватке ширины (для Label).
-func Ellipsis(v bool) Option {
+func Ellipsis(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.Ellipsis = v
+		s.Ellipsis = val
 	}
 }
 
 // LineNumbers включает отображение номеров строк в TextArea.
-func LineNumbers(v bool) Option {
+func LineNumbers(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.LineNumbers = v
+		s.LineNumbers = val
 	}
 }
 
@@ -429,23 +463,36 @@ func FocusBorderColor(c render.Color) Option {
 }
 
 // TextAlignCenter выравнивает текст и placeholder по центру (для TextInput и Label).
-func TextAlignCenter() Option {
+func TextAlignCenter(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.TextAlign = AlignTextCenter
+		if val {
+			s.TextAlign = AlignTextCenter
+		} else {
+			s.TextAlign = AlignTextLeft
+		}
 	}
 }
 
 // TextAlignLeft выравнивает текст и placeholder по левому краю (для TextInput и Label).
-func TextAlignLeft() Option {
+func TextAlignLeft(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.TextAlign = AlignTextLeft
+		if val {
+			s.TextAlign = AlignTextLeft
+		}
 	}
 }
 
 // TextAlignRight выравнивает текст и placeholder по правому краю (для TextInput и Label).
-func TextAlignRight() Option {
+func TextAlignRight(enabled ...bool) Option {
+	val := optBool(enabled)
 	return func(s *WidgetStyle) {
-		s.TextAlign = AlignTextRight
+		if val {
+			s.TextAlign = AlignTextRight
+		} else {
+			s.TextAlign = AlignTextLeft
+		}
 	}
 }
 
@@ -482,7 +529,8 @@ func ScrollToID(id string) Option {
 	}
 }
 
-// Reorderable разрешает перетаскивание элементов (строк или узлов) внутри компонента для изменения порядка.
+// Reorderable разрешает перетаскивание элементов (строк в Table/ListView или узлов в TreeView) внутри компонента для изменения порядка.
+// Без опции OnReorder результат перетаскивания отбрасывается.
 func Reorderable(enabled ...bool) Option {
 	return func(s *WidgetStyle) {
 		if len(enabled) == 0 || enabled[0] {
@@ -496,10 +544,6 @@ func Reorderable(enabled ...bool) Option {
 // OnReorder регистрирует обработчик события завершения перетаскивания элемента.
 func OnReorder(fn func(ev DragEvent)) Option {
 	return func(s *WidgetStyle) {
-		s.Reorderable = true
 		s.OnReorder = fn
 	}
 }
-
-
-

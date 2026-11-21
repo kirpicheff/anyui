@@ -28,7 +28,27 @@ const (
 	DropInside = ui.DropInside
 )
 
+// ВАЖНО: данный docstring должен быть строго синхронизирован с ui/options.go (ui.DragEvent).
+
 // DragEvent описывает событие завершения перетаскивания элемента (Reorder).
+//
+// Для списков и таблиц (Table, TableEx, ListView, ListViewEx):
+//   - FromIndex: исходный индекс перемещаемого элемента (>= 0).
+//   - ToIndex: уже вычисленная позиция вставки в списке после удаления перемещаемого элемента (0 <= ToIndex < rowCount).
+//   - FromKey и ToKey строго пусты ("").
+//   - Допустимые зоны Drop: только DropAbove и DropBelow.
+//   - Если ToIndex == FromIndex, операция является no-op и событие не генерируется.
+//   - ListViewEx: при Reorder приложение обязано синхронно переставлять элементы в checked []bool и selected map[int]bool, иначе отметки сохранятся за исходными числовыми индексами.
+//
+// Для иерархических деревьев (TreeView, TreeViewEx):
+//   - FromIndex и ToIndex строго равны -1.
+//   - FromKey: ID перемещаемого узла (sourceNode.ID).
+//   - ToKey: ID якорного узла (targetNode.ID), относительно которого применяется Drop; позицию вставки в список детей родителя вычисляет приложение.
+//   - Перетаскивание узлов разрешено только внутри одного родителя (source.Parent == target.Parent). При попытке сброса на узел другого родителя событие отбрасывается.
+//   - Раскрытый и свёрнутый узел: для раскрытого узла DropBelow означает позицию первого ребёнка; для свёрнутого — сразу после всего поддерева (обрабатывается приложением).
+//   - Допустимые зоны Drop: DropAbove и DropBelow (зона DropInside не поддерживается).
+//   - TreeViewEx: при перетаскивании одного узла из группы выделенных перемещается только он.
+//   - При сбросе узла на самого себя (ToKey == FromKey) операция является no-op и событие не генерируется.
 type DragEvent = ui.DragEvent
 
 // Orientation задаёт направление ориентации элементов интерфейса (горизонтальное или вертикальное).
@@ -37,14 +57,6 @@ type Orientation = ui.Orientation
 const (
 	Horizontal = ui.Horizontal
 	Vertical   = ui.Vertical
-)
-
-// SplitOrientation задаёт направление разделения в SplitPane.
-type SplitOrientation = ui.SplitOrientation
-
-const (
-	SplitHorizontal = ui.SplitHorizontal
-	SplitVertical   = ui.SplitVertical
 )
 
 // AccordionItem описывает одну секцию аккордеона.
@@ -73,7 +85,8 @@ const (
 )
 
 // Table рисует таблицу с заголовками, ресайзом ширины колонок, сортировкой и виртуализацией строк.
-func (u *UI) Table(id string, cols []TableColumn, rowCount int, selected *int, sort *TableSort, drawCell func(row, col int, area Rect, isSelected bool), opts ...Option) TableEvent {
+// Колбэк drawCell вызывается для отрисовки видимых ячеек; координаты ячейки areaPx передаются в физических пикселях (Px).
+func (u *UI) Table(id string, cols []TableColumn, rowCount int, selected *int, sort *TableSort, drawCell func(row, col int, areaPx Rect, isSelected bool), opts ...Option) TableEvent {
 	return u.ctx.Table(id, cols, rowCount, selected, sort, drawCell, opts...)
 }
 
@@ -83,7 +96,7 @@ func (u *UI) TreeView(id string, roots []*TreeNode, selectedID *string, opts ...
 }
 
 // SplitPane делит область на 2 панели с перетаскиваемым разделителем.
-func (u *UI) SplitPane(id string, orient SplitOrientation, ratio *float32, firstFn, secondFn func(), opts ...Option) {
+func (u *UI) SplitPane(id string, orient Orientation, ratio *float32, firstFn, secondFn func(), opts ...Option) {
 	u.ctx.SplitPane(id, orient, ratio, firstFn, secondFn, opts...)
 }
 
@@ -156,4 +169,3 @@ func (u *UI) Hyperlink(id, text string, opts ...Option) bool {
 func (u *UI) MaskedInput(id string, value *string, mask string, opts ...Option) bool {
 	return u.ctx.MaskedInput(id, value, mask, opts...)
 }
-

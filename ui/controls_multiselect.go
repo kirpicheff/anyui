@@ -276,11 +276,6 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 	return changed
 }
 
-// CheckComboBox — синоним MultiSelect для совместимости с десктопной терминологией.
-func (c *Context) CheckComboBox(id string, items []SelectItem, selectedIDs map[string]bool, opts ...Option) bool {
-	return c.MultiSelect(id, items, selectedIDs, opts...)
-}
-
 // TagInput отрисовывает поле ввода тегов/чипсов (добавление по Enter/запятой, удаление по клику на x или Backspace).
 func (c *Context) TagInput(id string, tags *[]string, placeholder string, opts ...Option) bool {
 	if tags == nil {

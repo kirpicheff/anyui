@@ -118,18 +118,14 @@ func (u *UI) MultiSelect(id string, items []SelectItem, selectedIDs map[string]b
 	return u.ctx.MultiSelect(id, items, selectedIDs, opts...)
 }
 
-// CheckComboBox — синоним MultiSelect.
-func (u *UI) CheckComboBox(id string, items []SelectItem, selectedIDs map[string]bool, opts ...Option) bool {
-	return u.ctx.CheckComboBox(id, items, selectedIDs, opts...)
-}
-
 // TagInput отрисовывает поле ввода тегов/чипсов.
 func (u *UI) TagInput(id string, tags *[]string, placeholder string, opts ...Option) bool {
 	return u.ctx.TagInput(id, tags, placeholder, opts...)
 }
 
 // ListViewEx отрисовывает список с мультивыбором и опциональными чекбоксами.
-func (u *UI) ListViewEx(id string, count int, itemHeightDp Dp, selected map[int]bool, checked []bool, drawItem func(index int, area Rect, isSelected bool), opts ...Option) bool {
+// Колбэк drawItem получает координаты элемента areaPx в физических пикселях (Px).
+func (u *UI) ListViewEx(id string, count int, itemHeightDp Dp, selected map[int]bool, checked []bool, drawItem func(index int, areaPx Rect, isSelected bool), opts ...Option) bool {
 	return u.ctx.ListViewEx(id, count, itemHeightDp, selected, checked, drawItem, opts...)
 }
 
@@ -139,7 +135,8 @@ func (u *UI) TreeViewEx(id string, roots []*TreeNode, selectedIDs map[string]boo
 }
 
 // TableEx отрисовывает расширенную таблицу с мультивыбором, чекбоксами, закреплением колонок и inline-редактированием.
-func (u *UI) TableEx(id string, cols []TableColumn, rowCount int, cfg *TableExConfig, sort *TableSort, drawCell func(row, col int, area Rect, isSelected bool), opts ...Option) TableEvent {
+// Колбэк drawCell вызывается для отрисовки видимых ячеек; координаты ячейки areaPx передаются в физических пикселях (Px).
+func (u *UI) TableEx(id string, cols []TableColumn, rowCount int, cfg *TableExConfig, sort *TableSort, drawCell func(row, col int, areaPx Rect, isSelected bool), opts ...Option) TableEvent {
 	return u.ctx.TableEx(id, cols, rowCount, cfg, sort, drawCell, opts...)
 }
 
@@ -148,7 +145,7 @@ func (u *UI) TitleBar(id, title string, cfg TitleBarConfig, opts ...Option) {
 	u.ctx.TitleBar(id, title, cfg, opts...)
 }
 
-// TitleBarHitTest определяет роль точки для HitTest в безрамочном окне с виджетом TitleBar.
-func (u *UI) TitleBarHitTest(x, y int) HitTestResult {
-	return u.ctx.TitleBarHitTest(x, y)
+// TitleBarHitTest определяет роль точки для HitTest в безрамочном окне с виджетом TitleBar (xPx, yPx — в физических пикселях окна ОС).
+func (u *UI) TitleBarHitTest(xPx, yPx int) HitTestResult {
+	return u.ctx.TitleBarHitTest(xPx, yPx)
 }

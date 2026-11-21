@@ -94,9 +94,9 @@ type Context struct {
 	Clock    func() time.Time // Виртуальный или пользовательский источник системного времени
 
 	// Состояние указателя мыши (в физических пикселях)
-	MouseX            int
-	MouseY            int
-	MouseDown         bool
+	MouseX              int
+	MouseY              int
+	MouseDown           bool
 	MousePressed        bool
 	MouseReleased       bool
 	WheelX              float32
@@ -139,37 +139,37 @@ type Context struct {
 	svStack         []scrollScope
 	svChildOffsets  map[string]map[string]render.Rect
 	openState       map[string]bool
-	floatPos       map[string][2]int
-	floatCollapsed map[string]bool
-	tabScroll      map[string]int
+	floatPos        map[string][2]int
+	floatCollapsed  map[string]bool
+	tabScroll       map[string]int
 
 	// Состояние контролов Фазы 5
-	tableColWidths    map[string][]int
-	tableResizeCol    map[string]int
-	tableResizeStartX map[string]int
-	tableResizeStartW map[string]int
-	tabDragID         string
-	tabDragIndex      int
-	tabDragStartX     int
-	tabDragStartY     int
-	tabDragging       bool
-	reorderWidgetID   string
-	reorderSourceKey  string
-	reorderGhostText  string
-	reorderStartX     int
-	reorderStartY     int
-	reorderActive     bool
-	numEditText       map[string]string
-	colorHexText      map[string]string
-	colorHSV          map[string][3]float32
-	dateViewMonth     map[string]time.Time
-	spinnerAngle      map[string]float32
-	toasts            []*ToastMessage
-	nextToastID       int
-	toastPos          ToastPosition
-	toastOffsetXDp    Dp
-	toastOffsetYDp    Dp
-	toastHasOffset    bool
+	tableColWidths     map[string][]int
+	tableResizeCol     map[string]int
+	tableResizeStartX  map[string]int
+	tableResizeStartW  map[string]int
+	tabDragID          string
+	tabDragIndex       int
+	tabDragStartX      int
+	tabDragStartY      int
+	tabDragging        bool
+	reorderWidgetID    string
+	reorderSourceKey   string
+	reorderStartX      int
+	reorderStartY      int
+	reorderActive      bool
+	reorderScrollAccum float32
+	numEditText        map[string]string
+	colorHexText       map[string]string
+	colorHSV           map[string][3]float32
+	dateViewMonth      map[string]time.Time
+	spinnerAngle       map[string]float32
+	toasts             []*ToastMessage
+	nextToastID        int
+	toastPos           ToastPosition
+	toastOffsetXDp     Dp
+	toastOffsetYDp     Dp
+	toastHasOffset     bool
 
 	focusOrder     []string
 	nextFocusOrder []string
@@ -181,13 +181,13 @@ type Context struct {
 	rememberMu    sync.Mutex
 	rememberStore map[string]*RememberEntry
 	autoHeights   map[string]int
-	justifySizes map[string][]int
-	layoutSeq    int
-	nextCursor   platform.CursorType
-	lastCursor  platform.CursorType
-	needsRedraw bool
-	inRender    bool
-	wakePending atomic.Bool
+	justifySizes  map[string][]int
+	layoutSeq     int
+	nextCursor    platform.CursorType
+	lastCursor    platform.CursorType
+	needsRedraw   bool
+	inRender      bool
+	wakePending   atomic.Bool
 
 	lastClickTime time.Time
 	lastClickX    int
@@ -204,23 +204,23 @@ type Context struct {
 	titleBarInteractive []render.Rect
 
 	// Слои, кеш hit-областей и фильтрация EventMouseMove (Фаза 7.2)
-	layers            LayerManager
-	lastTheme         Theme
-	lastScale         float32
-	hitRegions        []hitRegion
-	nextHitRegions    []hitRegion
-	lastHotID         string
-	lastHitID         string
-	smartMouseMove    bool
-	skippedMouseMove  uint64
-	lastDirtyRects    []render.Rect
-	prevPresentPixels []byte
-	prevPresentW      int
-	prevPresentH      int
-	paintRequested     bool
-	debugDirtyRect     bool
-	prevDebugDirty     render.Rect
-	prevPresentStale   bool
+	layers                LayerManager
+	lastTheme             Theme
+	lastScale             float32
+	hitRegions            []hitRegion
+	nextHitRegions        []hitRegion
+	lastHotID             string
+	lastHitID             string
+	smartMouseMove        bool
+	skippedMouseMove      uint64
+	lastDirtyRects        []render.Rect
+	prevPresentPixels     []byte
+	prevPresentW          int
+	prevPresentH          int
+	paintRequested        bool
+	debugDirtyRect        bool
+	prevDebugDirty        render.Rect
+	prevPresentStale      bool
 	wakeOnlyFrame         bool
 	streamingDirty        render.Rect
 	directCanvases        []directCanvasEntry
@@ -249,18 +249,18 @@ func NewContext(win platform.Window, fm *render.FontManager) *Context {
 		canvas.Resize(w, h)
 	}
 	return &Context{
-		Win:            win,
-		Canvas:         canvas,
-		Font:           fm,
-		Theme:          NavyTheme(),
-		DpiScale:       scale,
-		Animator:       NewAnimator(),
-		Strings:        RussianStrings(),
-		caretPos:       make(map[string]int),
+		Win:             win,
+		Canvas:          canvas,
+		Font:            fm,
+		Theme:           NavyTheme(),
+		DpiScale:        scale,
+		Animator:        NewAnimator(),
+		Strings:         RussianStrings(),
+		caretPos:        make(map[string]int),
 		textScroll:      make(map[string]int),
 		passwordVisible: make(map[string]bool),
 		layers:          newLayerManager(),
-		smartMouseMove: true,
+		smartMouseMove:  true,
 	}
 }
 
@@ -316,12 +316,12 @@ func (c *Context) Now() time.Time {
 	return time.Now()
 }
 
-// DrawText рисует строку текста в произвольных физических координатах (для кастомного рисования и ListView).
-func (c *Context) DrawText(x, y int, text string, sizeDp Dp, col render.Color) {
+// DrawText рисует строку текста в физических координатах xPx, yPx (для кастомного рисования и ListView).
+func (c *Context) DrawText(xPx, yPx int, text string, sizeDp Dp, col render.Color) {
 	if c.Font == nil || text == "" {
 		return
 	}
-	c.Font.DrawText(c.Canvas, x, y, text, c.Scale(sizeDp).Int(), col)
+	c.Font.DrawText(c.Canvas, xPx, yPx, text, c.Scale(sizeDp).Int(), col)
 }
 
 // RequestRedraw запрашивает повторную перерисовку после изменения состояния.
@@ -727,7 +727,7 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 		c.reorderActive = false
 		c.reorderWidgetID = ""
 		c.reorderSourceKey = ""
-		c.reorderGhostText = ""
+		c.reorderScrollAccum = 0
 		redraw = true
 	case platform.EventFocusLost:
 		c.FocusID = ""
@@ -738,9 +738,13 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 		c.reorderActive = false
 		c.reorderWidgetID = ""
 		c.reorderSourceKey = ""
-		c.reorderGhostText = ""
+		c.reorderScrollAccum = 0
 		redraw = true
 	case platform.EventKeyDown:
+		if (c.reorderActive || c.reorderWidgetID != "") && ev.KeyCode == KeyEscape {
+			c.ResetReorder()
+			redraw = true
+		}
 		c.KeyEvents = append(c.KeyEvents, KeyPress{Code: ev.KeyCode, Mods: ev.Mods})
 		c.rawKeyEvents = append(c.rawKeyEvents, RawKeyEvent{
 			Pressed:  true,
@@ -1002,7 +1006,7 @@ func (c *Context) beginFrame() {
 		c.reorderActive = false
 		c.reorderWidgetID = ""
 		c.reorderSourceKey = ""
-		c.reorderGhostText = ""
+		c.reorderScrollAccum = 0
 	}
 	c.HotID = ""
 	c.nextCursor = platform.CursorArrow
@@ -1040,43 +1044,7 @@ func (c *Context) beginFrame() {
 	})
 }
 
-// drawReorderGhost отрисовывает полупрозрачное превью перетаскиваемой строки или узла.
-func (c *Context) drawReorderGhost() {
-	if !c.reorderActive {
-		return
-	}
-	txt := c.reorderGhostText
-	if txt == "" {
-		txt = c.reorderSourceKey
-	}
-	if txt == "" {
-		return
-	}
-	pxSize := c.Scale(12).Int()
-	tw := c.Scale(100).Int()
-	th := c.Scale(14).Int()
-	if c.Font != nil {
-		tw, th = c.Font.MeasureText(txt, pxSize)
-	}
-	ghostW := tw + c.Scale(24).Int()
-	ghostH := c.Scale(26).Int()
-	ghostR := render.Rect{
-		X: c.MouseX + c.Scale(12).Int(),
-		Y: c.MouseY + c.Scale(12).Int(),
-		W: ghostW,
-		H: ghostH,
-	}
-	c.PushOverlay(render.Rect{}, func() {
-		c.Canvas.FillRoundedRect(ghostR, c.ScaleF(4), c.Theme.Surface.WithAlpha(210))
-		c.Canvas.DrawRoundedBox(ghostR, c.ScaleF(4), c.Theme.Surface.WithAlpha(0), 1.0, c.Theme.Accent.WithAlpha(180))
-		if c.Font != nil {
-			c.Font.DrawText(c.Canvas, ghostR.X+c.Scale(10).Int(), ghostR.Y+(ghostR.H-th)/2, txt, pxSize, c.Theme.TextPrimary.WithAlpha(240))
-		}
-	})
-}
-
 func (c *Context) endFrame() {
-	c.drawReorderGhost()
 	ovIdx := 0
 	c.Overlays.FlushWithHook(func(bounds render.Rect) {
 		if !bounds.Empty() {
@@ -1103,7 +1071,7 @@ func (c *Context) endFrame() {
 		c.reorderActive = false
 		c.reorderWidgetID = ""
 		c.reorderSourceKey = ""
-		c.reorderGhostText = ""
+		c.reorderScrollAccum = 0
 	}
 	if c.nextCursor != c.lastCursor {
 		c.Win.SetCursor(c.nextCursor)
@@ -1201,4 +1169,221 @@ func (c *Context) ResolveID(kind, id string) string {
 	return id
 }
 
+// ArmReorder инициирует отслеживание возможного перетаскивания (Reorder) элемента при нажатии кнопки мыши.
+func (c *Context) ArmReorder(widgetID string, fromIdx int, fromKey string) {
+	c.reorderWidgetID = widgetID
+	if fromKey != "" {
+		c.reorderSourceKey = fromKey
+	} else {
+		c.reorderSourceKey = strconv.Itoa(fromIdx)
+	}
+	c.reorderStartX = c.MouseX
+	c.reorderStartY = c.MouseY
+	c.reorderActive = false
+	c.reorderScrollAccum = 0
+}
 
+// UpdateReorderDrag проверяет превышение порога движения (4 Dp) при зажатой кнопке мыши и активирует режим drag.
+// Если перетаскивание активно, выставляет курсор platform.CursorHand и возвращает true.
+func (c *Context) UpdateReorderDrag(widgetID string) bool {
+	if c.reorderWidgetID == widgetID && c.MouseDown && !c.reorderActive {
+		dx := c.MouseX - c.reorderStartX
+		dy := c.MouseY - c.reorderStartY
+		if dx < 0 {
+			dx = -dx
+		}
+		if dy < 0 {
+			dy = -dy
+		}
+		threshold := c.Scale(4).Int()
+		if dx > threshold || dy > threshold {
+			c.reorderActive = true
+		}
+	}
+	if c.reorderActive && c.reorderWidgetID == widgetID {
+		c.nextCursor = platform.CursorHand
+		return true
+	}
+	return false
+}
+
+// ReorderSource возвращает исходный индекс, ключ и признак активности drag для указанного виджета.
+// Если перетаскивание не активно или принадлежит другому виджету, active равен false.
+func (c *Context) ReorderSource(widgetID string) (fromIdx int, fromKey string, active bool) {
+	if !c.reorderActive || c.reorderWidgetID != widgetID {
+		return -1, "", false
+	}
+	idx := -1
+	if n, err := strconv.Atoi(c.reorderSourceKey); err == nil {
+		idx = n
+	}
+	return idx, c.reorderSourceKey, true
+}
+
+// ResetReorder сбрасывает состояние перетаскивания (Reorder), восстанавливает курсор и запрашивает перерисовку.
+func (c *Context) ResetReorder() {
+	c.reorderActive = false
+	c.reorderWidgetID = ""
+	c.reorderSourceKey = ""
+	c.reorderScrollAccum = 0
+	c.nextCursor = platform.CursorArrow
+	c.RequestRedraw()
+}
+
+// DrawDropLine отрисовывает горизонтальную линию-индикатор места вставки Accent толщиной 2 Dp, центрированную по yPx.
+func (c *Context) DrawDropLine(xPx, yPx, wPx int) {
+	lineH := c.Scale(2).Int()
+	if lineH < 1 {
+		lineH = 1
+	}
+	lineY := yPx - lineH/2
+	c.Canvas.FillRect(render.Rect{
+		X: xPx,
+		Y: lineY,
+		W: wPx,
+		H: lineH,
+	}, c.Theme.Accent)
+}
+
+// ApplyReorderAutoScroll выполняет плавный авто-скролл контейнера при нахождении курсора у верхней или нижней границы.
+func (c *Context) ApplyReorderAutoScroll(viewY, viewH int, si *scrollInfo, maxSc int) {
+	if si == nil {
+		return
+	}
+	if maxSc < 0 {
+		maxSc = 0
+	}
+	if maxSc == 0 {
+		si.y = 0
+		c.reorderScrollAccum = 0
+		return
+	}
+	edgeZone := c.Scale(24).Int()
+	inTopZone := c.MouseY >= viewY && c.MouseY < viewY+edgeZone
+	inBottomZone := c.MouseY > viewY+viewH-edgeZone && c.MouseY <= viewY+viewH
+
+	dtSeconds := float32(1.0 / 60.0)
+	if c.Animator != nil {
+		if d := c.Animator.Delta(); d > 0 {
+			dtSeconds = d
+		}
+	}
+	if dtSeconds > 0.1 {
+		dtSeconds = 0.1 // Защита от телепортации прокрутки при паузах
+	}
+
+	speed := c.ScaleF(160) * dtSeconds
+	if inTopZone && si.y > 0 {
+		c.reorderScrollAccum -= speed
+		if c.reorderScrollAccum <= -1.0 {
+			step := int(c.reorderScrollAccum)
+			si.y += step
+			c.reorderScrollAccum -= float32(step)
+			c.RequestRedraw()
+		}
+	} else if inBottomZone && si.y < maxSc {
+		c.reorderScrollAccum += speed
+		if c.reorderScrollAccum >= 1.0 {
+			step := int(c.reorderScrollAccum)
+			si.y += step
+			c.reorderScrollAccum -= float32(step)
+			c.RequestRedraw()
+		}
+	} else {
+		c.reorderScrollAccum = 0
+	}
+
+	// Обязательный clamp si.y
+	if si.y < 0 {
+		si.y = 0
+		c.reorderScrollAccum = 0
+	}
+	if si.y > maxSc {
+		si.y = maxSc
+		c.reorderScrollAccum = 0
+	}
+}
+
+// LinearDropTarget рассчитывает строку-цель, зону сброса (DropAbove/DropBelow) и ToIndex (индекс после удаления)
+// для линейных списков и таблиц. Является чистой детерминированной функцией без графических зависимостей.
+func (c *Context) LinearDropTarget(from, cursorY, rowsTop, itemH, count int) (targetRow int, zone DropZone, toIdx int, noop bool) {
+	if count <= 0 || itemH <= 0 {
+		return 0, DropBelow, from, true
+	}
+	relY := cursorY - rowsTop
+	targetRow = relY / itemH
+	if targetRow < 0 {
+		targetRow = 0
+	}
+	if targetRow >= count {
+		targetRow = count - 1
+	}
+	targetRowY := rowsTop + targetRow*itemH
+	zone = DropBelow
+	if cursorY < targetRowY+itemH/2 {
+		zone = DropAbove
+	}
+	insertIdx := targetRow
+	if zone == DropBelow {
+		insertIdx = targetRow + 1
+	}
+	toIdx = insertIdx
+	if from < insertIdx {
+		toIdx = insertIdx - 1
+	}
+	noop = (toIdx == from)
+	return targetRow, zone, toIdx, noop
+}
+
+// HandleLinearReorder выполняет авто-скролл, подсчет целевой строки, отрисовку drop-линии и генерацию DragEvent при MouseReleased.
+// Возвращает true, если произошел сброс (Drop) элемента.
+func (c *Context) HandleLinearReorder(
+	widgetID string,
+	viewRect render.Rect,
+	lineX, lineW int,
+	itemH int,
+	count int,
+	si *scrollInfo,
+	maxSc int,
+	onReorder func(DragEvent),
+	onDrop func(),
+) bool {
+	if !c.UpdateReorderDrag(widgetID) {
+		return false
+	}
+	fromIdx, _, active := c.ReorderSource(widgetID)
+	if !active || fromIdx < 0 || fromIdx >= count {
+		c.ResetReorder()
+		return false
+	}
+
+	c.ApplyReorderAutoScroll(viewRect.Y, viewRect.H, si, maxSc)
+
+	if !c.IsInputBlocked() && viewRect.Contains(c.MouseX, c.MouseY) && c.MouseX < lineX+lineW {
+		targetRow, zone, toIdx, noop := c.LinearDropTarget(fromIdx, c.MouseY, viewRect.Y-si.y, itemH, count)
+		targetRowY := viewRect.Y + targetRow*itemH - si.y
+		lineY := targetRowY
+		if zone == DropBelow {
+			lineY += itemH
+		}
+		c.DrawDropLine(lineX, lineY, lineW)
+
+		if c.MouseReleased {
+			if onDrop != nil {
+				onDrop()
+			}
+			if !noop && onReorder != nil {
+				onReorder(DragEvent{
+					FromWidget: widgetID,
+					ToWidget:   widgetID,
+					FromIndex:  fromIdx,
+					ToIndex:    toIdx,
+					Drop:       zone,
+				})
+			}
+			c.ResetReorder()
+			return true
+		}
+	}
+	return false
+}
