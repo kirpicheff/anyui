@@ -515,7 +515,7 @@ func writeCommonHeader(out *bytes.Buffer, version string, isFull bool, idx *apiI
 	out.WriteString("- **Immediate Mode и многопоточность:** состояние хранится вне `drawFn`; вызовы методов `UI` и чтение/изменение состояния интерфейса выполняются **только в главном потоке** внутри `drawFn`. Для обновления состояния из фоновых горутин всегда используйте `App.Dispatch` (`app.Dispatch(func() { ... })`) или `Remember`. Повторный вызов `App.Run` на уже запущенном приложении возвращает `ErrAlreadyRunning`.\n")
 	out.WriteString("- **Единицы измерения (`Dp` vs `Px`):** весь API раскладки, опций, оверлеев и ввода Headless (`LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`, `InjectMouse*`, `CurrentArea`, `MousePosDp`) работает строго в логических `Dp`. Физические `Px` используются только в колбэках рисования (`CanvasView`, `InteractiveCanvas`, `Table`, `ListView`), прямых методах (`DrawText`, `DrawSVG`, `CurrentAreaPx`, `MousePosPx`, `LastDirtyRectsPx`, `TitleBarHitTest`, `InjectMouse*Px`) и на границе ОС (`Config`, `Window`).\n")
 	out.WriteString("- **`Rect` и `PointF` не типизированы по единицам:** `Rect` содержит `int`-поля, `PointF` — `float32`. В `Dp`-API (`CurrentArea`, `LayoutRect`, `PushOverlay`, `Tooltip`, `Popover`, `ContextMenu`, `RegisterHoverArea`) они трактуются как `Dp`, а в колбэках рисования и `CurrentAreaPx`/`LastDirtyRectsPx` — как `Px`.\n")
-	out.WriteString("- **Холст (`Canvas`) и текст на нём:** все методы `Canvas` принимают и возвращают физические `Px` (конвертация — через `Scale`/`ScaleF`/`PxToDp`/`PxToDpf`). Например, `UI.DrawSVG` принимает размер в `Dp`, а `Canvas.DrawSVG` — в `Px`. У `Canvas` нет метода рисования текста: внутри `CanvasView` / `InteractiveCanvas` текст выводится через `UI.DrawText` в абсолютных координатах `Px` (`areaPx.X + offset`, `areaPx.Y + offset`).\n")
+	out.WriteString("- **Холст (`Canvas`) и текст на нём:** все методы `Canvas` принимают и возвращают физические `Px` (конвертация — через `Scale`/`ScaleF`/`PxToDp`/`PxToDpf`). У `UI.DrawText` и `UI.DrawSVG` единицы смешанные: координаты `(xPx, yPx)` — в `Px`, а размер (`sizeDp`) — в `Dp`; у `Canvas.DrawSVG` и координаты, и размер — в `Px`. У `Canvas` нет метода рисования текста: внутри `CanvasView` / `InteractiveCanvas` текст выводится через `UI.DrawText` в абсолютных координатах `Px` (`areaPx.X + offset`, `areaPx.Y + offset`).\n")
 	out.WriteString("- **Единственный экземпляр (`SingleInstanceGuard`):** порядок вызовов — `anyui.AcquireSingleInstance` → `SingleInstanceGuard.SetCallback` (получает `args []string` второго экземпляра) → `SingleInstanceGuard.StartIPC` → `SingleInstanceGuard.Close` при выходе (либо передайте `guard` в `Config.SingleInstance.Guard`, чтобы `App` закрыл его автоматически).\n")
 	out.WriteString("- **Единое задание размеров через опции:** `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image`, `ListView`, `Table`, `TextArea`, `LogView` по умолчанию занимают доступное пространство (`Auto`); явные размеры задаются опциями `Width`, `Height`, `FillWidth`, `FillHeight`. `Card` по умолчанию подбирает высоту по содержимому (`AutoHeight`); для растягивания передайте `FillHeight`.\n")
 	out.WriteString("- **Колонки таблиц:** в `Table` и `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.\n")
@@ -841,18 +841,32 @@ func writeFullLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
 	for _, recv := range []string{"App", "Window", "Headless", "UI", "Canvas", "SingleInstanceGuard"} {
 		out.WriteString(fmt.Sprintf("## Методы `%s`\n\n", recv))
 		if recv == "Canvas" {
-			out.WriteString("Все методы `Canvas` работают строго в физических `Px`; клиппинг в `CanvasView`/`InteractiveCanvas` устанавливается фреймворком автоматически, а текст выводится через `UI.DrawText`:\n\n```go\n")
+			out.WriteString("Все методы `Canvas` работают строго в физических `Px`; клиппинг в `CanvasView`/`InteractiveCanvas` устанавливается фреймворком автоматически, а текст выводится через `UI.DrawText`. Методы `Resize`, `ResizeWithBuffer`, `AddDirtyRect`, `MarkFullDirty`, `ResetDirtyRects`, `DirtyBounds`, `DirtyRects` управляются фреймворком и внутри `OnDraw` обычно не вызываются:\n\n```go\n")
 			out.WriteString("ui.CanvasView(func(c *anyui.Canvas, areaPx anyui.Rect) {\n")
 			out.WriteString("\tc.FillRect(areaPx, ui.Theme().Card)\n")
 			out.WriteString("\tc.FillCircle(float32(areaPx.X+areaPx.W/2), float32(areaPx.Y+areaPx.H/2), 20, ui.Theme().Accent)\n")
 			out.WriteString("\tui.DrawText(anyui.Px(areaPx.X+8), anyui.Px(areaPx.Y+8), \"подпись\", 12, ui.Theme().TextMuted)\n")
 			out.WriteString("}, anyui.Height(120))\n```\n\n")
 			out.WriteString("```go\n")
+			canvasHints := map[string]string{
+				"BackdropBlur(":  "radius в Px, cr задаёт скругление области",
+				"BlendPixel(":    "cov: покрытие 0..255 для сглаживания",
+				"BlitFrom(":      "копирование области без альфа-смешивания (замена пикселей)",
+				"CompositeFrom(": "наложение области с учётом альфа-канала",
+				"DrawBGRA(":      "BGRA-буфер с альфой и кешем масштабирования",
+				"DrawBGRAFast(":  "непрозрачный BGRA-видеопоток без альфы, кеша и аллокаций (1:1 copy / nearest-neighbor)",
+				"DrawRGBA(":      "RGBA-буфер с альфой и кешем масштабирования",
+			}
 			for _, sig := range idx.methods[recv] {
-				if strings.Contains(sig, "BlendPixel(") {
-					out.WriteString(sig + " // cov: покрытие 0..255 для сглаживания\n")
-				} else if strings.Contains(sig, "BackdropBlur(") {
-					out.WriteString(sig + " // radius в Px, cr задаёт скругление области\n")
+				hint := ""
+				for needle, h := range canvasHints {
+					if strings.Contains(sig, needle) {
+						hint = h
+						break
+					}
+				}
+				if hint != "" {
+					out.WriteString(sig + " // " + hint + "\n")
 				} else {
 					out.WriteString(sig + "\n")
 				}
