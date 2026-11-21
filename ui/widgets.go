@@ -159,12 +159,22 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 }
 
 // StatusDot рисует цветной кружок-индикатор и подпись справа от него.
-func (c *Context) StatusDot(dotColor render.Color, label string) {
+func (c *Context) StatusDot(dotColor render.Color, label string, opts ...Option) {
 	if c.Font == nil {
 		return
 	}
-	pxSize := c.Scale(12).Int()
-	tw, th := c.Font.MeasureText(label, pxSize)
+	st := ApplyOptions(opts)
+	sizeDp := Dp(12)
+	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
+		sizeDp = *st.FontSizeDp
+	}
+	col := c.Theme.TextMuted
+	if st.Color != nil {
+		col = *st.Color
+	}
+	pxSize := c.Scale(sizeDp).Int()
+	textOpts := c.textRenderOpts(st)
+	tw, th := c.Font.MeasureTextWithOptions(label, pxSize, textOpts)
 	dotR := c.ScaleF(4)
 	gap := c.Scale(8).Int()
 	totalW := int(dotR*2) + gap + tw
@@ -173,9 +183,9 @@ func (c *Context) StatusDot(dotColor render.Color, label string) {
 		h = int(dotR * 2)
 	}
 
-	r := c.allocRect(totalW, h)
+	r := c.allocRectStyled(totalW, h, st)
 	c.Canvas.FillCircle(float32(r.X)+dotR, float32(r.Y)+float32(r.H)*0.5, dotR, dotColor)
-	c.Font.DrawText(c.Canvas, r.X+int(dotR*2)+gap, r.Y+(r.H-th)/2, label, pxSize, c.Theme.TextMuted)
+	c.Font.DrawTextWithOptions(c.Canvas, r.X+int(dotR*2)+gap, r.Y+(r.H-th)/2, label, pxSize, col, textOpts)
 }
 
 // Card рисует скруглённую карточку с 1px-обводкой и размещает внутри неё дочерние виджеты.
@@ -578,31 +588,35 @@ func (c *Context) ToggleOpts(id, label string, value *bool, opts ...Option) bool
 	return changed
 }
 
-// Image отображает image.Image в области размером wDp x hDp с заданным режимом масштабирования.
-func (c *Context) Image(img image.Image, wDp, hDp Dp, mode render.ImageScaleMode) {
-	w := c.Scale(wDp).Int()
-	if wDp <= 0 {
-		w = c.RemainingWidth()
+// Image отображает image.Image в выделенной области с заданным режимом масштабирования.
+// Размеры задаются через опции Width, Height, FillWidth, FillHeight (по умолчанию — доступное пространство).
+func (c *Context) Image(img image.Image, mode render.ImageScaleMode, opts ...Option) {
+	st := ApplyOptions(opts)
+	w := c.RemainingWidth()
+	if !st.FillWidth && st.WidthDp != nil && *st.WidthDp > 0 {
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.Scale(hDp).Int()
-	if hDp <= 0 {
-		h = c.RemainingHeight()
+	h := c.RemainingHeight()
+	if !st.FillHeight && st.HeightDp != nil && *st.HeightDp > 0 {
+		h = c.Scale(*st.HeightDp).Int()
 	}
-	r := c.allocRect(w, h)
+	r := c.allocRectStyled(w, h, st)
 	c.Canvas.DrawImage(r, img, mode)
 }
 
-// CanvasView выделяет область wDp x hDp в раскладке и вызывает drawFn для кастомного рисования с клиппингом.
-func (c *Context) CanvasView(wDp, hDp Dp, drawFn func(canvas *render.Canvas, area render.Rect)) {
-	w := c.Scale(wDp).Int()
-	if wDp <= 0 {
-		w = c.RemainingWidth()
+// CanvasView выделяет область в раскладке и вызывает drawFn для кастомного рисования с клиппингом.
+// Размеры задаются через опции Width, Height, FillWidth, FillHeight (по умолчанию — доступное пространство).
+func (c *Context) CanvasView(drawFn func(canvas *render.Canvas, area render.Rect), opts ...Option) {
+	st := ApplyOptions(opts)
+	w := c.RemainingWidth()
+	if !st.FillWidth && st.WidthDp != nil && *st.WidthDp > 0 {
+		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.Scale(hDp).Int()
-	if hDp <= 0 {
-		h = c.RemainingHeight()
+	h := c.RemainingHeight()
+	if !st.FillHeight && st.HeightDp != nil && *st.HeightDp > 0 {
+		h = c.Scale(*st.HeightDp).Int()
 	}
-	r := c.allocRect(w, h)
+	r := c.allocRectStyled(w, h, st)
 	if drawFn == nil || r.Empty() {
 		return
 	}
@@ -643,22 +657,19 @@ type CanvasCallbacks struct {
 	DirectInput bool
 }
 
-// InteractiveCanvas выделяет интерактивную область wDp x hDp с поддержкой фокуса,
+// InteractiveCanvas выделяет интерактивную область с поддержкой фокуса,
 // захвата мыши при перетаскивании и передачи сырых событий клавиатуры (включая ScanCode/Extended) и мыши.
-func (c *Context) InteractiveCanvas(id string, wDp, hDp Dp, cb CanvasCallbacks, opts ...Option) {
+// Размеры задаются через опции Width, Height, FillWidth, FillHeight (по умолчанию — доступное пространство).
+func (c *Context) InteractiveCanvas(id string, cb CanvasCallbacks, opts ...Option) {
 	id = c.ResolveID("canvas", id)
 	st := ApplyOptions(opts)
 
-	w := c.Scale(wDp).Int()
-	if wDp <= 0 || st.FillWidth || (st.WidthDp != nil && *st.WidthDp <= 0) {
-		w = c.RemainingWidth()
-	} else if st.WidthDp != nil && *st.WidthDp > 0 {
+	w := c.RemainingWidth()
+	if !st.FillWidth && st.WidthDp != nil && *st.WidthDp > 0 {
 		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.Scale(hDp).Int()
-	if hDp <= 0 || st.FillHeight || (st.HeightDp != nil && *st.HeightDp <= 0) {
-		h = c.RemainingHeight()
-	} else if st.HeightDp != nil && *st.HeightDp > 0 {
+	h := c.RemainingHeight()
+	if !st.FillHeight && st.HeightDp != nil && *st.HeightDp > 0 {
 		h = c.Scale(*st.HeightDp).Int()
 	}
 	r := c.allocRectStyled(w, h, st)

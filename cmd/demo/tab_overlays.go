@@ -4,12 +4,11 @@ import (
 	"fmt"
 
 	"github.com/kirpicheff/anyui"
-	"github.com/kirpicheff/anyui/render"
 )
 
 func (st *demoState) drawTabOverlays(ui *anyui.UI) {
 	th := ui.Theme()
-	ui.ScrollView("sv_overlays", 0, 0, func() {
+	ui.ScrollView("sv_overlays", func() {
 		ui.Label("Модальные окна, Popover, FloatingPanel и Drawer", anyui.FontSize(16), anyui.Bold())
 		ui.RowCentered(10, 40, func() {
 			if ui.Button("ov_modal", "Открыть Modal", anyui.Primary()) {
@@ -52,9 +51,9 @@ func (st *demoState) drawTabOverlays(ui *anyui.UI) {
 		box := ui.CurrentArea()
 		box.W = 460
 		box.H = 74
-		ui.CanvasView(460, 74, func(canvas *render.Canvas, r anyui.Rect) {
+		ui.CanvasView(func(canvas *anyui.Canvas, r anyui.Rect) {
 			canvas.DrawRoundedBox(r, ui.ScaleF(8), th.Surface, 1.0, th.Border)
-		})
+		}, anyui.Width(460), anyui.Height(74))
 		ui.Label(st.contextLog, anyui.FontSize(13), anyui.TextColor(th.TextMuted))
 
 		ui.Tooltip("Подсказка Tooltip: нажмите правую кнопку мыши!", box)
@@ -77,13 +76,13 @@ func (st *demoState) drawTabOverlays(ui *anyui.UI) {
 
 		ui.Separator()
 		ui.Label("ScrollView (прокрутка колесом и перетаскиванием ползунка)", anyui.FontSize(16), anyui.Bold())
-		ui.ScrollView("sv_inner", 460, 140, func() {
+		ui.ScrollView("sv_inner", func() {
 			for i := 1; i <= 15; i++ {
 				ui.Card(func() {
 					ui.Label(fmt.Sprintf("Карточка внутри ScrollView #%d", i))
 				}, anyui.Padding(10), anyui.Height(44))
 			}
-		})
+		}, anyui.Width(460), anyui.Height(140))
 	})
 }
 

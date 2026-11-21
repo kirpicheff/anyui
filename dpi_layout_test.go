@@ -1,9 +1,8 @@
 package anyui
 
 import (
+	"image"
 	"testing"
-
-	"github.com/kirpicheff/anyui/render"
 )
 
 // TestCurrentAreaAndMousePosDPI проверяет контракт систем координат (Dp vs Px)
@@ -108,8 +107,8 @@ func TestAdaptiveContainersAutoFill(t *testing.T) {
 				ui.Label("Верхняя панель")
 			}, Height(100), FillWidth())
 
-			// 2. ScrollView с Auto, должен занять оставшиеся 500 dp
-			ui.ScrollView("sv_auto", Auto, Auto, func() {
+			// 2. ScrollView без явных размеров (Auto по умолчанию) должен занять оставшиеся 500 dp
+			ui.ScrollView("sv_auto", func() {
 				svArea = ui.CurrentArea()
 				ui.Label("Контент внутри ScrollView")
 			})
@@ -121,14 +120,14 @@ func TestAdaptiveContainersAutoFill(t *testing.T) {
 		t.Errorf("ScrollView с Auto должен занять остаток высоты ~500dp, получено %d", svArea.H)
 	}
 
-	// Проверяем CanvasView с sentinel-значением Auto
+	// Проверяем CanvasView без явных размеров (Auto по умолчанию)
 	h.SetDraw(func(ui *UI) {
 		ui.Column(0, func() {
 			ui.Card(func() {
 				ui.Label("Шапка")
 			}, Height(50), FillWidth())
 
-			ui.CanvasView(Auto, Auto, func(canvas *render.Canvas, area Rect) {
+			ui.CanvasView(func(canvas *Canvas, area Rect) {
 				cvArea = area
 			})
 		})
@@ -197,16 +196,16 @@ func TestNestedContainersScrollViewInsideSplitPaneInsidePage(t *testing.T) {
 
 				// SplitPane внутри тела Page с заполнением доступной высоты
 				ui.SplitPane("test_sp", Horizontal, &ratio, func() {
-					// Первая панель: ScrollView с Auto
-					ui.ScrollView("sv_panel1", Auto, Auto, func() {
+					// Первая панель: ScrollView с Auto по умолчанию
+					ui.ScrollView("sv_panel1", func() {
 						sv1Area = ui.CurrentArea()
 						for i := 0; i < 20; i++ {
 							ui.Label("Панель 1 Строка")
 						}
 					})
 				}, func() {
-					// Вторая панель: ScrollView с Auto
-					ui.ScrollView("sv_panel2", Auto, Auto, func() {
+					// Вторая панель: ScrollView с Auto по умолчанию
+					ui.ScrollView("sv_panel2", func() {
 						sv2Area = ui.CurrentArea()
 						for i := 0; i < 20; i++ {
 							ui.Label("Панель 2 Строка")
@@ -352,5 +351,75 @@ func TestPushOverlayDPI2xCoveringArea(t *testing.T) {
 
 	if btnClicked {
 		t.Fatal("кнопка под оверлеем сработала! Оверлей при 2.0x DPI не накрыл область в правом нижнем углу")
+	}
+}
+
+// TestUnifiedOptionsAndSizing проверяет работу opts ...Option и задание размеров через опции
+// для StatusDot, Image, CanvasView, InteractiveCanvas, ScrollView, ContextMenu и Tooltip.
+func TestUnifiedOptionsAndSizing(t *testing.T) {
+	reg, bold, mono := DefaultTestFonts()
+	h, err := NewHeadless(Config{
+		Width:       600,
+		Height:      500,
+		FontRegular: reg,
+		FontBold:    bold,
+		FontMono:    mono,
+	})
+	if err != nil {
+		t.Fatalf("NewHeadless error: %v", err)
+	}
+	defer h.Close()
+
+	img := image.NewRGBA(image.Rect(0, 0, 16, 16))
+	var cvArea, icArea, svArea Rect
+	menuClicked := false
+
+	h.SetDraw(func(u *UI) {
+		u.Column(4, func() {
+			u.StatusDot(RGB(0, 200, 0), "Активен", FontSize(14), Bold(), TextColor(RGB(255, 255, 255)))
+			u.Image(img, ScaleFit, Width(64), Height(48))
+			u.CanvasView(func(c *Canvas, areaPx Rect) {
+				cvArea = areaPx
+			}, Width(180), Height(60))
+			u.InteractiveCanvas("ic_opt", CanvasCallbacks{
+				OnDraw: func(c *Canvas, areaPx Rect, focused bool) {
+					icArea = areaPx
+				},
+			}, Width(150), Height(70))
+			u.ScrollView("sv_opt", func() {
+				svArea = u.CurrentArea()
+				u.Label("Содержимое")
+			}, Width(220), Height(90))
+		})
+
+		anchor := Rect{X: 10, Y: 10, W: 100, H: 40}
+		u.Tooltip("Подсказка с опциями", anchor, Bg(RGB(20, 20, 30)), TextColor(RGB(240, 240, 240)), Padding(8), FontSize(13))
+		u.ContextMenu("cm_opt", anchor, []ContextMenuItem{
+			{Label: "Действие", OnClick: func() { menuClicked = true }},
+		}, Width(180), Bg(RGB(25, 25, 35)), BorderColor(RGB(80, 80, 100)))
+	})
+
+	h.Step()
+
+	if cvArea.W != 180 || cvArea.H != 60 {
+		t.Errorf("CanvasView: ожидалось 180x60, получено %dx%d", cvArea.W, cvArea.H)
+	}
+	if icArea.W != 150 || icArea.H != 70 {
+		t.Errorf("InteractiveCanvas: ожидалось 150x70, получено %dx%d", icArea.W, icArea.H)
+	}
+	if svArea.W < 200 || svArea.W > 220 || svArea.H < 75 || svArea.H > 90 {
+		t.Errorf("ScrollView: ожидалась внутренняя область около 220x90 (с учётом отступов скроллбара), получено %dx%d", svArea.W, svArea.H)
+	}
+
+	// Наведение на anchor активирует Tooltip, правый клик открывает ContextMenu
+	h.InjectMouseMove(30, 20)
+	h.Step()
+	h.InjectMouseClick(30, 20, MouseRight)
+	h.Step()
+	// Клик по первому пункту открытого ContextMenu (открывается в точке (30, 20), первый пункт y ~ 24..54)
+	h.InjectMouseClick(50, 36, MouseLeft)
+	h.Step()
+	if !menuClicked {
+		t.Error("ContextMenu с опциями не обработал клик по пункту")
 	}
 }

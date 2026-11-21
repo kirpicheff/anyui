@@ -214,8 +214,8 @@ func (u *UI) Label(text string, opts ...Option) {
 }
 
 // StatusDot рисует цветной кружок-индикатор и подпись справа от него.
-func (u *UI) StatusDot(dotColor Color, label string) {
-	u.ctx.StatusDot(dotColor, label)
+func (u *UI) StatusDot(dotColor Color, label string, opts ...Option) {
+	u.ctx.StatusDot(dotColor, label, opts...)
 }
 
 // Card рисует скруглённую карточку и размещает внутри неё дочерние виджеты.
@@ -238,22 +238,25 @@ func (u *UI) TextInput(id string, value *string, placeholder string, opts ...Opt
 	return u.ctx.TextInputOpts(id, value, placeholder, opts...)
 }
 
-// Image выводит изображение image.Image в области wDp x hDp.
-func (u *UI) Image(img image.Image, wDp, hDp Dp, mode ImageScaleMode) {
-	u.ctx.Image(img, wDp, hDp, mode)
+// Image выводит изображение image.Image в выделенной области.
+// Размеры задаются через опции Width, Height, FillWidth, FillHeight (по умолчанию — доступное пространство).
+func (u *UI) Image(img image.Image, mode ImageScaleMode, opts ...Option) {
+	u.ctx.Image(img, mode, opts...)
 }
 
-// CanvasView выделяет область wDp x hDp для кастомного рисования (графики, видеокадры, градиенты).
+// CanvasView выделяет область для кастомного рисования (графики, видеокадры, градиенты).
+// Размеры задаются через опции Width, Height, FillWidth, FillHeight (по умолчанию — доступное пространство).
 // Колбэк drawFn получает координаты области areaPx строго в физических пикселях (Px) для прямого вывода в Canvas.
-func (u *UI) CanvasView(wDp, hDp Dp, drawFn func(canvas *Canvas, areaPx Rect)) {
-	u.ctx.CanvasView(wDp, hDp, drawFn)
+func (u *UI) CanvasView(drawFn func(canvas *Canvas, areaPx Rect), opts ...Option) {
+	u.ctx.CanvasView(drawFn, opts...)
 }
 
-// InteractiveCanvas выделяет интерактивную область wDp x hDp с поддержкой фокуса,
+// InteractiveCanvas выделяет интерактивную область с поддержкой фокуса,
 // захвата перетаскивания мыши и передачи сырых событий клавиатуры (со ScanCode/Extended) и мыши/колеса.
+// Размеры задаются через опции Width, Height, FillWidth, FillHeight (по умолчанию — доступное пространство).
 // Методы cb (включая OnDraw) работают с областью area в физических пикселях (Px).
-func (u *UI) InteractiveCanvas(id string, wDp, hDp Dp, cb CanvasCallbacks, opts ...Option) {
-	u.ctx.InteractiveCanvas(id, wDp, hDp, cb, opts...)
+func (u *UI) InteractiveCanvas(id string, cb CanvasCallbacks, opts ...Option) {
+	u.ctx.InteractiveCanvas(id, cb, opts...)
 }
 
 // DrawSVG рисует SVG-иконку в физических координатах (xPx, yPx) с размером sizeDp и цветом tint.

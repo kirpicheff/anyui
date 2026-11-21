@@ -116,22 +116,19 @@ func (c *Context) Anchor(id string) {
 }
 
 // ScrollView создаёт прокручиваемую область с поддержкой колеса мыши и перетаскивания скроллбара.
-func (c *Context) ScrollView(id string, wDp, hDp Dp, fn func(), opts ...Option) {
+// Размеры задаются через опции Width, Height, FillWidth, FillHeight (по умолчанию — доступное пространство).
+func (c *Context) ScrollView(id string, fn func(), opts ...Option) {
 	if fn == nil {
 		return
 	}
 	id = c.ResolveID("sv", id)
 	st := ApplyOptions(opts)
-	w := c.Scale(wDp).Int()
-	if wDp <= 0 || st.FillWidth || (st.WidthDp != nil && *st.WidthDp <= 0) {
-		w = c.RemainingWidth()
-	} else if st.WidthDp != nil && *st.WidthDp > 0 {
+	w := c.RemainingWidth()
+	if !st.FillWidth && st.WidthDp != nil && *st.WidthDp > 0 {
 		w = c.Scale(*st.WidthDp).Int()
 	}
-	h := c.Scale(hDp).Int()
-	if hDp <= 0 || st.FillHeight || (st.HeightDp != nil && *st.HeightDp <= 0) {
-		h = c.RemainingHeight()
-	} else if st.HeightDp != nil && *st.HeightDp > 0 {
+	h := c.RemainingHeight()
+	if !st.FillHeight && st.HeightDp != nil && *st.HeightDp > 0 {
 		h = c.Scale(*st.HeightDp).Int()
 	}
 
@@ -716,11 +713,12 @@ func (c *Context) Drawer(id string, open *bool, side DrawerSide, fn func(), opts
 }
 
 // ContextMenu открывает всплывающее меню по правому клику внутри anchor.
-func (c *Context) ContextMenu(id string, anchor render.Rect, items []ContextMenuItem) {
+func (c *Context) ContextMenu(id string, anchor render.Rect, items []ContextMenuItem, opts ...Option) {
 	if len(items) == 0 {
 		return
 	}
 	id = c.ResolveID("ctx", id)
+	st := ApplyOptions(opts)
 	if c.openState == nil {
 		c.openState = make(map[string]bool)
 	}
@@ -739,7 +737,11 @@ func (c *Context) ContextMenu(id string, anchor render.Rect, items []ContextMenu
 	}
 
 	pos := c.floatPos["cm:"+id]
-	w := c.Scale(200).Int()
+	wDp := Dp(200)
+	if st.WidthDp != nil && *st.WidthDp > 0 {
+		wDp = *st.WidthDp
+	}
+	w := c.Scale(wDp).Int()
 	itemH := c.Scale(30).Int()
 	sepH := c.Scale(9).Int()
 	totalH := c.Scale(8).Int()
@@ -766,15 +768,37 @@ func (c *Context) ContextMenu(id string, anchor render.Rect, items []ContextMenu
 		return
 	}
 
+	bgCol := c.Theme.Card
+	if st.Bg != nil {
+		bgCol = *st.Bg
+	}
+	borderCol := c.Theme.Border
+	if st.BorderColor != nil {
+		borderCol = *st.BorderColor
+	}
+	radDp := c.Theme.RadiusSm
+	if st.Radius != nil {
+		radDp = *st.Radius
+	}
+	fontSizeDp := Dp(13)
+	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
+		fontSizeDp = *st.FontSizeDp
+	}
+	textCol := c.Theme.TextPrimary
+	if st.Color != nil {
+		textCol = *st.Color
+	}
+
 	c.PushOverlay(menuRect, func() {
-		c.drawDropShadow(menuRect, c.Theme.RadiusSm, 12, 120)
-		c.Canvas.DrawRoundedBox(menuRect, c.ScaleF(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
+		c.drawDropShadow(menuRect, radDp, 12, 120)
+		c.Canvas.DrawRoundedBox(menuRect, c.ScaleF(radDp), bgCol, 1.0, borderCol)
 
 		curY := menuRect.Y + c.Scale(4).Int()
-		pxSize := c.Scale(13).Int()
+		pxSize := c.Scale(fontSizeDp).Int()
+		textOpts := c.textRenderOpts(st)
 		for idx, it := range items {
 			if it.Separator {
-				c.Canvas.FillRect(render.Rect{X: menuRect.X + c.Scale(8).Int(), Y: curY + sepH/2, W: menuRect.W - c.Scale(16).Int(), H: 1}, c.Theme.Border)
+				c.Canvas.FillRect(render.Rect{X: menuRect.X + c.Scale(8).Int(), Y: curY + sepH/2, W: menuRect.W - c.Scale(16).Int(), H: 1}, borderCol)
 				curY += sepH
 				continue
 			}
@@ -795,12 +819,12 @@ func (c *Context) ContextMenu(id string, anchor render.Rect, items []ContextMenu
 				}
 			}
 			if c.Font != nil {
-				col := c.Theme.TextPrimary
+				col := textCol
 				if it.Disabled {
 					col = c.Theme.TextMuted
 				}
-				_, th := c.Font.MeasureText(it.Label, pxSize)
-				c.Font.DrawText(c.Canvas, ir.X+c.Scale(10).Int(), ir.Y+(ir.H-th)/2, it.Label, pxSize, col)
+				_, th := c.Font.MeasureTextWithOptions(it.Label, pxSize, textOpts)
+				c.Font.DrawTextWithOptions(c.Canvas, ir.X+c.Scale(10).Int(), ir.Y+(ir.H-th)/2, it.Label, pxSize, col, textOpts)
 				if it.Shortcut != "" {
 					sw, sh := c.Font.MeasureText(it.Shortcut, c.Scale(11).Int())
 					c.Font.DrawText(c.Canvas, ir.X+ir.W-sw-c.Scale(10).Int(), ir.Y+(ir.H-sh)/2, it.Shortcut, c.Scale(11).Int(), c.Theme.TextMuted)
@@ -812,14 +836,24 @@ func (c *Context) ContextMenu(id string, anchor render.Rect, items []ContextMenu
 }
 
 // Tooltip отображает всплывающую подсказку, когда курсор находится над областью anchor.
-func (c *Context) Tooltip(text string, anchor render.Rect) {
+func (c *Context) Tooltip(text string, anchor render.Rect, opts ...Option) {
 	if text == "" || c.Font == nil || c.IsInputBlocked() || !anchor.Contains(c.MouseX, c.MouseY) {
 		return
 	}
+	st := ApplyOptions(opts)
 	c.RegisterHitTrack("tip:"+text, anchor, c.nextCursor)
-	pxSize := c.Scale(12).Int()
-	tw, th := c.Font.MeasureText(text, pxSize)
+	fontSizeDp := Dp(12)
+	if st.FontSizeDp != nil && *st.FontSizeDp > 0 {
+		fontSizeDp = *st.FontSizeDp
+	}
+	pxSize := c.Scale(fontSizeDp).Int()
+	textOpts := c.textRenderOpts(st)
+	tw, th := c.Font.MeasureTextWithOptions(text, pxSize, textOpts)
 	padX, padY := c.Scale(10).Int(), c.Scale(6).Int()
+	if st.PadDp != nil && *st.PadDp >= 0 {
+		padX = c.Scale(*st.PadDp).Int()
+		padY = c.Scale(*st.PadDp).Int()
+	}
 	tipW, tipH := tw+padX*2, th+padY*2
 	x := c.MouseX + c.Scale(12).Int()
 	y := c.MouseY + c.Scale(18).Int()
@@ -829,10 +863,26 @@ func (c *Context) Tooltip(text string, anchor render.Rect) {
 	if y+tipH > c.Canvas.Height-c.Scale(4).Int() {
 		y = c.MouseY - tipH - c.Scale(8).Int()
 	}
+	bgCol := c.Theme.Card
+	if st.Bg != nil {
+		bgCol = *st.Bg
+	}
+	borderCol := c.Theme.Border
+	if st.BorderColor != nil {
+		borderCol = *st.BorderColor
+	}
+	textCol := c.Theme.TextPrimary
+	if st.Color != nil {
+		textCol = *st.Color
+	}
+	radDp := c.Theme.RadiusSm
+	if st.Radius != nil {
+		radDp = *st.Radius
+	}
 	tipRect := render.Rect{X: x, Y: y, W: tipW, H: tipH}
 	c.PushOverlay(tipRect, func() {
-		c.drawDropShadow(tipRect, c.Theme.RadiusSm, 8, 110)
-		c.Canvas.DrawRoundedBox(tipRect, c.ScaleF(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
-		c.Font.DrawText(c.Canvas, tipRect.X+padX, tipRect.Y+padY, text, pxSize, c.Theme.TextPrimary)
+		c.drawDropShadow(tipRect, radDp, 8, 110)
+		c.Canvas.DrawRoundedBox(tipRect, c.ScaleF(radDp), bgCol, 1.0, borderCol)
+		c.Font.DrawTextWithOptions(c.Canvas, tipRect.X+padX, tipRect.Y+padY, text, pxSize, textCol, textOpts)
 	})
 }

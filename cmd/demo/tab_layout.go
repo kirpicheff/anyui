@@ -8,7 +8,7 @@ import (
 
 func (st *demoState) drawTabLayout(ui *anyui.UI) {
 	th := ui.Theme()
-	ui.ScrollView("sv_layout", 0, 0, func() {
+	ui.ScrollView("sv_layout", func() {
 		ui.Label("Продвинутая раскладка (Фаза 6.1)", anyui.FontSize(16), anyui.Bold())
 
 		// 1. RowFlex: фиксированный слот + пропорциональные веса

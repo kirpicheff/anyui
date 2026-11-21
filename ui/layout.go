@@ -578,7 +578,7 @@ func (c *Context) Page(cfg PageConfig, headerFn, bodyFn, footerFn func()) {
 			if svID == "" {
 				svID = "page_body"
 			}
-			c.ScrollView(svID, 0, 0, bodyFn)
+			c.ScrollView(svID, bodyFn)
 		}})
 	}
 	if footerFn != nil {

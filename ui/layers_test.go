@@ -201,14 +201,14 @@ func TestStaticLayerInRowCenteredAndScroll(t *testing.T) {
 				clicked = true
 			}
 		})
-		c.ScrollView("sv_perf", 400, 200, func() {
+		c.ScrollView("sv_perf", func() {
 			c.StaticLayer("sv_static", func() {
 				staticBodyCalls++
 				c.CardOpts(func() {
 					c.Spacer(40)
 				}, Width(200), Height(60))
 			})
-		})
+		}, Width(400), Height(200))
 	}
 
 	ctx.Render(draw)

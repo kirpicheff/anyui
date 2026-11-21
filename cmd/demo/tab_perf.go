@@ -59,7 +59,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 		}
 	}
 
-	ui.ScrollView("scroll_perf", 0, 0, func() {
+	ui.ScrollView("scroll_perf", func() {
 		ui.Column(14, func() {
 			ui.Label("Фаза 7.2: Слои, Dirty Rectangles, фильтры и LRU-кеши", anyui.FontSize(16), anyui.Bold())
 
@@ -73,7 +73,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 						ui.Column(6, func() {
 							ui.Label(fmt.Sprintf("Static Layer (перерисовок: #%d)", perfTab.staticDraws), anyui.FontSize(13), anyui.Bold(), anyui.TextColor(th.Accent))
 							ui.Label("Этот блок с градиентом и SVG кешируется в отдельный буфер.", anyui.FontSize(11), anyui.TextColor(th.TextMuted))
-							ui.CanvasView(320, 74, func(c *render.Canvas, r anyui.Rect) {
+							ui.CanvasView(func(c *anyui.Canvas, r anyui.Rect) {
 								c.FillLinearGradient(r, render.UniformRadii(ui.ScaleF(8)), render.LinearGradient{
 									StartX: 0, StartY: 0, EndX: 1, EndY: 1,
 									Stops: []render.GradientStop{
@@ -90,7 +90,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 									pts = append(pts, render.PointF{X: px, Y: py})
 								}
 								c.DrawPolyline(pts, ui.ScaleF(2), th.Accent, false)
-							})
+							}, anyui.Width(320), anyui.Height(74))
 						})
 					}, anyui.Width(370), anyui.Height(176), anyui.Padding(12))
 				})
@@ -173,7 +173,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 				rStatic.W = 340
 				rStatic.H = 50
 				ui.RegisterHoverArea("perf_hover_static", rStatic, anyui.CursorHand, false)
-				ui.CanvasView(340, 50, func(c *render.Canvas, r anyui.Rect) {
+				ui.CanvasView(func(c *anyui.Canvas, r anyui.Rect) {
 					mx, my := ui.MousePosPx()
 					hov := r.Contains(mx.Int(), my.Int())
 					bg := th.Surface
@@ -183,12 +183,12 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 					c.DrawRoundedBox(r, ui.ScaleF(8), bg, 1.0, th.Border)
 					ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(10).Int(), "Зона без перерисовки внутри (trackMove=false)", 12, th.TextPrimary)
 					ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(28).Int(), "Водите мышью здесь — Render не вызывается", 11, th.TextMuted)
-				})
+				}, anyui.Width(340), anyui.Height(50))
 				rTrack := ui.CurrentArea()
 				rTrack.W = 340
 				rTrack.H = 50
 				ui.RegisterHoverArea("perf_hover_track", rTrack, anyui.CursorCrosshair, true)
-				ui.CanvasView(340, 50, func(c *render.Canvas, r anyui.Rect) {
+				ui.CanvasView(func(c *anyui.Canvas, r anyui.Rect) {
 					mx, my := ui.MousePosPx()
 					hov := r.Contains(mx.Int(), my.Int())
 					bg := th.Surface
@@ -202,7 +202,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 					} else {
 						ui.DrawText(r.X+ui.Scale(12).Int(), r.Y+ui.Scale(28).Int(), "Наведите для трекинга координат и Crosshair", 11, th.TextMuted)
 					}
-				})
+				}, anyui.Width(340), anyui.Height(50))
 			})
 
 			ui.Separator()
@@ -232,7 +232,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 					itemRect.W = 134
 					itemRect.H = 34
 					ui.RegisterHoverArea("perf_"+item.id, itemRect, item.cursor, false)
-					ui.CanvasView(134, 34, func(c *render.Canvas, r anyui.Rect) {
+					ui.CanvasView(func(c *anyui.Canvas, r anyui.Rect) {
 						mx, my := ui.MousePosPx()
 						hov := r.Contains(mx.Int(), my.Int())
 						bg := th.Surface
@@ -244,7 +244,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 						}
 						c.DrawRoundedBox(r, ui.ScaleF(6), bg, 1.0, border)
 						ui.DrawText(r.X+ui.Scale(10).Int(), r.Y+ui.Scale(10).Int(), item.label, 12, th.TextPrimary)
-					})
+					}, anyui.Width(134), anyui.Height(34))
 				}
 			})
 
@@ -276,7 +276,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 						iEntries, iBytes := ui.ScaledImageCacheStats()
 						ui.Label(fmt.Sprintf("Кеш изображений: %d шт. (%.1f КБ)", iEntries, float64(iBytes)/1024.0), anyui.FontSize(12), anyui.Bold())
 						ui.Row(10, 120, func() {
-							ui.Image(st.sampleImg, perfTab.imgSizeDp, perfTab.imgSizeDp, perfTab.imgScaleMode)
+							ui.Image(st.sampleImg, perfTab.imgScaleMode, anyui.Width(perfTab.imgSizeDp), anyui.Height(perfTab.imgSizeDp))
 							ui.Column(4, func() {
 								ui.RowCentered(4, 26, func() {
 									if ui.Button("perf_img_64", "64dp", anyui.Height(24), anyui.Padding(6)) {

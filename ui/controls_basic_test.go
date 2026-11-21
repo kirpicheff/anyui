@@ -203,22 +203,22 @@ func TestScrollViewWheel(t *testing.T) {
 
 	// Первый кадр вычисляет contentH (например, 10 строк по 30px)
 	ctx.beginFrame()
-	ctx.ScrollView("sv", 300, 100, func() {
+	ctx.ScrollView("sv", func() {
 		for i := 0; i < 10; i++ {
 			ctx.allocRect(100, 30)
 		}
-	})
+	}, Width(300), Height(100))
 	ctx.endFrame()
 
 	// Прокрутка колесом вниз (WheelY < 0)
 	ctx.MouseX, ctx.MouseY = 50, 50
 	ctx.WheelY = -2
 	ctx.beginFrame()
-	ctx.ScrollView("sv", 300, 100, func() {
+	ctx.ScrollView("sv", func() {
 		for i := 0; i < 10; i++ {
 			ctx.allocRect(100, 30)
 		}
-	})
+	}, Width(300), Height(100))
 	ctx.endFrame()
 
 	si := ctx.getScrollInfo("sv:sv")

@@ -83,7 +83,7 @@ func ensureDesktopTree() []*anyui.TreeNode {
 
 func (st *demoState) drawTabDesktop(ui *anyui.UI) {
 	th := ui.Theme()
-	ui.ScrollView("scroll_desktop", 0, 0, func() {
+	ui.ScrollView("scroll_desktop", func() {
 		ui.Column(14, func() {
 			ui.Label("Фаза 7.1: Десктоп-контролы, графики и мультивыбор", anyui.FontSize(16), anyui.Bold())
 

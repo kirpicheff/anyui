@@ -8,7 +8,7 @@ import (
 
 func (st *demoState) drawTabAdvanced(ui *anyui.UI) {
 	th := ui.Theme()
-	ui.ScrollView("sv_advanced", 0, 0, func() {
+	ui.ScrollView("sv_advanced", func() {
 		ui.Label("Расширенный ввод: NumberInput, Slider, RangeSlider", anyui.FontSize(16), anyui.Bold())
 		ui.RowCentered(14, 40, func() {
 			ui.Label("Количество (Stepper):", anyui.FontSize(13))

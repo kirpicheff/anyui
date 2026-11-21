@@ -9,7 +9,7 @@ import (
 
 func (st *demoState) drawTabInputs(ui *anyui.UI) {
 	th := ui.Theme()
-	ui.ScrollView("sv_inputs", 0, 0, func() {
+	ui.ScrollView("sv_inputs", func() {
 		ui.Label("Однострочные поля ввода (TextInput) — Undo/Redo, слова, ПКМ-меню, валидация", anyui.FontSize(16), anyui.Bold())
 		ui.Row(14, 38, func() {
 			ui.TextInput("ti_main", &st.textVal, "Обычное поле...", anyui.Width(240), anyui.Clearable(true), anyui.Icon(svgStar))
@@ -94,12 +94,12 @@ func (st *demoState) drawTabInputs(ui *anyui.UI) {
 
 		ui.Separator()
 		ui.Label("Горизонтальный ScrollView (Shift+Колесо или WheelX)", anyui.FontSize(15), anyui.Bold())
-		ui.ScrollView("sv_horiz_demo", 0, 74, func() {
+		ui.ScrollView("sv_horiz_demo", func() {
 			ui.Row(8, 36, func() {
 				for i := 1; i <= 10; i++ {
 					ui.Button(fmt.Sprintf("hbtn_%d", i), fmt.Sprintf("Элемент #%d", i), anyui.Width(120))
 				}
 			})
-		})
+		}, anyui.Height(74))
 	})
 }

@@ -87,9 +87,9 @@ func TestScrollViewHorizontalScroll(t *testing.T) {
 	ctx := newTestContext(400, 300)
 
 	draw := func(c *Context) {
-		c.ScrollView("sv", 200, 150, func() {
+		c.ScrollView("sv", func() {
 			c.Button("wide_btn", "Очень широкая кнопка", false, 500)
-		})
+		}, Width(200), Height(150))
 	}
 	ctx.Render(draw)
 
@@ -305,11 +305,11 @@ func TestFocusLostAndScrollbarCapture(t *testing.T) {
 
 	// Перетаскивание вертикального скроллбара ScrollView продолжается за пределами окна
 	draw := func(c *Context) {
-		c.ScrollView("sv_cap", 200, 100, func() {
+		c.ScrollView("sv_cap", func() {
 			for i := 0; i < 15; i++ {
 				c.Spacer(30)
 			}
-		})
+		}, Width(200), Height(100))
 	}
 	ctx.Render(draw)
 
@@ -340,7 +340,7 @@ func TestInteractiveCanvasInputCaptureAndFocus(t *testing.T) {
 
 	draw := func(c *Context) {
 		c.Padding(20, func() {
-			c.InteractiveCanvas("rdp", 200, 100, CanvasCallbacks{
+			c.InteractiveCanvas("rdp", CanvasCallbacks{
 				OnDraw: func(canvas *render.Canvas, area render.Rect, focused bool) {
 					lastFocused = focused
 				},
@@ -366,7 +366,7 @@ func TestInteractiveCanvasInputCaptureAndFocus(t *testing.T) {
 				OnFocusLost: func() {
 					focusLostCount++
 				},
-			})
+			}, Width(200), Height(100))
 		})
 	}
 
@@ -463,7 +463,7 @@ func TestInteractiveCanvasDirectInputSkipsRender(t *testing.T) {
 
 	draw := func(c *Context) {
 		c.Padding(20, func() {
-			c.InteractiveCanvas("rdp", 200, 100, CanvasCallbacks{
+			c.InteractiveCanvas("rdp", CanvasCallbacks{
 				DirectInput: true,
 				OnMouseMove: func(x, y int, mods platform.Modifiers) {
 					moves++
@@ -484,7 +484,7 @@ func TestInteractiveCanvasDirectInputSkipsRender(t *testing.T) {
 				OnKey: func(ev RawKeyEvent) {
 					keys++
 				},
-			})
+			}, Width(200), Height(100))
 		})
 		if showOverlay {
 			c.PushOverlay(render.Rect{X: 0, Y: 0, W: 100, H: 100}, func() {})
@@ -571,12 +571,12 @@ func TestInteractiveCanvasStreamingFastPath(t *testing.T) {
 	frameColor := render.RGB(10, 20, 30)
 	draw := func(c *Context) {
 		c.Padding(20, func() {
-			c.InteractiveCanvas("video", 200, 100, CanvasCallbacks{
+			c.InteractiveCanvas("video", CanvasCallbacks{
 				Streaming: true,
 				OnDraw: func(canvas *render.Canvas, area render.Rect, focused bool) {
 					canvas.FillRect(area, frameColor)
 				},
-			})
+			}, Width(200), Height(100))
 		})
 	}
 
@@ -624,13 +624,13 @@ func TestStreamingWakeOnlySkipsFullRedraw(t *testing.T) {
 	draw := func(c *Context) {
 		drawCalls++
 		c.Padding(16, func() {
-			c.InteractiveCanvas("video", 160, 120, CanvasCallbacks{
+			c.InteractiveCanvas("video", CanvasCallbacks{
 				Streaming: true,
 				OnDraw: func(canvas *render.Canvas, area render.Rect, focused bool) {
 					canvasCalls++
 					canvas.FillRect(area, frameColor)
 				},
-			})
+			}, Width(160), Height(120))
 		})
 	}
 

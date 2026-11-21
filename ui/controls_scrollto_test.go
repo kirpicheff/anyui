@@ -102,12 +102,12 @@ func TestScrollViewScrollToID(t *testing.T) {
 
 	// Кадр 1: первичный рендер без скролла
 	ctx.beginFrame()
-	ctx.ScrollView("sv", 400, 200, drawContent)
+	ctx.ScrollView("sv", drawContent, Width(400), Height(200))
 	ctx.endFrame()
 
 	// Кадр 2: декларативная прокрутка к якорю section_marker
 	ctx.beginFrame()
-	ctx.ScrollView("sv", 400, 200, drawContent, ScrollToID("section_marker"))
+	ctx.ScrollView("sv", drawContent, Width(400), Height(200), ScrollToID("section_marker"))
 	ctx.endFrame()
 
 	si := ctx.getScrollInfo("sv:sv")
@@ -119,7 +119,7 @@ func TestScrollViewScrollToID(t *testing.T) {
 
 	// Кадр 3: ScrollToID к кнопке btn_target (или короткому id)
 	ctx.beginFrame()
-	ctx.ScrollView("sv", 400, 200, drawContent, ScrollToID("btn_target"))
+	ctx.ScrollView("sv", drawContent, Width(400), Height(200), ScrollToID("btn_target"))
 	ctx.endFrame()
 
 	if si.y < savedY {

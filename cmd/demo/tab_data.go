@@ -159,7 +159,7 @@ func insertNode(nodes []*anyui.TreeNode, targetID string, item *anyui.TreeNode, 
 
 func (st *demoState) drawTabData(ui *anyui.UI) {
 	th := ui.Theme()
-	ui.ScrollView("sv_data", 0, 0, func() {
+	ui.ScrollView("sv_data", func() {
 		ui.Label("Table (Drag-Reorder строк, сортировка, ресайз, скролл, DoubleClick/MiddleClick)", anyui.FontSize(15), anyui.Bold())
 		cols := []anyui.TableColumn{
 			{Title: "ID", WidthDp: 64, MinWidthDp: 48, Sortable: true},

@@ -237,7 +237,7 @@ func TestMultiWindowDispatchMouseMoveDirectInputNoLostWakeup(t *testing.T) {
 		ctx:     ctx2,
 		drawFn: func(u *UI) {
 			w2Renders++
-			u.ctx.InteractiveCanvas("viewer", 200, 150, ui.CanvasCallbacks{
+			u.ctx.InteractiveCanvas("viewer", ui.CanvasCallbacks{
 				DirectInput: true,
 				Streaming:   true,
 				OnDraw: func(cv *render.Canvas, area render.Rect, _ bool) {
@@ -246,7 +246,7 @@ func TestMultiWindowDispatchMouseMoveDirectInputNoLostWakeup(t *testing.T) {
 						cv.FillRect(render.Rect{X: area.X, Y: area.Y, W: 50, H: 50}, render.RGB(255, 0, 0))
 					}
 				},
-			})
+			}, ui.Width(200), ui.Height(150))
 		},
 	}
 	w2.ui = &UI{ctx: ctx2, win: w2}
@@ -329,14 +329,14 @@ func TestWindowWakeUpTargeted(t *testing.T) {
 		ctx:     ctx2,
 		drawFn: func(u *UI) {
 			w2Renders++
-			u.ctx.InteractiveCanvas("viewer", 200, 150, ui.CanvasCallbacks{
+			u.ctx.InteractiveCanvas("viewer", ui.CanvasCallbacks{
 				DirectInput: true,
 				Streaming:   true,
 				OnDraw: func(cv *render.Canvas, area render.Rect, _ bool) {
 					w2CanvasDraws++
 					cv.FillRect(render.Rect{X: area.X, Y: area.Y, W: 40, H: 40}, render.RGB(0, 255, 0))
 				},
-			})
+			}, ui.Width(200), ui.Height(150))
 		},
 	}
 	w2.ui = &UI{ctx: ctx2, win: w2}

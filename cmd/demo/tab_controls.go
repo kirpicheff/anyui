@@ -8,7 +8,7 @@ import (
 
 func (st *demoState) drawTabControls(ui *anyui.UI) {
 	th := ui.Theme()
-	ui.ScrollView("sv_controls", 0, 0, func() {
+	ui.ScrollView("sv_controls", func() {
 		ui.Label("Кнопки и варианты стилей", anyui.FontSize(16), anyui.Bold())
 		ui.RowCentered(10, 40, func() {
 			if ui.Button("btn_prim", "Primary", anyui.Primary(), anyui.Icon(svgStar)) {

@@ -10,11 +10,11 @@ import (
 
 func (st *demoState) drawTabGraphicsSystem(ui *anyui.UI) {
 	th := ui.Theme()
-	ui.ScrollView("sv_gfx", 0, 0, func() {
+	ui.ScrollView("sv_gfx", func() {
 		ui.Label("Графика Фазы 2 (Градиенты, Тени, Blur, Вектор, SVG, Image)", anyui.FontSize(16), anyui.Bold())
 
 		ui.Row(14, 150, func() {
-			ui.CanvasView(460, 145, func(c *render.Canvas, r anyui.Rect) {
+			ui.CanvasView(func(c *anyui.Canvas, r anyui.Rect) {
 				c.DrawRoundedBox(r, ui.ScaleF(10), th.SurfaceDark, 1.0, th.Border)
 
 				// 1. Линейный градиент + тень
@@ -59,11 +59,11 @@ func (st *demoState) drawTabGraphicsSystem(ui *anyui.UI) {
 				c.DrawArc(float32(r.X+ui.Scale(415).Int()), float32(r.Y+ui.Scale(55).Int()), ui.ScaleF(22), 0, math.Pi*1.45, ui.ScaleF(3.5), th.Warning)
 				c.DrawSVG(svgStar, r.X+ui.Scale(285).Int(), r.Y+ui.Scale(95).Int(), ui.Scale(28).Int(), th.Warning)
 				c.DrawSVG(svgGear, r.X+ui.Scale(325).Int(), r.Y+ui.Scale(95).Int(), ui.Scale(28).Int(), th.Accent)
-			})
+			}, anyui.Width(460), anyui.Height(145))
 
 			ui.Column(6, func() {
 				ui.Label("Image:", anyui.FontSize(12), anyui.TextColor(th.TextMuted))
-				ui.Image(st.sampleImg, 96, 96, render.ScaleFit)
+				ui.Image(st.sampleImg, anyui.ScaleFit, anyui.Width(96), anyui.Height(96))
 			})
 		})
 

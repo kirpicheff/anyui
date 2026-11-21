@@ -317,7 +317,7 @@ func BenchmarkFrameBudget1000Widgets(b *testing.B) {
 
 	// 200 строк по 5 виджетов = 1000 виджетов
 	h.SetDraw(func(ui *UI) {
-		ui.ScrollView("bench_scroll", 1280, 960, func() {
+		ui.ScrollView("bench_scroll", func() {
 			for i := 0; i < 200; i++ {
 				ui.Row(8, 30, func() {
 					ui.Label(fmt.Sprintf("Item %d", i))
@@ -329,7 +329,7 @@ func BenchmarkFrameBudget1000Widgets(b *testing.B) {
 					ui.StatusDot(render.RGB(0, 200, 0), "OK")
 				})
 			}
-		})
+		}, Width(1280), Height(960))
 	})
 
 	// Прогревочный шаг

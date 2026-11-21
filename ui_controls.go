@@ -93,8 +93,9 @@ func (u *UI) TabBar(id string, tabs []TabItem, activeID *string, opts ...Option)
 }
 
 // ScrollView создаёт прокручиваемую область с поддержкой колеса мыши и скроллбара.
-func (u *UI) ScrollView(id string, wDp, hDp Dp, fn func(), opts ...Option) {
-	u.ctx.ScrollView(id, wDp, hDp, fn, opts...)
+// Размеры задаются через опции Width, Height, FillWidth, FillHeight (по умолчанию — доступное пространство).
+func (u *UI) ScrollView(id string, fn func(), opts ...Option) {
+	u.ctx.ScrollView(id, fn, opts...)
 }
 
 // Modal рисует модальное окно с затемнением фона и блокировкой кликов под ним.
@@ -121,19 +122,19 @@ func (u *UI) Drawer(id string, open *bool, side DrawerSide, fn func(), opts ...O
 }
 
 // ContextMenu открывает кастомное всплывающее меню по правому клику внутри anchor (в логических пикселях Dp / CurrentArea()).
-func (u *UI) ContextMenu(id string, anchor Rect, items []ContextMenuItem) {
+func (u *UI) ContextMenu(id string, anchor Rect, items []ContextMenuItem, opts ...Option) {
 	if u.ctx == nil {
 		return
 	}
-	u.ctx.ContextMenu(id, u.scaleRect(anchor), items)
+	u.ctx.ContextMenu(id, u.scaleRect(anchor), items, opts...)
 }
 
 // Tooltip отображает всплывающую подсказку при наведении на область anchor (в логических пикселях Dp / CurrentArea()).
-func (u *UI) Tooltip(text string, anchor Rect) {
+func (u *UI) Tooltip(text string, anchor Rect, opts ...Option) {
 	if u.ctx == nil {
 		return
 	}
-	u.ctx.Tooltip(text, u.scaleRect(anchor))
+	u.ctx.Tooltip(text, u.scaleRect(anchor), opts...)
 }
 
 // Anchor размещает маркер якоря с заданным id для ScrollToID.
