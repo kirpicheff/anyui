@@ -202,6 +202,34 @@ func (w *win32Window) IsFullscreen() bool {
 	return w.fullscreen
 }
 
+const (
+	wsExTopMost   = 0x00000008
+	swpNoActivate = 0x0010
+	hwndTopMost   = ^uintptr(0) // HWND_TOPMOST (-1)
+	hwndNoTopMost = ^uintptr(1) // HWND_NOTOPMOST (-2)
+)
+
+func (w *win32Window) SetAlwaysOnTop(onTop bool) {
+	w.alwaysOnTop = onTop
+	if w.hwnd == 0 {
+		return
+	}
+	insertAfter := hwndNoTopMost
+	if onTop {
+		insertAfter = hwndTopMost
+	}
+	procSetWindowPos.Call(
+		uintptr(w.hwnd),
+		insertAfter,
+		0, 0, 0, 0,
+		swpNoMove|swpNoSize|swpNoActivate,
+	)
+}
+
+func (w *win32Window) IsAlwaysOnTop() bool {
+	return w.alwaysOnTop
+}
+
 func (w *win32Window) SetFullscreen(fullscreen bool) {
 	if w.hwnd == 0 || w.fullscreen == fullscreen {
 		return

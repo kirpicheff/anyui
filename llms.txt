@@ -1,4 +1,4 @@
-# AnyUI (v0.8.3)
+# AnyUI (v0.8.4)
 
 Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).
 
@@ -189,6 +189,7 @@ type Config struct {
 	Tray                *TrayConfig
 	Parent              *Window
 	Frameless           bool
+	AlwaysOnTop         bool                             // Закрепить окно поверх всех окон ОС (TopMost)
 	TitleBarHeight      int                              // Высота системного заголовка окна в физических пикселях ОС (px).
 	HitTest             func(xPx, yPx int) HitTestResult // Проверка зон окна Frameless (xPx, yPx — в физических пикселях ОС).
 	AcceptDropFiles     bool
@@ -213,7 +214,7 @@ type PageConfig struct {
 ## Карта API (полные сигнатуры и структуры — в `llms-full.txt`)
 
 - **Приложение (`App`):** `anyui.NewApp`, `App.Run`, `App.Dispatch`, `App.OpenWindow`, `App.MainWindow`, `App.Show`, `App.Quit`, `App.SetStrings`, `App.SetTrayMenu`, `App.SetTrayIcon`, `App.SetTrayTooltip`, `App.ShowNotification`.
-- **Окно (`Window`):** `Window.SetTitle`, `Window.SetSize`, `Window.SetPosition`, `Window.Position`, `Window.SetIcon`, `Window.SetTheme`, `Window.SetStrings`, `Window.SetDarkTitle`, `Window.SetTitleBarColors`, `Window.SetHideOnClose`, `Window.SetOnClose`, `Window.SetOnDropFiles`, `Window.Show`, `Window.Hide`, `Window.BringToFront`, `Window.Minimize`, `Window.Maximize`, `Window.Restore`, `Window.IsMinimized`, `Window.IsMaximized`, `Window.IsFullscreen`, `Window.SetFullscreen`, `Window.State`, `Window.RestoreState`, `Window.ClipboardText`, `Window.SetClipboardText`, `Window.ClipboardImage`, `Window.SetClipboardImage`, `Window.Invalidate`, `Window.WakeUp`, `Window.Close`.
+- **Окно (`Window`):** `Window.SetTitle`, `Window.SetSize`, `Window.SetPosition`, `Window.Position`, `Window.SetIcon`, `Window.SetTheme`, `Window.SetStrings`, `Window.SetDarkTitle`, `Window.SetTitleBarColors`, `Window.SetHideOnClose`, `Window.SetOnClose`, `Window.SetOnDropFiles`, `Window.Show`, `Window.Hide`, `Window.BringToFront`, `Window.Minimize`, `Window.Maximize`, `Window.Restore`, `Window.IsMinimized`, `Window.IsMaximized`, `Window.IsFullscreen`, `Window.SetFullscreen`, `Window.SetAlwaysOnTop`, `Window.IsAlwaysOnTop`, `Window.State`, `Window.RestoreState`, `Window.ClipboardText`, `Window.SetClipboardText`, `Window.ClipboardImage`, `Window.SetClipboardImage`, `Window.Invalidate`, `Window.WakeUp`, `Window.Close`.
 - **Раскладка и контейнеры (`UI`):** `Column`, `ColumnCentered`, `ColumnWith`, `ColumnFlex`, `Row`, `RowCentered`, `RowWith`, `RowFlex`, `Grid`, `Flow`, `FormLayout`, `FormRow`, `Padding`, `PaddingXY`, `Spacer`, `FlexSpacer`, `Expand`, `DockTop`, `DockBottom`, `Page`, `Card`, `ScrollView`, `Anchor`, `SplitPane`, `Collapsible`, `Accordion`, `LayoutRect`, `IDScope`, `PushID`, `PopID`.
 - **Ввод и формы (`UI`):** `Button`, `IconButton`, `Hyperlink`, `Toggle`, `Checkbox`, `RadioButton`, `RadioGroup`, `TextInput`, `TextArea`, `MaskedInput`, `NumberInput`, `Slider`, `RangeSlider`, `Select`, `MultiSelect`, `TagInput`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`.
 - **Списки, деревья, таблицы и графики (`UI`):** `ListView`, `ListViewEx`, `TreeView`, `TreeViewEx`, `Table`, `TableEx`, `LogView`, `VirtualTextView`, `Sparkline`, `LineChart`, `BarChart`.

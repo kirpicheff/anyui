@@ -24,6 +24,7 @@ const (
 	netWMStateMaxHorz  = "_NET_WM_STATE_MAXIMIZED_HORZ"
 	netWMStateMaxVert  = "_NET_WM_STATE_MAXIMIZED_VERT"
 	netWMStateFull     = "_NET_WM_STATE_FULLSCREEN"
+	netWMStateAbove    = "_NET_WM_STATE_ABOVE"
 	netWMStateHidden   = "_NET_WM_STATE_HIDDEN"
 	netWMMoveResize    = "_NET_WM_MOVERESIZE"
 	netWMIcon          = "_NET_WM_ICON"
@@ -376,8 +377,9 @@ type x11Window struct {
 	shmH    int
 
 	// XDND состояние
-	xdndSource xproto.Window
-	xdndTypes  []xproto.Atom
+	xdndSource  xproto.Window
+	xdndTypes   []xproto.Atom
+	alwaysOnTop bool
 }
 
 // newX11Window создаёт новое нативное окно X11.
@@ -512,6 +514,9 @@ func newX11Window(cfg WindowConfig) (Window, error) {
 
 	if cfg.InitialState != nil && cfg.InitialState.Maximized {
 		w.Maximize()
+	}
+	if cfg.AlwaysOnTop {
+		w.SetAlwaysOnTop(true)
 	}
 
 	return w, nil
@@ -680,6 +685,9 @@ func (w *x11Window) WakeUp() {
 
 func (w *x11Window) Show() {
 	_ = xproto.MapWindowChecked(w.disp.conn, w.win).Check()
+	if w.IsAlwaysOnTop() {
+		w.sendNetWMState(1, netWMStateAbove, "")
+	}
 }
 
 func (w *x11Window) Hide() {
@@ -816,6 +824,23 @@ func (w *x11Window) IsFullscreen() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.fullscreen
+}
+
+func (w *x11Window) SetAlwaysOnTop(onTop bool) {
+	action := uint32(0)
+	if onTop {
+		action = 1
+	}
+	w.sendNetWMState(action, netWMStateAbove, "")
+	w.mu.Lock()
+	w.alwaysOnTop = onTop
+	w.mu.Unlock()
+}
+
+func (w *x11Window) IsAlwaysOnTop() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.alwaysOnTop
 }
 
 func (w *x11Window) Position() (int, int) {

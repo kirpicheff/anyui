@@ -71,7 +71,8 @@ type Config struct {
 	Tray                *TrayConfig
 	Parent              *Window
 	Frameless           bool
-	TitleBarHeight      int                              // Высота системного заголовка окна в физических пикселях ОС (px).
+	AlwaysOnTop         bool // Закрепить окно поверх всех окон ОС (TopMost)
+	TitleBarHeight      int  // Высота системного заголовка окна в физических пикселях ОС (px).
 	HitTest             func(xPx, yPx int) HitTestResult // Проверка зон окна Frameless (xPx, yPx — в физических пикселях ОС).
 	AcceptDropFiles     bool
 	IconRGBA            []byte
@@ -230,6 +231,7 @@ func (a *App) createWindow(cfg Config, drawFn func(*UI)) (*Window, error) {
 		InitialState:    cfg.InitialState,
 		Parent:          parentPlat,
 		Frameless:       cfg.Frameless,
+		AlwaysOnTop:     cfg.AlwaysOnTop,
 		TitleBarHeight:  cfg.TitleBarHeight,
 		HitTest:         cfg.HitTest,
 		AcceptDropFiles: cfg.AcceptDropFiles,

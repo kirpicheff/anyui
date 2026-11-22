@@ -19,8 +19,9 @@ type stylerMockWindow struct {
 	borderCol   *platform.WindowColor
 	brought     int
 	wakeUps     int
-	presents    int
+	presents     int
 	presentRects int
+	alwaysOnTop  bool
 }
 
 func (m *stylerMockWindow) Run(func(platform.Event)) error          { return nil }
@@ -55,10 +56,28 @@ func (m *stylerMockWindow) ReleaseCapture()                         {}
 func (m *stylerMockWindow) DoubleClickTimeMs() int                  { return 500 }
 func (m *stylerMockWindow) SetDarkTitle(dark bool)                  { m.darkTitle = dark; m.darkChanged++ }
 func (m *stylerMockWindow) BringToFront()                           { m.brought++ }
+func (m *stylerMockWindow) SetAlwaysOnTop(onTop bool)               { m.alwaysOnTop = onTop }
+func (m *stylerMockWindow) IsAlwaysOnTop() bool                     { return m.alwaysOnTop }
 func (m *stylerMockWindow) SetTitleBarColors(c, t, b *platform.WindowColor) {
 	m.captionCol = c
 	m.textCol = t
 	m.borderCol = b
+}
+
+func TestWindowAlwaysOnTop(t *testing.T) {
+	mw := &stylerMockWindow{w: 800, h: 600, scale: 1.0}
+	w := &Window{platWin: mw}
+	if w.IsAlwaysOnTop() {
+		t.Fatal("по умолчанию IsAlwaysOnTop() должен быть false")
+	}
+	w.SetAlwaysOnTop(true)
+	if !w.IsAlwaysOnTop() || !mw.alwaysOnTop {
+		t.Fatal("ожидалось IsAlwaysOnTop() == true после SetAlwaysOnTop(true)")
+	}
+	w.SetAlwaysOnTop(false)
+	if w.IsAlwaysOnTop() || mw.alwaysOnTop {
+		t.Fatal("ожидалось IsAlwaysOnTop() == false после SetAlwaysOnTop(false)")
+	}
 }
 
 func TestSaveAndLoadWindowState(t *testing.T) {

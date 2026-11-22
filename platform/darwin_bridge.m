@@ -779,6 +779,28 @@ int anyui_darwin_is_fullscreen(uintptr_t handle) {
     return res;
 }
 
+void anyui_darwin_set_always_on_top(uintptr_t handle, int onTop) {
+    if (!handle) return;
+    NSWindow *win = (__bridge NSWindow *)(void *)handle;
+    runOnMainAsync(^{
+        @autoreleasepool {
+            [win setLevel:(onTop ? NSFloatingWindowLevel : NSNormalWindowLevel)];
+        }
+    });
+}
+
+int anyui_darwin_is_always_on_top(uintptr_t handle) {
+    if (!handle) return 0;
+    NSWindow *win = (__bridge NSWindow *)(void *)handle;
+    __block int res = 0;
+    runOnMainSync(^{
+        @autoreleasepool {
+            res = (win.level >= NSFloatingWindowLevel) ? 1 : 0;
+        }
+    });
+    return res;
+}
+
 void anyui_darwin_bring_to_front(uintptr_t handle) {
     if (!handle) return;
     NSWindow *win = (__bridge NSWindow *)(void *)handle;

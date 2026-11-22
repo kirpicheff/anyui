@@ -230,6 +230,21 @@ func (w *Window) IsFullscreen() bool {
 	return false
 }
 
+// SetAlwaysOnTop закрепляет окно поверх всех остальных окон ОС (или снимает закрепление).
+func (w *Window) SetAlwaysOnTop(onTop bool) {
+	if tm, ok := w.platWin.(platform.WindowTopMoster); ok {
+		tm.SetAlwaysOnTop(onTop)
+	}
+}
+
+// IsAlwaysOnTop возвращает true, если окно закреплено поверх всех окон ОС.
+func (w *Window) IsAlwaysOnTop() bool {
+	if tm, ok := w.platWin.(platform.WindowTopMoster); ok {
+		return tm.IsAlwaysOnTop()
+	}
+	return false
+}
+
 // Position возвращает экранные координаты верхнего левого угла окна в физических пикселях (xPx, yPx).
 func (w *Window) Position() (xPx, yPx int) {
 	if w.platWin != nil {

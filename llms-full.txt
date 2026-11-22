@@ -1,4 +1,4 @@
-# AnyUI (v0.8.3) — Полный справочник API
+# AnyUI (v0.8.4) — Полный справочник API
 
 Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).
 
@@ -339,6 +339,7 @@ type Config struct {
 	Tray                *TrayConfig
 	Parent              *Window
 	Frameless           bool
+	AlwaysOnTop         bool                             // Закрепить окно поверх всех окон ОС (TopMost)
 	TitleBarHeight      int                              // Высота системного заголовка окна в физических пикселях ОС (px).
 	HitTest             func(xPx, yPx int) HitTestResult // Проверка зон окна Frameless (xPx, yPx — в физических пикселях ОС).
 	AcceptDropFiles     bool
@@ -780,6 +781,7 @@ func (w *Window) ClipboardText() (string, error)
 func (w *Window) Close()
 func (w *Window) Hide()
 func (w *Window) Invalidate()
+func (w *Window) IsAlwaysOnTop() bool
 func (w *Window) IsFullscreen() bool
 func (w *Window) IsMaximized() bool
 func (w *Window) IsMinimized() bool
@@ -788,6 +790,7 @@ func (w *Window) Minimize()
 func (w *Window) Position() (xPx, yPx int)
 func (w *Window) Restore()
 func (w *Window) RestoreState(state WindowState)
+func (w *Window) SetAlwaysOnTop(onTop bool)
 func (w *Window) SetClipboardImage(img image.Image) error
 func (w *Window) SetClipboardText(text string) error
 func (w *Window) SetDarkTitle(dark bool)

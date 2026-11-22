@@ -122,6 +122,7 @@ type WindowConfig struct {
 	InitialState    *WindowState // Восстанавливаемая позиция и размер окна
 	Parent          Window       // Родительское окно (owner), если есть
 	Frameless       bool         // Окно без системной рамки с поддержкой перетаскивания и Aero Snap
+	AlwaysOnTop     bool         // Закрепить окно поверх всех окон ОС (TopMost)
 	TitleBarHeight  int          // Логическая высота области перетаскивания (по умолчанию 36, если HitTest не задан)
 	HitTest         func(x, y int) HitTestResult
 	AcceptDropFiles bool   // Разрешить перетаскивание файлов из проводника (WM_DROPFILES)
@@ -167,6 +168,12 @@ type WindowActivator interface {
 // WindowIconSetter — опциональный интерфейс окна для программной установки иконки.
 type WindowIconSetter interface {
 	SetIcon(rgba []byte, width, height int) error
+}
+
+// WindowTopMoster — опциональный интерфейс окна для закрепления поверх всех окон ОС (AlwaysOnTop).
+type WindowTopMoster interface {
+	SetAlwaysOnTop(onTop bool)
+	IsAlwaysOnTop() bool
 }
 
 // Window — кроссплатформенный интерфейс нативного окна.

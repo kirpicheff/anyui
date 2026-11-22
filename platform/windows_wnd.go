@@ -220,6 +220,7 @@ type win32Window struct {
 	closing           bool
 	onClose           func() bool
 	fullscreen        bool
+	alwaysOnTop       bool
 	savedStyle        uintptr
 	savedRect         rect
 	releasingCapture  bool
@@ -352,12 +353,16 @@ func (w *win32Window) Open(handler func(Event)) error {
 		right:  int32(float32(w.cfg.Width) * w.scale),
 		bottom: int32(float32(w.cfg.Height) * w.scale),
 	}
+	var exStyle uintptr
+	if w.cfg.AlwaysOnTop {
+		exStyle |= wsExTopMost
+	}
 	if !w.cfg.Frameless {
 		procAdjustWindowRectEx.Call(
 			uintptr(unsafe.Pointer(&winRect)),
 			style,
 			0,
-			0,
+			exStyle,
 		)
 		runtime.KeepAlive(&winRect)
 	}
@@ -368,7 +373,7 @@ func (w *win32Window) Open(handler func(Event)) error {
 	}
 
 	hwndRaw, _, createErr := procCreateWindowExW.Call(
-		0,
+		exStyle,
 		uintptr(unsafe.Pointer(className)),
 		uintptr(unsafe.Pointer(titlePtr)),
 		style,
@@ -389,6 +394,7 @@ func (w *win32Window) Open(handler func(Event)) error {
 	}
 
 	w.hwnd = windows.Handle(hwndRaw)
+	w.alwaysOnTop = w.cfg.AlwaysOnTop
 	windowMapMu.Lock()
 	windowMap[w.hwnd] = w
 	windowMapMu.Unlock()

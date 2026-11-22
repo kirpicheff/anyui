@@ -43,6 +43,8 @@ int anyui_darwin_is_maximized(uintptr_t handle);
 int anyui_darwin_is_minimized(uintptr_t handle);
 void anyui_darwin_set_fullscreen(uintptr_t handle, int fullscreen);
 int anyui_darwin_is_fullscreen(uintptr_t handle);
+void anyui_darwin_set_always_on_top(uintptr_t handle, int onTop);
+int anyui_darwin_is_always_on_top(uintptr_t handle);
 void anyui_darwin_bring_to_front(uintptr_t handle);
 void anyui_darwin_set_dark_title(uintptr_t handle, int dark);
 int anyui_darwin_double_click_ms(void);

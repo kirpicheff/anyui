@@ -53,6 +53,7 @@ type darwinWindow struct {
 var (
 	_ Window          = (*darwinWindow)(nil)
 	_ WindowActivator = (*darwinWindow)(nil)
+	_ WindowTopMoster = (*darwinWindow)(nil)
 	_ TitleBarStyler  = (*darwinWindow)(nil)
 	_ WindowStater    = (*darwinWindow)(nil)
 )
@@ -152,6 +153,9 @@ func (w *darwinWindow) Open(handler func(Event)) error {
 
 	if w.cfg.InitialState != nil && isValidWindowState(*w.cfg.InitialState) {
 		w.RestoreState(*w.cfg.InitialState)
+	}
+	if w.cfg.AlwaysOnTop {
+		w.SetAlwaysOnTop(true)
 	}
 
 	fmt.Fprintf(os.Stderr, "[anyui-darwin] Open(id=%d): показ окна и первичный рендер\n", w.id)
@@ -355,6 +359,30 @@ func (w *darwinWindow) IsFullscreen() bool {
 		return false
 	}
 	return C.anyui_darwin_is_fullscreen(C.uintptr_t(handle)) != 0
+}
+
+func (w *darwinWindow) SetAlwaysOnTop(onTop bool) {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle == 0 {
+		return
+	}
+	flag := C.int(0)
+	if onTop {
+		flag = 1
+	}
+	C.anyui_darwin_set_always_on_top(C.uintptr_t(handle), flag)
+}
+
+func (w *darwinWindow) IsAlwaysOnTop() bool {
+	w.mu.Lock()
+	handle := w.handle
+	w.mu.Unlock()
+	if handle == 0 {
+		return false
+	}
+	return C.anyui_darwin_is_always_on_top(C.uintptr_t(handle)) != 0
 }
 
 func (w *darwinWindow) Position() (int, int) {

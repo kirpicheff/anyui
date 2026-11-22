@@ -93,6 +93,7 @@ if res == anyui.ResYes {
 `*anyui.Window` methods:
 - `Minimize()`, `Maximize()`, `Restore()`, `IsMaximized()`, `IsMinimized()`
 - `SetFullscreen(bool)`, `IsFullscreen()`
+- `SetAlwaysOnTop(bool)`, `IsAlwaysOnTop()` (also configurable at creation via `Config.AlwaysOnTop` — keeps the window above all OS windows)
 - `Position() (x, y int)`, `SetPosition(x, y int)`, `SetSize(width, height int)`
 - `SetHideOnClose(bool)` and `SetOnClose(func(w *Window) bool)` (returning `false` cancels closing)
 

@@ -93,6 +93,7 @@ if res == anyui.ResYes {
 Методы `*anyui.Window`:
 - `Minimize()`, `Maximize()`, `Restore()`, `IsMaximized()`, `IsMinimized()`
 - `SetFullscreen(bool)`, `IsFullscreen()`
+- `SetAlwaysOnTop(bool)`, `IsAlwaysOnTop()` (также задаётся на старте через `Config.AlwaysOnTop` — закрепление окна поверх всех окон ОС)
 - `Position() (x, y int)`, `SetPosition(x, y int)`, `SetSize(width, height int)`
 - `SetHideOnClose(bool)` и `SetOnClose(func(w *Window) bool)` (возврат `false` отменяет закрытие)
 
