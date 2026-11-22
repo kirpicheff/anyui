@@ -75,6 +75,35 @@ func customCursorDigest(bgra []byte) uint64 {
 	return h.Sum64()
 }
 
+func premultiplyBGRA(dst, src []byte) {
+	n := len(src)
+	if len(dst) < n {
+		n = len(dst)
+	}
+	n &^= 3
+	for i := 0; i < n; i += 4 {
+		a := src[i+3]
+		switch a {
+		case 0:
+			dst[i+0] = 0
+			dst[i+1] = 0
+			dst[i+2] = 0
+			dst[i+3] = 0
+		case 255:
+			dst[i+0] = src[i+0]
+			dst[i+1] = src[i+1]
+			dst[i+2] = src[i+2]
+			dst[i+3] = 255
+		default:
+			aa := uint32(a)
+			dst[i+0] = uint8((uint32(src[i+0])*aa + 127) / 255)
+			dst[i+1] = uint8((uint32(src[i+1])*aa + 127) / 255)
+			dst[i+2] = uint8((uint32(src[i+2])*aa + 127) / 255)
+			dst[i+3] = a
+		}
+	}
+}
+
 // createHCursorFromBGRA создаёт нативный 32-битный HCURSOR с альфа-каналом
 // через CreateDIBSection (top-down BGRA) + CreateBitmap (маска) + CreateIconIndirect.
 func createHCursorFromBGRA(cur *CustomCursor) (windows.Handle, error) {
@@ -109,7 +138,7 @@ func createHCursorFromBGRA(cur *CustomCursor) (windows.Handle, error) {
 
 	byteLen := cur.Width * cur.Height * 4
 	dst := unsafe.Slice((*byte)(bits), byteLen)
-	copy(dst, cur.BGRA[:byteLen])
+	premultiplyBGRA(dst, cur.BGRA[:byteLen])
 	runtime.KeepAlive(cur.BGRA)
 
 	hMask, _, _ := procCreateBitmap.Call(uintptr(cur.Width), uintptr(cur.Height), 1, 1, 0)
@@ -145,3 +174,4 @@ func createHCursorFromBGRA(cur *CustomCursor) (windows.Handle, error) {
 	}
 	return windows.Handle(hCursor), nil
 }
+

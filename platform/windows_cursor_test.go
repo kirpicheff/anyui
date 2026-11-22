@@ -107,3 +107,28 @@ func TestWin32CursorNone(t *testing.T) {
 		t.Fatalf("ожидался возврат w.cursor == CursorArrow, получено %v", w.cursor)
 	}
 }
+
+func TestPremultiplyBGRA(t *testing.T) {
+	src := []byte{
+		// a = 0: цветные каналы должны обнулиться
+		200, 150, 100, 0,
+		// a = 128: (c*128 + 127) / 255
+		255, 100, 0, 128,
+		// a = 255: без изменений
+		12, 34, 56, 255,
+	}
+	dst := make([]byte, len(src))
+	premultiplyBGRA(dst, src)
+
+	want := []byte{
+		0, 0, 0, 0,
+		128, 50, 0, 128,
+		12, 34, 56, 255,
+	}
+	for i := range want {
+		if dst[i] != want[i] {
+			t.Fatalf("индекс %d: ожидалось %d, получено %d (dst=%v)", i, want[i], dst[i], dst)
+		}
+	}
+}
+
