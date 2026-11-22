@@ -7,7 +7,7 @@
 ## Контракт единиц измерения
 - **`Dp` (`type Dp int`)** — логические аппаратно-независимые пиксели (Density-independent Pixels). Используются во всем высокоуровневом публичном API раскладки, контейнеров, опций, оверлеев и виджетов:
   - Все публичные методы раскладки и оверлеев принимают геометрию строго в `Dp`: `LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`. Прямоугольники из `ui.CurrentArea()` имеют единицы `Dp` и могут передаваться напрямую без масштабирования.
-- **`Px` (`type Px int`)** — физические пиксели буфера отрисовки (Device Pixels). Сохранены исключительно для низкоуровневого рисования (`render.Canvas`), низкоуровневых колбэков холста и таблиц (`CanvasView` area, `Table.drawCell` area), системных метрик окна и вывода на экран (`LastDirtyRects`, `Config.HitTest`, `TitleBarHitTest`).
+- **`Px` (`type Px int`)** — физические пиксели буфера отрисовки (Device Pixels). Сохранены исключительно для низкоуровневого рисования (`anyui.Canvas`), низкоуровневых колбэков холста и таблиц (`CanvasView` area, `Table.drawCell` area), системных метрик окна и вывода на экран (`LastDirtyRectsPx`, `Config.HitTest`, `TitleBarHitTest`).
 - **Ориентация**: константы `Horizontal` и `Vertical` являются единственными допустимыми значениями типа `Orientation`. Устаревший `SplitOrientation` полностью удалён.
 - **Правило масштабирования и конвертации**:
   - `Scale(dp Dp) Px` преобразует логические единицы в физические пиксели (частый hot-path в прикладном коде).
@@ -68,7 +68,7 @@
 | `FontSize(dp Dp) Option` | | ✓ | Размер шрифта текста виджета |
 | `Padding(dp Dp) Option` | | ✓ | Внутренний отступ виджета |
 | `Radius(dp float32) Option` | | ✓ | Радиус скругления в логических единицах float32 |
-| **Структура WidgetStyle** | | | |
+| **Внутренняя структура `ui.WidgetStyle` (внутренний пакет `ui`)** | | | |
 | `WidgetStyle.WidthDp *Dp` | | ✓ | Хранение ширины |
 | `WidgetStyle.HeightDp *Dp` | | ✓ | Хранение высоты |
 | `WidgetStyle.MinWidthDp *Dp` | | ✓ | Хранение минимальной ширины |

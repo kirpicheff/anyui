@@ -10,7 +10,7 @@ import (
 func (st *demoState) drawTabGraphicsSystem(ui *anyui.UI) {
 	th := ui.Theme()
 	ui.ScrollView("sv_gfx", func() {
-		ui.Label("Графика Фазы 2 (Градиенты, Тени, Blur, Вектор, SVG, Image)", anyui.FontSize(16), anyui.Bold())
+		ui.Label("2D-графика (Градиенты, Тени, Blur, Вектор, SVG, Image)", anyui.FontSize(16), anyui.Bold())
 
 		ui.Row(14, 150, func() {
 			ui.CanvasView(func(c *anyui.Canvas, r anyui.Rect) {

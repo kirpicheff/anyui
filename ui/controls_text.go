@@ -1192,6 +1192,9 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 	}
 	if focused {
 		borderCol = c.Theme.BorderFocus
+		if st.FocusBorderColor != nil {
+			borderCol = *st.FocusBorderColor
+		}
 	}
 	if st.ErrorText != "" {
 		borderCol = c.Theme.Danger

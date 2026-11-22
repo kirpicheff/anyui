@@ -752,7 +752,11 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 		_, th := c.Font.MeasureText(label, pxSize)
 		tx := rect.X + c.Scale(10).Int()
 		ty := rect.Y + (rect.H-th)/2
-		c.Font.DrawText(c.Canvas, tx, ty, label, pxSize, c.Theme.TextPrimary)
+		txtCol := c.Theme.TextPrimary
+		if st.Disabled {
+			txtCol = c.Theme.TextMuted
+		}
+		c.Font.DrawText(c.Canvas, tx, ty, label, pxSize, txtCol)
 		if dpEditActive[id] && c.FocusID == id+":edit" {
 			tw, _ := c.Font.MeasureText(label, pxSize)
 			c.Canvas.FillRect(render.Rect{X: tx + tw + 1, Y: rect.Y + c.Scale(7).Int(), W: 1, H: rect.H - c.Scale(14).Int()}, c.Theme.Accent)

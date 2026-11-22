@@ -8,7 +8,7 @@ A lightweight, embeddable cross-platform Go UI framework with software 2D render
 - Single root package `anyui` for building interfaces.
 - Zero CPU usage when idle (the OS event loop wakes up only on OS events, `Dispatch`, or active animations).
 - Smooth animation engine (`Animator`) that automatically goes to sleep once transitions finish.
-- Theme support (`NavyTheme`, `DarkTheme`, `LightTheme`) and functional styling options (`Option`).
+- Theme support (`NavyTheme`, `DarkTheme`, `LightTheme`, `SystemTheme`) and functional styling options (`Option`).
 - Keyboard focus navigation (`Tab` / `Shift+Tab`), confirmation via `Enter`, dismissal via `Escape`, and global shortcuts (`Shortcut`).
 - Overlay layer (`PushOverlay`) blocking clicks beneath floating panels and popups.
 
@@ -55,7 +55,7 @@ func main() {
 ## Architecture
 
 - `anyui` (module root) — public facade (`App`, `Window`, `UI`, `Config`, `Theme`, `Option`).
-- `platform/` — cross-platform `Window` interface and native OS backends (Windows Win32 with Per-Monitor V2 DPI, Linux X11, Linux Wayland).
+- `platform/` — cross-platform `Window` interface and native OS backends (Windows Win32 with Per-Monitor V2 DPI, Linux X11, Linux Wayland, macOS Cocoa/AppKit).
 - `render/` — software 2D BGRA renderer, anti-aliased SDF primitives, SVG rasterizer, and font glyph cache.
 - `ui/` — Immediate Mode UI context, layout engine (`Column`, `Row`, `Padding`, `Grid`, `Flow`), animation engine (`Animator`), overlays (`OverlayLayer`), focus management, and widgets.
 
@@ -109,7 +109,7 @@ win, _ := app.OpenWindow(anyui.Config{
 })
 ```
 
-To wake up and redraw only a specific window from a background goroutine (for example, when streaming frames to an `InteractiveCanvas` with `Streaming: true`), call `win.WakeUp()` instead of `app.Dispatch(...)` — this avoids waking other windows and preserves the `EventWakeUp` fast-path: `Canvas.Clear` and full widget tree reconstruction are skipped (only the streaming canvas `OnDraw` and `PresentRect` run, rendering directly into the Windows `DIBSection` + `BitBlt`). When surrounding UI elements (such as a status-bar FPS counter once per second) need updating, call `ctx.RequestRedraw()` (or `win.Invalidate()`).
+To wake up and redraw only a specific window from a background goroutine (for example, when streaming frames to an `InteractiveCanvas` with `Streaming: true`), call `win.WakeUp()` instead of `app.Dispatch(...)` — this avoids waking other windows and preserves the `EventWakeUp` fast-path: `Canvas.Clear` and full widget tree reconstruction are skipped (only the streaming canvas `OnDraw` and `PresentRect` run, rendering directly into the Windows `DIBSection` + `BitBlt`). When surrounding UI elements (such as a status-bar FPS counter once per second) need updating, call `ui.RequestRedraw()` (or `win.Invalidate()`).
 
 ---
 

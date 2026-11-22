@@ -255,7 +255,7 @@ child, err := app.OpenWindow(anyui.Config{
 - **Wayland:** uses `wl_compositor`, `wl_shm`, `xdg_shell`, `wl_seat` / `wl_pointer` / `wl_keyboard`, `wp_cursor_shape_manager_v1`, `wp_fractional_scale_manager_v1` / `wp_viewporter` for HiDPI, and `wl_data_device_manager` for clipboard and Drag & Drop.
 - **System integration:**
   - Dialogs (`OpenFileDialog`, `OpenFilesDialog`, `SaveFileDialog`, `SelectFolderDialog`, `MessageBox`) use `zenity`, `yad`, or `kdialog` (auto-detected in `PATH`).
-  - System tray (`NewTray`) supports `StatusNotifierItem` (D-Bus) and `XEmbed` (`_NET_SYSTEM_TRAY_S0`); notifications use `notify-send`.
+  - System tray (`Config.Tray`) supports `StatusNotifierItem` (D-Bus) and `XEmbed` (`_NET_SYSTEM_TRAY_S0`); notifications use `notify-send`.
   - `SingleInstance` uses `flock` and a UNIX domain socket in `$XDG_RUNTIME_DIR`.
   - `IsSystemDarkTheme` checks `gsettings` (`color-scheme` / `gtk-theme`), `GTK_THEME`, and `~/.config/kdeglobals`.
   - `OpenURL` uses `xdg-open`; `RevealInFileManager` uses D-Bus `org.freedesktop.FileManager1.ShowItems` with fallback to `xdg-open`.

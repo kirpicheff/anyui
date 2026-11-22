@@ -505,6 +505,9 @@ func writeCommonHeader(out *bytes.Buffer, version string, isFull bool, idx *apiI
 	if !isFull {
 		out.WriteString("> Полный офлайн-справочник со всеми сигнатурами, опциями, константами и структурами: `llms-full.txt`.\n\n")
 	}
+	out.WriteString("## Документация и примеры\n\n")
+	out.WriteString("- Примеры godoc: `example_test.go`; интерактивная витрина всех виджетов: `go run ./cmd/demo`.\n")
+	out.WriteString("- Оффлайн-документация: `docs/en/*.md`, `docs/ru/*.md` (обзор, виджеты, графика, темы, системная интеграция, тестирование, единицы Dp/Px).\n\n")
 	out.WriteString("## Версия и источник истины\n\n")
 	out.WriteString("- Импорт: `import \"github.com/kirpicheff/anyui\"` (`go get github.com/kirpicheff/anyui`).\n")
 	out.WriteString("- Проверить установленную версию модуля: `go list -m github.com/kirpicheff/anyui`.\n")
@@ -512,12 +515,12 @@ func writeCommonHeader(out *bytes.Buffer, version string, isFull bool, idx *apiI
 	out.WriteString("- Подпакеты являются внутренними; прикладной код импортирует **только** корневой пакет `github.com/kirpicheff/anyui`.\n\n")
 
 	out.WriteString("## Правила работы с API\n\n")
-	out.WriteString("- **Immediate Mode и многопоточность:** состояние хранится вне `drawFn`; вызовы методов `UI` и чтение/изменение состояния интерфейса выполняются **только в главном потоке** внутри `drawFn`. Для обновления состояния из фоновых горутин всегда используйте `App.Dispatch` (`app.Dispatch(func() { ... })`) или `Remember`. Повторный вызов `App.Run` на уже запущенном приложении возвращает `ErrAlreadyRunning`.\n")
+	out.WriteString("- **Immediate Mode и многопоточность:** состояние хранится вне `drawFn`; вызовы методов `UI` и чтение/изменение состояния интерфейса выполняются **только в главном потоке** внутри `drawFn`. Для обновления состояния из фоновых горутин всегда используйте `App.Dispatch` (`app.Dispatch(func() { ... })`) или `Remember`. Если второй процесс приложения стартует с уже занятым `Config.SingleInstance.ID`, `App.Run` возвращает `ErrAlreadyRunning` (см. правило «Единственный экземпляр» ниже).\n")
 	out.WriteString("- **Единицы измерения (`Dp` vs `Px`):** весь API раскладки, опций, оверлеев и ввода Headless (`LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`, `InjectMouse*`, `CurrentArea`, `MousePosDp`) работает строго в логических `Dp`. Физические `Px` используются только в колбэках рисования (`CanvasView`, `InteractiveCanvas`, `Table`, `ListView`), прямых методах (`DrawText`, `DrawSVG`, `CurrentAreaPx`, `MousePosPx`, `LastDirtyRectsPx`, `TitleBarHitTest`, `InjectMouse*Px`) и на границе ОС (`Config`, `Window`).\n")
 	out.WriteString("- **`Rect` и `PointF` не типизированы по единицам:** `Rect` содержит `int`-поля, `PointF` — `float32`. В `Dp`-API (`CurrentArea`, `LayoutRect`, `PushOverlay`, `Tooltip`, `Popover`, `ContextMenu`, `RegisterHoverArea`) они трактуются как `Dp`, а в колбэках рисования и `CurrentAreaPx`/`LastDirtyRectsPx` — как `Px`.\n")
 	out.WriteString("- **Холст (`Canvas`) и текст на нём:** все методы `Canvas` принимают и возвращают физические `Px` (конвертация — через `Scale`/`ScaleF`/`PxToDp`/`PxToDpf`). У `UI.DrawText` и `UI.DrawSVG` единицы смешанные: координаты `(xPx, yPx)` — в `Px`, а размер (`sizeDp`) — в `Dp`; у `Canvas.DrawSVG` и координаты, и размер — в `Px`. У `Canvas` нет метода рисования текста: внутри `CanvasView` / `InteractiveCanvas` текст выводится через `UI.DrawText` в абсолютных координатах `Px` (`areaPx.X + offset`, `areaPx.Y + offset`). `UI.Canvas` возвращает холст текущего кадра для прямой отрисовки вне `CanvasView` (например, в `ListView`/`Table`/`PushOverlay`) — координаты абсолютные `Px` окна с активным клипом.\n")
 	out.WriteString("- **Статический слой (`StaticLayer`):** `StaticLayer` кеширует результат `fn` между кадрами в отдельный буфер; после изменения данных внутри слоя вызывайте `InvalidateStatic`, иначе слой не перерисуется.\n")
-	out.WriteString("- **Единственный экземпляр (`SingleInstanceGuard`):** порядок вызовов — `anyui.AcquireSingleInstance` → `SingleInstanceGuard.SetCallback` (получает `args []string` второго экземпляра) → `SingleInstanceGuard.StartIPC` → `SingleInstanceGuard.Close` при выходе (либо передайте `guard` в `Config.SingleInstance.Guard`, чтобы `App` закрыл его автоматически).\n")
+	out.WriteString("- **Единственный экземпляр (`SingleInstanceGuard`):** два варианта. (а) Ручной: `anyui.AcquireSingleInstance` → `SingleInstanceGuard.SetCallback` (получает `args []string` второго экземпляра) → `SingleInstanceGuard.StartIPC` после запуска цикла событий → `SingleInstanceGuard.Close` при выходе. (б) Декларативный: заполните `Config.SingleInstance` (`ID` или заранее полученный `Guard`, опционально `OnSecondInstance`, `SkipActivate`, `Args`) — `App` сам захватит экземпляр, сам вызовет `SingleInstanceGuard.StartIPC`, сам закроет guard при выходе и сам доставит `OnSecondInstance`; вручную `SingleInstanceGuard.SetCallback`/`SingleInstanceGuard.StartIPC`/`SingleInstanceGuard.Close` в этом варианте вызывать **не нужно** (свой callback будет перезаписан).\n")
 	out.WriteString("- **Единое задание размеров через опции:** `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image`, `ListView`, `ListViewEx`, `SplitPane` по умолчанию занимают всё доступное пространство по ширине и высоте (`Auto`). `TextArea` (120 dp), `Table`, `TableEx`, `LogView`, `VirtualTextView` (260 dp), `TreeView`, `TreeViewEx` (240 dp), `LineChart`, `BarChart` (220 dp) и `Sparkline` (44 dp) по умолчанию занимают доступную ширину, но имеют фиксированную дефолтную высоту — для растягивания на остаток высоты контейнера передайте `FillHeight` (или `Height(Auto)`). Явные размеры и ограничения задаются опциями `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`. `Card` по умолчанию подбирает высоту по содержимому (`AutoHeight`); для растягивания передайте `FillHeight`.\n")
 	out.WriteString("- **Потоковый холст (`InteractiveCanvas`):** в `CanvasCallbacks` флаг `Streaming: true` включает быстрый путь обновления по `Window.WakeUp` (перерисовывается только `OnDraw` холста без прохода всего дерева `UI` и без полного diff буфера), а `DirectInput: true` доставляет события мыши и клавиатуры напрямую в колбэки холста. Если в обработчике изменилось внешнее состояние интерфейса за пределами холста, вызовите `UI.RequestRedraw`.\n")
 	out.WriteString("- **Колонки таблиц:** в `Table` и `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.\n")
@@ -526,7 +529,8 @@ func writeCommonHeader(out *bytes.Buffer, version string, isFull bool, idx *apiI
 	out.WriteString("- **Идентификаторы, ключи и `IDScope`:** `IDScope` (или `PushID`/`PopID`) изолирует `id` виджетов внутри циклов и переиспользуемых компонентов. Передача пустого `id == \"\"` автоматически генерирует детерминированный идентификатор по порядковому номеру виджета в текущем `IDScope`. В `Select`, `MultiSelect`, `TabBar`, `TreeView`, `TreeViewEx` и `Breadcrumbs` ключи элементов (`Key` / `ID`) локальны для конкретного виджета и должны быть уникальны в его пределах — при дублировании ключей выделение и клик совпадут для всех дубликатов. В `Breadcrumbs`, если у сегмента `ID == \"\"`, возвращается его `Label`.\n")
 	out.WriteString("- **Выпадающие списки и вкладки:** `Select` с опцией `Searchable` заменяет комбобокс; `MultiSelect` работает с `map[string]bool`; `TabBar` и `TabItems` работают на строковых ключах.\n")
 	out.WriteString("- **Раскладка и оверлеи:** для типового экрана используйте `Page` или `DockTop` / `DockBottom` / `ColumnFlex`. Для диалогов всегда используйте `Modal` — `PushOverlay` предназначен только для небольших всплывающих контролов.\n")
-	out.WriteString("- **Drag & Drop (Reorder):** `Reorderable` + `OnReorder` работают в `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы `FromIndex`/`ToIndex`) и `TreeView`, `TreeViewEx` (ключи `FromKey`/`ToKey`; с `AllowReparent` доступны смена родителя и `DropInside`).\n\n")
+	out.WriteString("- **Drag & Drop (Reorder):** `Reorderable` + `OnReorder` работают в `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы `FromIndex`/`ToIndex`) и `TreeView`, `TreeViewEx` (ключи `FromKey`/`ToKey`; с `AllowReparent` доступны смена родителя и `DropInside`).\n")
+	out.WriteString("- **Горячие клавиши (`Key`) и Headless-тесты:** из букв экспортированы базовые константы (`KeyA`, `KeyC`, `KeyV`, `KeyX`, `KeyY`, `KeyZ`); для остальных клавиш в `Shortcut` / `InjectKey` передавайте виртуальный код `anyui.Key('S')` или VK-код (например, `0x70` для F1). Для `anyui.NewHeadless` обязательно указывать `Config.FontRegular` (для детерминированных тестов используйте `anyui.DefaultTestFonts`).\n\n")
 
 	out.WriteString("## Семантика возвращаемых значений\n\n")
 	out.WriteString("- `Button`, `IconButton`, `Hyperlink` → `bool`: `true` **только в кадре нажатия**.\n")
@@ -592,7 +596,7 @@ var optionMatrixRows = []optionMatrixRow{
 	},
 	{
 		"`Checkbox`, `Toggle`, `RadioButton`, `RadioGroup`",
-		"`Disabled`, `FontSize`, `Bold`/`Mono` (кроме `Toggle`), `TextColor` (`Checkbox`, `Toggle`), `Bg` (`Toggle`), `Height`/`Radius`/`Indeterminate` (`Checkbox`)",
+		"`Disabled`, `FontSize`, `Bold`, `Mono`, `TextColor` (в `Checkbox` красит заливку флажка), `Bg` (`Toggle`), `Height`/`Radius`/`Indeterminate` (`Checkbox`)",
 	},
 	{
 		"`TextInput`",
@@ -604,15 +608,15 @@ var optionMatrixRows = []optionMatrixRow{
 	},
 	{
 		"`TextArea`",
-		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `Radius`, `LineNumbers`, `ReadOnly`, `Disabled`, `InputFilter`, `Error`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `FocusBorderColor`, `Radius`, `LineNumbers`, `ReadOnly`, `Disabled`, `InputFilter`, `Error`",
 	},
 	{
 		"`NumberInput`, `Slider`, `RangeSlider`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`",
-		"`Disabled`, `Width` (кроме `DateTimePicker`), `Height`/`Radius` (`NumberInput`)",
+		"`Disabled`, `Width`, `Height`/`Radius` (`NumberInput`)",
 	},
 	{
 		"`Select`, `MultiSelect`",
-		"`Width`, `Height`, `Disabled`, `Searchable` (`Select`), `Bg` (`Select`), `Radius` (`Select`), `Bold`/`Mono` (`Select`)",
+		"`Width`, `Height`, `Disabled`, `Bg`, `Radius`, `Bold`, `Mono`, `Searchable` (`Select`)",
 	},
 	{
 		"`TagInput`",
@@ -632,11 +636,11 @@ var optionMatrixRows = []optionMatrixRow{
 	},
 	{
 		"`Table`, `TableEx`",
-		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Radius`, `Disabled`, `ScrollToIndex`, `Reorderable`, `OnReorder`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `ScrollToIndex`, `Reorderable`, `OnReorder`",
 	},
 	{
 		"`TreeView`, `TreeViewEx`",
-		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Radius`, `Disabled`, `Reorderable`, `AllowReparent`, `OnReorder`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `Reorderable`, `AllowReparent`, `OnReorder`",
 	},
 	{
 		"`LogView`, `VirtualTextView`, `LineChart`, `BarChart`, `Sparkline`",
@@ -906,7 +910,7 @@ func writeFullLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
 			continue
 		}
 		if recv == "SingleInstanceGuard" {
-			out.WriteString("Порядок вызовов: `anyui.AcquireSingleInstance` → `SetCallback` (получает `args []string` второго экземпляра) → `StartIPC` → `Close` при выходе (или передайте `guard` в `Config.SingleInstance.Guard`).\n\n")
+			out.WriteString("Порядок вызовов (ручной вариант): `anyui.AcquireSingleInstance` → `SetCallback` (получает `args []string` второго экземпляра) → `StartIPC` → `Close` при выходе. Альтернатива — заполнить `Config.SingleInstance` (`ID` или заранее полученный `Guard`, `OnSecondInstance`, `SkipActivate`, `Args`): тогда `App` выполняет весь цикл самостоятельно, включая `Close`.\n\n")
 		}
 		out.WriteString("```go\n")
 		for _, sig := range idx.methods[recv] {
@@ -1075,6 +1079,7 @@ func lintOutputs(idx *apiIndex, shortText, fullText string) error {
 		"SelectedID": true, "ClosedID": true, "Added": true, "MovedFrom": true, "MovedTo": true, "DetachedID": true,
 		"RowClicked": true, "RowDoubleClicked": true, "RowMiddleClicked": true, "SortChanged": true, "ColumnResized": true, "Drag": true,
 		"Streaming": true, "DirectInput": true, "OnDraw": true,
+		"Guard": true, "Args": true, "SkipActivate": true, "OnSecondInstance": true,
 	}
 
 	inCode := false

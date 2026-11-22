@@ -62,6 +62,9 @@ func (c *Context) SelectableLabel(id, text string, opts ...Option) {
 	if len(lines) > 1 {
 		totalH = len(lines)*lineStep - gap
 	}
+	if st.HeightDp != nil && *st.HeightDp > 0 {
+		totalH = c.Scale(*st.HeightDp).Int()
+	}
 
 	r := c.allocRectStyled(totalW, totalH, st)
 	if !st.Disabled {
@@ -227,7 +230,15 @@ func (c *Context) Hyperlink(id, text string, opts ...Option) bool {
 	if c.Font != nil {
 		w, h = c.Font.MeasureTextStyled(text, pxSize, st.FontStyle)
 	}
-	r := c.allocRectStyled(w, h+c.Scale(2).Int(), st)
+	allocW := w
+	if st.WidthDp != nil && *st.WidthDp > 0 {
+		allocW = c.Scale(*st.WidthDp).Int()
+	}
+	allocH := h + c.Scale(2).Int()
+	if st.HeightDp != nil && *st.HeightDp > 0 {
+		allocH = c.Scale(*st.HeightDp).Int()
+	}
+	r := c.allocRectStyled(allocW, allocH, st)
 	if !st.Disabled {
 		c.registerFocusable(id)
 		c.RegisterHit(id, r, platform.CursorHand)

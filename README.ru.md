@@ -121,6 +121,7 @@ go run ./cmd/demo
 - [Системная интеграция (окна, трей, диалоги, Linux)](docs/ru/system.md)
 - [Тестирование и Headless-рантайм](docs/ru/testing.md)
 - [Единицы измерения и типизация (Dp / Px)](docs/ru/units.md)
+- Справочник API для LLM-агентов: [llms.txt](llms.txt) (краткий) и [llms-full.txt](llms-full.txt) (полный)
 
 Для просмотра справочника API из терминала:
 

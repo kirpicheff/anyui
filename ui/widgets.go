@@ -100,6 +100,9 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 		if st.WidthDp != nil && *st.WidthDp > 0 {
 			totalW = c.Scale(*st.WidthDp).Int()
 		}
+		if st.HeightDp != nil && *st.HeightDp > 0 {
+			totalH = c.Scale(*st.HeightDp).Int()
+		}
 		r := c.allocRectStyled(totalW, totalH, st)
 		for i, sp := range lines {
 			lineStr := string(runes[sp.start:sp.end])
@@ -146,13 +149,20 @@ func (c *Context) LabelOpts(text string, opts ...Option) {
 			}
 		}
 	}
+	tw := w
+	if st.WidthDp != nil && *st.WidthDp > 0 {
+		w = c.Scale(*st.WidthDp).Int()
+	}
+	if st.HeightDp != nil && *st.HeightDp > 0 {
+		h = c.Scale(*st.HeightDp).Int()
+	}
 	r := c.allocRectStyled(w, h, st)
 	lineX := r.X
 	if st.TextAlign != AlignTextLeft {
 		if st.TextAlign == AlignTextCenter {
-			lineX = r.X + (r.W-w)/2
+			lineX = r.X + (r.W-tw)/2
 		} else if st.TextAlign == AlignTextRight {
-			lineX = r.X + r.W - w
+			lineX = r.X + r.W - tw
 		}
 	}
 	c.Font.DrawTextWithOptions(c.Canvas, lineX, r.Y, drawText, pxSize, col, textOpts)
@@ -181,6 +191,12 @@ func (c *Context) StatusDot(dotColor render.Color, label string, opts ...Option)
 	h := th
 	if int(dotR*2) > h {
 		h = int(dotR * 2)
+	}
+	if st.WidthDp != nil && *st.WidthDp > 0 {
+		totalW = c.Scale(*st.WidthDp).Int()
+	}
+	if st.HeightDp != nil && *st.HeightDp > 0 {
+		h = c.Scale(*st.HeightDp).Int()
 	}
 
 	r := c.allocRectStyled(totalW, h, st)
@@ -487,7 +503,7 @@ func (c *Context) ToggleOpts(id, label string, value *bool, opts ...Option) bool
 	pxSize := c.Scale(fontSizeDp).Int()
 	tw, th := 0, pxSize
 	if c.Font != nil && label != "" {
-		tw, th = c.Font.MeasureText(label, pxSize)
+		tw, th = c.Font.MeasureTextStyled(label, pxSize, st.FontStyle)
 	}
 
 	swW := c.Scale(42).Int()
@@ -582,7 +598,7 @@ func (c *Context) ToggleOpts(id, label string, value *bool, opts ...Option) bool
 		if st.Disabled {
 			lblCol = c.Theme.TextMuted
 		}
-		c.Font.DrawText(c.Canvas, r.X+swW+gap, r.Y+(r.H-th)/2, label, pxSize, lblCol)
+		c.Font.DrawTextStyled(c.Canvas, r.X+swW+gap, r.Y+(r.H-th)/2, label, pxSize, lblCol, st.FontStyle)
 	}
 
 	return changed

@@ -232,6 +232,9 @@ func (c *Context) RadioButton(id, label string, selected *string, value string, 
 
 	if c.Font != nil && label != "" {
 		textCol := c.Theme.TextPrimary
+		if st.Color != nil {
+			textCol = *st.Color
+		}
 		if st.Disabled {
 			textCol = c.Theme.TextMuted
 		}

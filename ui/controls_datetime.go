@@ -70,7 +70,11 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 		pxSize := c.Scale(13).Int()
 		label := t.Format("15:04:05")
 		_, th := c.Font.MeasureText(label, pxSize)
-		c.Font.DrawText(c.Canvas, rect.X+c.Scale(10).Int(), rect.Y+(rect.H-th)/2, label, pxSize, c.Theme.TextPrimary)
+		txtCol := c.Theme.TextPrimary
+		if st.Disabled {
+			txtCol = c.Theme.TextMuted
+		}
+		c.Font.DrawText(c.Canvas, rect.X+c.Scale(10).Int(), rect.Y+(rect.H-th)/2, label, pxSize, txtCol)
 	}
 
 	// Иконка часов справа
@@ -207,8 +211,18 @@ func (c *Context) DateTimePicker(id string, dt *time.Time, opts ...Option) bool 
 	changed := false
 	dCopy := *dt
 	tCopy := *dt
-	dateOpts := []Option{Width(150)}
-	timeOpts := []Option{Width(120)}
+	dateW := Dp(150)
+	timeW := Dp(120)
+	if st.WidthDp != nil && *st.WidthDp > 0 {
+		avail := *st.WidthDp - 8
+		if avail < 150 {
+			avail = 150
+		}
+		dateW = Dp(int(avail) * 55 / 100)
+		timeW = avail - dateW
+	}
+	dateOpts := []Option{Width(dateW)}
+	timeOpts := []Option{Width(timeW)}
 	if st.Disabled {
 		dateOpts = append(dateOpts, Disabled())
 		timeOpts = append(timeOpts, Disabled())

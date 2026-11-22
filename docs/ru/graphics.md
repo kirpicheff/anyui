@@ -116,7 +116,7 @@ ui.Label("Заголовок", anyui.Bold(), anyui.FontSize(20), anyui.TextShado
 - **Умная фильтрация `EventMouseMove`:**
   Контекст сравнивает `HotID` и активный курсор по зарегистрированным областям (`RegisterHoverArea` для кастомных зон) и пропускает лишние перерисовки при движении мыши внутри одного виджета или по пустому фону.
 - **LRU-кеш глифов и изображений:**
-  `FontManager` кеширует цветные битмапы глифов по ключу `(style, rune, sizePx, color)` (управляется через `SetGlyphCacheCapacity`, `GlyphCacheStats`, `ClearGlyphCache`), а `render.Canvas` кеширует масштабированные изображения (`ClearScaledImageCache`, `ScaledImageCacheStats`, `SetScaledImageCacheLimits`).
+  Внутренний менеджер шрифтов кеширует цветные битмапы глифов по ключу `(style, rune, sizePx, color)` (статистика и сброс доступны через `ui.GlyphCacheStats`, `ui.ClearGlyphCache`), а холст `anyui.Canvas` кеширует масштабированные изображения (`ui.ScaledImageCacheStats`, `ui.ClearScaledImageCache`).
 - **Системные курсоры:**
   Поддерживаются `CursorArrow`, `CursorHand`, `CursorIBeam`, `CursorResizeH`, `CursorResizeV`, `CursorResizeNWSE`, `CursorResizeNESW`, `CursorNotAllowed`, `CursorCrosshair`, `CursorMove` (`ui.SetCursor(...)`).
 

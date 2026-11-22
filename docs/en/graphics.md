@@ -116,7 +116,7 @@ ui.Label("Heading", anyui.Bold(), anyui.FontSize(20), anyui.TextShadow(0, 0, 8, 
 - **Smart `EventMouseMove` filtering:**
   The context tracks `HotID` and active cursor across registered hover regions (`RegisterHoverArea` for custom zones) and skips redundant redraws when moving the mouse within the same widget or over empty background.
 - **LRU glyph and image caches:**
-  `FontManager` caches colored glyph bitmaps by `(style, rune, sizePx, color)` (configured via `SetGlyphCacheCapacity`, `GlyphCacheStats`, `ClearGlyphCache`), and `render.Canvas` caches scaled images (`ClearScaledImageCache`, `ScaledImageCacheStats`, `SetScaledImageCacheLimits`).
+  The internal font manager caches colored glyph bitmaps by `(style, rune, sizePx, color)` (inspect and clear via `ui.GlyphCacheStats`, `ui.ClearGlyphCache`), and `anyui.Canvas` caches scaled images (`ui.ScaledImageCacheStats`, `ui.ClearScaledImageCache`).
 - **System cursors:**
   Supports `CursorArrow`, `CursorHand`, `CursorIBeam`, `CursorResizeH`, `CursorResizeV`, `CursorResizeNWSE`, `CursorResizeNESW`, `CursorNotAllowed`, `CursorCrosshair`, `CursorMove` (`ui.SetCursor(...)`).
 

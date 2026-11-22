@@ -337,11 +337,15 @@ func (c *Context) TreeViewEx(
 	if st.Radius != nil {
 		rad = *st.Radius
 	}
+	bg := c.Theme.Card
+	if st.Bg != nil {
+		bg = *st.Bg
+	}
 	borderCol := c.Theme.Border
 	if c.FocusID == id && !st.Disabled {
 		borderCol = c.Theme.BorderFocus
 	}
-	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), c.Theme.Card, 1.0, borderCol)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), bg, 1.0, borderCol)
 
 	flat := FlattenTree(roots)
 	rowH := c.Scale(28).Int()
@@ -588,11 +592,15 @@ func (c *Context) TableEx(
 	if st.Radius != nil {
 		rad = *st.Radius
 	}
+	bg := c.Theme.Card
+	if st.Bg != nil {
+		bg = *st.Bg
+	}
 	borderCol := c.Theme.Border
 	if c.FocusID == id && !st.Disabled {
 		borderCol = c.Theme.BorderFocus
 	}
-	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), c.Theme.Card, 1.0, borderCol)
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), bg, 1.0, borderCol)
 
 	// Инициализация ширин колонок
 	if c.tableColWidths == nil {

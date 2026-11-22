@@ -131,7 +131,7 @@ func HoverBg(c Color) Option { return ui.HoverBg(c) }
 // HoverBorderColor переопределяет цвет рамки при наведении (для Button).
 func HoverBorderColor(c Color) Option { return ui.HoverBorderColor(c) }
 
-// FocusBorderColor переопределяет цвет рамки при фокусе (для TextInput).
+// FocusBorderColor переопределяет цвет рамки при фокусе (для TextInput, MaskedInput и TextArea).
 func FocusBorderColor(c Color) Option { return ui.FocusBorderColor(c) }
 
 // TextAlignCenter выравнивает текст и placeholder по центру (для TextInput и Label).
@@ -143,15 +143,15 @@ func TextAlignLeft(enabled ...bool) Option { return ui.TextAlignLeft(enabled...)
 // TextAlignRight выравнивает текст и placeholder по правому краю (для TextInput и Label).
 func TextAlignRight(enabled ...bool) Option { return ui.TextAlignRight(enabled...) }
 
-// LetterSpacing задаёт межбуквенный интервал в логических пикселях (для Label и Button).
+// LetterSpacing задаёт межбуквенный интервал в логических пикселях (для Label, StatusDot, Button, ContextMenu и Tooltip).
 func LetterSpacing(dp float32) Option { return ui.LetterSpacing(dp) }
 
-// TextShadow задаёт тень или мягкое свечение текста (для Label и Button).
+// TextShadow задаёт тень или мягкое свечение текста (для Label, StatusDot, Button, ContextMenu и Tooltip).
 func TextShadow(offsetX, offsetY, blur float32, c Color) Option {
 	return ui.TextShadow(offsetX, offsetY, blur, c)
 }
 
-// ScrollToIndex задаёт индекс элемента для программной прокрутки в ListView и Table.
+// ScrollToIndex задаёт индекс элемента для программной прокрутки в ListView, ListViewEx, Table и TableEx.
 func ScrollToIndex(idx int) Option { return ui.ScrollToIndex(idx) }
 
 // ScrollToID задаёт строковый идентификатор дочернего элемента или якоря для программной прокрутки в ScrollView.

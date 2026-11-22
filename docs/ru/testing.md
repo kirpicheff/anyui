@@ -161,7 +161,7 @@ func TestToastExpiration(t *testing.T) {
 - `h.InjectKeyDown(key, mod)` / `h.InjectKeyUp(key, mod)` — раздельные события нажатия и отпускания.
 
 Константы виртуальных клавиш `anyui.Key`:
-`KeyTab`, `KeyEnter`, `KeyEscape`, `KeyBackspace`, `KeySpace`, `KeyDelete`, `KeyLeft`, `KeyUp`, `KeyRight`, `KeyDown`, `KeyHome`, `KeyEnd`, `KeyPageUp`, `KeyPageDown`, `KeyA`..`KeyZ`.
+`KeyTab`, `KeyEnter`, `KeyEscape`, `KeyBackspace`, `KeySpace`, `KeyDelete`, `KeyLeft`, `KeyUp`, `KeyRight`, `KeyDown`, `KeyHome`, `KeyEnd`, `KeyPageUp`, `KeyPageDown`, `KeyA`, `KeyC`, `KeyV`, `KeyX`, `KeyY`, `KeyZ` (для остальных клавиш передавайте виртуальный код, например `anyui.Key('S')` или `0x70`).
 
 ### Фокус и навигация по табуляции
 - `h.InjectFocus(id string)` — программно установить фокус на виджет по его `id`.

@@ -55,7 +55,15 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 	if isOpen {
 		borderCol = c.Theme.BorderFocus
 	}
-	c.Canvas.DrawRoundedBox(rect, c.ScaleF(c.Theme.RadiusSm), c.Theme.SurfaceDark, 1.0, borderCol)
+	bg := c.Theme.SurfaceDark
+	if st.Bg != nil {
+		bg = *st.Bg
+	}
+	rad := c.ScaleF(c.Theme.RadiusSm)
+	if st.Radius != nil {
+		rad = c.ScaleF(*st.Radius)
+	}
+	c.Canvas.DrawRoundedBox(rect, rad, bg, 1.0, borderCol)
 
 	// Подсчёт выбранных пунктов и отображение чипсов/сводки
 	var selItems []SelectItem
@@ -69,8 +77,8 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 	if c.Font != nil {
 		c.Canvas.PushClip(render.Rect{X: rect.X + c.Scale(6).Int(), Y: rect.Y, W: rect.W - c.Scale(28).Int(), H: rect.H})
 		if len(selItems) == 0 {
-			_, th := c.Font.MeasureText(loc.SelectPlaceholder, c.Scale(13).Int())
-			c.Font.DrawText(c.Canvas, rect.X+c.Scale(10).Int(), rect.Y+(rect.H-th)/2, loc.SelectPlaceholder, c.Scale(13).Int(), c.Theme.TextMuted)
+			_, th := c.Font.MeasureTextStyled(loc.SelectPlaceholder, c.Scale(13).Int(), st.FontStyle)
+			c.Font.DrawTextStyled(c.Canvas, rect.X+c.Scale(10).Int(), rect.Y+(rect.H-th)/2, loc.SelectPlaceholder, c.Scale(13).Int(), c.Theme.TextMuted, st.FontStyle)
 		} else {
 			// Пытаемся отрисовать чипсы; если их много, показываем сводку
 			curX := rect.X + c.Scale(6).Int()
@@ -78,7 +86,7 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 			pxChip := c.Scale(11).Int()
 			fitsAll := true
 			for _, it := range selItems {
-				tw, _ := c.Font.MeasureText(it.Label, pxChip)
+				tw, _ := c.Font.MeasureTextStyled(it.Label, pxChip, st.FontStyle)
 				cw := tw + c.Scale(12).Int()
 				if curX+cw > maxX {
 					fitsAll = false
@@ -89,12 +97,12 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 			if fitsAll && len(selItems) <= 4 {
 				curX = rect.X + c.Scale(6).Int()
 				for _, it := range selItems {
-					tw, th := c.Font.MeasureText(it.Label, pxChip)
+					tw, th := c.Font.MeasureTextStyled(it.Label, pxChip, st.FontStyle)
 					cw := tw + c.Scale(12).Int()
 					ch := c.Scale(22).Int()
 					cr := render.Rect{X: curX, Y: rect.Y + (rect.H-ch)/2, W: cw, H: ch}
 					c.Canvas.FillRoundedRect(cr, c.ScaleF(4), c.Theme.Accent.WithAlpha(45))
-					c.Font.DrawText(c.Canvas, cr.X+c.Scale(6).Int(), cr.Y+(cr.H-th)/2, it.Label, pxChip, c.Theme.Accent)
+					c.Font.DrawTextStyled(c.Canvas, cr.X+c.Scale(6).Int(), cr.Y+(cr.H-th)/2, it.Label, pxChip, c.Theme.Accent, st.FontStyle)
 					curX += cw + c.Scale(4).Int()
 				}
 			} else {
@@ -103,8 +111,12 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 					names = append(names, it.Label)
 				}
 				summary := fmt.Sprintf(loc.SelectedSummaryFmt, len(names), strings.Join(names, ", "))
-				_, th := c.Font.MeasureText(summary, c.Scale(12).Int())
-				c.Font.DrawText(c.Canvas, rect.X+c.Scale(10).Int(), rect.Y+(rect.H-th)/2, summary, c.Scale(12).Int(), c.Theme.TextPrimary)
+				_, th := c.Font.MeasureTextStyled(summary, c.Scale(12).Int(), st.FontStyle)
+				txtCol := c.Theme.TextPrimary
+				if st.Disabled {
+					txtCol = c.Theme.TextMuted
+				}
+				c.Font.DrawTextStyled(c.Canvas, rect.X+c.Scale(10).Int(), rect.Y+(rect.H-th)/2, summary, c.Scale(12).Int(), txtCol, st.FontStyle)
 			}
 		}
 		c.Canvas.PopClip()

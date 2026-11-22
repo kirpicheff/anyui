@@ -161,7 +161,7 @@ This test runs in sub-milliseconds without calling `time.Sleep` and with zero fl
 - `h.InjectKeyDown(key, mod)` / `h.InjectKeyUp(key, mod)` — separate down and up events.
 
 Virtual key constants `anyui.Key`:
-`KeyTab`, `KeyEnter`, `KeyEscape`, `KeyBackspace`, `KeySpace`, `KeyDelete`, `KeyLeft`, `KeyUp`, `KeyRight`, `KeyDown`, `KeyHome`, `KeyEnd`, `KeyPageUp`, `KeyPageDown`, `KeyA`..`KeyZ`.
+`KeyTab`, `KeyEnter`, `KeyEscape`, `KeyBackspace`, `KeySpace`, `KeyDelete`, `KeyLeft`, `KeyUp`, `KeyRight`, `KeyDown`, `KeyHome`, `KeyEnd`, `KeyPageUp`, `KeyPageDown`, `KeyA`, `KeyC`, `KeyV`, `KeyX`, `KeyY`, `KeyZ` (for other keys pass a virtual key code such as `anyui.Key('S')` or `0x70`).
 
 ### Focus & Tab Navigation
 - `h.InjectFocus(id string)` — focus a widget programmatically by `id`.

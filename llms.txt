@@ -4,6 +4,11 @@
 
 > Полный офлайн-справочник со всеми сигнатурами, опциями, константами и структурами: `llms-full.txt`.
 
+## Документация и примеры
+
+- Примеры godoc: `example_test.go`; интерактивная витрина всех виджетов: `go run ./cmd/demo`.
+- Оффлайн-документация: `docs/en/*.md`, `docs/ru/*.md` (обзор, виджеты, графика, темы, системная интеграция, тестирование, единицы Dp/Px).
+
 ## Версия и источник истины
 
 - Импорт: `import "github.com/kirpicheff/anyui"` (`go get github.com/kirpicheff/anyui`).
@@ -13,12 +18,12 @@
 
 ## Правила работы с API
 
-- **Immediate Mode и многопоточность:** состояние хранится вне `drawFn`; вызовы методов `UI` и чтение/изменение состояния интерфейса выполняются **только в главном потоке** внутри `drawFn`. Для обновления состояния из фоновых горутин всегда используйте `App.Dispatch` (`app.Dispatch(func() { ... })`) или `Remember`. Повторный вызов `App.Run` на уже запущенном приложении возвращает `ErrAlreadyRunning`.
+- **Immediate Mode и многопоточность:** состояние хранится вне `drawFn`; вызовы методов `UI` и чтение/изменение состояния интерфейса выполняются **только в главном потоке** внутри `drawFn`. Для обновления состояния из фоновых горутин всегда используйте `App.Dispatch` (`app.Dispatch(func() { ... })`) или `Remember`. Если второй процесс приложения стартует с уже занятым `Config.SingleInstance.ID`, `App.Run` возвращает `ErrAlreadyRunning` (см. правило «Единственный экземпляр» ниже).
 - **Единицы измерения (`Dp` vs `Px`):** весь API раскладки, опций, оверлеев и ввода Headless (`LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`, `InjectMouse*`, `CurrentArea`, `MousePosDp`) работает строго в логических `Dp`. Физические `Px` используются только в колбэках рисования (`CanvasView`, `InteractiveCanvas`, `Table`, `ListView`), прямых методах (`DrawText`, `DrawSVG`, `CurrentAreaPx`, `MousePosPx`, `LastDirtyRectsPx`, `TitleBarHitTest`, `InjectMouse*Px`) и на границе ОС (`Config`, `Window`).
 - **`Rect` и `PointF` не типизированы по единицам:** `Rect` содержит `int`-поля, `PointF` — `float32`. В `Dp`-API (`CurrentArea`, `LayoutRect`, `PushOverlay`, `Tooltip`, `Popover`, `ContextMenu`, `RegisterHoverArea`) они трактуются как `Dp`, а в колбэках рисования и `CurrentAreaPx`/`LastDirtyRectsPx` — как `Px`.
 - **Холст (`Canvas`) и текст на нём:** все методы `Canvas` принимают и возвращают физические `Px` (конвертация — через `Scale`/`ScaleF`/`PxToDp`/`PxToDpf`). У `UI.DrawText` и `UI.DrawSVG` единицы смешанные: координаты `(xPx, yPx)` — в `Px`, а размер (`sizeDp`) — в `Dp`; у `Canvas.DrawSVG` и координаты, и размер — в `Px`. У `Canvas` нет метода рисования текста: внутри `CanvasView` / `InteractiveCanvas` текст выводится через `UI.DrawText` в абсолютных координатах `Px` (`areaPx.X + offset`, `areaPx.Y + offset`). `UI.Canvas` возвращает холст текущего кадра для прямой отрисовки вне `CanvasView` (например, в `ListView`/`Table`/`PushOverlay`) — координаты абсолютные `Px` окна с активным клипом.
 - **Статический слой (`StaticLayer`):** `StaticLayer` кеширует результат `fn` между кадрами в отдельный буфер; после изменения данных внутри слоя вызывайте `InvalidateStatic`, иначе слой не перерисуется.
-- **Единственный экземпляр (`SingleInstanceGuard`):** порядок вызовов — `anyui.AcquireSingleInstance` → `SingleInstanceGuard.SetCallback` (получает `args []string` второго экземпляра) → `SingleInstanceGuard.StartIPC` → `SingleInstanceGuard.Close` при выходе (либо передайте `guard` в `Config.SingleInstance.Guard`, чтобы `App` закрыл его автоматически).
+- **Единственный экземпляр (`SingleInstanceGuard`):** два варианта. (а) Ручной: `anyui.AcquireSingleInstance` → `SingleInstanceGuard.SetCallback` (получает `args []string` второго экземпляра) → `SingleInstanceGuard.StartIPC` после запуска цикла событий → `SingleInstanceGuard.Close` при выходе. (б) Декларативный: заполните `Config.SingleInstance` (`ID` или заранее полученный `Guard`, опционально `OnSecondInstance`, `SkipActivate`, `Args`) — `App` сам захватит экземпляр, сам вызовет `SingleInstanceGuard.StartIPC`, сам закроет guard при выходе и сам доставит `OnSecondInstance`; вручную `SingleInstanceGuard.SetCallback`/`SingleInstanceGuard.StartIPC`/`SingleInstanceGuard.Close` в этом варианте вызывать **не нужно** (свой callback будет перезаписан).
 - **Единое задание размеров через опции:** `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image`, `ListView`, `ListViewEx`, `SplitPane` по умолчанию занимают всё доступное пространство по ширине и высоте (`Auto`). `TextArea` (120 dp), `Table`, `TableEx`, `LogView`, `VirtualTextView` (260 dp), `TreeView`, `TreeViewEx` (240 dp), `LineChart`, `BarChart` (220 dp) и `Sparkline` (44 dp) по умолчанию занимают доступную ширину, но имеют фиксированную дефолтную высоту — для растягивания на остаток высоты контейнера передайте `FillHeight` (или `Height(Auto)`). Явные размеры и ограничения задаются опциями `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`. `Card` по умолчанию подбирает высоту по содержимому (`AutoHeight`); для растягивания передайте `FillHeight`.
 - **Потоковый холст (`InteractiveCanvas`):** в `CanvasCallbacks` флаг `Streaming: true` включает быстрый путь обновления по `Window.WakeUp` (перерисовывается только `OnDraw` холста без прохода всего дерева `UI` и без полного diff буфера), а `DirectInput: true` доставляет события мыши и клавиатуры напрямую в колбэки холста. Если в обработчике изменилось внешнее состояние интерфейса за пределами холста, вызовите `UI.RequestRedraw`.
 - **Колонки таблиц:** в `Table` и `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.
@@ -28,6 +33,7 @@
 - **Выпадающие списки и вкладки:** `Select` с опцией `Searchable` заменяет комбобокс; `MultiSelect` работает с `map[string]bool`; `TabBar` и `TabItems` работают на строковых ключах.
 - **Раскладка и оверлеи:** для типового экрана используйте `Page` или `DockTop` / `DockBottom` / `ColumnFlex`. Для диалогов всегда используйте `Modal` — `PushOverlay` предназначен только для небольших всплывающих контролов.
 - **Drag & Drop (Reorder):** `Reorderable` + `OnReorder` работают в `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы `FromIndex`/`ToIndex`) и `TreeView`, `TreeViewEx` (ключи `FromKey`/`ToKey`; с `AllowReparent` доступны смена родителя и `DropInside`).
+- **Горячие клавиши (`Key`) и Headless-тесты:** из букв экспортированы базовые константы (`KeyA`, `KeyC`, `KeyV`, `KeyX`, `KeyY`, `KeyZ`); для остальных клавиш в `Shortcut` / `InjectKey` передавайте виртуальный код `anyui.Key('S')` или VK-код (например, `0x70` для F1). Для `anyui.NewHeadless` обязательно указывать `Config.FontRegular` (для детерминированных тестов используйте `anyui.DefaultTestFonts`).
 
 ## Семантика возвращаемых значений
 
@@ -93,18 +99,18 @@ type MessageBoxResult uint8  // ResNone, ResOK, ResCancel, ResYes, ResNo
 |---|---|
 | `Label`, `SelectableLabel`, `StatusDot`, `Hyperlink` | `FontSize`, `Bold`, `Mono`, `TextColor`, `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Disabled` (кроме `StatusDot`), `WordWrap` (`Label`, `SelectableLabel`), `Ellipsis` (`Label`), `TextAlignLeft`/`TextAlignCenter`/`TextAlignRight` (`Label`), `LetterSpacing`/`TextShadow` (`Label`, `StatusDot`) |
 | `Button`, `IconButton` | `Primary`, `Secondary`, `Danger`, `Ghost`, `Icon`, `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `Radius`, `FontSize`, `Bold`, `Mono`, `LetterSpacing`, `TextShadow`, `Bg`, `HoverBg`, `TextColor`, `HoverTextColor`, `BorderColor`, `HoverBorderColor`, `Disabled` |
-| `Checkbox`, `Toggle`, `RadioButton`, `RadioGroup` | `Disabled`, `FontSize`, `Bold`/`Mono` (кроме `Toggle`), `TextColor` (`Checkbox`, `Toggle`), `Bg` (`Toggle`), `Height`/`Radius`/`Indeterminate` (`Checkbox`) |
+| `Checkbox`, `Toggle`, `RadioButton`, `RadioGroup` | `Disabled`, `FontSize`, `Bold`, `Mono`, `TextColor` (в `Checkbox` красит заливку флажка), `Bg` (`Toggle`), `Height`/`Radius`/`Indeterminate` (`Checkbox`) |
 | `TextInput` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `FocusBorderColor`, `Radius`, `TextAlignLeft`, `TextAlignCenter`, `TextAlignRight`, `Password`, `PasswordToggle`, `Clearable`, `ReadOnly`, `Disabled`, `InputFilter`, `Error`, `Icon`, `IconRight` |
 | `MaskedInput` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `FocusBorderColor`, `Radius`, `ReadOnly`, `Disabled`, `Error` |
-| `TextArea` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `Radius`, `LineNumbers`, `ReadOnly`, `Disabled`, `InputFilter`, `Error` |
-| `NumberInput`, `Slider`, `RangeSlider`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker` | `Disabled`, `Width` (кроме `DateTimePicker`), `Height`/`Radius` (`NumberInput`) |
-| `Select`, `MultiSelect` | `Width`, `Height`, `Disabled`, `Searchable` (`Select`), `Bg` (`Select`), `Radius` (`Select`), `Bold`/`Mono` (`Select`) |
+| `TextArea` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `FocusBorderColor`, `Radius`, `LineNumbers`, `ReadOnly`, `Disabled`, `InputFilter`, `Error` |
+| `NumberInput`, `Slider`, `RangeSlider`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker` | `Disabled`, `Width`, `Height`/`Radius` (`NumberInput`) |
+| `Select`, `MultiSelect` | `Width`, `Height`, `Disabled`, `Bg`, `Radius`, `Bold`, `Mono`, `Searchable` (`Select`) |
 | `TagInput` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Disabled` |
 | `Card` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `AutoHeight`, `Padding`, `Radius`, `Bg`, `BorderColor` |
 | `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image`, `SplitPane` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding` (`ScrollView`), `ScrollToID` (`ScrollView`), `Radius` (`SplitPane`) |
 | `ListView`, `ListViewEx` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `ScrollToIndex`, `Reorderable`, `OnReorder` |
-| `Table`, `TableEx` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Radius`, `Disabled`, `ScrollToIndex`, `Reorderable`, `OnReorder` |
-| `TreeView`, `TreeViewEx` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Radius`, `Disabled`, `Reorderable`, `AllowReparent`, `OnReorder` |
+| `Table`, `TableEx` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `ScrollToIndex`, `Reorderable`, `OnReorder` |
+| `TreeView`, `TreeViewEx` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `Reorderable`, `AllowReparent`, `OnReorder` |
 | `LogView`, `VirtualTextView`, `LineChart`, `BarChart`, `Sparkline` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `TextColor` (`Sparkline`) |
 | `TabBar`, `Collapsible`, `Accordion` | `Width`, `Height` (`TabBar`) |
 | `MenuBar`, `Toolbar`, `StatusBar`, `Breadcrumbs`, `Pagination`, `TitleBar` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg` (`MenuBar`, `Toolbar`, `StatusBar`, `TitleBar`), `FontSize` (`MenuBar`, `Breadcrumbs`, `TitleBar`), `TextColor` (`TitleBar`) |

@@ -188,7 +188,7 @@ func Padding(dp Dp) Option {
 	}
 }
 
-// Icon задаёт SVG-иконку для виджета (растеризация будет добавлена в Фазе 2).
+// Icon задаёт SVG-иконку для виджета.
 func Icon(svg string) Option {
 	return func(s *WidgetStyle) {
 		s.IconSVG = svg
@@ -453,7 +453,7 @@ func HoverBorderColor(c render.Color) Option {
 	}
 }
 
-// FocusBorderColor переопределяет цвет рамки при фокусе (для TextInput).
+// FocusBorderColor переопределяет цвет рамки при фокусе (для TextInput, MaskedInput и TextArea).
 func FocusBorderColor(c render.Color) Option {
 	return func(s *WidgetStyle) {
 		s.FocusBorderColor = &c
@@ -494,14 +494,14 @@ func TextAlignRight(enabled ...bool) Option {
 	}
 }
 
-// LetterSpacing задаёт межбуквенный интервал в логических пикселях (для Label и Button).
+// LetterSpacing задаёт межбуквенный интервал в логических пикселях (для Label, StatusDot, Button, ContextMenu и Tooltip).
 func LetterSpacing(dp float32) Option {
 	return func(s *WidgetStyle) {
 		s.LetterSpacing = dp
 	}
 }
 
-// TextShadow задаёт тень или мягкое свечение текста (для Label и Button).
+// TextShadow задаёт тень или мягкое свечение текста (для Label, StatusDot, Button, ContextMenu и Tooltip).
 func TextShadow(offsetX, offsetY, blur float32, c render.Color) Option {
 	return func(s *WidgetStyle) {
 		s.TextShadow = &render.TextShadowStyle{
@@ -513,7 +513,7 @@ func TextShadow(offsetX, offsetY, blur float32, c render.Color) Option {
 	}
 }
 
-// ScrollToIndex задаёт индекс элемента для программной прокрутки в ListView и Table.
+// ScrollToIndex задаёт индекс элемента для программной прокрутки в ListView, ListViewEx, Table и TableEx.
 func ScrollToIndex(idx int) Option {
 	return func(s *WidgetStyle) {
 		s.ScrollToIndex = &idx

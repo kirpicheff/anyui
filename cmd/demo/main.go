@@ -457,7 +457,7 @@ func main() {
 			ui.RowCentered(20, 32, func() {
 				ui.StatusDot(th.Success, st.statusMsg)
 				ui.FlexSpacer(140)
-				ui.Label("AnyUI Фаза 1–7 • Pure Go", anyui.FontSize(12), anyui.TextColor(th.TextMuted))
+				ui.Label("AnyUI • Pure Go", anyui.FontSize(12), anyui.TextColor(th.TextMuted))
 			})
 		})
 

@@ -69,7 +69,7 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 
 	ui.ScrollView("scroll_perf", func() {
 		ui.Column(14, func() {
-			ui.Label("Фаза 7.2: Слои, Dirty Rectangles, фильтры и LRU-кеши", anyui.FontSize(16), anyui.Bold())
+			ui.Label("Производительность: слои, Dirty Rectangles, фильтры и LRU-кеши", anyui.FontSize(16), anyui.Bold())
 
 			// 1. Стенд слоёв (Static / Dynamic / Overlay) и Dirty Rectangles
 			ui.Label("1. Слои (Static / Dynamic / Overlay) и Dirty Rectangles", anyui.FontSize(13), anyui.Bold())

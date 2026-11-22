@@ -121,6 +121,7 @@ go run ./cmd/demo
 - [System Integration (Windows, Tray, Dialogs, Linux)](docs/en/system.md)
 - [Testing & Headless Runtime](docs/en/testing.md)
 - [Units & Typing (Dp / Px)](docs/en/units.md)
+- LLM API Reference: [llms.txt](llms.txt) (compact) and [llms-full.txt](llms-full.txt) (full)
 
 You can also inspect the Go API directly from the terminal:
 

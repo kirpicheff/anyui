@@ -103,7 +103,7 @@ func (c *Context) Table(
 	if !st.Disabled {
 		c.registerFocusable(id)
 	}
-	if !c.IsInputBlocked() && rect.Contains(c.MouseX, c.MouseY) && (c.MousePressed || c.MiddleMousePressed) {
+	if !st.Disabled && !c.IsInputBlocked() && rect.Contains(c.MouseX, c.MouseY) && (c.MousePressed || c.MiddleMousePressed) {
 		c.FocusID = id
 		c.RequestRedraw()
 	}
@@ -111,11 +111,15 @@ func (c *Context) Table(
 	if st.Radius != nil {
 		radius = c.ScaleF(*st.Radius)
 	}
+	bg := c.Theme.SurfaceDark
+	if st.Bg != nil {
+		bg = *st.Bg
+	}
 	borderCol := c.Theme.Border
-	if c.FocusID == id {
+	if c.FocusID == id && !st.Disabled {
 		borderCol = c.Theme.BorderFocus
 	}
-	c.Canvas.DrawRoundedBox(rect, radius, c.Theme.SurfaceDark, 1.0, borderCol)
+	c.Canvas.DrawRoundedBox(rect, radius, bg, 1.0, borderCol)
 
 	// Инициализируем ширины колонок в dp
 	if c.tableColWidths == nil {
@@ -191,15 +195,17 @@ func (c *Context) Table(
 
 	pxSize := c.Scale(12).Int()
 	curX := headerRect.X - si.x
-	blocked := c.IsInputBlocked()
+	blocked := c.IsInputBlocked() || st.Disabled
 	for i, col := range cols {
 		cw := c.Scale(Dp(widthsDp[i])).Int()
 		colRect := render.Rect{X: curX, Y: headerRect.Y, W: cw, H: headerRect.H}
 		resizeZone := render.Rect{X: curX + cw - c.Scale(4).Int(), Y: headerRect.Y, W: c.Scale(8).Int(), H: headerRect.H}
-		if col.Sortable && sort != nil {
-			c.RegisterHit(id+":hdr:"+strconv.Itoa(i), headerRect.Intersect(colRect), platform.CursorHand)
+		if !st.Disabled {
+			if col.Sortable && sort != nil {
+				c.RegisterHit(id+":hdr:"+strconv.Itoa(i), headerRect.Intersect(colRect), platform.CursorHand)
+			}
+			c.RegisterHit(id+":res:"+strconv.Itoa(i), headerRect.Intersect(resizeZone), platform.CursorResizeH)
 		}
-		c.RegisterHit(id+":res:"+strconv.Itoa(i), headerRect.Intersect(resizeZone), platform.CursorResizeH)
 
 		inResize := !blocked && resizeZone.Contains(c.MouseX, c.MouseY)
 		inHeader := !blocked && colRect.Contains(c.MouseX, c.MouseY) && !inResize
@@ -384,7 +390,9 @@ func (c *Context) Table(
 	for row := startRow; row < endRow; row++ {
 		ry := bodyRect.Y + row*rowH - si.y
 		rowRect := render.Rect{X: bodyRect.X, Y: ry, W: contentW, H: rowH}
-		c.RegisterHit(id+":row:"+strconv.Itoa(row), bodyRect.Intersect(rowRect), platform.CursorHand)
+		if !st.Disabled {
+			c.RegisterHit(id+":row:"+strconv.Itoa(row), bodyRect.Intersect(rowRect), platform.CursorHand)
+		}
 		isSel := selected != nil && *selected == row
 		rowHover := !blocked && bodyRect.Contains(c.MouseX, c.MouseY) && c.MouseY < bodyRect.Y+viewH && rowRect.Contains(c.MouseX, c.MouseY) && c.MouseX < bodyRect.X+contentW
 
@@ -443,7 +451,7 @@ func (c *Context) Table(
 	c.Canvas.PopClip()
 
 	// Обработка перетаскивания (Reorder) строк таблицы
-	if st.Reorderable {
+	if st.Reorderable && !st.Disabled {
 		viewRect := render.Rect{X: bodyRect.X, Y: bodyRect.Y, W: contentW, H: viewH}
 		c.HandleLinearReorder(id, viewRect, bodyRect.X, contentW, rowH, rowCount, si, maxSc, func(dragEv DragEvent) {
 			ev.Drag = &dragEv
@@ -554,7 +562,7 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 	if !st.Disabled {
 		c.registerFocusable(id)
 	}
-	if !c.IsInputBlocked() && rect.Contains(c.MouseX, c.MouseY) && (c.MousePressed || c.MiddleMousePressed) {
+	if !st.Disabled && !c.IsInputBlocked() && rect.Contains(c.MouseX, c.MouseY) && (c.MousePressed || c.MiddleMousePressed) {
 		c.FocusID = id
 		c.RequestRedraw()
 	}
@@ -562,11 +570,15 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 	if st.Radius != nil {
 		radius = c.ScaleF(*st.Radius)
 	}
+	bg := c.Theme.SurfaceDark
+	if st.Bg != nil {
+		bg = *st.Bg
+	}
 	borderCol := c.Theme.Border
-	if c.FocusID == id {
+	if c.FocusID == id && !st.Disabled {
 		borderCol = c.Theme.BorderFocus
 	}
-	c.Canvas.DrawRoundedBox(rect, radius, c.Theme.SurfaceDark, 1.0, borderCol)
+	c.Canvas.DrawRoundedBox(rect, radius, bg, 1.0, borderCol)
 
 	flat := FlattenTree(roots)
 	itemH := c.Scale(28).Int()
@@ -576,7 +588,7 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 	si := c.getScrollInfo("tree:" + id)
 	totalH := len(flat) * itemH
 
-	blocked := c.IsInputBlocked()
+	blocked := c.IsInputBlocked() || st.Disabled
 	if !blocked && inner.Contains(c.MouseX, c.MouseY) && c.WheelY != 0 {
 		si.y -= int(c.WheelY * float32(itemH*2))
 		c.RequestRedraw()
@@ -692,7 +704,9 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 		rowR := render.Rect{X: inner.X, Y: iy, W: contentW, H: itemH}
 
 		isSel := selectedID != nil && *selectedID == node.ID
-		c.RegisterHit(id+":node:"+node.ID, inner.Intersect(rowR), platform.CursorHand)
+		if !st.Disabled {
+			c.RegisterHit(id+":node:"+node.ID, inner.Intersect(rowR), platform.CursorHand)
+		}
 		rowHover := !blocked && inner.Contains(c.MouseX, c.MouseY) && rowR.Contains(c.MouseX, c.MouseY) && c.MouseX < inner.X+contentW
 
 		if isSel {
@@ -772,7 +786,7 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 	c.Canvas.PopClip()
 
 	// Обработка перетаскивания (Reorder) узлов дерева
-	if st.Reorderable {
+	if st.Reorderable && !st.Disabled {
 		if c.HandleTreeReorder(id, inner, contentW, itemH, flat, si, maxSc, st.AllowReparent, st.OnReorder, nil) {
 			changed = true
 		}

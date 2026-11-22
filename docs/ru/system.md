@@ -255,7 +255,7 @@ child, err := app.OpenWindow(anyui.Config{
 - **Wayland:** используются `wl_compositor`, `wl_shm`, `xdg_shell`, `wl_seat` / `wl_pointer` / `wl_keyboard`, `wp_cursor_shape_manager_v1`, `wp_fractional_scale_manager_v1` / `wp_viewporter` для HiDPI и `wl_data_device_manager` для буфера обмена и Drag & Drop.
 - **Системная интеграция:**
   - Диалоги (`OpenFileDialog`, `OpenFilesDialog`, `SaveFileDialog`, `SelectFolderDialog`, `MessageBox`) работают через `zenity`, `yad` или `kdialog` (автоопределение в `PATH`).
-  - Системный трей (`NewTray`) поддерживает `StatusNotifierItem` (D-Bus) и `XEmbed` (`_NET_SYSTEM_TRAY_S0`), уведомления — через `notify-send`.
+  - Системный трей (`Config.Tray`) поддерживает `StatusNotifierItem` (D-Bus) и `XEmbed` (`_NET_SYSTEM_TRAY_S0`), уведомления — через `notify-send`.
   - `SingleInstance` использует `flock` и UNIX domain socket в `$XDG_RUNTIME_DIR`.
   - `IsSystemDarkTheme` проверяет `gsettings` (`color-scheme` / `gtk-theme`), `GTK_THEME` и `~/.config/kdeglobals`.
   - `OpenURL` использует `xdg-open`, а `RevealInFileManager` — D-Bus `org.freedesktop.FileManager1.ShowItems` с откатом на `xdg-open`.

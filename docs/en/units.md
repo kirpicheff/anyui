@@ -7,7 +7,7 @@ This document tracks the status of strict scalar typing in the AnyUI library acc
 ## Units Contract
 - **`Dp` (`type Dp int`)** — density-independent logical pixels. Used across the entire high-level public API for layouts, containers, options, overlays, and widgets:
   - All public layout and overlay methods accept geometry strictly in `Dp`: `LayoutRect`, `Tooltip`, `PushOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`. Coordinates from `ui.CurrentArea()` are in `Dp` and can be passed directly.
-- **`Px` (`type Px int`)** — device physical pixels of the render buffer. Kept strictly for low-level drawing (`render.Canvas`), low-level canvas/table callbacks (`CanvasView` area, `Table.drawCell` area), system window metrics, and screen presentation (`LastDirtyRects`, `Config.HitTest`, `TitleBarHitTest`).
+- **`Px` (`type Px int`)** — device physical pixels of the render buffer. Kept strictly for low-level drawing (`anyui.Canvas`), low-level canvas/table callbacks (`CanvasView` area, `Table.drawCell` area), system window metrics, and screen presentation (`LastDirtyRectsPx`, `Config.HitTest`, `TitleBarHitTest`).
 - **Orientation**: `Horizontal` and `Vertical` are the only valid enum constants of type `Orientation`. Legacy `SplitOrientation` is completely removed.
 - **DPI Scaling & Conversion Rule**:
   - `Scale(dp Dp) Px` converts logical units to physical device pixels (frequent hot-path in application code).
@@ -68,7 +68,7 @@ This document tracks the status of strict scalar typing in the AnyUI library acc
 | `FontSize(dp Dp) Option` | | ✓ | Widget text font size |
 | `Padding(dp Dp) Option` | | ✓ | Widget internal padding |
 | `Radius(dp float32) Option` | | ✓ | Corner radius in logical units (float32) |
-| **WidgetStyle Struct** | | | |
+| **Internal `ui.WidgetStyle` Struct (internal `ui` package)** | | | |
 | `WidgetStyle.WidthDp *Dp` | | ✓ | Width storage |
 | `WidgetStyle.HeightDp *Dp` | | ✓ | Height storage |
 | `WidgetStyle.MinWidthDp *Dp` | | ✓ | Minimum width storage |

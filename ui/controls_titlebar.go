@@ -21,6 +21,7 @@ type TitleBarConfig struct {
 // TitleBar отрисовывает кастомную шапку окна с иконкой, заголовком, пользовательским контентом
 // и системными кнопками управления окном (Свернуть / Развернуть / Закрыть).
 func (c *Context) TitleBar(id, title string, cfg TitleBarConfig, opts ...Option) {
+	id = c.ResolveID("titlebar", id)
 	st := ApplyOptions(opts)
 	hDp := Dp(36)
 	if cfg.HeightDp > 0 {
