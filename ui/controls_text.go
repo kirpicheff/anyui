@@ -573,7 +573,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 	caret := clampRuneIdx(c.caretPos[id], len(displayRunes))
 	selStart := clampRuneIdx(c.textSelStart[id], len(displayRunes))
 
-	prefixW, lineH := c.Font.MeasureTextStyled(string(displayRunes[:caret]), pxSize, st.FontStyle)
+	prefixW, _ := c.Font.MeasureTextStyled(string(displayRunes[:caret]), pxSize, st.FontStyle)
 	scroll := c.textScroll[id]
 	if prefixW-scroll > textArea.W-c.Scale(4).Int() {
 		scroll = prefixW - (textArea.W - c.Scale(4).Int())
@@ -610,7 +610,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 		textCol = c.Theme.TextMuted
 	}
 
-	textY := textArea.Y + (textArea.H-lineH)/2
+	textY := c.Font.CenterTextY(textArea.Y, textArea.H, pxSize, st.FontStyle)
 	if len(displayRunes) == 0 && !focused && placeholder != "" {
 		phX := textArea.X
 		if st.TextAlign != AlignTextLeft {

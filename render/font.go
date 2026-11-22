@@ -76,7 +76,8 @@ type coloredGlyph struct {
 
 type faceEntry struct {
 	face       font.Face
-	ascent     int
+	ascent     int // Смещение baseline от верхнего края строки с учётом half-leading
+	capHeight  int // Высота заглавных букв/цифр над baseline
 	lineHeight int
 }
 
@@ -123,10 +124,29 @@ func (fs *fontSet) getFace(sizePx int) *faceEntry {
 		return nil
 	}
 	m := face.Metrics()
+	rawAscent := m.Ascent.Round()
+	rawDescent := m.Descent.Round()
+	lineH := m.Height.Round()
+	halfLeading := 0
+	if leading := lineH - (rawAscent + rawDescent); leading > 0 {
+		halfLeading = leading / 2
+	}
+	capH := m.CapHeight.Round()
+	if capH <= 0 {
+		if bounds, _, ok := face.GlyphBounds('0'); ok {
+			if h := (-bounds.Min.Y).Round(); h > 0 {
+				capH = h
+			}
+		}
+	}
+	if capH <= 0 {
+		capH = int(math.Round(float64(rawAscent) * 0.72))
+	}
 	fe := &faceEntry{
 		face:       face,
-		ascent:     m.Ascent.Round(),
-		lineHeight: m.Height.Round(),
+		ascent:     rawAscent + halfLeading,
+		capHeight:  capH,
+		lineHeight: lineH,
 	}
 	fs.faces[sizePx] = fe
 	return fe
@@ -560,6 +580,23 @@ func (fm *FontManager) MeasureText(text string, sizePx int) (int, int) {
 // MeasureTextStyled возвращает ширину и высоту строки в пикселях для указанного начертания.
 func (fm *FontManager) MeasureTextStyled(text string, sizePx int, style FontStyle) (int, int) {
 	return fm.MeasureTextWithOptions(text, sizePx, TextRenderOptions{Style: style})
+}
+
+// CenterTextY возвращает координату Y верхнего края строки для оптического вертикального
+// центрирования однострочного текста (по центру CapHeight) внутри области [boxY, boxY+boxH).
+func (fm *FontManager) CenterTextY(boxY, boxH, sizePx int, style FontStyle) int {
+	if fm == nil {
+		return boxY + (boxH-sizePx)/2
+	}
+	fs := fm.styleSet(style)
+	if fs == nil {
+		return boxY + (boxH-sizePx)/2
+	}
+	fe := fs.getFace(sizePx)
+	if fe == nil {
+		return boxY + (boxH-sizePx)/2
+	}
+	return boxY + (boxH+fe.capHeight)/2 - fe.ascent
 }
 
 // MeasureTextWithOptions возвращает ширину и высоту строки в пикселях с учётом начертания и межбуквенного интервала.

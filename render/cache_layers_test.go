@@ -142,3 +142,44 @@ func TestScaledImageLRUCache(t *testing.T) {
 	}
 }
 
+func TestFontCenterTextYOpticalBalance(t *testing.T) {
+	fm, err := LoadDefaultSystemFont()
+	if err != nil {
+		t.Skipf("системный шрифт недоступен: %v", err)
+	}
+
+	const boxH = 48
+	for _, style := range []FontStyle{FontRegular, FontMono} {
+		c := NewCanvas(200, boxH)
+		c.Clear(RGB(0, 0, 0))
+		y := fm.CenterTextY(0, boxH, 18, style)
+		fm.DrawTextStyled(c, 10, y, "000 000 000", 18, RGB(255, 255, 255), style)
+
+		minY, maxY := boxH, -1
+		for py := 0; py < boxH; py++ {
+			for px := 0; px < 200; px++ {
+				if p := pixelAt(c, px, py); p.R > 40 {
+					if py < minY {
+						minY = py
+					}
+					if py > maxY {
+						maxY = py
+					}
+				}
+			}
+		}
+		if maxY < minY {
+			t.Fatalf("style=%v: текст не отрисовался", style)
+		}
+		topMargin := minY
+		bottomMargin := (boxH - 1) - maxY
+		diff := topMargin - bottomMargin
+		if diff < 0 {
+			diff = -diff
+		}
+		if diff > 2 {
+			t.Fatalf("style=%v: нарушен вертикальный оптический баланс: top=%d bottom=%d (minY=%d maxY=%d)", style, topMargin, bottomMargin, minY, maxY)
+		}
+	}
+}
+

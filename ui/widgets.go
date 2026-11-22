@@ -327,9 +327,9 @@ func (c *Context) ButtonOpts(id, label string, opts ...Option) bool {
 	}
 	pxSize := c.Scale(fontSizeDp).Int()
 	textOpts := c.textRenderOpts(st)
-	tw, th := 0, pxSize
+	tw := 0
 	if c.Font != nil {
-		tw, th = c.Font.MeasureTextWithOptions(label, pxSize, textOpts)
+		tw, _ = c.Font.MeasureTextWithOptions(label, pxSize, textOpts)
 	}
 
 	padX := Dp(16)
@@ -421,7 +421,8 @@ func (c *Context) ButtonOpts(id, label string, opts ...Option) bool {
 		startX += iconSize + iconGap
 	}
 	if c.Font != nil && label != "" {
-		c.Font.DrawTextWithOptions(c.Canvas, startX, r.Y+(r.H-th)/2, label, pxSize, textCol, textOpts)
+		textY := c.Font.CenterTextY(r.Y, r.H, pxSize, st.FontStyle)
+		c.Font.DrawTextWithOptions(c.Canvas, startX, textY, label, pxSize, textCol, textOpts)
 	}
 
 	return clicked
