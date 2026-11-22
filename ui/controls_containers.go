@@ -770,10 +770,23 @@ func (c *Context) Drawer(id string, open *bool, side DrawerSide, fn func(), opts
 	c.PushOverlay(full, func() {
 		c.Canvas.FillRect(full, render.RGBA(0, 0, 0, uint8(90*anim)))
 		c.drawDropShadow(panelRect, 0, 18, 120)
-		c.Canvas.FillRect(panelRect, c.Theme.Card)
+		bg := c.Theme.Card
+		if st.Bg != nil {
+			bg = *st.Bg
+		}
+		c.Canvas.FillRect(panelRect, bg)
 		if fn != nil {
 			pad := c.Scale(16).Int()
+			if st.PadDp != nil && *st.PadDp >= 0 {
+				pad = c.Scale(*st.PadDp).Int()
+			}
 			body := render.Rect{X: panelRect.X + pad, Y: panelRect.Y + pad, W: panelRect.W - pad*2, H: panelRect.H - pad*2}
+			if body.W < 0 {
+				body.W = 0
+			}
+			if body.H < 0 {
+				body.H = 0
+			}
 			c.Canvas.PushClip(body)
 			c.pushBox(body, dirColumn, AlignStart, c.Scale(10).Int())
 			fn()

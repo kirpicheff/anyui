@@ -327,3 +327,22 @@ func TestModalAutoHeight(t *testing.T) {
 		t.Fatalf("ожидалась высота тела модалки 122px при MaxHeight(200), получено %d", bodyRect.H)
 	}
 }
+
+func TestDrawerPaddingAndBg(t *testing.T) {
+	ctx := newTestContext(800, 600)
+	open := true
+
+	var bodyRect render.Rect
+	// Прокручиваем анимацию открытия до конца, чтобы panelRect занял полную ширину 300px
+	for i := 0; i < 3; i++ {
+		ctx.beginFrame()
+		ctx.Drawer("drw_pad0", &open, DrawerLeft, func() {
+			bodyRect = ctx.CurrentArea()
+		}, Width(300), Padding(0), Bg(render.RGB(10, 20, 30)))
+		ctx.endFrame()
+	}
+
+	if bodyRect.Y != 0 || bodyRect.H != 600 || bodyRect.W != 300 {
+		t.Fatalf("при Padding(0) тело Drawer должно совпадать с панелью (W=300, Y=0, H=600), получено %+v", bodyRect)
+	}
+}

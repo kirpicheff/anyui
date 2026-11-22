@@ -267,6 +267,7 @@ ui.Popover("pop_filters", &popoverOpen, btnArea, func() {
   - `anyui.DrawerRight` — slides out from the right along full window height (default width 280 dp, option `anyui.Width(wDp)`).
   - `anyui.DrawerTop` — slides down from the top across full window width (default height 240 dp, option `anyui.Height(hDp)`). If `anyui.Width(wDp)` is set, horizontally centered.
   - `anyui.DrawerBottom` — slides up from the bottom (bottom sheet, default height 240 dp, option `anyui.Height(hDp)`). If `anyui.Width(wDp)` is set, horizontally centered.
+  - Styling options: `anyui.Padding(dp)` (inner panel padding, defaults to `16 dp`; pass `anyui.Padding(0)` for edge-to-edge headers/content) and `anyui.Bg(color)` (panel background).
 - **Behavior:**
   - Smooth slide animation.
   - Dims the remaining screen area and automatically closes when clicking the dimmed backdrop outside the panel or pressing `Escape`.

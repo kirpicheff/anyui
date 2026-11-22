@@ -660,7 +660,7 @@ var optionMatrixRows = []optionMatrixRow{
 	},
 	{
 		"`Modal`, `Popover`, `FloatingPanel`, `Drawer`",
-		"`Width`, `Height`, `AutoHeight`/`MinHeight`/`MaxHeight` (`Modal`)",
+		"`Width`, `Height`, `AutoHeight`/`MinHeight`/`MaxHeight` (`Modal`), `Padding`/`Bg` (`Drawer`)",
 	},
 	{
 		"`ContextMenu`, `Tooltip`",
