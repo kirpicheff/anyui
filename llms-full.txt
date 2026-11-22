@@ -30,7 +30,7 @@
 - **Идентификаторы, ключи и `IDScope`:** `IDScope` (или `PushID`/`PopID`) изолирует `id` виджетов внутри циклов и переиспользуемых компонентов. Передача пустого `id == ""` автоматически генерирует детерминированный идентификатор по порядковому номеру виджета в текущем `IDScope`. В `Select`, `MultiSelect`, `TabBar`, `TreeView`, `TreeViewEx` и `Breadcrumbs` ключи элементов (`Key` / `ID`) локальны для конкретного виджета и должны быть уникальны в его пределах — при дублировании ключей выделение и клик совпадут для всех дубликатов. В `Breadcrumbs`, если у сегмента `ID == ""`, возвращается его `Label`.
 - **Выпадающие списки и вкладки:** `Select` с опцией `Searchable` заменяет комбобокс; `MultiSelect` работает с `map[string]bool`; `TabBar` и `TabItems` работают на строковых ключах.
 - **Раскладка и оверлеи:** для типового экрана используйте `Page` или `DockTop` / `DockBottom` / `ColumnFlex`. Для диалогов всегда используйте `Modal` — `PushOverlay` предназначен только для небольших всплывающих контролов.
-- **Drag & Drop (Reorder):** `Reorderable` + `OnReorder` работают в `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы `FromIndex`/`ToIndex`) и `TreeView`, `TreeViewEx` (ключи `FromKey`/`ToKey`; с `AllowReparent` доступны смена родителя и `DropInside`).
+- **Drag & Drop (Reorder и кросс-виджетный перенос):** `Reorderable` + `OnReorder` работают внутри `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы `FromIndex`/`ToIndex`) и `TreeView`, `TreeViewEx` (ключи `FromKey`/`ToKey`; с `AllowReparent` доступны смена родителя и `DropInside`). Для кросс-виджетного переноса (например, `TreeView` → `Table`) используйте `DragSource` с типизированным `DragPayload` на источнике и `AcceptDrop` + `OnDrop` на приёмнике.
 - **Горячие клавиши (`Key`) и Headless-тесты:** из букв экспортированы базовые константы (`KeyA`, `KeyC`, `KeyV`, `KeyX`, `KeyY`, `KeyZ`); для остальных клавиш в `Shortcut` / `InjectKey` передавайте виртуальный код `anyui.Key('S')` или VK-код (например, `0x70` для F1). Для `anyui.NewHeadless` обязательно указывать `Config.FontRegular` (для детерминированных тестов используйте `anyui.DefaultTestFonts`).
 
 ## Семантика возвращаемых значений
@@ -106,9 +106,9 @@ type MessageBoxResult uint8  // ResNone, ResOK, ResCancel, ResYes, ResNo
 | `TagInput` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Disabled` |
 | `Card` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `AutoHeight`, `Padding`, `Radius`, `Bg`, `BorderColor` |
 | `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image`, `SplitPane` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding` (`ScrollView`), `ScrollToID` (`ScrollView`), `Radius` (`SplitPane`) |
-| `ListView`, `ListViewEx` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `ScrollToIndex`, `Reorderable`, `OnReorder` |
-| `Table`, `TableEx` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `ScrollToIndex`, `Reorderable`, `OnReorder` |
-| `TreeView`, `TreeViewEx` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `Reorderable`, `AllowReparent`, `OnReorder` |
+| `ListView`, `ListViewEx` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `ScrollToIndex`, `Reorderable`, `OnReorder`, `DragSource`, `AcceptDrop`, `OnDrop` |
+| `Table`, `TableEx` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `ScrollToIndex`, `Reorderable`, `OnReorder`, `DragSource`, `AcceptDrop`, `OnDrop` |
+| `TreeView`, `TreeViewEx` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `Reorderable`, `AllowReparent`, `OnReorder`, `DragSource`, `AcceptDrop`, `OnDrop` |
 | `LogView`, `VirtualTextView`, `LineChart`, `BarChart`, `Sparkline` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `TextColor` (`Sparkline`) |
 | `TabBar`, `Collapsible`, `Accordion` | `Width`, `Height` (`TabBar`) |
 | `MenuBar`, `Toolbar`, `StatusBar`, `Breadcrumbs`, `Pagination`, `TitleBar` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg` (`MenuBar`, `Toolbar`, `StatusBar`, `TitleBar`), `FontSize` (`MenuBar`, `Breadcrumbs`, `TitleBar`), `TextColor` (`TitleBar`) |
@@ -253,6 +253,7 @@ func UniformRadii(r float32) CornerRadii
 ## Опции стилизации (`Option`)
 
 ```go
+func AcceptDrop(types ...string) Option
 func AllowReparent(enabled ...bool) Option
 func AutoHeight(enabled ...bool) Option
 func Bg(c Color) Option
@@ -261,6 +262,7 @@ func BorderColor(c Color) Option
 func Clearable(enabled ...bool) Option
 func Danger(enabled ...bool) Option
 func Disabled(enabled ...bool) Option
+func DragSource(typeName string, fn func(index int, key string) DragPayload) Option
 func Ellipsis(enabled ...bool) Option
 func Error(text string) Option
 func FillHeight(enabled ...bool) Option
@@ -283,6 +285,7 @@ func MaxWidth(dp Dp) Option
 func MinHeight(dp Dp) Option
 func MinWidth(dp Dp) Option
 func Mono(enabled ...bool) Option
+func OnDrop(fn func(ev DragEvent)) Option
 func OnReorder(fn func(ev DragEvent)) Option
 func Padding(dp Dp) Option
 func Password(enabled ...bool) Option
@@ -554,14 +557,21 @@ type KeyEvent struct {
 	Mods     Modifiers // Состояние модификаторов
 }
 
+type DragPayload struct {
+	Type  string // Строковый идентификатор типа перетаскиваемых данных (например, "file", "task", "node")
+	Data  any    // Произвольные типизированные данные приложения
+	Label string // Опциональная подпись для отображения у курсора во время перетаскивания
+}
+
 type DragEvent struct {
-	FromWidget string   // ID виджета-источника перетаскивания
-	ToWidget   string   // ID целевого виджета
-	FromKey    string   // Ключ перетаскиваемого узла (для TreeView — node.ID; "" для Table/ListView)
-	ToKey      string   // Ключ якорного целевого узла (для TreeView — node.ID; "" для Table/ListView)
-	FromIndex  int      // Индекс перетаскиваемой строки (для Table/ListView; -1 для TreeView)
-	ToIndex    int      // Позиция вставки в списке после удаления перемещаемого элемента (0 <= ToIndex < rowCount; -1 для TreeView)
-	Drop       DropZone // Зона сброса (DropAbove, DropBelow; DropInside при AllowReparent в TreeView)
+	FromWidget string       // ID виджета-источника перетаскивания
+	ToWidget   string       // ID целевого виджета
+	FromKey    string       // Ключ перетаскиваемого узла (для TreeView — node.ID; "" для Table/ListView)
+	ToKey      string       // Ключ якорного целевого узла (для TreeView — node.ID; "" для Table/ListView и пустого дерева)
+	FromIndex  int          // Индекс перетаскиваемой строки (для Table/ListView; -1 для TreeView)
+	ToIndex    int          // Позиция вставки в списке/таблице (-1 для TreeView)
+	Drop       DropZone     // Зона сброса (DropAbove, DropBelow, DropInside)
+	Payload    *DragPayload // Типизированные данные кросс-виджетного переноса (nil при обычном Reorder без DragSource)
 }
 
 type TrayConfig struct {

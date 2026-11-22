@@ -31,25 +31,32 @@ const (
 	DropInside                 // Сброс внутрь целевого элемента (для папок/контейнеров)
 )
 
+// DragPayload описывает типизированные данные для кросс-виджетного перетаскивания (Drag & Drop).
+type DragPayload struct {
+	Type  string // Строковый идентификатор типа перетаскиваемых данных (например, "file", "task", "node")
+	Data  any    // Произвольные типизированные данные приложения
+	Label string // Опциональная подпись для отображения у курсора во время перетаскивания
+}
+
 // ВАЖНО: данный docstring должен быть строго синхронизирован с ui_controls_extra.go (anyui.DragEvent).
 
-// DragEvent описывает событие завершения перетаскивания элемента (Reorder).
+// DragEvent описывает событие завершения перетаскивания элемента (Reorder или кросс-виджетный Drop).
 //
 // Для списков и таблиц (Table, TableEx, ListView, ListViewEx):
-//   - FromIndex: исходный индекс перемещаемого элемента (>= 0).
-//   - ToIndex: уже вычисленная позиция вставки в списке после удаления перемещаемого элемента (0 <= ToIndex < rowCount).
-//   - FromKey и ToKey строго пусты ("").
-//   - Допустимые зоны Drop: только DropAbove и DropBelow.
-//   - Если ToIndex == FromIndex, операция является no-op и событие не генерируется.
+//   - FromIndex: исходный индекс перемещаемого элемента (>= 0; -1 при внешнем переносе из дерева).
+//   - ToIndex: при внутреннем Reorder — вычисленная позиция вставки после удаления перемещаемого элемента (0 <= ToIndex < rowCount); при внешнем Drop — позиция вставки (0 <= ToIndex <= rowCount; 0 для пустого списка/таблицы).
+//   - FromKey и ToKey строго пусты ("") при внутреннем Reorder; при внешнем Drop из дерева FromKey содержит node.ID.
+//   - Допустимые зоны Drop: DropAbove и DropBelow (при внешнем Drop в пустой список/таблицу — DropInside).
+//   - Если при внутреннем Reorder ToIndex == FromIndex, операция является no-op и событие не генерируется.
 //   - ListViewEx / TableEx: при Reorder приложение обязано синхронно переставлять элементы в срезе чекбоксов и карте выделения, иначе отметки сохранятся за исходными числовыми индексами.
 //
 // Для иерархических деревьев (TreeView, TreeViewEx):
-//   - FromIndex и ToIndex строго равны -1.
-//   - FromKey: ID перемещаемого узла (sourceNode.ID).
-//   - ToKey: ID якорного узла (targetNode.ID), относительно которого применяется Drop; позицию вставки в список детей родителя вычисляет приложение.
-//   - По умолчанию перетаскивание узлов разрешено только внутри одного родителя (source.Parent == target.Parent), зоны DropAbove и DropBelow. При попытке сброса на узел другого родителя событие отбрасывается.
+//   - FromIndex и ToIndex равны -1 при внутреннем Reorder; при внешнем Drop из списка/таблицы FromIndex >= 0.
+//   - FromKey: ID перемещаемого узла (sourceNode.ID; "" при внешнем Drop из списка/таблицы).
+//   - ToKey: ID якорного узла (targetNode.ID; "" при внешнем Drop в пустое дерево), относительно которого применяется Drop; позицию вставки в список детей родителя вычисляет приложение.
+//   - По умолчанию внутреннее перетаскивание узлов разрешено только внутри одного родителя (source.Parent == target.Parent), зоны DropAbove и DropBelow. При попытке сброса на узел другого родителя событие отбрасывается.
 //   - По умолчанию DropBelow на узле (в том числе раскрытом) вставляет элемент в того же родителя сразу после всего поддерева ToKey; для раскрытого узла с детьми при включённой AllowReparent() — первым ребёнком в ToKey.Children (см. ниже).
-//   - Сброс узла в самого себя (ToKey == FromKey) является no-op и событие не генерирует.
+//   - Сброс узла в самого себя (ToKey == FromKey при FromWidget == ToWidget) является no-op и событие не генерирует.
 //   - TreeViewEx: при перетаскивании одного узла из группы выделенных перемещается только он, при этом выделение группы не сбрасывается.
 //
 // Режим AllowReparent() в TreeView и TreeViewEx (смена родителя и вложение):
@@ -57,14 +64,19 @@ const (
 //   - DropAbove: новым родителем становится target.ParentID (для корневого узла — "" / верхний уровень), вставка перед ToKey.
 //   - DropBelow: для раскрытого узла с детьми (ToKey.Expanded && len(ToKey.Children) > 0) новым родителем становится сам ToKey (позиция первого ребёнка); для свёрнутого узла или листа — target.ParentID (сразу после поддерева ToKey).
 //   - Защита от циклов и no-op: сброс узла в любого своего потомка и DropInside на собственного текущего родителя являются no-op и событие не генерируют. При этом DropAbove/DropBelow на собственного текущего родителя не являются no-op (перемещают узел на уровень родителя).
+//
+// Кросс-виджетный перенос (DragSource + AcceptDrop + OnDrop):
+//   - Payload содержит типизированные данные (*DragPayload), сформированные источником DragSource.
+//   - FromWidget != ToWidget; событие доставляется в OnDrop целевого виджета (и в TableEvent.Drag для Table/TableEx).
 type DragEvent struct {
-	FromWidget string   // ID виджета-источника перетаскивания
-	ToWidget   string   // ID целевого виджета
-	FromKey    string   // Ключ перетаскиваемого узла (для TreeView — node.ID; "" для Table/ListView)
-	ToKey      string   // Ключ якорного целевого узла (для TreeView — node.ID; "" для Table/ListView)
-	FromIndex  int      // Индекс перетаскиваемой строки (для Table/ListView; -1 для TreeView)
-	ToIndex    int      // Позиция вставки в списке после удаления перемещаемого элемента (0 <= ToIndex < rowCount; -1 для TreeView)
-	Drop       DropZone // Зона сброса (DropAbove, DropBelow; DropInside при AllowReparent в TreeView)
+	FromWidget string       // ID виджета-источника перетаскивания
+	ToWidget   string       // ID целевого виджета
+	FromKey    string       // Ключ перетаскиваемого узла (для TreeView — node.ID; "" для Table/ListView)
+	ToKey      string       // Ключ якорного целевого узла (для TreeView — node.ID; "" для Table/ListView и пустого дерева)
+	FromIndex  int          // Индекс перетаскиваемой строки (для Table/ListView; -1 для TreeView)
+	ToIndex    int          // Позиция вставки в списке/таблице (-1 для TreeView)
+	Drop       DropZone     // Зона сброса (DropAbove, DropBelow, DropInside)
+	Payload    *DragPayload // Типизированные данные кросс-виджетного переноса (nil при обычном Reorder без DragSource)
 }
 
 // WidgetStyle хранит переопределения оформления и размеров конкретного виджета.
@@ -113,6 +125,10 @@ type WidgetStyle struct {
 	Reorderable      bool
 	AllowReparent    bool
 	OnReorder        func(ev DragEvent)
+	DragSourceType   string
+	DragSourceFn     func(index int, key string) DragPayload
+	AcceptDropTypes  []string
+	OnDrop           func(ev DragEvent)
 }
 
 // Auto — константа sentinel-значения для автоматического занятия доступного остатка области контейнера.
@@ -558,5 +574,31 @@ func AllowReparent(enabled ...bool) Option {
 func OnReorder(fn func(ev DragEvent)) Option {
 	return func(s *WidgetStyle) {
 		s.OnReorder = fn
+	}
+}
+
+// DragSource разрешает виджету выступать источником кросс-виджетного перетаскивания с типизированным DragPayload.
+// Если fn == nil, автоматически формируется DragPayload{Type: typeName}.
+// Действует для Table, TableEx, ListView, ListViewEx, TreeView, TreeViewEx.
+func DragSource(typeName string, fn func(index int, key string) DragPayload) Option {
+	return func(s *WidgetStyle) {
+		s.DragSourceType = typeName
+		s.DragSourceFn = fn
+	}
+}
+
+// AcceptDrop разрешает виджету принимать внешний перенос элементов с указанными типами Payload.Type.
+// Работает совместно с OnDrop(...). Действует для Table, TableEx, ListView, ListViewEx, TreeView, TreeViewEx.
+func AcceptDrop(types ...string) Option {
+	return func(s *WidgetStyle) {
+		s.AcceptDropTypes = append(s.AcceptDropTypes, types...)
+	}
+}
+
+// OnDrop регистрирует обработчик события внешнего кросс-виджетного сброса (Drop).
+// Работает совместно с AcceptDrop(...). Действует для Table, TableEx, ListView, ListViewEx, TreeView, TreeViewEx.
+func OnDrop(fn func(ev DragEvent)) Option {
+	return func(s *WidgetStyle) {
+		s.OnDrop = fn
 	}
 }

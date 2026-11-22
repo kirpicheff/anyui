@@ -552,8 +552,8 @@ func (c *Context) ListView(id string, count int, itemHeightDp Dp, selected *int,
 					*selected = i
 					changed = true
 				}
-				if st.Reorderable {
-					c.ArmReorder(id, i, "")
+				if st.Reorderable || st.DragSourceType != "" {
+					c.ArmDrag(id, i, "", st)
 				}
 				c.RequestRedraw()
 			}
@@ -576,16 +576,25 @@ func (c *Context) ListView(id string, count int, itemHeightDp Dp, selected *int,
 	}
 	c.Canvas.PopClip()
 
-	// Обработка перетаскивания (Reorder) элементов ListView
-	if st.Reorderable {
+	// Обработка перетаскивания (Reorder и кросс-виджетный Drop) элементов ListView
+	if !st.Disabled {
 		contentW := r.W
 		if maxSc > 0 {
 			contentW -= c.Scale(8).Int()
 		}
 		lineX := r.X + c.Scale(2).Int()
 		lineW := contentW - c.Scale(4).Int()
-		if c.HandleLinearReorder(id, r, lineX, lineW, itemH, count, si, maxSc, st.OnReorder, nil) {
-			changed = true
+		if st.Reorderable {
+			if c.HandleLinearReorder(id, r, lineX, lineW, itemH, count, si, maxSc, st.OnReorder, nil) {
+				changed = true
+			}
+		} else if st.DragSourceType != "" {
+			c.UpdateReorderDrag(id)
+		}
+		if len(st.AcceptDropTypes) > 0 {
+			if c.HandleLinearDrop(id, r, lineX, lineW, itemH, count, si, maxSc, st.AcceptDropTypes, st.OnDrop) {
+				changed = true
+			}
 		}
 	}
 

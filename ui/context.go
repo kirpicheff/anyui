@@ -154,10 +154,14 @@ type Context struct {
 	tabDragStartY      int
 	tabDragging        bool
 	reorderWidgetID    string
+	reorderSourceIdx   int
 	reorderSourceKey   string
 	reorderStartX      int
 	reorderStartY      int
 	reorderActive      bool
+	reorderSourceType  string
+	reorderSourceFn    func(index int, key string) DragPayload
+	reorderPayload     *DragPayload
 	reorderScrollAccum float32
 	numEditText        map[string]string
 	colorHexText       map[string]string
@@ -1052,6 +1056,7 @@ func (c *Context) endFrame() {
 		}
 		ovIdx++
 	})
+	c.drawDragGhostBadge()
 	c.drawToasts()
 	c.focusOrder, c.nextFocusOrder = c.nextFocusOrder, c.focusOrder[:0]
 	c.hitRegions, c.nextHitRegions = c.nextHitRegions, c.hitRegions[:0]
@@ -1070,8 +1075,12 @@ func (c *Context) endFrame() {
 	if c.MouseReleased || !c.MouseDown {
 		c.reorderActive = false
 		c.reorderWidgetID = ""
+		c.reorderSourceIdx = -1
 		c.reorderSourceKey = ""
 		c.reorderScrollAccum = 0
+		c.reorderSourceType = ""
+		c.reorderSourceFn = nil
+		c.reorderPayload = nil
 	}
 	if c.nextCursor != c.lastCursor {
 		c.Win.SetCursor(c.nextCursor)
@@ -1172,33 +1181,59 @@ func (c *Context) ResolveID(kind, id string) string {
 // ArmReorder инициирует отслеживание возможного перетаскивания (Reorder) элемента при нажатии кнопки мыши.
 func (c *Context) ArmReorder(widgetID string, fromIdx int, fromKey string) {
 	c.reorderWidgetID = widgetID
-	if fromKey != "" {
-		c.reorderSourceKey = fromKey
-	} else {
-		c.reorderSourceKey = strconv.Itoa(fromIdx)
-	}
+	c.reorderSourceIdx = fromIdx
+	c.reorderSourceKey = fromKey
 	c.reorderStartX = c.MouseX
 	c.reorderStartY = c.MouseY
 	c.reorderActive = false
 	c.reorderScrollAccum = 0
+	c.reorderSourceType = ""
+	c.reorderSourceFn = nil
+	c.reorderPayload = nil
+}
+
+// ArmDrag инициирует отслеживание перетаскивания (внутреннего Reorder и/или внешнего DragSource).
+func (c *Context) ArmDrag(widgetID string, fromIdx int, fromKey string, st WidgetStyle) {
+	c.ArmReorder(widgetID, fromIdx, fromKey)
+	c.reorderSourceType = st.DragSourceType
+	c.reorderSourceFn = st.DragSourceFn
+}
+
+func (c *Context) updateReorderThreshold() {
+	if c.reorderWidgetID == "" || !c.MouseDown || c.reorderActive {
+		return
+	}
+	dx := c.MouseX - c.reorderStartX
+	dy := c.MouseY - c.reorderStartY
+	if dx < 0 {
+		dx = -dx
+	}
+	if dy < 0 {
+		dy = -dy
+	}
+	threshold := c.Scale(4).Int()
+	if dx > threshold || dy > threshold {
+		c.reorderActive = true
+		if c.reorderSourceType != "" && c.reorderPayload == nil {
+			var p DragPayload
+			if c.reorderSourceFn != nil {
+				p = c.reorderSourceFn(c.reorderSourceIdx, c.reorderSourceKey)
+				if p.Type == "" {
+					p.Type = c.reorderSourceType
+				}
+			} else {
+				p = DragPayload{Type: c.reorderSourceType}
+			}
+			c.reorderPayload = &p
+		}
+	}
 }
 
 // UpdateReorderDrag проверяет превышение порога движения (4 Dp) при зажатой кнопке мыши и активирует режим drag.
 // Если перетаскивание активно, выставляет курсор platform.CursorHand и возвращает true.
 func (c *Context) UpdateReorderDrag(widgetID string) bool {
-	if c.reorderWidgetID == widgetID && c.MouseDown && !c.reorderActive {
-		dx := c.MouseX - c.reorderStartX
-		dy := c.MouseY - c.reorderStartY
-		if dx < 0 {
-			dx = -dx
-		}
-		if dy < 0 {
-			dy = -dy
-		}
-		threshold := c.Scale(4).Int()
-		if dx > threshold || dy > threshold {
-			c.reorderActive = true
-		}
+	if c.reorderWidgetID == widgetID {
+		c.updateReorderThreshold()
 	}
 	if c.reorderActive && c.reorderWidgetID == widgetID {
 		c.nextCursor = platform.CursorHand
@@ -1213,21 +1248,60 @@ func (c *Context) ReorderSource(widgetID string) (fromIdx int, fromKey string, a
 	if !c.reorderActive || c.reorderWidgetID != widgetID {
 		return -1, "", false
 	}
-	idx := -1
-	if n, err := strconv.Atoi(c.reorderSourceKey); err == nil {
-		idx = n
-	}
-	return idx, c.reorderSourceKey, true
+	return c.reorderSourceIdx, c.reorderSourceKey, true
 }
 
-// ResetReorder сбрасывает состояние перетаскивания (Reorder), восстанавливает курсор и запрашивает перерисовку.
+// ResetReorder сбрасывает состояние перетаскивания (Reorder/Drop), восстанавливает курсор и запрашивает перерисовку.
 func (c *Context) ResetReorder() {
 	c.reorderActive = false
 	c.reorderWidgetID = ""
+	c.reorderSourceIdx = -1
 	c.reorderSourceKey = ""
 	c.reorderScrollAccum = 0
+	c.reorderSourceType = ""
+	c.reorderSourceFn = nil
+	c.reorderPayload = nil
 	c.nextCursor = platform.CursorArrow
 	c.RequestRedraw()
+}
+
+func (c *Context) acceptsExternalDrop(targetID string, acceptTypes []string) (*DragPayload, bool) {
+	if len(acceptTypes) == 0 || c.reorderWidgetID == "" || c.reorderWidgetID == targetID {
+		return nil, false
+	}
+	c.updateReorderThreshold()
+	if !c.reorderActive || c.reorderPayload == nil || c.reorderPayload.Type == "" {
+		return nil, false
+	}
+	for _, t := range acceptTypes {
+		if t == c.reorderPayload.Type {
+			return c.reorderPayload, true
+		}
+	}
+	return nil, false
+}
+
+func (c *Context) drawDragGhostBadge() {
+	if !c.reorderActive || c.reorderPayload == nil || c.reorderPayload.Label == "" || c.Font == nil {
+		return
+	}
+	pxSize := c.Scale(12).Int()
+	tw, th := c.Font.MeasureText(c.reorderPayload.Label, pxSize)
+	padX := c.Scale(8).Int()
+	padY := c.Scale(4).Int()
+	bw := tw + padX*2
+	bh := th + padY*2
+	bx := c.MouseX + c.Scale(12).Int()
+	by := c.MouseY + c.Scale(12).Int()
+	if bx+bw > c.Canvas.Width-4 {
+		bx = c.Canvas.Width - bw - 4
+	}
+	if by+bh > c.Canvas.Height-4 {
+		by = c.Canvas.Height - bh - 4
+	}
+	r := render.Rect{X: bx, Y: by, W: bw, H: bh}
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(6), c.Theme.Surface.WithAlpha(230), 1.0, c.Theme.Accent)
+	c.Font.DrawText(c.Canvas, r.X+padX, r.Y+padY, c.reorderPayload.Label, pxSize, c.Theme.TextPrimary)
 }
 
 // DrawDropLine отрисовывает горизонтальную линию-индикатор места вставки Accent толщиной 2 Dp, центрированную по yPx.
@@ -1401,6 +1475,7 @@ func (c *Context) HandleLinearReorder(
 					FromIndex:  fromIdx,
 					ToIndex:    toIdx,
 					Drop:       zone,
+					Payload:    c.reorderPayload,
 				})
 			}
 			c.ResetReorder()
@@ -1501,6 +1576,7 @@ func (c *Context) HandleTreeReorder(
 						FromIndex:  -1,
 						ToIndex:    -1,
 						Drop:       zone,
+						Payload:    c.reorderPayload,
 					}
 					if onReorder != nil {
 						onReorder(dragEv)
@@ -1512,6 +1588,154 @@ func (c *Context) HandleTreeReorder(
 				c.ResetReorder()
 			}
 		}
+	}
+	return false
+}
+
+// HandleLinearDrop обрабатывает внешний кросс-виджетный перенос в список или таблицу (ListView, ListViewEx, Table, TableEx).
+func (c *Context) HandleLinearDrop(
+	widgetID string,
+	viewRect render.Rect,
+	lineX, lineW int,
+	itemH int,
+	count int,
+	si *scrollInfo,
+	maxSc int,
+	acceptTypes []string,
+	onDrop func(DragEvent),
+) bool {
+	payload, ok := c.acceptsExternalDrop(widgetID, acceptTypes)
+	if !ok {
+		return false
+	}
+	if c.IsInputBlocked() || !viewRect.Contains(c.MouseX, c.MouseY) || c.MouseX >= lineX+lineW {
+		return false
+	}
+	c.nextCursor = platform.CursorHand
+	c.ApplyReorderAutoScroll(viewRect.Y, viewRect.H, si, maxSc)
+
+	var (
+		toIdx int
+		zone  DropZone
+	)
+	if count <= 0 {
+		zone = DropInside
+		toIdx = 0
+		c.DrawDropInside(viewRect)
+	} else {
+		targetRow, z, _, _ := c.RowDropTarget(-1, c.MouseY, viewRect.Y-si.y, itemH, count, false)
+		zone = z
+		toIdx = targetRow
+		if zone == DropBelow {
+			toIdx = targetRow + 1
+		}
+		targetRowY := viewRect.Y + targetRow*itemH - si.y
+		lineY := targetRowY
+		if zone == DropBelow {
+			lineY += itemH
+		}
+		c.DrawDropLine(lineX, lineY, lineW)
+	}
+
+	if c.MouseReleased {
+		pCopy := *payload
+		ev := DragEvent{
+			FromWidget: c.reorderWidgetID,
+			ToWidget:   widgetID,
+			FromKey:    c.reorderSourceKey,
+			FromIndex:  c.reorderSourceIdx,
+			ToIndex:    toIdx,
+			Drop:       zone,
+			Payload:    &pCopy,
+		}
+		if onDrop != nil {
+			onDrop(ev)
+		}
+		c.ResetReorder()
+		return true
+	}
+	return false
+}
+
+// HandleTreeDrop обрабатывает внешний кросс-виджетный перенос в дерево (TreeView, TreeViewEx).
+func (c *Context) HandleTreeDrop(
+	widgetID string,
+	viewRect render.Rect,
+	contentW int,
+	itemH int,
+	flat []FlatTreeItem,
+	si *scrollInfo,
+	maxSc int,
+	allowReparent bool,
+	acceptTypes []string,
+	onDrop func(DragEvent),
+) bool {
+	payload, ok := c.acceptsExternalDrop(widgetID, acceptTypes)
+	if !ok {
+		return false
+	}
+	if c.IsInputBlocked() || !viewRect.Contains(c.MouseX, c.MouseY) || c.MouseX >= viewRect.X+contentW {
+		return false
+	}
+	c.nextCursor = platform.CursorHand
+	c.ApplyReorderAutoScroll(viewRect.Y, viewRect.H, si, maxSc)
+
+	var (
+		toKey string
+		zone  DropZone
+	)
+	if len(flat) == 0 {
+		zone = DropInside
+		c.DrawDropInside(viewRect)
+	} else {
+		targetIdx, z, _, _ := c.RowDropTarget(-1, c.MouseY, viewRect.Y-si.y, itemH, len(flat), allowReparent)
+		if targetIdx < 0 || targetIdx >= len(flat) {
+			return false
+		}
+		targetItem := flat[targetIdx]
+		toKey = targetItem.Node.ID
+		zone = z
+		targetRowY := viewRect.Y + targetIdx*itemH - si.y
+		if zone == DropInside {
+			c.DrawDropInside(render.Rect{
+				X: viewRect.X,
+				Y: targetRowY,
+				W: contentW,
+				H: itemH,
+			})
+		} else {
+			lineY := targetRowY
+			if zone == DropBelow {
+				lineY += itemH
+			}
+			treeIndentPx := c.Scale(TreeIndent).Int()
+			treeInsetPx := c.Scale(TreeIndicatorInset).Int()
+			targetIndent := targetItem.Depth*treeIndentPx + treeInsetPx
+			lineX := viewRect.X + targetIndent
+			lineW := contentW - targetIndent
+			if lineW > 0 {
+				c.DrawDropLine(lineX, lineY, lineW)
+			}
+		}
+	}
+
+	if c.MouseReleased {
+		pCopy := *payload
+		ev := DragEvent{
+			FromWidget: c.reorderWidgetID,
+			ToWidget:   widgetID,
+			FromKey:    c.reorderSourceKey,
+			ToKey:      toKey,
+			FromIndex:  c.reorderSourceIdx,
+			ToIndex:    -1,
+			Drop:       zone,
+			Payload:    &pCopy,
+		}
+		if onDrop != nil {
+			onDrop(ev)
+		}
+		c.ResetReorder()
+		return true
 	}
 	return false
 }

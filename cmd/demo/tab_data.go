@@ -186,6 +186,36 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 			}
 		}
 
+		handleTableExternalDrop := func(ev anyui.DragEvent) {
+			if ev.Payload == nil {
+				return
+			}
+			label := ev.Payload.Label
+			if label == "" {
+				label = ev.FromKey
+			}
+			newRow := demoTableRow{
+				ID:      len(st.tableRows) + 1,
+				Name:    fmt.Sprintf("Из дерева: %s", label),
+				Status:  "Online",
+				Latency: 12,
+			}
+			idx := ev.ToIndex
+			if idx < 0 {
+				idx = 0
+			}
+			if idx > len(st.tableRows) {
+				idx = len(st.tableRows)
+			}
+			res := make([]demoTableRow, 0, len(st.tableRows)+1)
+			res = append(res, st.tableRows[:idx]...)
+			res = append(res, newRow)
+			res = append(res, st.tableRows[idx:]...)
+			st.tableRows = res
+			st.statusMsg = fmt.Sprintf("Перенос %s -> %s (позиция %d): %s", ev.FromWidget, ev.ToWidget, idx, label)
+			ui.ShowToast("Кросс-виджетный Drop", st.statusMsg, anyui.ToastSuccess)
+		}
+
 		tev := ui.Table("tbl_servers", cols, len(st.tableRows), &st.tableSelected, &st.tableSort, func(row, col int, area anyui.Rect, sel bool) {
 			r := st.tableRows[row]
 			var txt string
@@ -212,7 +242,7 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 				txtCol = th.TextMuted
 			}
 			ui.DrawText(anyui.Px(area.X)+ui.Scale(8), anyui.Px(area.Y)+ui.Scale(7), txt, 12, txtCol)
-		}, anyui.Height(210), anyui.Reorderable(), anyui.OnReorder(handleTableReorder))
+		}, anyui.Height(210), anyui.Reorderable(), anyui.OnReorder(handleTableReorder), anyui.AcceptDrop("tree_node"), anyui.OnDrop(handleTableExternalDrop))
 		if tev.SortChanged {
 			st.sortDemoTable()
 			st.statusMsg = fmt.Sprintf("Таблица отсортирована по колонке %d", st.tableSort.Column)
@@ -259,13 +289,23 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 		ui.Spacer(12)
 		ui.Label("SplitPane + TreeView (Drag-Reorder, вложение DropInside и смена родителя) + Collapsible & Accordion", anyui.FontSize(16), anyui.Bold())
 		ui.SplitPane("split_main", anyui.Horizontal, &st.splitRatio, func() {
-			ui.Label("TreeView Проект (AllowReparent: смена родителя и вложение DropInside)", anyui.FontSize(13), anyui.Bold())
-			if ui.TreeView("tree_proj", st.treeRoots, &st.treeSelected, anyui.Height(170), anyui.Reorderable(), anyui.AllowReparent(), anyui.OnReorder(handleTreeDrop)) {
+			ui.Label("TreeView Проект (AllowReparent + DragSource в Table/Избранное)", anyui.FontSize(13), anyui.Bold())
+			if ui.TreeView("tree_proj", st.treeRoots, &st.treeSelected, anyui.Height(170), anyui.Reorderable(), anyui.AllowReparent(), anyui.OnReorder(handleTreeDrop), anyui.DragSource("tree_node", func(_ int, key string) anyui.DragPayload {
+				return anyui.DragPayload{Type: "tree_node", Data: key, Label: key}
+			})) {
 				st.statusMsg = fmt.Sprintf("TreeView: %s", st.treeSelected)
 			}
 			ui.Spacer(6)
-			ui.Label("TreeView Избранное (перестановка корневых узлов)", anyui.FontSize(12), anyui.Bold())
-			if ui.TreeView("tree_fav", st.treeFavRoots, &st.treeFavSelected, anyui.Height(100), anyui.Reorderable(), anyui.OnReorder(handleTreeDrop)) {
+			ui.Label("TreeView Избранное (Reorder + AcceptDrop из Проекта)", anyui.FontSize(12), anyui.Bold())
+			if ui.TreeView("tree_fav", st.treeFavRoots, &st.treeFavSelected, anyui.Height(100), anyui.Reorderable(), anyui.OnReorder(handleTreeDrop), anyui.AcceptDrop("tree_node"), anyui.OnDrop(func(ev anyui.DragEvent) {
+				if ev.Payload == nil {
+					return
+				}
+				clone := &anyui.TreeNode{ID: "fav_" + ev.FromKey, Label: ev.Payload.Label}
+				st.treeFavRoots = insertNode(st.treeFavRoots, ev.ToKey, clone, ev.Drop)
+				st.statusMsg = fmt.Sprintf("Добавлено в избранное: %s", clone.Label)
+				ui.ShowToast("Избранное", st.statusMsg, anyui.ToastSuccess)
+			})) {
 				st.statusMsg = fmt.Sprintf("TreeView Избранное: %s", st.treeFavSelected)
 			}
 		}, func() {

@@ -414,8 +414,8 @@ func (c *Context) Table(
 				if c.DoubleClicked() {
 					ev.RowDoubleClicked = row
 				}
-				if st.Reorderable {
-					c.ArmReorder(id, row, "")
+				if st.Reorderable || st.DragSourceType != "" {
+					c.ArmDrag(id, row, "", st)
 				}
 				c.RequestRedraw()
 			} else if c.MiddleMousePressed {
@@ -450,15 +450,27 @@ func (c *Context) Table(
 	}
 	c.Canvas.PopClip()
 
-	// Обработка перетаскивания (Reorder) строк таблицы
-	if st.Reorderable && !st.Disabled {
+	// Обработка перетаскивания (Reorder и кросс-виджетный Drop) строк таблицы
+	if !st.Disabled {
 		viewRect := render.Rect{X: bodyRect.X, Y: bodyRect.Y, W: contentW, H: viewH}
-		c.HandleLinearReorder(id, viewRect, bodyRect.X, contentW, rowH, rowCount, si, maxSc, func(dragEv DragEvent) {
-			ev.Drag = &dragEv
-			if st.OnReorder != nil {
-				st.OnReorder(dragEv)
-			}
-		}, nil)
+		if st.Reorderable {
+			c.HandleLinearReorder(id, viewRect, bodyRect.X, contentW, rowH, rowCount, si, maxSc, func(dragEv DragEvent) {
+				ev.Drag = &dragEv
+				if st.OnReorder != nil {
+					st.OnReorder(dragEv)
+				}
+			}, nil)
+		} else if st.DragSourceType != "" {
+			c.UpdateReorderDrag(id)
+		}
+		if len(st.AcceptDropTypes) > 0 {
+			c.HandleLinearDrop(id, viewRect, bodyRect.X, contentW, rowH, rowCount, si, maxSc, st.AcceptDropTypes, func(dragEv DragEvent) {
+				ev.Drag = &dragEv
+				if st.OnDrop != nil {
+					st.OnDrop(dragEv)
+				}
+			})
+		}
 	}
 
 	// Вертикальный скроллбар
@@ -743,8 +755,8 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 						changed = true
 						c.RequestRedraw()
 					}
-					if st.Reorderable {
-						c.ArmReorder(id, -1, node.ID)
+					if st.Reorderable || st.DragSourceType != "" {
+						c.ArmDrag(id, -1, node.ID, st)
 					}
 				}
 			}
@@ -785,10 +797,19 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 	}
 	c.Canvas.PopClip()
 
-	// Обработка перетаскивания (Reorder) узлов дерева
-	if st.Reorderable && !st.Disabled {
-		if c.HandleTreeReorder(id, inner, contentW, itemH, flat, si, maxSc, st.AllowReparent, st.OnReorder, nil) {
-			changed = true
+	// Обработка перетаскивания (Reorder и кросс-виджетный Drop) узлов дерева
+	if !st.Disabled {
+		if st.Reorderable {
+			if c.HandleTreeReorder(id, inner, contentW, itemH, flat, si, maxSc, st.AllowReparent, st.OnReorder, nil) {
+				changed = true
+			}
+		} else if st.DragSourceType != "" {
+			c.UpdateReorderDrag(id)
+		}
+		if len(st.AcceptDropTypes) > 0 {
+			if c.HandleTreeDrop(id, inner, contentW, itemH, flat, si, maxSc, st.AllowReparent, st.AcceptDropTypes, st.OnDrop) {
+				changed = true
+			}
 		}
 	}
 

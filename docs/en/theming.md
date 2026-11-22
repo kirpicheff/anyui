@@ -79,4 +79,7 @@ Every widget accepts variadic `opts ...anyui.Option` to override appearance and 
 | `anyui.Reorderable(enabled ...bool)` | Enable drag-and-drop reorder (`ListView*`, `Table*`, `TreeView*`) | `anyui.Reorderable()` |
 | `anyui.AllowReparent(enabled ...bool)` | Allow reparenting and `DropInside` in `TreeView*` | `anyui.AllowReparent()` |
 | `anyui.OnReorder(fn)` | Drag-and-drop `DragEvent` handler | `anyui.OnReorder(func(ev anyui.DragEvent) { ... })` |
+| `anyui.DragSource(typeName, fn)` | Cross-widget drag source (`DragPayload`) | `anyui.DragSource("node", fn)` |
+| `anyui.AcceptDrop(types...)` | Accept external drag payloads of specified types | `anyui.AcceptDrop("node")` |
+| `anyui.OnDrop(fn)` | External cross-widget drop `DragEvent` handler | `anyui.OnDrop(func(ev anyui.DragEvent) { ... })` |
 

@@ -306,7 +306,7 @@ ev := ui.Table("tbl", cols, len(rows), &selectedRow, &sortState, func(row, col i
 ```
 
 ### `TreeView`
-Древовидный список с раскрытием узлов и виртуализацией. Поддерживает перетаскивание узлов внутри дерева (`Reorderable`), зоны сброса `DropAbove`, `DropBelow`, а с опцией `AllowReparent` — смену родителя и вложение внутрь каталогов (`DropInside` с подсветкой строки и защитой от циклов):
+Древовидный список с раскрытием узлов и виртуализацией. Поддерживает перетаскивание узлов внутри дерева (`Reorderable`), зоны сброса `DropAbove`, `DropBelow`, а с опцией `AllowReparent` — смену родителя и вложение внутрь каталогов (`DropInside` с подсветкой строки и защитой от циклов). Для кросс-виджетного переноса (например, `TreeView -> Table`) используйте `DragSource(typeName, fn)` с типизированным `DragPayload` на источнике и `AcceptDrop(types...)` + `OnDrop(fn)` на приёмнике:
 ```go
 ui.TreeView("tree", roots, &selectedNodeID, anyui.Height(220), anyui.Reorderable(), anyui.AllowReparent(), anyui.OnReorder(func(ev anyui.DragEvent) {
 	// ev.FromWidget, ev.ToWidget — ID виджета дерева

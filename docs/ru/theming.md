@@ -79,4 +79,7 @@ custom.RadiusSm = 6
 | `anyui.Reorderable(enabled ...bool)` | Включить перетаскивание элементов (`ListView*`, `Table*`, `TreeView*`) | `anyui.Reorderable()` |
 | `anyui.AllowReparent(enabled ...bool)` | Разрешить смену родителя и `DropInside` в `TreeView*` | `anyui.AllowReparent()` |
 | `anyui.OnReorder(fn)` | Обработчик события перестановки `DragEvent` | `anyui.OnReorder(func(ev anyui.DragEvent) { ... })` |
+| `anyui.DragSource(typeName, fn)` | Источник кросс-виджетного переноса (`DragPayload`) | `anyui.DragSource("node", fn)` |
+| `anyui.AcceptDrop(types...)` | Разрешить приём внешнего переноса указанных типов | `anyui.AcceptDrop("node")` |
+| `anyui.OnDrop(fn)` | Обработчик внешнего кросс-виджетного сброса `DragEvent` | `anyui.OnDrop(func(ev anyui.DragEvent) { ... })` |
 

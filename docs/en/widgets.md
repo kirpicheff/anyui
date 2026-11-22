@@ -305,7 +305,7 @@ ev := ui.Table("tbl", cols, len(rows), &selectedRow, &sortState, func(row, col i
 ```
 
 ### `TreeView`
-Expandable hierarchical tree with virtualization. Supports node reordering within the tree (`Reorderable`), drop zones `DropAbove`, `DropBelow`, and with `AllowReparent` — parent change and nesting inside folders (`DropInside` with row highlight and cycle prevention):
+Expandable hierarchical tree with virtualization. Supports node reordering within the tree (`Reorderable`), drop zones `DropAbove`, `DropBelow`, and with `AllowReparent` — parent change and nesting inside folders (`DropInside` with row highlight and cycle prevention). For cross-widget transfer (e.g. `TreeView -> Table`), use `DragSource(typeName, fn)` with a typed `DragPayload` on the source and `AcceptDrop(types...)` + `OnDrop(fn)` on the target:
 ```go
 ui.TreeView("tree", roots, &selectedNodeID, anyui.Height(220), anyui.Reorderable(), anyui.AllowReparent(), anyui.OnReorder(func(ev anyui.DragEvent) {
 	// ev.FromWidget, ev.ToWidget — tree widget ID

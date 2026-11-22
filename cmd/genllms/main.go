@@ -529,7 +529,7 @@ func writeCommonHeader(out *bytes.Buffer, version string, isFull bool, idx *apiI
 	out.WriteString("- **Идентификаторы, ключи и `IDScope`:** `IDScope` (или `PushID`/`PopID`) изолирует `id` виджетов внутри циклов и переиспользуемых компонентов. Передача пустого `id == \"\"` автоматически генерирует детерминированный идентификатор по порядковому номеру виджета в текущем `IDScope`. В `Select`, `MultiSelect`, `TabBar`, `TreeView`, `TreeViewEx` и `Breadcrumbs` ключи элементов (`Key` / `ID`) локальны для конкретного виджета и должны быть уникальны в его пределах — при дублировании ключей выделение и клик совпадут для всех дубликатов. В `Breadcrumbs`, если у сегмента `ID == \"\"`, возвращается его `Label`.\n")
 	out.WriteString("- **Выпадающие списки и вкладки:** `Select` с опцией `Searchable` заменяет комбобокс; `MultiSelect` работает с `map[string]bool`; `TabBar` и `TabItems` работают на строковых ключах.\n")
 	out.WriteString("- **Раскладка и оверлеи:** для типового экрана используйте `Page` или `DockTop` / `DockBottom` / `ColumnFlex`. Для диалогов всегда используйте `Modal` — `PushOverlay` предназначен только для небольших всплывающих контролов.\n")
-	out.WriteString("- **Drag & Drop (Reorder):** `Reorderable` + `OnReorder` работают в `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы `FromIndex`/`ToIndex`) и `TreeView`, `TreeViewEx` (ключи `FromKey`/`ToKey`; с `AllowReparent` доступны смена родителя и `DropInside`).\n")
+	out.WriteString("- **Drag & Drop (Reorder и кросс-виджетный перенос):** `Reorderable` + `OnReorder` работают внутри `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы `FromIndex`/`ToIndex`) и `TreeView`, `TreeViewEx` (ключи `FromKey`/`ToKey`; с `AllowReparent` доступны смена родителя и `DropInside`). Для кросс-виджетного переноса (например, `TreeView` → `Table`) используйте `DragSource` с типизированным `DragPayload` на источнике и `AcceptDrop` + `OnDrop` на приёмнике.\n")
 	out.WriteString("- **Горячие клавиши (`Key`) и Headless-тесты:** из букв экспортированы базовые константы (`KeyA`, `KeyC`, `KeyV`, `KeyX`, `KeyY`, `KeyZ`); для остальных клавиш в `Shortcut` / `InjectKey` передавайте виртуальный код `anyui.Key('S')` или VK-код (например, `0x70` для F1). Для `anyui.NewHeadless` обязательно указывать `Config.FontRegular` (для детерминированных тестов используйте `anyui.DefaultTestFonts`).\n\n")
 
 	out.WriteString("## Семантика возвращаемых значений\n\n")
@@ -632,15 +632,15 @@ var optionMatrixRows = []optionMatrixRow{
 	},
 	{
 		"`ListView`, `ListViewEx`",
-		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `ScrollToIndex`, `Reorderable`, `OnReorder`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `ScrollToIndex`, `Reorderable`, `OnReorder`, `DragSource`, `AcceptDrop`, `OnDrop`",
 	},
 	{
 		"`Table`, `TableEx`",
-		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `ScrollToIndex`, `Reorderable`, `OnReorder`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `ScrollToIndex`, `Reorderable`, `OnReorder`, `DragSource`, `AcceptDrop`, `OnDrop`",
 	},
 	{
 		"`TreeView`, `TreeViewEx`",
-		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `Reorderable`, `AllowReparent`, `OnReorder`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `Reorderable`, `AllowReparent`, `OnReorder`, `DragSource`, `AcceptDrop`, `OnDrop`",
 	},
 	{
 		"`LogView`, `VirtualTextView`, `LineChart`, `BarChart`, `Sparkline`",
@@ -853,7 +853,7 @@ func writeFullLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
 		"TabItem", "TabBarEvent", "SelectItem", "TreeNode",
 		"ToolbarItem", "ContextMenuItem", "MenuBarItem", "MenuBarEntry",
 		"StatusBarSection", "BreadcrumbItem", "AccordionItem",
-		"LogEntry", "ChartSeries", "CanvasCallbacks", "KeyEvent", "DragEvent",
+		"LogEntry", "ChartSeries", "CanvasCallbacks", "KeyEvent", "DragPayload", "DragEvent",
 		"TrayConfig", "MenuItem", "Notification",
 		"FileDialogOptions", "FolderDialogOptions", "FileFilter",
 		"SingleInstanceConfig", "WindowState",

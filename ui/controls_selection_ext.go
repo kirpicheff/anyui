@@ -194,8 +194,8 @@ func (c *Context) ListViewEx(
 		}
 
 		if hov && c.MousePressed {
-			if st.Reorderable {
-				c.ArmReorder(id, i, "")
+			if st.Reorderable || st.DragSourceType != "" {
+				c.ArmDrag(id, i, "", st)
 			}
 			if selected != nil {
 				c.FocusID = id
@@ -239,12 +239,21 @@ func (c *Context) ListViewEx(
 
 	c.Canvas.PopClip()
 
-	// Обработка перетаскивания (Reorder) строк ListViewEx
-	if !st.Disabled && st.Reorderable {
-		if c.HandleLinearReorder(id, viewRect, viewRect.X, contentW, rowH, count, si, maxScroll, st.OnReorder, func() {
-			delete(listAnchorStore, id)
-		}) {
-			changed = true
+	// Обработка перетаскивания (Reorder и кросс-виджетный Drop) строк ListViewEx
+	if !st.Disabled {
+		if st.Reorderable {
+			if c.HandleLinearReorder(id, viewRect, viewRect.X, contentW, rowH, count, si, maxScroll, st.OnReorder, func() {
+				delete(listAnchorStore, id)
+			}) {
+				changed = true
+			}
+		} else if st.DragSourceType != "" {
+			c.UpdateReorderDrag(id)
+		}
+		if len(st.AcceptDropTypes) > 0 {
+			if c.HandleLinearDrop(id, viewRect, viewRect.X, contentW, rowH, count, si, maxScroll, st.AcceptDropTypes, st.OnDrop) {
+				changed = true
+			}
 		}
 	}
 
@@ -480,9 +489,9 @@ func (c *Context) TreeViewEx(
 		}
 
 		if hov && c.MousePressed {
-			// Вооружение Reorder (при клике на стрелку или чекбокс hov уже сброшен в false)
-			if st.Reorderable {
-				c.ArmReorder(id, -1, n.ID)
+			// Вооружение Reorder / DragSource (при клике на стрелку или чекбокс hov уже сброшен в false)
+			if st.Reorderable || st.DragSourceType != "" {
+				c.ArmDrag(id, -1, n.ID, st)
 			}
 			if selectedIDs != nil {
 				c.FocusID = id
@@ -525,12 +534,21 @@ func (c *Context) TreeViewEx(
 
 	c.Canvas.PopClip()
 
-	// Обработка перетаскивания (Reorder) узлов TreeViewEx
-	if !st.Disabled && st.Reorderable {
-		if c.HandleTreeReorder(id, viewRect, contentW, rowH, flat, si, maxScroll, st.AllowReparent, st.OnReorder, func() {
-			delete(treeAnchorStore, id)
-		}) {
-			changed = true
+	// Обработка перетаскивания (Reorder и кросс-виджетный Drop) узлов TreeViewEx
+	if !st.Disabled {
+		if st.Reorderable {
+			if c.HandleTreeReorder(id, viewRect, contentW, rowH, flat, si, maxScroll, st.AllowReparent, st.OnReorder, func() {
+				delete(treeAnchorStore, id)
+			}) {
+				changed = true
+			}
+		} else if st.DragSourceType != "" {
+			c.UpdateReorderDrag(id)
+		}
+		if len(st.AcceptDropTypes) > 0 {
+			if c.HandleTreeDrop(id, viewRect, contentW, rowH, flat, si, maxScroll, st.AllowReparent, st.AcceptDropTypes, st.OnDrop) {
+				changed = true
+			}
 		}
 	}
 
@@ -1015,8 +1033,8 @@ func (c *Context) TableEx(
 			if allowRowClick && hovRow && c.MousePressed {
 				ev.RowClicked = ri
 				c.FocusID = id
-				if st.Reorderable {
-					c.ArmReorder(id, ri, "")
+				if st.Reorderable || st.DragSourceType != "" {
+					c.ArmDrag(id, ri, "", st)
 				}
 				if cfg.Selected != nil {
 					anchor, hasAnchor := tableAnchorStore[id]
@@ -1065,16 +1083,28 @@ func (c *Context) TableEx(
 		c.Canvas.FillRect(render.Rect{X: bodyRect.X + frozenW - 1, Y: viewRect.Y, W: 1, H: viewRect.H}, c.Theme.Border)
 	}
 
-	// Обработка перетаскивания (Reorder) строк TableEx
-	if !st.Disabled && st.Reorderable {
-		c.HandleLinearReorder(id, bodyRect, bodyRect.X, contentW, rowH, rowCount, si, maxScrollY, func(dragEv DragEvent) {
-			ev.Drag = &dragEv
-			if st.OnReorder != nil {
-				st.OnReorder(dragEv)
-			}
-		}, func() {
-			delete(tableAnchorStore, id)
-		})
+	// Обработка перетаскивания (Reorder и кросс-виджетный Drop) строк TableEx
+	if !st.Disabled {
+		if st.Reorderable {
+			c.HandleLinearReorder(id, bodyRect, bodyRect.X, contentW, rowH, rowCount, si, maxScrollY, func(dragEv DragEvent) {
+				ev.Drag = &dragEv
+				if st.OnReorder != nil {
+					st.OnReorder(dragEv)
+				}
+			}, func() {
+				delete(tableAnchorStore, id)
+			})
+		} else if st.DragSourceType != "" {
+			c.UpdateReorderDrag(id)
+		}
+		if len(st.AcceptDropTypes) > 0 {
+			c.HandleLinearDrop(id, bodyRect, bodyRect.X, contentW, rowH, rowCount, si, maxScrollY, st.AcceptDropTypes, func(dragEv DragEvent) {
+				ev.Drag = &dragEv
+				if st.OnDrop != nil {
+					st.OnDrop(dragEv)
+				}
+			})
+		}
 	}
 
 	if needVScroll {

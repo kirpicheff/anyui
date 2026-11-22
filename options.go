@@ -170,3 +170,18 @@ func AllowReparent(enabled ...bool) Option { return ui.AllowReparent(enabled...)
 // OnReorder регистрирует обработчик события завершения перетаскивания элемента.
 // Действует для Table, TableEx, ListView, ListViewEx, TreeView, TreeViewEx.
 func OnReorder(fn func(ev DragEvent)) Option { return ui.OnReorder(fn) }
+
+// DragSource разрешает виджету выступать источником кросс-виджетного перетаскивания с типизированным DragPayload.
+// Если fn == nil, автоматически формируется DragPayload{Type: typeName}.
+// Действует для Table, TableEx, ListView, ListViewEx, TreeView, TreeViewEx.
+func DragSource(typeName string, fn func(index int, key string) DragPayload) Option {
+	return ui.DragSource(typeName, fn)
+}
+
+// AcceptDrop разрешает виджету принимать внешний перенос элементов с указанными типами Payload.Type.
+// Работает совместно с OnDrop(...). Действует для Table, TableEx, ListView, ListViewEx, TreeView, TreeViewEx.
+func AcceptDrop(types ...string) Option { return ui.AcceptDrop(types...) }
+
+// OnDrop регистрирует обработчик события внешнего кросс-виджетного сброса (Drop).
+// Работает совместно с AcceptDrop(...). Действует для Table, TableEx, ListView, ListViewEx, TreeView, TreeViewEx.
+func OnDrop(fn func(ev DragEvent)) Option { return ui.OnDrop(fn) }
