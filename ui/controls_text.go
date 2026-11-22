@@ -272,6 +272,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 		runes = []rune(*value)
 		caret := clampRuneIdx(c.caretPos[id], len(runes))
 		selStart := clampRuneIdx(c.textSelStart[id], len(runes))
+		submitted := false
 
 		for _, kp := range c.KeyEvents {
 			if kp.Mods.Ctrl {
@@ -458,9 +459,13 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 				if !kp.Mods.Shift {
 					selStart = caret
 				}
-			case KeyEscape, KeyEnter:
+			case KeyEscape:
 				c.FocusID = ""
 				focused = false
+			case KeyEnter:
+				c.FocusID = ""
+				focused = false
+				submitted = true
 			}
 		}
 
@@ -494,6 +499,12 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 			displayRunes = runes
 			if isMasked {
 				displayRunes = maskRunes(runes)
+			}
+			c.RequestRedraw()
+		}
+		if submitted {
+			if st.OnSubmit != nil {
+				st.OnSubmit()
 			}
 			c.RequestRedraw()
 		}

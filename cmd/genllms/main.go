@@ -601,11 +601,11 @@ var optionMatrixRows = []optionMatrixRow{
 	},
 	{
 		"`TextInput`",
-		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `FocusBorderColor`, `Radius`, `TextAlignLeft`, `TextAlignCenter`, `TextAlignRight`, `Password`, `PasswordToggle`, `Clearable`, `ReadOnly`, `Disabled`, `InputFilter`, `Error`, `Icon`, `IconRight`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `FocusBorderColor`, `Radius`, `TextAlignLeft`, `TextAlignCenter`, `TextAlignRight`, `Password`, `PasswordToggle`, `Clearable`, `ReadOnly`, `Disabled`, `InputFilter`, `OnSubmit`, `Error`, `Icon`, `IconRight`",
 	},
 	{
 		"`MaskedInput`",
-		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `FocusBorderColor`, `Radius`, `ReadOnly`, `Disabled`, `Error`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `FocusBorderColor`, `Radius`, `ReadOnly`, `Disabled`, `OnSubmit`, `Error`",
 	},
 	{
 		"`TextArea`",

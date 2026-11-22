@@ -38,6 +38,7 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 	}
 
 	isOpen := c.openState[id]
+	openedThisFrame := false
 	if !st.Disabled {
 		c.RegisterHit(id, rect, platform.CursorHand)
 	}
@@ -47,6 +48,9 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 		if c.MousePressed {
 			isOpen = !isOpen
 			c.openState[id] = isOpen
+			if isOpen {
+				openedThisFrame = true
+			}
 			c.RequestRedraw()
 		}
 	}
@@ -165,66 +169,44 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 	}
 	popR := render.Rect{X: popX, Y: popY, W: popW, H: popH}
 
-	if c.MousePressed && !popR.Contains(c.MouseX, c.MouseY) && !rect.Contains(c.MouseX, c.MouseY) {
+	if !openedThisFrame && c.MousePressed && !popR.Contains(c.MouseX, c.MouseY) && !rect.Contains(c.MouseX, c.MouseY) {
 		c.openState[id] = false
 		c.RequestRedraw()
 		return false
 	}
 
-	c.PushOverlay(popR, func() {
-		c.drawDropShadow(popR, c.Theme.RadiusSm, 12, 120)
-		c.Canvas.DrawRoundedBox(popR, c.ScaleF(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
+	// Синхронный этап: геометрия элементов попапа и обработка ввода до PushOverlay
+	sr := render.Rect{X: popR.X + c.Scale(8).Int(), Y: popR.Y + c.Scale(8).Int(), W: popR.W - c.Scale(16).Int(), H: c.Scale(26).Int()}
+	btnY := sr.Y + sr.H + c.Scale(6).Int()
+	btnW := (popR.W - c.Scale(22).Int()) / 2
+	allR := render.Rect{X: popR.X + c.Scale(8).Int(), Y: btnY, W: btnW, H: c.Scale(22).Int()}
+	clrR := render.Rect{X: allR.X + btnW + c.Scale(6).Int(), Y: btnY, W: btnW, H: c.Scale(22).Int()}
 
-		// Поле поиска
-		sr := render.Rect{X: popR.X + c.Scale(8).Int(), Y: popR.Y + c.Scale(8).Int(), W: popR.W - c.Scale(16).Int(), H: c.Scale(26).Int()}
-		sVal := multiSelectSearch[id]
-		c.drawInlineSearchBox(id+":search", sr, &sVal, loc.SearchPlaceholder)
-		multiSelectSearch[id] = sVal
+	listRect := render.Rect{X: popR.X + c.Scale(4).Int(), Y: btnY + c.Scale(26).Int(), W: popR.W - c.Scale(8).Int(), H: listH}
+	si := c.getScrollInfo(id + ":list")
+	totalH := len(filtered) * itemH
+	maxScr := totalH - listRect.H
+	if maxScr < 0 {
+		maxScr = 0
+	}
 
-		// Кнопки "Выбрать все" и "Сбросить"
-		btnY := sr.Y + sr.H + c.Scale(6).Int()
-		btnW := (popR.W - c.Scale(22).Int()) / 2
-		allR := render.Rect{X: popR.X + c.Scale(8).Int(), Y: btnY, W: btnW, H: c.Scale(22).Int()}
-		clrR := render.Rect{X: allR.X + btnW + c.Scale(6).Int(), Y: btnY, W: btnW, H: c.Scale(22).Int()}
-
-		drawMiniBtn := func(br render.Rect, key, lbl string, fn func()) {
-			c.RegisterHit(id+":mb:"+key, br, platform.CursorHand)
-			bhov := br.Contains(c.MouseX, c.MouseY)
-			bg := c.Theme.Surface
-			if bhov {
-				c.nextCursor = platform.CursorHand
-				bg = c.Theme.Border
-				if c.MousePressed {
-					fn()
-					changed = true
-					c.RequestRedraw()
-				}
-			}
-			c.Canvas.FillRoundedRect(br, c.ScaleF(4), bg)
-			if c.Font != nil {
-				tw, th := c.Font.MeasureText(lbl, c.Scale(11).Int())
-				c.Font.DrawText(c.Canvas, br.X+(br.W-tw)/2, br.Y+(br.H-th)/2, lbl, c.Scale(11).Int(), c.Theme.TextMuted)
-			}
-		}
-		drawMiniBtn(allR, "all", loc.SelectAllBtn, func() {
+	if !openedThisFrame {
+		// Клики по кнопкам "Выбрать все" и "Сбросить"
+		if c.MousePressed && allR.Contains(c.MouseX, c.MouseY) {
 			for _, idx := range filtered {
 				selectedIDs[items[idx].Key] = true
 			}
-		})
-		drawMiniBtn(clrR, "reset", loc.ResetBtn, func() {
+			changed = true
+			c.RequestRedraw()
+		} else if c.MousePressed && clrR.Contains(c.MouseX, c.MouseY) {
 			for k := range selectedIDs {
 				delete(selectedIDs, k)
 			}
-		})
-
-		// Список элементов с чекбоксами
-		listRect := render.Rect{X: popR.X + c.Scale(4).Int(), Y: btnY + c.Scale(26).Int(), W: popR.W - c.Scale(8).Int(), H: listH}
-		si := c.getScrollInfo(id + ":list")
-		totalH := len(filtered) * itemH
-		maxScr := totalH - listRect.H
-		if maxScr < 0 {
-			maxScr = 0
+			changed = true
+			c.RequestRedraw()
 		}
+
+		// Прокрутка колесом мыши внутри списка
 		if listRect.Contains(c.MouseX, c.MouseY) && c.WheelY != 0 {
 			si.y -= int(c.WheelY * float32(itemH*2))
 			if si.y < 0 {
@@ -236,6 +218,59 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 			c.RequestRedraw()
 		}
 
+		// Клик по строке списка (переключение чекбокса)
+		if c.MousePressed && listRect.Contains(c.MouseX, c.MouseY) {
+			startIdx, endIdx := ComputeVisibleRange(si.y, listRect.H, itemH, len(filtered))
+			for fi := startIdx; fi < endIdx; fi++ {
+				origIdx := filtered[fi]
+				itemKey := items[origIdx].Key
+				iy := listRect.Y + fi*itemH - si.y
+				ir := render.Rect{X: listRect.X + c.Scale(2).Int(), Y: iy, W: listRect.W - c.Scale(4).Int(), H: itemH}
+				if ir.Contains(c.MouseX, c.MouseY) {
+					selectedIDs[itemKey] = !selectedIDs[itemKey]
+					changed = true
+					c.RequestRedraw()
+					break
+				}
+			}
+		}
+	}
+	if si.y < 0 {
+		si.y = 0
+	}
+	if si.y > maxScr {
+		si.y = maxScr
+	}
+
+	// Отложенный этап: отрисовка попапа поверх основного UI
+	c.PushOverlay(popR, func() {
+		c.drawDropShadow(popR, c.Theme.RadiusSm, 12, 120)
+		c.Canvas.DrawRoundedBox(popR, c.ScaleF(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
+
+		// Поле поиска
+		sVal := multiSelectSearch[id]
+		c.drawInlineSearchBox(id+":search", sr, &sVal, loc.SearchPlaceholder)
+		multiSelectSearch[id] = sVal
+
+		// Кнопки "Выбрать все" и "Сбросить"
+		drawMiniBtn := func(br render.Rect, key, lbl string) {
+			c.RegisterHit(id+":mb:"+key, br, platform.CursorHand)
+			bhov := br.Contains(c.MouseX, c.MouseY)
+			bg := c.Theme.Surface
+			if bhov {
+				c.nextCursor = platform.CursorHand
+				bg = c.Theme.Border
+			}
+			c.Canvas.FillRoundedRect(br, c.ScaleF(4), bg)
+			if c.Font != nil {
+				tw, th := c.Font.MeasureText(lbl, c.Scale(11).Int())
+				c.Font.DrawText(c.Canvas, br.X+(br.W-tw)/2, br.Y+(br.H-th)/2, lbl, c.Scale(11).Int(), c.Theme.TextMuted)
+			}
+		}
+		drawMiniBtn(allR, "all", loc.SelectAllBtn)
+		drawMiniBtn(clrR, "reset", loc.ResetBtn)
+
+		// Список элементов с чекбоксами
 		c.Canvas.PushClip(listRect)
 		startIdx, endIdx := ComputeVisibleRange(si.y, listRect.H, itemH, len(filtered))
 		for fi := startIdx; fi < endIdx; fi++ {
@@ -245,15 +280,10 @@ func (c *Context) MultiSelect(id string, items []SelectItem, selectedIDs map[str
 			ir := render.Rect{X: listRect.X + c.Scale(2).Int(), Y: iy, W: listRect.W - c.Scale(4).Int(), H: itemH}
 			c.RegisterHit(id+":opt:"+strconv.Itoa(origIdx), ir, platform.CursorHand)
 
-			ihov := ir.Contains(c.MouseX, c.MouseY)
+			ihov := listRect.Contains(c.MouseX, c.MouseY) && ir.Contains(c.MouseX, c.MouseY)
 			if ihov {
 				c.nextCursor = platform.CursorHand
 				c.Canvas.FillRoundedRect(ir, c.ScaleF(4), c.Theme.Surface)
-				if c.MousePressed {
-					selectedIDs[itemKey] = !selectedIDs[itemKey]
-					changed = true
-					c.RequestRedraw()
-				}
 			}
 
 			// Чекбокс

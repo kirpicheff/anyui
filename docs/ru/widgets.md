@@ -59,7 +59,7 @@ ui.Toggle("autostart", "Запускать при старте ОС", &autoStart
 ### `TextInput`
 - **Сигнатура:** `ui.TextInput(id string, value *string, placeholder string, opts ...Option) bool`
 - **Возможности:** точный клик курсора, выделение мышью, `Shift + Стрелки`, навигация/удаление по словам (`Ctrl + Left/Right`, `Ctrl + Shift + Left/Right`, `Ctrl + Backspace/Delete`), двойной клик (слово) и тройной клик (весь текст), `Ctrl+A / C / V / X`, история правок `Undo` / `Redo` (`Ctrl+Z` / `Ctrl+Y` / `Ctrl+Shift+Z`), встроенное контекстное меню по ПКМ.
-- **Опции:** `Password()`, `PasswordToggle(visible ...*bool)`, `ReadOnly(enabled ...bool)`, `Clearable(enabled ...bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `Error(string)`, `FocusBorderColor(c)`, `TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`, `Disabled(enabled ...bool)`, `Width(dp)`.
+- **Опции:** `Password()`, `PasswordToggle(visible ...*bool)`, `ReadOnly(enabled ...bool)`, `Clearable(enabled ...bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `OnSubmit(func())`, `Error(string)`, `FocusBorderColor(c)`, `TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`, `Disabled(enabled ...bool)`, `Width(dp)`.
 - **Встроенная кнопка пароля (PasswordToggle):**
   - `anyui.PasswordToggle()` или `anyui.PasswordToggle(&showPassword)` встраивает кликабельную иконку глазика прямо **внутрь** поля с правого края (с автоматическим резервированием внутреннего отступа `rightOffset`).
   - По клику на глазик маскировка символов переключается (`••••••••` / открытый текст), а иконка меняется с открытого глаза на перечёркнутый.
@@ -128,7 +128,7 @@ if ui.Hyperlink("docs_link", "Открыть документацию") {
 
 ### `Select`
 - **Модель элементов:** `anyui.SelectItem{Key string, Label string, Icon string}` (или хелпер `anyui.SelectItems("Пункт 1", "Пункт 2")`).
-- **Сигнатура:** `ui.Select(id string, items []anyui.SelectItem, selected *string, opts ...Option) bool` (с опцией `anyui.Searchable()` — со встроенным полем фильтрации/поиска).
+- **Сигнатура:** `ui.Select(id string, items []anyui.SelectItem, selected *string, opts ...Option) bool` (с опцией `anyui.Searchable()` — со встроенным полем фильтрации/поиска). Возвращает `true` синхронно в кадре изменения значения (включая выбор кликом или клавиатурой внутри открытого списка).
 - **Пример:**
 ```go
 countries := anyui.SelectItems("Россия", "Казахстан", "Беларусь")
@@ -527,6 +527,7 @@ ui.StatusBar("sb", []anyui.StatusBarSection{{Text: "Готово", Flex: 1}, {Te
 ### Расширенный `DatePicker`, `TimePicker`, `DateTimePicker`
 - `DatePicker`: клик по названию месяца или году в шапке открывает сетку 12 месяцев или 12 лет; кнопка «Сегодня» внизу календаря; двойной клик по полю включает ручной ввод даты (`YYYY-MM-DD`).
 - `ui.TimePicker(id, &t, opts...)` и `ui.DateTimePicker(id, &dt, opts...)`: выбор времени `ЧЧ:ММ:СС` с кнопками `+`/`-` и колесом мыши.
+- Выбор и изменение значений внутри выпадающих попапов (`Select`, `MultiSelect`, `DatePicker`, `TimePicker`, `DateTimePicker`, `ColorPicker`) обрабатываются синхронно и возвращают `true` в том же кадре.
 
 ### `MultiSelect` и `TagInput`
 - `ui.MultiSelect(id, items, selectedIDs, opts...)`: выпадающий список с чекбоксами на базе `map[string]bool`, поиском, кнопками «Выбрать все / Сбросить» и отображением тегов/сводки. Принимает `[]anyui.SelectItem`.

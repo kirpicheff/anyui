@@ -192,3 +192,6 @@ func TabOrientation(orient Orientation) Option { return ui.TabOrientation(orient
 
 // HideAddButton скрывает кнопку '+' добавления новой вкладки в TabBar.
 func HideAddButton(enabled ...bool) Option { return ui.HideAddButton(enabled...) }
+
+// OnSubmit регистрирует обработчик подтверждения ввода по клавише Enter (TextInput, MaskedInput).
+func OnSubmit(fn func()) Option { return ui.OnSubmit(fn) }

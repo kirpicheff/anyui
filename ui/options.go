@@ -116,6 +116,7 @@ type WidgetStyle struct {
 	Indeterminate    bool
 	Searchable       bool
 	InputFilter      func(rune) bool
+	OnSubmit         func()
 	WordWrap         bool
 	Ellipsis         bool
 	LineNumbers      bool
@@ -618,5 +619,13 @@ func HideAddButton(enabled ...bool) Option {
 	val := optBool(enabled)
 	return func(s *WidgetStyle) {
 		s.HideAddButton = val
+	}
+}
+
+// OnSubmit регистрирует обработчик подтверждения ввода по клавише Enter.
+// Вызывается после обновления значения виджета; действует для TextInput и MaskedInput.
+func OnSubmit(fn func()) Option {
+	return func(s *WidgetStyle) {
+		s.OnSubmit = fn
 	}
 }

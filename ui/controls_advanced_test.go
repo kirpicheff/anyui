@@ -779,3 +779,364 @@ func TestToastClickAfterReorder(t *testing.T) {
 		t.Fatal("reorderActive должен быть сброшен при EventCaptureLost!")
 	}
 }
+
+func TestSelectSyncClickAndKeyboard(t *testing.T) {
+	ctx := newTestContext(400, 300)
+	items := []SelectItem{
+		{Key: "a", Label: "Alpha"},
+		{Key: "b", Label: "Beta"},
+		{Key: "c", Label: "Gamma"},
+	}
+	selected := "a"
+
+	// 1. Открываем список кликом по кнопке Select (высота 38, y=[0..38])
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 18})
+	changed := false
+	ctx.Render(func(c *Context) {
+		if c.Select("sel1", items, &selected, Width(200)) {
+			changed = true
+		}
+	})
+	if changed {
+		t.Fatal("открытие списка не должно возвращать changed=true")
+	}
+	if !ctx.openState["sel1"] {
+		t.Fatal("список должен быть открыт после клика по кнопке")
+	}
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 50, Y: 18})
+
+	// 2. Клик по второму пункту ("Beta"): dropRect.Y = 38 + 4 = 42, listY = 46, item0=[46..78], item1=[78..110]
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 90})
+	changed = false
+	ctx.Render(func(c *Context) {
+		if c.Select("sel1", items, &selected, Width(200)) {
+			changed = true
+		}
+	})
+	if !changed {
+		t.Fatalf("клик по пункту Select должен синхронно вернуть true в том же кадре (selected=%q, open=%v, mouse=(%d,%d))", selected, ctx.openState["sel1"], ctx.MouseX, ctx.MouseY)
+	}
+	if selected != "b" {
+		t.Fatalf("ожидался ключ 'b', получено %q", selected)
+	}
+	if ctx.openState["sel1"] {
+		t.Fatal("список должен закрыться после выбора пункта кликом")
+	}
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 50, Y: 90})
+
+	// 3. Повторно открываем список и выбираем следующий пункт клавиатурой (KeyDown + KeyEnter)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 18})
+	ctx.Render(func(c *Context) {
+		c.Select("sel1", items, &selected, Width(200))
+	})
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 50, Y: 18})
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: KeyDown})
+	changed = false
+	ctx.Render(func(c *Context) {
+		if c.Select("sel1", items, &selected, Width(200)) {
+			changed = true
+		}
+	})
+	if !changed || selected != "c" {
+		t.Fatalf("KeyDown в открытом Select должен синхронно вернуть true и выбрать 'c', got changed=%v selected=%q", changed, selected)
+	}
+	if !ctx.openState["sel1"] {
+		t.Fatal("KeyDown не должен закрывать список")
+	}
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: KeyEnter})
+	ctx.Render(func(c *Context) {
+		c.Select("sel1", items, &selected, Width(200))
+	})
+	if ctx.openState["sel1"] {
+		t.Fatal("KeyEnter должен закрыть открытый список")
+	}
+}
+
+func TestMultiSelectSyncClickAndButtons(t *testing.T) {
+	ctx := newTestContext(400, 300)
+	items := []SelectItem{
+		{Key: "k1", Label: "One"},
+		{Key: "k2", Label: "Two"},
+		{Key: "k3", Label: "Three"},
+	}
+	selectedIDs := map[string]bool{}
+
+	// 1. Открываем MultiSelect кликом по основному полю (rect: y=[0..34])
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 16})
+	changed := false
+	ctx.Render(func(c *Context) {
+		if c.MultiSelect("ms1", items, selectedIDs, Width(240)) {
+			changed = true
+		}
+	})
+	if changed {
+		t.Fatal("открытие MultiSelect не должно возвращать changed=true")
+	}
+	if !ctx.openState["ms1"] {
+		t.Fatal("MultiSelect должен быть открыт")
+	}
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 50, Y: 16})
+
+	// 2. Клик по второму пункту ("Two"): listRect.Y = 104, item0=[104..132], item1=[132..160]
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 146})
+	changed = false
+	ctx.Render(func(c *Context) {
+		if c.MultiSelect("ms1", items, selectedIDs, Width(240)) {
+			changed = true
+		}
+	})
+	if !changed || !selectedIDs["k2"] {
+		t.Fatalf("клик по пункту MultiSelect должен синхронно вернуть true и отметить k2, got changed=%v selectedIDs=%v", changed, selectedIDs)
+	}
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 50, Y: 146})
+
+	// 3. Клик по кнопке "Выбрать все" (allR: x=[8..117], y=[78..100])
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 60, Y: 89})
+	changed = false
+	ctx.Render(func(c *Context) {
+		if c.MultiSelect("ms1", items, selectedIDs, Width(240)) {
+			changed = true
+		}
+	})
+	if !changed || !selectedIDs["k1"] || !selectedIDs["k2"] || !selectedIDs["k3"] {
+		t.Fatalf("кнопка 'Выбрать все' должна синхронно вернуть true и выбрать все пункты, got changed=%v selectedIDs=%v", changed, selectedIDs)
+	}
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 60, Y: 89})
+
+	// 4. Клик по кнопке "Сбросить" (clrR: x=[123..232], y=[78..100])
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 175, Y: 89})
+	changed = false
+	ctx.Render(func(c *Context) {
+		if c.MultiSelect("ms1", items, selectedIDs, Width(240)) {
+			changed = true
+		}
+	})
+	if !changed || len(selectedIDs) != 0 {
+		t.Fatalf("кнопка 'Сбросить' должна синхронно вернуть true и очистить выбор, got changed=%v selectedIDs=%v", changed, selectedIDs)
+	}
+}
+
+func TestDatePickerSyncClick(t *testing.T) {
+	ctx := newTestContext(400, 400)
+	fixedNow := time.Date(2025, 6, 20, 12, 0, 0, 0, time.UTC)
+	ctx.Clock = func() time.Time { return fixedNow }
+
+	date := time.Date(2025, 5, 10, 0, 0, 0, 0, time.UTC)
+
+	// 1. Открываем календарь кликом по полю (rect: x=[0..180], y=[0..34])
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 16})
+	changed := false
+	ctx.Render(func(c *Context) {
+		if c.DatePicker("dp1", &date, Width(180)) {
+			changed = true
+		}
+	})
+	if changed || !ctx.openState["dp1"] {
+		t.Fatalf("открытие DatePicker должно открыть попап без changed, got changed=%v open=%v", changed, ctx.openState["dp1"])
+	}
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 50, Y: 16})
+
+	// 2. Клик по 15 мая 2025: 1 мая — четверг (offset=3), день 15 -> slot=17 (col=3, row=2), центр ~(122, 176)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 122, Y: 176})
+	changed = false
+	ctx.Render(func(c *Context) {
+		if c.DatePicker("dp1", &date, Width(180)) {
+			changed = true
+		}
+	})
+	if !changed {
+		t.Fatal("клик по числу в DatePicker должен синхронно вернуть true в том же кадре")
+	}
+	if date.Year() != 2025 || date.Month() != time.May || date.Day() != 15 {
+		t.Fatalf("ожидалась дата 2025-05-15, получено %s", date.Format("2006-01-02"))
+	}
+	if ctx.openState["dp1"] {
+		t.Fatal("календарь должен закрыться после выбора числа")
+	}
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 122, Y: 176})
+
+	// 3. Повторно открываем и жмём кнопку "Сегодня" (todayR: y=[288..312], центр (120, 300))
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 16})
+	ctx.Render(func(c *Context) {
+		c.DatePicker("dp1", &date, Width(180))
+	})
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 50, Y: 16})
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 120, Y: 300})
+	changed = false
+	ctx.Render(func(c *Context) {
+		if c.DatePicker("dp1", &date, Width(180)) {
+			changed = true
+		}
+	})
+	if !changed {
+		t.Fatal("клик по 'Сегодня' в DatePicker должен синхронно вернуть true в том же кадре")
+	}
+	if date.Year() != 2025 || date.Month() != time.June || date.Day() != 20 {
+		t.Fatalf("ожидалась дата 2025-06-20, получено %s", date.Format("2006-01-02"))
+	}
+	if ctx.openState["dp1"] {
+		t.Fatal("календарь должен закрыться после клика по 'Сегодня'")
+	}
+}
+
+func TestTimePickerAndDateTimePickerSyncClick(t *testing.T) {
+	ctx := newTestContext(400, 400)
+	fixedNow := time.Date(2025, 6, 20, 14, 30, 45, 0, time.UTC)
+	ctx.Clock = func() time.Time { return fixedNow }
+
+	// Часть 1: TimePicker
+	tm := time.Date(2025, 5, 10, 10, 15, 20, 0, time.UTC)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 16})
+	changed := false
+	ctx.Render(func(c *Context) {
+		if c.TimePicker("tp1", &tm, Width(140)) {
+			changed = true
+		}
+	})
+	if changed || !ctx.openState["tp1"] {
+		t.Fatalf("открытие TimePicker не должно менять значение, got changed=%v open=%v", changed, ctx.openState["tp1"])
+	}
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 50, Y: 16})
+
+	// Клик по кнопке "+" часов: upR col0 = {18, 50, 50, 26}, центр (43, 63)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 43, Y: 63})
+	changed = false
+	ctx.Render(func(c *Context) {
+		if c.TimePicker("tp1", &tm, Width(140)) {
+			changed = true
+		}
+	})
+	if !changed || tm.Hour() != 11 {
+		t.Fatalf("клик '+' в TimePicker должен синхронно вернуть true и увеличить час до 11, got changed=%v hour=%d", changed, tm.Hour())
+	}
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 43, Y: 63})
+
+	// Клик по кнопке "Сейчас": nowR = {12, 150, 186, 24}, центр (100, 162)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 100, Y: 162})
+	changed = false
+	ctx.Render(func(c *Context) {
+		if c.TimePicker("tp1", &tm, Width(140)) {
+			changed = true
+		}
+	})
+	if !changed || tm.Hour() != 14 || tm.Minute() != 30 || tm.Second() != 45 {
+		t.Fatalf("клик 'Сейчас' в TimePicker должен синхронно вернуть true и установить 14:30:45, got changed=%v time=%s", changed, tm.Format("15:04:05"))
+	}
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 100, Y: 162})
+
+	// Часть 2: составной DateTimePicker
+	ctx2 := newTestContext(400, 400)
+	ctx2.Clock = func() time.Time { return fixedNow }
+	dt := time.Date(2025, 5, 10, 8, 0, 0, 0, time.UTC)
+
+	// Открываем DatePicker внутри DateTimePicker (x=[0..150], y=[0..34])
+	ctx2.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 40, Y: 16})
+	ctx2.Render(func(c *Context) {
+		c.DateTimePicker("dtp1", &dt)
+	})
+	ctx2.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 40, Y: 16})
+
+	// Выбираем 15 мая 2025 (центр ячейки (122, 176))
+	ctx2.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 122, Y: 176})
+	changed = false
+	ctx2.Render(func(c *Context) {
+		if c.DateTimePicker("dtp1", &dt) {
+			changed = true
+		}
+	})
+	if !changed || dt.Day() != 15 || dt.Hour() != 8 {
+		t.Fatalf("DateTimePicker должен синхронно вернуть true и обновить дату до 15-го (сохранив час 8), got changed=%v dt=%s", changed, dt.Format(time.RFC3339))
+	}
+	ctx2.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 122, Y: 176})
+
+	// Открываем TimePicker внутри DateTimePicker (x=[158..278], y=[0..34])
+	ctx2.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 180, Y: 16})
+	ctx2.Render(func(c *Context) {
+		c.DateTimePicker("dtp1", &dt)
+	})
+	ctx2.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 180, Y: 16})
+
+	// Жмём "+" часов (popX=158, baseX=170, upR col0={176, 50, 50, 26}, центр (201, 63))
+	ctx2.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 201, Y: 63})
+	changed = false
+	ctx2.Render(func(c *Context) {
+		if c.DateTimePicker("dtp1", &dt) {
+			changed = true
+		}
+	})
+	if !changed || dt.Day() != 15 || dt.Hour() != 9 {
+		t.Fatalf("DateTimePicker должен синхронно вернуть true и обновить час до 9 (сохранив день 15), got changed=%v dt=%s", changed, dt.Format(time.RFC3339))
+	}
+}
+
+func TestColorPickerSyncClick(t *testing.T) {
+	ctx := newTestContext(400, 400)
+	col := render.Hex(0x000000)
+
+	// 1. Открываем ColorPicker кликом по полю (rect: x=[0..160], y=[0..34])
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 40, Y: 16})
+	changed := false
+	ctx.Render(func(c *Context) {
+		if c.ColorPicker("cp1", &col, Width(160)) {
+			changed = true
+		}
+	})
+	if changed || !ctx.openState["cp1"] {
+		t.Fatalf("открытие ColorPicker не должно возвращать changed=true, got changed=%v open=%v", changed, ctx.openState["cp1"])
+	}
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 40, Y: 16})
+
+	// 2. Клик по второму быстрому свотчу (0x22C55E): swY=216, sr1={38, 216, 20, 20}, центр (48, 226)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 48, Y: 226})
+	changed = false
+	ctx.Render(func(c *Context) {
+		if c.ColorPicker("cp1", &col, Width(160)) {
+			changed = true
+		}
+	})
+	if !changed || col != render.Hex(0x22C55E) {
+		t.Fatalf("клик по свотчу ColorPicker должен синхронно вернуть true и установить #22C55E, got changed=%v col=%s", changed, FormatHexColor(col))
+	}
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 48, Y: 226})
+
+	// 3. Клик по SV-квадрату (svR={12, 50, 212, 130}), правый верхний угол -> (220, 52)
+	prevCol := col
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 220, Y: 52})
+	changed = false
+	ctx.Render(func(c *Context) {
+		if c.ColorPicker("cp1", &col, Width(160)) {
+			changed = true
+		}
+	})
+	if !changed || col == prevCol {
+		t.Fatalf("клик по SV-квадрату ColorPicker должен синхронно вернуть true и изменить цвет, got changed=%v col=%s", changed, FormatHexColor(col))
+	}
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 220, Y: 52})
+
+	// 4. Клик по HEX-полю (hexBox={12, 246, 212, 30}) и замена последней цифры
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 100, Y: 260})
+	ctx.Render(func(c *Context) {
+		c.ColorPicker("cp1", &col, Width(160))
+	})
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 100, Y: 260})
+
+	// Стираем 6 символов и вводим "FF0000"
+	for i := 0; i < 6; i++ {
+		ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: KeyBackspace})
+	}
+	for _, r := range "FF0000" {
+		ctx.HandleEvent(platform.Event{Type: platform.EventChar, Char: r})
+	}
+	changed = false
+	ctx.Render(func(c *Context) {
+		if c.ColorPicker("cp1", &col, Width(160)) {
+			changed = true
+		}
+	})
+	if !changed || col != render.Hex(0xFF0000) {
+		t.Fatalf("ввод HEX в ColorPicker должен синхронно вернуть true и установить #FF0000, got changed=%v col=%s", changed, FormatHexColor(col))
+	}
+}

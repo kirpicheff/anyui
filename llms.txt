@@ -1,4 +1,4 @@
-# AnyUI (v0.8.5)
+# AnyUI (v0.8.6)
 
 Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).
 
@@ -100,8 +100,8 @@ type MessageBoxResult uint8  // ResNone, ResOK, ResCancel, ResYes, ResNo
 | `Label`, `SelectableLabel`, `StatusDot`, `Hyperlink` | `FontSize`, `Bold`, `Mono`, `TextColor`, `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Disabled` (кроме `StatusDot`), `WordWrap` (`Label`, `SelectableLabel`), `Ellipsis` (`Label`), `TextAlignLeft`/`TextAlignCenter`/`TextAlignRight` (`Label`), `LetterSpacing`/`TextShadow` (`Label`, `StatusDot`) |
 | `Button`, `IconButton` | `Primary`, `Secondary`, `Danger`, `Ghost`, `Icon`, `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `Radius`, `FontSize`, `Bold`, `Mono`, `LetterSpacing`, `TextShadow`, `Bg`, `HoverBg`, `TextColor`, `HoverTextColor`, `BorderColor`, `HoverBorderColor`, `Disabled` |
 | `Checkbox`, `Toggle`, `RadioButton`, `RadioGroup` | `Disabled`, `FontSize`, `Bold`, `Mono`, `TextColor` (в `Checkbox` красит заливку флажка), `Bg` (`Toggle`), `Height`/`Radius`/`Indeterminate` (`Checkbox`) |
-| `TextInput` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `FocusBorderColor`, `Radius`, `TextAlignLeft`, `TextAlignCenter`, `TextAlignRight`, `Password`, `PasswordToggle`, `Clearable`, `ReadOnly`, `Disabled`, `InputFilter`, `Error`, `Icon`, `IconRight` |
-| `MaskedInput` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `FocusBorderColor`, `Radius`, `ReadOnly`, `Disabled`, `Error` |
+| `TextInput` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `FocusBorderColor`, `Radius`, `TextAlignLeft`, `TextAlignCenter`, `TextAlignRight`, `Password`, `PasswordToggle`, `Clearable`, `ReadOnly`, `Disabled`, `InputFilter`, `OnSubmit`, `Error`, `Icon`, `IconRight` |
+| `MaskedInput` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `FocusBorderColor`, `Radius`, `ReadOnly`, `Disabled`, `OnSubmit`, `Error` |
 | `TextArea` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `FocusBorderColor`, `Radius`, `LineNumbers`, `ReadOnly`, `Disabled`, `InputFilter`, `Error` |
 | `NumberInput`, `Slider`, `RangeSlider`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker` | `Disabled`, `Width`, `Height`/`Radius` (`NumberInput`) |
 | `Select`, `MultiSelect` | `Width`, `Height`, `Disabled`, `Bg`, `Radius`, `Bold`, `Mono`, `Searchable` (`Select`) |

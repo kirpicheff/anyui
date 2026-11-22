@@ -59,7 +59,7 @@ ui.Toggle("autostart", "Launch on startup", &autoStart)
 ### `TextInput`
 - **Signature:** `ui.TextInput(id string, value *string, placeholder string, opts ...Option) bool`
 - **Features:** accurate click-to-position cursor, mouse selection, `Shift + Arrows`, word navigation/deletion (`Ctrl + Left/Right`, `Ctrl + Shift + Left/Right`, `Ctrl + Backspace/Delete`), double-click (word) and triple-click (all text), `Ctrl+A / C / V / X`, `Undo` / `Redo` (`Ctrl+Z` / `Ctrl+Y` / `Ctrl+Shift+Z`), built-in right-click context menu.
-- **Options:** `Password()`, `PasswordToggle(visible ...*bool)`, `ReadOnly(enabled ...bool)`, `Clearable(enabled ...bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `Error(string)`, `FocusBorderColor(c)`, `TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`, `Disabled(enabled ...bool)`, `Width(dp)`.
+- **Options:** `Password()`, `PasswordToggle(visible ...*bool)`, `ReadOnly(enabled ...bool)`, `Clearable(enabled ...bool)`, `Icon(svg)`, `IconRight(svg)`, `InputFilter(func(rune) bool)`, `OnSubmit(func())`, `Error(string)`, `FocusBorderColor(c)`, `TextAlignCenter()`, `TextAlignLeft()`, `TextAlignRight()`, `Disabled(enabled ...bool)`, `Width(dp)`.
 - **Built-in Password Visibility Toggle (PasswordToggle):**
   - `anyui.PasswordToggle()` or `anyui.PasswordToggle(&showPassword)` renders a clickable eye icon **inside** the right edge of the input field (automatically reserving inner `rightOffset`).
   - Clicking the eye toggles symbol masking (`••••••••` / plain text) and switches the icon between eye and eye-off.
@@ -128,7 +128,7 @@ if ui.Hyperlink("docs_link", "Open Documentation") {
 
 ### `Select`
 - **Item Model:** `anyui.SelectItem{Key string, Label string, Icon string}` (or convenience helper `anyui.SelectItems("Item 1", "Item 2")`).
-- **Signature:** `ui.Select(id string, items []anyui.SelectItem, selected *string, opts ...Option) bool` (pass `anyui.Searchable()` to enable built-in search/filter input).
+- **Signature:** `ui.Select(id string, items []anyui.SelectItem, selected *string, opts ...Option) bool` (pass `anyui.Searchable()` to enable built-in search/filter input). Returns `true` synchronously in the frame when the selection changes (including mouse click or keyboard navigation inside the open dropdown).
 - **Example:**
 ```go
 countries := anyui.SelectItems("United States", "Germany", "Japan")
@@ -518,6 +518,7 @@ ui.StatusBar("sb", []anyui.StatusBarSection{{Text: "Ready", Flex: 1}, {Text: "UT
 ### Extended `DatePicker`, `TimePicker`, `DateTimePicker`
 - `DatePicker`: clicking the month or year in the header opens a 12-month or 12-year picker grid; includes a "Today" button; double-clicking the field enables manual `YYYY-MM-DD` input.
 - `ui.TimePicker(id, &t, opts...)` and `ui.DateTimePicker(id, &dt, opts...)`: `HH:MM:SS` time selection with `+`/`-` buttons and mouse wheel support.
+- Selection and value changes inside popup overlays (`Select`, `MultiSelect`, `DatePicker`, `TimePicker`, `DateTimePicker`, `ColorPicker`) are processed synchronously and return `true` in the same frame.
 
 ### `MultiSelect` and `TagInput`
 - `ui.MultiSelect(id, items, selectedIDs, opts...)`: dropdown with checkboxes using `map[string]bool`, search, "Select All / Clear", and tag/summary display. Accepts `[]anyui.SelectItem`.

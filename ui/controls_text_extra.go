@@ -479,6 +479,7 @@ func (c *Context) MaskedInput(id string, value *string, mask string, opts ...Opt
 			}
 		}
 
+		submitted := false
 		for _, kp := range c.KeyEvents {
 			if kp.Mods.Ctrl {
 				switch kp.Code {
@@ -597,9 +598,13 @@ func (c *Context) MaskedInput(id string, value *string, mask string, opts ...Opt
 				if !kp.Mods.Shift {
 					selStart = caret
 				}
-			case KeyEscape, KeyEnter:
+			case KeyEscape:
 				c.FocusID = ""
 				focused = false
+			case KeyEnter:
+				c.FocusID = ""
+				focused = false
+				submitted = true
 			}
 		}
 
@@ -645,6 +650,12 @@ func (c *Context) MaskedInput(id string, value *string, mask string, opts ...Opt
 				} else {
 					displayRunes[i] = m
 				}
+			}
+			c.RequestRedraw()
+		}
+		if submitted {
+			if st.OnSubmit != nil {
+				st.OnSubmit()
 			}
 			c.RequestRedraw()
 		}

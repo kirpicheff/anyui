@@ -282,3 +282,71 @@ func TestTextInputPasswordToggle(t *testing.T) {
 		t.Fatal("ожидалось showBoth == true после клика по глазику")
 	}
 }
+
+func TestTextInputAndMaskedInputOnSubmit(t *testing.T) {
+	ctx := newTestContext(400, 200)
+	val := "hello"
+	submittedVal := ""
+	submitCount := 0
+
+	drawInput := func(c *Context) {
+		c.TextInputOpts("ti_sub", &val, "", Width(200), OnSubmit(func() {
+			submitCount++
+			submittedVal = val
+		}))
+	}
+
+	// Фокусируемся на поле кликом
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 40, Y: 16})
+	ctx.Render(drawInput)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 40, Y: 16})
+
+	// Escape снимает фокус, но не вызывает OnSubmit
+	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: KeyEscape})
+	ctx.Render(drawInput)
+	if submitCount != 0 {
+		t.Fatalf("KeyEscape не должен вызывать OnSubmit, got submitCount=%d", submitCount)
+	}
+	if ctx.FocusID != "" {
+		t.Fatalf("KeyEscape должен снять фокус, got FocusID=%q", ctx.FocusID)
+	}
+
+	// Снова фокусируемся (в другой точке, чтобы не сработал double-click), дописываем "!" и жмём Enter в том же кадре
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 180, Y: 16})
+	ctx.Render(drawInput)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 180, Y: 16})
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: KeyEnd})
+	ctx.HandleEvent(platform.Event{Type: platform.EventChar, Char: '!'})
+	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: KeyEnter})
+	ctx.Render(drawInput)
+	if submitCount != 1 {
+		t.Fatalf("KeyEnter должен вызвать OnSubmit один раз, got submitCount=%d", submitCount)
+	}
+	if submittedVal != "hello!" {
+		t.Fatalf("OnSubmit должен видеть актуальное значение 'hello!', получено %q", submittedVal)
+	}
+	if ctx.FocusID != "" {
+		t.Fatalf("KeyEnter должен снять фокус, got FocusID=%q", ctx.FocusID)
+	}
+
+	// Проверка MaskedInput с OnSubmit
+	maskVal := "12.34"
+	maskSubmitted := ""
+	maskCount := 0
+	drawMask := func(c *Context) {
+		c.MaskedInput("mi_sub", &maskVal, "00.00", Width(160), OnSubmit(func() {
+			maskCount++
+			maskSubmitted = maskVal
+		}))
+	}
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 40, Y: 16})
+	ctx.Render(drawMask)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 40, Y: 16})
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: KeyEnter})
+	ctx.Render(drawMask)
+	if maskCount != 1 || maskSubmitted != "12.34" || ctx.FocusID != "" {
+		t.Fatalf("MaskedInput OnSubmit: ожидалось count=1 val='12.34' focus='', got count=%d val=%q focus=%q", maskCount, maskSubmitted, ctx.FocusID)
+	}
+}

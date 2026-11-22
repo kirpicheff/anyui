@@ -47,6 +47,7 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 	radius := c.ScaleF(c.Theme.RadiusSm)
 
 	isOpen := c.openState[id]
+	openedThisFrame := false
 	if !st.Disabled {
 		c.RegisterHit(id, rect, platform.CursorHand)
 	}
@@ -56,6 +57,9 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 		if c.MousePressed {
 			isOpen = !isOpen
 			c.openState[id] = isOpen
+			if isOpen {
+				openedThisFrame = true
+			}
 			c.RequestRedraw()
 		}
 	}
@@ -99,40 +103,80 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 		}
 		popR := render.Rect{X: popX, Y: popY, W: popW, H: popH}
 
-		if c.MousePressed && !popR.Contains(c.MouseX, c.MouseY) && !rect.Contains(c.MouseX, c.MouseY) {
+		if !openedThisFrame && c.MousePressed && !popR.Contains(c.MouseX, c.MouseY) && !rect.Contains(c.MouseX, c.MouseY) {
 			c.openState[id] = false
 			c.RequestRedraw()
 			return false
 		}
 
+		// Синхронный этап: расчёт геометрии и обработка кликов/колеса до PushOverlay
+		colW := (popR.W - c.Scale(24).Int()) / 3
+		baseX := popR.X + c.Scale(12).Int()
+		topY := popR.Y + c.Scale(12).Int()
+		nowR := render.Rect{X: popR.X + c.Scale(12).Int(), Y: popR.Y + popR.H - c.Scale(34).Int(), W: popR.W - c.Scale(24).Int(), H: c.Scale(24).Int()}
+
+		colRects := func(idx int) (upR, valR, dnR render.Rect) {
+			cxR := baseX + idx*colW
+			upR = render.Rect{X: cxR + c.Scale(6).Int(), Y: topY, W: colW - c.Scale(12).Int(), H: c.Scale(26).Int()}
+			valR = render.Rect{X: cxR + c.Scale(6).Int(), Y: topY + c.Scale(30).Int(), W: colW - c.Scale(12).Int(), H: c.Scale(32).Int()}
+			dnR = render.Rect{X: cxR + c.Scale(6).Int(), Y: topY + c.Scale(66).Int(), W: colW - c.Scale(12).Int(), H: c.Scale(26).Int()}
+			return
+		}
+
+		if !openedThisFrame {
+			handleColInput := func(idx int, val int, maxVal int, setFn func(int)) {
+				upR, valR, dnR := colRects(idx)
+				if c.MousePressed && upR.Contains(c.MouseX, c.MouseY) {
+					setFn((val + 1 + maxVal) % maxVal)
+					changed = true
+					c.RequestRedraw()
+				} else if c.MousePressed && dnR.Contains(c.MouseX, c.MouseY) {
+					setFn((val - 1 + maxVal) % maxVal)
+					changed = true
+					c.RequestRedraw()
+				} else if valR.Contains(c.MouseX, c.MouseY) && c.WheelY != 0 {
+					d := 1
+					if c.WheelY < 0 {
+						d = -1
+					}
+					setFn((val + d + maxVal) % maxVal)
+					changed = true
+					c.RequestRedraw()
+				}
+			}
+
+			handleColInput(0, t.Hour(), 24, func(nv int) {
+				*t = time.Date(t.Year(), t.Month(), t.Day(), nv, t.Minute(), t.Second(), 0, t.Location())
+			})
+			handleColInput(1, t.Minute(), 60, func(nv int) {
+				*t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), nv, t.Second(), 0, t.Location())
+			})
+			handleColInput(2, t.Second(), 60, func(nv int) {
+				*t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), nv, 0, t.Location())
+			})
+
+			if c.MousePressed && nowR.Contains(c.MouseX, c.MouseY) {
+				now := c.Now()
+				*t = time.Date(t.Year(), t.Month(), t.Day(), now.Hour(), now.Minute(), now.Second(), 0, t.Location())
+				changed = true
+				c.RequestRedraw()
+			}
+		}
+
+		// Отложенный этап: отрисовка попапа поверх основного UI
 		c.PushOverlay(popR, func() {
 			c.drawDropShadow(popR, 10, 14, 120)
 			c.Canvas.DrawRoundedBox(popR, c.ScaleF(10), c.Theme.Card, 1.0, c.Theme.Border)
 
-			hr, mn, sc := t.Hour(), t.Minute(), t.Second()
-			colW := (popR.W - c.Scale(24).Int()) / 3
-			baseX := popR.X + c.Scale(12).Int()
-			topY := popR.Y + c.Scale(12).Int()
-
-			stepCol := func(idx int, label string, val int, maxVal int, setFn func(int)) {
-				cxR := baseX + idx*colW
-				upR := render.Rect{X: cxR + c.Scale(6).Int(), Y: topY, W: colW - c.Scale(12).Int(), H: c.Scale(26).Int()}
-				valR := render.Rect{X: cxR + c.Scale(6).Int(), Y: topY + c.Scale(30).Int(), W: colW - c.Scale(12).Int(), H: c.Scale(32).Int()}
-				dnR := render.Rect{X: cxR + c.Scale(6).Int(), Y: topY + c.Scale(66).Int(), W: colW - c.Scale(12).Int(), H: c.Scale(26).Int()}
-
-				drawStepBtn := func(br render.Rect, txt string, delta int) {
+			drawCol := func(idx int, label string, val int) {
+				upR, valR, dnR := colRects(idx)
+				drawStepBtn := func(br render.Rect, txt string) {
 					c.RegisterHit(id+":tp:"+label+":"+txt, br, platform.CursorHand)
 					hov := br.Contains(c.MouseX, c.MouseY)
 					bg := c.Theme.Surface
 					if hov {
 						c.nextCursor = platform.CursorHand
 						bg = c.Theme.Border
-						if c.MousePressed {
-							nv := (val + delta + maxVal) % maxVal
-							setFn(nv)
-							changed = true
-							c.RequestRedraw()
-						}
 					}
 					c.Canvas.FillRoundedRect(br, c.ScaleF(4), bg)
 					if c.Font != nil {
@@ -141,20 +185,10 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 					}
 				}
 
-				drawStepBtn(upR, "+", 1)
-				drawStepBtn(dnR, "-", -1)
+				drawStepBtn(upR, "+")
+				drawStepBtn(dnR, "-")
 
 				c.Canvas.DrawRoundedBox(valR, c.ScaleF(4), c.Theme.Bg, 1.0, c.Theme.Border)
-				if valR.Contains(c.MouseX, c.MouseY) && c.WheelY != 0 {
-					d := 1
-					if c.WheelY < 0 {
-						d = -1
-					}
-					nv := (val + d + maxVal) % maxVal
-					setFn(nv)
-					changed = true
-					c.RequestRedraw()
-				}
 				if c.Font != nil {
 					vs := fmt.Sprintf("%02d", val)
 					tw, th := c.Font.MeasureText(vs, c.Scale(15).Int())
@@ -162,30 +196,17 @@ func (c *Context) TimePicker(id string, t *time.Time, opts ...Option) bool {
 				}
 			}
 
-			stepCol(0, "Ч", hr, 24, func(nv int) {
-				*t = time.Date(t.Year(), t.Month(), t.Day(), nv, t.Minute(), t.Second(), 0, t.Location())
-			})
-			stepCol(1, "М", mn, 60, func(nv int) {
-				*t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), nv, t.Second(), 0, t.Location())
-			})
-			stepCol(2, "С", sc, 60, func(nv int) {
-				*t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), nv, 0, t.Location())
-			})
+			drawCol(0, "Ч", t.Hour())
+			drawCol(1, "М", t.Minute())
+			drawCol(2, "С", t.Second())
 
 			// Кнопка "Сейчас" внизу
-			nowR := render.Rect{X: popR.X + c.Scale(12).Int(), Y: popR.Y + popR.H - c.Scale(34).Int(), W: popR.W - c.Scale(24).Int(), H: c.Scale(24).Int()}
 			c.RegisterHit(id+":now", nowR, platform.CursorHand)
 			hovNow := nowR.Contains(c.MouseX, c.MouseY)
 			nowBg := c.Theme.Surface
 			if hovNow {
 				c.nextCursor = platform.CursorHand
 				nowBg = c.Theme.Accent.WithAlpha(40)
-				if c.MousePressed {
-					now := c.Now()
-					*t = time.Date(t.Year(), t.Month(), t.Day(), now.Hour(), now.Minute(), now.Second(), 0, t.Location())
-					changed = true
-					c.RequestRedraw()
-				}
 			}
 			c.Canvas.DrawRoundedBox(nowR, c.ScaleF(4), nowBg, 1.0, c.Theme.Border)
 			if c.Font != nil {

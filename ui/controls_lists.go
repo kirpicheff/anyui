@@ -102,6 +102,7 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 	}
 
 	isOpen := c.openState[id]
+	openedThisFrame := false
 	hovered := !st.Disabled && !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)
 	if hovered {
 		c.HotID = id
@@ -109,6 +110,9 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 		if c.MousePressed {
 			isOpen = !isOpen
 			c.openState[id] = isOpen
+			if isOpen {
+				openedThisFrame = true
+			}
 			c.FocusID = id
 			c.RequestRedraw()
 		}
@@ -180,6 +184,7 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 			switch kp.Code {
 			case KeySpace, KeyEnter:
 				isOpen = true
+				openedThisFrame = true
 				c.openState[id] = true
 				c.RequestRedraw()
 			case KeyDown:
@@ -258,58 +263,68 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 		}
 
 		// Закрытие по Escape или клику вне кнопки и выпадающего списка
-		for _, kp := range c.KeyEvents {
-			if kp.Code == KeyEscape {
+		if !openedThisFrame {
+			for _, kp := range c.KeyEvents {
+				if kp.Code == KeyEscape {
+					c.openState[id] = false
+					c.RequestRedraw()
+					return false
+				}
+			}
+			if c.MousePressed && !r.Contains(c.MouseX, c.MouseY) && !dropRect.Contains(c.MouseX, c.MouseY) {
 				c.openState[id] = false
 				c.RequestRedraw()
 				return false
 			}
 		}
-		if c.MousePressed && !r.Contains(c.MouseX, c.MouseY) && !dropRect.Contains(c.MouseX, c.MouseY) {
-			c.openState[id] = false
-			c.RequestRedraw()
-			return false
+
+		// Синхронный этап: расчёт геометрии, фильтрация и обработка ввода до PushOverlay
+		listY := dropRect.Y + c.Scale(4).Int()
+		searchKey := "sel_q:" + id
+		filterText := ""
+		if st.Searchable {
+			c.ensureTextMaps()
+			if !c.openState[searchKey+"_init"] {
+				c.openState[searchKey+"_init"] = true
+			}
+			filterText = strings.ToLower(strings.TrimSpace(c.searchQuery(searchKey)))
+			listY += searchH
 		}
 
-		c.PushOverlay(dropRect, func() {
-			c.drawDropShadow(dropRect, rad, 12, 110)
-			c.Canvas.DrawRoundedBox(dropRect, c.ScaleF(rad), c.Theme.Card, 1.0, c.Theme.Border)
-
-			listY := dropRect.Y + c.Scale(4).Int()
-			filterText := ""
-			if st.Searchable {
-				c.ensureTextMaps()
-				searchKey := "sel_q:" + id
-				if c.openState[searchKey+"_init"] == false {
-					c.openState[searchKey+"_init"] = true
-				}
-				// Простой инлайн-фильтр через локальный буфер в layout
-				c.pushBox(render.Rect{X: dropRect.X + c.Scale(6).Int(), Y: listY, W: dropRect.W - c.Scale(12).Int(), H: searchH}, dirColumn, AlignStart, 0)
-				q := c.searchQuery(searchKey)
-				if c.TextInputOpts(searchKey, &q, c.str().SearchPlaceholder, Height(32)) {
-					c.setSearchQuery(searchKey, q)
-				}
-				c.popBox()
-				filterText = strings.ToLower(strings.TrimSpace(q))
-				listY += searchH
-			}
-
-			var filtered []int
+		buildFiltered := func(ft string) []int {
+			var out []int
 			for idx, it := range items {
-				if filterText == "" || strings.Contains(strings.ToLower(it.Label), filterText) || strings.Contains(strings.ToLower(it.Key), filterText) {
-					filtered = append(filtered, idx)
+				if ft == "" || strings.Contains(strings.ToLower(it.Label), ft) || strings.Contains(strings.ToLower(it.Key), ft) {
+					out = append(out, idx)
 				}
 			}
+			return out
+		}
+		filtered := buildFiltered(filterText)
 
-			listRect := render.Rect{
-				X: dropRect.X + c.Scale(4).Int(),
-				Y: listY,
-				W: dropRect.W - c.Scale(8).Int(),
-				H: dropRect.Y + dropRect.H - listY - c.Scale(4).Int(),
+		listRect := render.Rect{
+			X: dropRect.X + c.Scale(4).Int(),
+			Y: listY,
+			W: dropRect.W - c.Scale(8).Int(),
+			H: dropRect.Y + dropRect.H - listY - c.Scale(4).Int(),
+		}
+
+		si := c.getScrollInfo("sel_sc:" + id)
+		totalH := len(filtered) * itemH
+		clampScroll := func(th int) {
+			maxSc := th - listRect.H
+			if maxSc < 0 {
+				maxSc = 0
 			}
+			if si.y < 0 {
+				si.y = 0
+			}
+			if si.y > maxSc {
+				si.y = maxSc
+			}
+		}
 
-			si := c.getScrollInfo("sel_sc:" + id)
-			totalH := len(filtered) * itemH
+		if !openedThisFrame {
 			if listRect.Contains(c.MouseX, c.MouseY) && c.WheelY != 0 {
 				si.y -= int(c.WheelY * float32(itemH))
 			}
@@ -371,60 +386,86 @@ func (c *Context) Select(id string, items []SelectItem, selected *string, opts .
 					}
 				}
 			}
-			maxSc := totalH - listRect.H
-			if maxSc < 0 {
-				maxSc = 0
-			}
-			if si.y < 0 {
-				si.y = 0
-			}
-			if si.y > maxSc {
-				si.y = maxSc
-			}
+			clampScroll(totalH)
 
-			c.Canvas.PushClip(listRect)
-			pxSize := c.Scale(13).Int()
-			for pos, origIdx := range filtered {
-				iy := listRect.Y + pos*itemH - si.y
-				if iy+itemH < listRect.Y || iy > listRect.Y+listRect.H {
-					continue
-				}
-				ir := render.Rect{X: listRect.X, Y: iy, W: listRect.W, H: itemH}
-				c.RegisterHit(id+":opt:"+strconv.Itoa(origIdx), ir, platform.CursorHand)
-				itemHover := ir.Contains(c.MouseX, c.MouseY)
-				isSelectedItem := *selected == items[origIdx].Key
-				if itemHover {
-					c.nextCursor = platform.CursorHand
-					c.Canvas.FillRoundedRect(ir, c.ScaleF(4), c.Theme.Surface)
-					if c.MousePressed {
+			// Клик мышью по видимому пункту списка
+			if c.openState[id] && c.MousePressed && listRect.Contains(c.MouseX, c.MouseY) {
+				for pos, origIdx := range filtered {
+					iy := listRect.Y + pos*itemH - si.y
+					if iy+itemH < listRect.Y || iy > listRect.Y+listRect.H {
+						continue
+					}
+					ir := render.Rect{X: listRect.X, Y: iy, W: listRect.W, H: itemH}
+					if ir.Contains(c.MouseX, c.MouseY) {
 						if *selected != items[origIdx].Key {
 							*selected = items[origIdx].Key
 							changed = true
 						}
 						c.openState[id] = false
 						c.RequestRedraw()
+						break
 					}
-				} else if isSelectedItem {
-					c.Canvas.FillRoundedRect(ir, c.ScaleF(4), c.Theme.Accent.WithAlpha(45))
-				}
-
-				rowX := ir.X + c.Scale(10).Int()
-				if items[origIdx].Icon != "" {
-					icSz := c.Scale(14).Int()
-					c.Canvas.DrawSVG(items[origIdx].Icon, rowX, ir.Y+(ir.H-icSz)/2, icSz, c.Theme.TextMuted)
-					rowX += icSz + c.Scale(6).Int()
-				}
-				if c.Font != nil {
-					_, th := c.Font.MeasureText(items[origIdx].Label, pxSize)
-					col := c.Theme.TextPrimary
-					if isSelectedItem {
-						col = c.Theme.Accent
-					}
-					c.Font.DrawText(c.Canvas, rowX, ir.Y+(ir.H-th)/2, items[origIdx].Label, pxSize, col)
 				}
 			}
-			c.Canvas.PopClip()
-		})
+		} else {
+			clampScroll(totalH)
+		}
+
+		// Отложенный этап: отрисовка поверх основного UI, если список ещё открыт
+		if c.openState[id] {
+			c.PushOverlay(dropRect, func() {
+				c.drawDropShadow(dropRect, rad, 12, 110)
+				c.Canvas.DrawRoundedBox(dropRect, c.ScaleF(rad), c.Theme.Card, 1.0, c.Theme.Border)
+
+				drawFiltered := filtered
+				if st.Searchable {
+					searchY := dropRect.Y + c.Scale(4).Int()
+					c.pushBox(render.Rect{X: dropRect.X + c.Scale(6).Int(), Y: searchY, W: dropRect.W - c.Scale(12).Int(), H: searchH}, dirColumn, AlignStart, 0)
+					q := c.searchQuery(searchKey)
+					if c.TextInputOpts(searchKey, &q, c.str().SearchPlaceholder, Height(32)) {
+						c.setSearchQuery(searchKey, q)
+						drawFiltered = buildFiltered(strings.ToLower(strings.TrimSpace(q)))
+						clampScroll(len(drawFiltered) * itemH)
+					}
+					c.popBox()
+				}
+
+				c.Canvas.PushClip(listRect)
+				pxSize := c.Scale(13).Int()
+				for pos, origIdx := range drawFiltered {
+					iy := listRect.Y + pos*itemH - si.y
+					if iy+itemH < listRect.Y || iy > listRect.Y+listRect.H {
+						continue
+					}
+					ir := render.Rect{X: listRect.X, Y: iy, W: listRect.W, H: itemH}
+					c.RegisterHit(id+":opt:"+strconv.Itoa(origIdx), ir, platform.CursorHand)
+					itemHover := listRect.Contains(c.MouseX, c.MouseY) && ir.Contains(c.MouseX, c.MouseY)
+					isSelectedItem := *selected == items[origIdx].Key
+					if itemHover {
+						c.nextCursor = platform.CursorHand
+						c.Canvas.FillRoundedRect(ir, c.ScaleF(4), c.Theme.Surface)
+					} else if isSelectedItem {
+						c.Canvas.FillRoundedRect(ir, c.ScaleF(4), c.Theme.Accent.WithAlpha(45))
+					}
+
+					rowX := ir.X + c.Scale(10).Int()
+					if items[origIdx].Icon != "" {
+						icSz := c.Scale(14).Int()
+						c.Canvas.DrawSVG(items[origIdx].Icon, rowX, ir.Y+(ir.H-icSz)/2, icSz, c.Theme.TextMuted)
+						rowX += icSz + c.Scale(6).Int()
+					}
+					if c.Font != nil {
+						_, th := c.Font.MeasureText(items[origIdx].Label, pxSize)
+						col := c.Theme.TextPrimary
+						if isSelectedItem {
+							col = c.Theme.Accent
+						}
+						c.Font.DrawText(c.Canvas, rowX, ir.Y+(ir.H-th)/2, items[origIdx].Label, pxSize, col)
+					}
+				}
+				c.Canvas.PopClip()
+			})
+		}
 	}
 
 	return changed

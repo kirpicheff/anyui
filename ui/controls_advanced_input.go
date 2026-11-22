@@ -453,6 +453,7 @@ func (c *Context) ColorPicker(id string, col *render.Color, opts ...Option) bool
 	radius := c.ScaleF(c.Theme.RadiusSm)
 
 	isOpen := c.openState[id]
+	openedThisFrame := false
 	if !st.Disabled {
 		c.RegisterHit(id, rect, platform.CursorHand)
 	}
@@ -463,6 +464,7 @@ func (c *Context) ColorPicker(id string, col *render.Color, opts ...Option) bool
 			isOpen = !isOpen
 			c.openState[id] = isOpen
 			if isOpen {
+				openedThisFrame = true
 				hv, sv, vv := rgbToHSV(*col)
 				c.colorHSV[id] = [3]float32{hv, sv, vv}
 				c.colorHexText[id] = FormatHexColor(*col)
@@ -501,37 +503,30 @@ func (c *Context) ColorPicker(id string, col *render.Color, opts ...Option) bool
 		}
 		popR := render.Rect{X: popX, Y: popY, W: popW, H: popH}
 
-		if c.MousePressed && !popR.Contains(c.MouseX, c.MouseY) && !rect.Contains(c.MouseX, c.MouseY) {
+		if !openedThisFrame && c.MousePressed && !popR.Contains(c.MouseX, c.MouseY) && !rect.Contains(c.MouseX, c.MouseY) {
 			c.openState[id] = false
 			c.RequestRedraw()
 			return false
 		}
 
-		c.PushOverlay(popR, func() {
-			c.Canvas.DrawBoxShadow(popR, render.BoxShadow{
-				OffsetY: c.ScaleF(4),
-				Blur:    c.ScaleF(14),
-				Color:   render.RGBA(0, 0, 0, 120),
-				Radii:   render.UniformRadii(c.ScaleF(10)),
-			})
-			c.Canvas.DrawRoundedBox(popR, c.ScaleF(10), c.Theme.Card, 1.0, c.Theme.Border)
+		// Синхронный этап: расчёт геометрии и обработка ввода до PushOverlay
+		hsv := c.colorHSV[id]
+		svR := render.Rect{X: popR.X + c.Scale(12).Int(), Y: popR.Y + c.Scale(12).Int(), W: popR.W - c.Scale(24).Int(), H: c.Scale(130).Int()}
+		hueR := render.Rect{X: svR.X, Y: svR.Y + svR.H + c.Scale(10).Int(), W: svR.W, H: c.Scale(16).Int()}
+		swatches := []render.Color{
+			render.Hex(0x3B82F6), render.Hex(0x22C55E), render.Hex(0xF59E0B), render.Hex(0xEF4444),
+			render.Hex(0x8B5CF6), render.Hex(0xEC4899), render.Hex(0x06B6D4), render.Hex(0xF8FAFC),
+		}
+		swY := hueR.Y + hueR.H + c.Scale(10).Int()
+		swSize := c.Scale(20).Int()
+		swGap := c.Scale(6).Int()
+		hexBox := render.Rect{X: svR.X, Y: swY + swSize + c.Scale(10).Int(), W: svR.W, H: c.Scale(30).Int()}
+		svID := id + ":sv"
+		hueID := id + ":hue"
+		hexID := id + ":hex"
 
-			hsv := c.colorHSV[id]
-			svR := render.Rect{X: popR.X + c.Scale(12).Int(), Y: popR.Y + c.Scale(12).Int(), W: popR.W - c.Scale(24).Int(), H: c.Scale(130).Int()}
-
-			// Отрисовка SV-квадрата (шагом 2px для скорости)
-			stepPx := 2
-			for py := 0; py < svR.H; py += stepPx {
-				vv := 1.0 - float32(py)/float32(svR.H)
-				for px := 0; px < svR.W; px += stepPx {
-					ss := float32(px) / float32(svR.W)
-					c.Canvas.FillRect(render.Rect{X: svR.X + px, Y: svR.Y + py, W: stepPx, H: stepPx}, hsvToRGB(hsv[0], ss, vv))
-				}
-			}
-			c.Canvas.DrawRoundedBox(svR, 0, render.RGBA(0, 0, 0, 0), 1.0, c.Theme.Border)
-
+		if !openedThisFrame {
 			// Взаимодействие с SV-квадратом
-			svID := id + ":sv"
 			if svR.Contains(c.MouseX, c.MouseY) && c.MousePressed {
 				c.ActiveID = svID
 			}
@@ -556,21 +551,7 @@ func (c *Context) ColorPicker(id string, col *render.Color, opts ...Option) bool
 				c.RequestRedraw()
 			}
 
-			// Маркер на SV-квадрате
-			mx := float32(svR.X) + hsv[1]*float32(svR.W)
-			my := float32(svR.Y) + (1.0-hsv[2])*float32(svR.H)
-			c.Canvas.FillCircle(mx, my, c.ScaleF(5), render.RGBA(255, 255, 255, 240))
-			c.Canvas.FillCircle(mx, my, c.ScaleF(3), *col)
-
-			// Полоса оттенка Hue
-			hueR := render.Rect{X: svR.X, Y: svR.Y + svR.H + c.Scale(10).Int(), W: svR.W, H: c.Scale(16).Int()}
-			for px := 0; px < hueR.W; px += 2 {
-				hh := (float32(px) / float32(hueR.W)) * 360.0
-				c.Canvas.FillRect(render.Rect{X: hueR.X + px, Y: hueR.Y, W: 2, H: hueR.H}, hsvToRGB(hh, 1, 1))
-			}
-			c.Canvas.DrawRoundedBox(hueR, 0, render.RGBA(0, 0, 0, 0), 1.0, c.Theme.Border)
-
-			hueID := id + ":hue"
+			// Взаимодействие с полосой оттенка Hue
 			if hueR.Contains(c.MouseX, c.MouseY) && c.MousePressed {
 				c.ActiveID = hueID
 			}
@@ -589,48 +570,167 @@ func (c *Context) ColorPicker(id string, col *render.Color, opts ...Option) bool
 				c.RequestRedraw()
 			}
 
-			hx := float32(hueR.X) + (hsv[0]/360.0)*float32(hueR.W)
+			// Клики по быстрым свотчам
+			if c.MousePressed {
+				for i, swCol := range swatches {
+					sr := render.Rect{X: svR.X + i*(swSize+swGap), Y: swY, W: swSize, H: swSize}
+					if sr.Contains(c.MouseX, c.MouseY) {
+						*col = swCol
+						hv, sv, vv := rgbToHSV(swCol)
+						hsv = [3]float32{hv, sv, vv}
+						c.colorHSV[id] = hsv
+						c.colorHexText[id] = FormatHexColor(swCol)
+						changed = true
+						c.RequestRedraw()
+						break
+					}
+				}
+			}
+
+			// Синхронная обработка фокуса и ввода в HEX-поле
+			if c.MousePressed && hexBox.Contains(c.MouseX, c.MouseY) {
+				c.FocusID = hexID
+				c.RequestRedraw()
+			}
+			if c.FocusID == hexID {
+				hexText := c.colorHexText[id]
+				buf := []rune(hexText)
+				hexModified := false
+				for _, kp := range c.KeyEvents {
+					if kp.Mods.Ctrl && kp.Code == KeyV && c.Win != nil {
+						if clip, err := c.Win.ClipboardText(); err == nil {
+							clip = strings.TrimSpace(clip)
+							var filtered []rune
+							for _, r := range clip {
+								if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F') || r == '#' {
+									filtered = append(filtered, r)
+									if len(filtered) >= 7 {
+										break
+									}
+								}
+							}
+							if len(filtered) > 0 {
+								buf = filtered
+								hexModified = true
+							}
+						}
+					} else if kp.Code == KeyBackspace && len(buf) > 0 {
+						buf = buf[:len(buf)-1]
+						hexModified = true
+					} else if kp.Code == KeyEnter || kp.Code == KeyEscape {
+						c.FocusID = ""
+						c.RequestRedraw()
+					}
+				}
+				for _, ch := range c.TypedRunes {
+					if (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F') || ch == '#' {
+						if len(buf) < 7 {
+							buf = append(buf, ch)
+							hexModified = true
+						}
+					}
+				}
+				if hexModified {
+					hexStr := string(buf)
+					c.colorHexText[id] = hexStr
+					if parsed, ok := ParseHexColor(hexStr); ok {
+						*col = parsed
+						hv, sv, vv := rgbToHSV(parsed)
+						hsv = [3]float32{hv, sv, vv}
+						c.colorHSV[id] = hsv
+						changed = true
+					}
+					c.RequestRedraw()
+				}
+			}
+		}
+
+		// Отложенный этап: отрисовка попапа поверх основного UI
+		c.PushOverlay(popR, func() {
+			c.Canvas.DrawBoxShadow(popR, render.BoxShadow{
+				OffsetY: c.ScaleF(4),
+				Blur:    c.ScaleF(14),
+				Color:   render.RGBA(0, 0, 0, 120),
+				Radii:   render.UniformRadii(c.ScaleF(10)),
+			})
+			c.Canvas.DrawRoundedBox(popR, c.ScaleF(10), c.Theme.Card, 1.0, c.Theme.Border)
+
+			hsvDraw := c.colorHSV[id]
+
+			// Отрисовка SV-квадрата (шагом 2px для скорости)
+			stepPx := 2
+			for py := 0; py < svR.H; py += stepPx {
+				vv := 1.0 - float32(py)/float32(svR.H)
+				for px := 0; px < svR.W; px += stepPx {
+					ss := float32(px) / float32(svR.W)
+					c.Canvas.FillRect(render.Rect{X: svR.X + px, Y: svR.Y + py, W: stepPx, H: stepPx}, hsvToRGB(hsvDraw[0], ss, vv))
+				}
+			}
+			c.Canvas.DrawRoundedBox(svR, 0, render.RGBA(0, 0, 0, 0), 1.0, c.Theme.Border)
+			c.RegisterHit(svID, svR, platform.CursorHand)
+			if svR.Contains(c.MouseX, c.MouseY) {
+				c.nextCursor = platform.CursorHand
+			}
+
+			// Маркер на SV-квадрате
+			mx := float32(svR.X) + hsvDraw[1]*float32(svR.W)
+			my := float32(svR.Y) + (1.0-hsvDraw[2])*float32(svR.H)
+			c.Canvas.FillCircle(mx, my, c.ScaleF(5), render.RGBA(255, 255, 255, 240))
+			c.Canvas.FillCircle(mx, my, c.ScaleF(3), *col)
+
+			// Полоса оттенка Hue
+			for px := 0; px < hueR.W; px += 2 {
+				hh := (float32(px) / float32(hueR.W)) * 360.0
+				c.Canvas.FillRect(render.Rect{X: hueR.X + px, Y: hueR.Y, W: 2, H: hueR.H}, hsvToRGB(hh, 1, 1))
+			}
+			c.Canvas.DrawRoundedBox(hueR, 0, render.RGBA(0, 0, 0, 0), 1.0, c.Theme.Border)
+			c.RegisterHit(hueID, hueR, platform.CursorHand)
+			if hueR.Contains(c.MouseX, c.MouseY) {
+				c.nextCursor = platform.CursorHand
+			}
+
+			hx := float32(hueR.X) + (hsvDraw[0]/360.0)*float32(hueR.W)
 			c.Canvas.FillRect(render.Rect{X: int(hx) - c.Scale(2).Int(), Y: hueR.Y - c.Scale(2).Int(), W: c.Scale(4).Int(), H: hueR.H + c.Scale(4).Int()}, render.RGBA(255, 255, 255, 255))
 
 			// Быстрые свотчи
-			swatches := []render.Color{
-				render.Hex(0x3B82F6), render.Hex(0x22C55E), render.Hex(0xF59E0B), render.Hex(0xEF4444),
-				render.Hex(0x8B5CF6), render.Hex(0xEC4899), render.Hex(0x06B6D4), render.Hex(0xF8FAFC),
-			}
-			swY := hueR.Y + hueR.H + c.Scale(10).Int()
-			swSize := c.Scale(20).Int()
-			swGap := c.Scale(6).Int()
 			for i, swCol := range swatches {
 				sr := render.Rect{X: svR.X + i*(swSize+swGap), Y: swY, W: swSize, H: swSize}
 				c.RegisterHit(id+":sw:"+strconv.Itoa(i), sr, platform.CursorHand)
 				c.Canvas.DrawRoundedBox(sr, c.ScaleF(4), swCol, 1.0, c.Theme.Border)
 				if sr.Contains(c.MouseX, c.MouseY) {
 					c.nextCursor = platform.CursorHand
-					if c.MousePressed {
-						*col = swCol
-						hv, sv, vv := rgbToHSV(swCol)
-						c.colorHSV[id] = [3]float32{hv, sv, vv}
-						c.colorHexText[id] = FormatHexColor(swCol)
-						changed = true
-						c.RequestRedraw()
-					}
 				}
 			}
 
 			// HEX-поле ввода внутри оверлея
-			hexBox := render.Rect{X: svR.X, Y: swY + swSize + c.Scale(10).Int(), W: svR.W, H: c.Scale(30).Int()}
-			c.pushBox(hexBox, dirColumn, AlignStart, 0)
-			hexStr := c.colorHexText[id]
-			if c.TextInput(id+":hex", &hexStr, "#RRGGBB", Dp(float32(svR.W)/c.DpiScale)) {
-				c.colorHexText[id] = hexStr
-				if parsed, ok := ParseHexColor(hexStr); ok {
-					*col = parsed
-					hv, sv, vv := rgbToHSV(parsed)
-					c.colorHSV[id] = [3]float32{hv, sv, vv}
-					changed = true
+			c.RegisterHit(hexID, hexBox, platform.CursorIBeam)
+			if hexBox.Contains(c.MouseX, c.MouseY) {
+				c.nextCursor = platform.CursorIBeam
+			}
+			hexFocused := c.FocusID == hexID
+			hexBorder := c.Theme.Border
+			if hexFocused {
+				hexBorder = c.Theme.BorderFocus
+			}
+			c.Canvas.DrawRoundedBox(hexBox, c.ScaleF(c.Theme.RadiusSm), c.Theme.SurfaceDark, 1.0, hexBorder)
+			if c.Font != nil {
+				hexStr := c.colorHexText[id]
+				pxSize := c.Scale(13).Int()
+				displayText := hexStr
+				txtCol := c.Theme.TextPrimary
+				if displayText == "" {
+					displayText = "#RRGGBB"
+					txtCol = c.Theme.TextMuted
+				}
+				_, th := c.Font.MeasureText(displayText, pxSize)
+				tx := hexBox.X + c.Scale(10).Int()
+				ty := hexBox.Y + (hexBox.H-th)/2
+				c.Font.DrawText(c.Canvas, tx, ty, displayText, pxSize, txtCol)
+				if hexFocused {
+					tw, _ := c.Font.MeasureText(hexStr, pxSize)
+					c.Canvas.FillRect(render.Rect{X: tx + tw + 1, Y: hexBox.Y + c.Scale(6).Int(), W: 1, H: hexBox.H - c.Scale(12).Int()}, c.Theme.Accent)
 				}
 			}
-			c.popBox()
 		})
 	}
 
@@ -663,6 +763,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 	radius := c.ScaleF(c.Theme.RadiusSm)
 
 	isOpen := c.openState[id]
+	openedThisFrame := false
 	changed := false
 
 	// Клик по полю открывает/закрывает выпадающий календарь; двойной клик по текстовой части включает ручной ввод
@@ -686,6 +787,7 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 			c.openState[id] = isOpen
 			dpEditActive[id] = false
 			if isOpen {
+				openedThisFrame = true
 				dpModeStore[id] = dpModeDays
 				c.dateViewMonth[id] = time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, date.Location())
 			}
@@ -783,283 +885,357 @@ func (c *Context) DatePicker(id string, date *time.Time, opts ...Option) bool {
 		}
 		popR := render.Rect{X: popX, Y: popY, W: popW, H: popH}
 
-		if c.MousePressed && !popR.Contains(c.MouseX, c.MouseY) && !rect.Contains(c.MouseX, c.MouseY) {
+		if !openedThisFrame && c.MousePressed && !popR.Contains(c.MouseX, c.MouseY) && !rect.Contains(c.MouseX, c.MouseY) {
 			c.openState[id] = false
 			c.RequestRedraw()
 			return false
 		}
 
-		c.PushOverlay(popR, func() {
-			c.Canvas.DrawBoxShadow(popR, render.BoxShadow{
-				OffsetY: c.ScaleF(4),
-				Blur:    c.ScaleF(14),
-				Color:   render.RGBA(0, 0, 0, 120),
-				Radii:   render.UniformRadii(c.ScaleF(10)),
-			})
-			c.Canvas.DrawRoundedBox(popR, c.ScaleF(10), c.Theme.Card, 1.0, c.Theme.Border)
+		// Синхронный этап: расчёт геометрии календаря и обработка кликов до PushOverlay
+		vm := c.dateViewMonth[id]
+		if vm.IsZero() {
+			vm = time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, date.Location())
+			c.dateViewMonth[id] = vm
+		}
+		mode := dpModeStore[id]
 
-			vm := c.dateViewMonth[id]
-			if vm.IsZero() {
-				vm = time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, date.Location())
-				c.dateViewMonth[id] = vm
-			}
+		hdrR := render.Rect{X: popR.X + c.Scale(10).Int(), Y: popR.Y + c.Scale(10).Int(), W: popR.W - c.Scale(20).Int(), H: c.Scale(28).Int()}
+		prevR := render.Rect{X: hdrR.X, Y: hdrR.Y, W: c.Scale(28).Int(), H: hdrR.H}
+		nextR := render.Rect{X: hdrR.X + hdrR.W - c.Scale(28).Int(), Y: hdrR.Y, W: c.Scale(28).Int(), H: hdrR.H}
+		gridX := popR.X + c.Scale(10).Int()
+		gridY := hdrR.Y + hdrR.H + c.Scale(8).Int()
+		todayR := render.Rect{X: popR.X + c.Scale(10).Int(), Y: popR.Y + popR.H - c.Scale(34).Int(), W: popR.W - c.Scale(20).Int(), H: c.Scale(24).Int()}
 
-			mode := dpModeStore[id]
-
-			// Шапка месяца/года с кнопками < и >
-			hdrR := render.Rect{X: popR.X + c.Scale(10).Int(), Y: popR.Y + c.Scale(10).Int(), W: popR.W - c.Scale(20).Int(), H: c.Scale(28).Int()}
-			prevR := render.Rect{X: hdrR.X, Y: hdrR.Y, W: c.Scale(28).Int(), H: hdrR.H}
-			nextR := render.Rect{X: hdrR.X + hdrR.W - c.Scale(28).Int(), Y: hdrR.Y, W: c.Scale(28).Int(), H: hdrR.H}
-			c.RegisterHit(id+":prev", prevR, platform.CursorHand)
-			c.RegisterHit(id+":next", nextR, platform.CursorHand)
-
+		if !openedThisFrame && c.MousePressed {
+			handled := false
 			if prevR.Contains(c.MouseX, c.MouseY) {
-				c.nextCursor = platform.CursorHand
-				c.Canvas.FillRoundedRect(prevR, c.ScaleF(6), c.Theme.Surface)
-				if c.MousePressed {
-					if mode == dpModeYears {
-						c.dateViewMonth[id] = vm.AddDate(-12, 0, 0)
-					} else if mode == dpModeMonths {
-						c.dateViewMonth[id] = vm.AddDate(-1, 0, 0)
-					} else {
-						c.dateViewMonth[id] = vm.AddDate(0, -1, 0)
-					}
-					c.RequestRedraw()
-				}
-			}
-			if nextR.Contains(c.MouseX, c.MouseY) {
-				c.nextCursor = platform.CursorHand
-				c.Canvas.FillRoundedRect(nextR, c.ScaleF(6), c.Theme.Surface)
-				if c.MousePressed {
-					if mode == dpModeYears {
-						c.dateViewMonth[id] = vm.AddDate(12, 0, 0)
-					} else if mode == dpModeMonths {
-						c.dateViewMonth[id] = vm.AddDate(1, 0, 0)
-					} else {
-						c.dateViewMonth[id] = vm.AddDate(0, 1, 0)
-					}
-					c.RequestRedraw()
-				}
-			}
-
-			if c.Font != nil {
-				loc := c.str()
-				px := c.Scale(13).Int()
-				months := loc.Months
 				if mode == dpModeYears {
-					title := formatYearRangeTitle(vm.Year())
-					tw, th := c.Font.MeasureText(title, px)
-					c.Font.DrawText(c.Canvas, hdrR.X+(hdrR.W-tw)/2, hdrR.Y+(hdrR.H-th)/2, title, px, c.Theme.TextPrimary)
+					c.dateViewMonth[id] = vm.AddDate(-12, 0, 0)
+				} else if mode == dpModeMonths {
+					c.dateViewMonth[id] = vm.AddDate(-1, 0, 0)
 				} else {
-					mName := months[int(vm.Month())-1]
-					yName := strconv.Itoa(vm.Year())
-					mw, mh := c.Font.MeasureText(mName, px)
-					yw, yh := c.Font.MeasureText(yName, px)
-					gap := c.Scale(6).Int()
-					totalW := mw + gap + yw
-					startX := hdrR.X + (hdrR.W-totalW)/2
-					mRect := render.Rect{X: startX - c.Scale(4).Int(), Y: hdrR.Y, W: mw + c.Scale(8).Int(), H: hdrR.H}
-					yRect := render.Rect{X: startX + mw + gap - c.Scale(4).Int(), Y: hdrR.Y, W: yw + c.Scale(8).Int(), H: hdrR.H}
-					c.RegisterHit(id+":month", mRect, platform.CursorHand)
-					c.RegisterHit(id+":year", yRect, platform.CursorHand)
-
-					mCol := c.Theme.TextPrimary
-					if mRect.Contains(c.MouseX, c.MouseY) {
-						c.nextCursor = platform.CursorHand
-						c.Canvas.FillRoundedRect(mRect, c.ScaleF(6), c.Theme.Surface)
-						mCol = c.Theme.Accent
-						if c.MousePressed {
-							if mode == dpModeMonths {
-								dpModeStore[id] = dpModeDays
-							} else {
-								dpModeStore[id] = dpModeMonths
-							}
-							c.RequestRedraw()
-						}
-					}
-					yCol := c.Theme.TextPrimary
-					if yRect.Contains(c.MouseX, c.MouseY) {
-						c.nextCursor = platform.CursorHand
-						c.Canvas.FillRoundedRect(yRect, c.ScaleF(6), c.Theme.Surface)
-						yCol = c.Theme.Accent
-						if c.MousePressed {
-							dpModeStore[id] = dpModeYears
-							c.RequestRedraw()
-						}
-					}
-					c.Font.DrawText(c.Canvas, startX, hdrR.Y+(hdrR.H-mh)/2, mName, px, mCol)
-					c.Font.DrawText(c.Canvas, startX+mw+gap, hdrR.Y+(hdrR.H-yh)/2, yName, px, yCol)
+					c.dateViewMonth[id] = vm.AddDate(0, -1, 0)
 				}
-
-				pw, ph := c.Font.MeasureText("<", px)
-				c.Font.DrawText(c.Canvas, prevR.X+(prevR.W-pw)/2, prevR.Y+(prevR.H-ph)/2, "<", px, c.Theme.TextPrimary)
-				nw, nh := c.Font.MeasureText(">", px)
-				c.Font.DrawText(c.Canvas, nextR.X+(nextR.W-nw)/2, nextR.Y+(nextR.H-nh)/2, ">", px, c.Theme.TextPrimary)
+				c.RequestRedraw()
+				handled = true
+			} else if nextR.Contains(c.MouseX, c.MouseY) {
+				if mode == dpModeYears {
+					c.dateViewMonth[id] = vm.AddDate(12, 0, 0)
+				} else if mode == dpModeMonths {
+					c.dateViewMonth[id] = vm.AddDate(1, 0, 0)
+				} else {
+					c.dateViewMonth[id] = vm.AddDate(0, 1, 0)
+				}
+				c.RequestRedraw()
+				handled = true
 			}
 
-			gridX := popR.X + c.Scale(10).Int()
-			gridY := hdrR.Y + hdrR.H + c.Scale(8).Int()
-
-			if mode == dpModeMonths {
-				shortMonths := c.str().ShortMonths
-				mW := (popR.W - c.Scale(20).Int()) / 3
-				mH := c.Scale(42).Int()
-				for mi := 0; mi < 12; mi++ {
-					colIdx := mi % 3
-					rowIdx := mi / 3
-					mr := render.Rect{X: gridX + colIdx*mW + c.Scale(2).Int(), Y: gridY + rowIdx*mH + c.Scale(2).Int(), W: mW - c.Scale(4).Int(), H: mH - c.Scale(4).Int()}
-					c.RegisterHit(id+":m:"+strconv.Itoa(mi), mr, platform.CursorHand)
-					isCur := int(vm.Month())-1 == mi
-					hov := mr.Contains(c.MouseX, c.MouseY)
-					if isCur {
-						c.Canvas.FillRoundedRect(mr, c.ScaleF(6), c.Theme.Accent)
-					} else if hov {
-						c.Canvas.FillRoundedRect(mr, c.ScaleF(6), c.Theme.Surface)
+			if !handled && c.Font != nil && mode != dpModeYears {
+				px := c.Scale(13).Int()
+				mName := c.str().Months[int(vm.Month())-1]
+				yName := strconv.Itoa(vm.Year())
+				mw, _ := c.Font.MeasureText(mName, px)
+				yw, _ := c.Font.MeasureText(yName, px)
+				gap := c.Scale(6).Int()
+				totalW := mw + gap + yw
+				startX := hdrR.X + (hdrR.W-totalW)/2
+				mRect := render.Rect{X: startX - c.Scale(4).Int(), Y: hdrR.Y, W: mw + c.Scale(8).Int(), H: hdrR.H}
+				yRect := render.Rect{X: startX + mw + gap - c.Scale(4).Int(), Y: hdrR.Y, W: yw + c.Scale(8).Int(), H: hdrR.H}
+				if mRect.Contains(c.MouseX, c.MouseY) {
+					if mode == dpModeMonths {
+						dpModeStore[id] = dpModeDays
+					} else {
+						dpModeStore[id] = dpModeMonths
 					}
-					if hov {
-						c.nextCursor = platform.CursorHand
-						if c.MousePressed {
+					c.RequestRedraw()
+					handled = true
+				} else if yRect.Contains(c.MouseX, c.MouseY) {
+					dpModeStore[id] = dpModeYears
+					c.RequestRedraw()
+					handled = true
+				}
+			}
+
+			if !handled {
+				if mode == dpModeMonths {
+					mW := (popR.W - c.Scale(20).Int()) / 3
+					mH := c.Scale(42).Int()
+					for mi := 0; mi < 12; mi++ {
+						colIdx := mi % 3
+						rowIdx := mi / 3
+						mr := render.Rect{X: gridX + colIdx*mW + c.Scale(2).Int(), Y: gridY + rowIdx*mH + c.Scale(2).Int(), W: mW - c.Scale(4).Int(), H: mH - c.Scale(4).Int()}
+						if mr.Contains(c.MouseX, c.MouseY) {
 							c.dateViewMonth[id] = time.Date(vm.Year(), time.Month(mi+1), 1, 0, 0, 0, 0, vm.Location())
 							dpModeStore[id] = dpModeDays
 							c.RequestRedraw()
+							handled = true
+							break
 						}
 					}
-					if c.Font != nil {
-						tc := c.Theme.TextPrimary
-						if isCur {
-							tc = render.RGBA(255, 255, 255, 255)
-						}
-						tw, th := c.Font.MeasureText(shortMonths[mi], c.Scale(12).Int())
-						c.Font.DrawText(c.Canvas, mr.X+(mr.W-tw)/2, mr.Y+(mr.H-th)/2, shortMonths[mi], c.Scale(12).Int(), tc)
-					}
-				}
-			} else if mode == dpModeYears {
-				startYear := (vm.Year() / 12) * 12
-				yW := (popR.W - c.Scale(20).Int()) / 3
-				yH := c.Scale(42).Int()
-				for yi := 0; yi < 12; yi++ {
-					yr := startYear + yi
-					colIdx := yi % 3
-					rowIdx := yi / 3
-					yrRect := render.Rect{X: gridX + colIdx*yW + c.Scale(2).Int(), Y: gridY + rowIdx*yH + c.Scale(2).Int(), W: yW - c.Scale(4).Int(), H: yH - c.Scale(4).Int()}
-					c.RegisterHit(id+":y:"+strconv.Itoa(yr), yrRect, platform.CursorHand)
-					isCur := vm.Year() == yr
-					hov := yrRect.Contains(c.MouseX, c.MouseY)
-					if isCur {
-						c.Canvas.FillRoundedRect(yrRect, c.ScaleF(6), c.Theme.Accent)
-					} else if hov {
-						c.Canvas.FillRoundedRect(yrRect, c.ScaleF(6), c.Theme.Surface)
-					}
-					if hov {
-						c.nextCursor = platform.CursorHand
-						if c.MousePressed {
+				} else if mode == dpModeYears {
+					startYear := (vm.Year() / 12) * 12
+					yW := (popR.W - c.Scale(20).Int()) / 3
+					yH := c.Scale(42).Int()
+					for yi := 0; yi < 12; yi++ {
+						yr := startYear + yi
+						colIdx := yi % 3
+						rowIdx := yi / 3
+						yrRect := render.Rect{X: gridX + colIdx*yW + c.Scale(2).Int(), Y: gridY + rowIdx*yH + c.Scale(2).Int(), W: yW - c.Scale(4).Int(), H: yH - c.Scale(4).Int()}
+						if yrRect.Contains(c.MouseX, c.MouseY) {
 							c.dateViewMonth[id] = time.Date(yr, vm.Month(), 1, 0, 0, 0, 0, vm.Location())
 							dpModeStore[id] = dpModeMonths
 							c.RequestRedraw()
+							handled = true
+							break
 						}
 					}
-					if c.Font != nil {
-						tc := c.Theme.TextPrimary
-						if isCur {
-							tc = render.RGBA(255, 255, 255, 255)
-						}
-						ys := strconv.Itoa(yr)
-						tw, th := c.Font.MeasureText(ys, c.Scale(12).Int())
-						c.Font.DrawText(c.Canvas, yrRect.X+(yrRect.W-tw)/2, yrRect.Y+(yrRect.H-th)/2, ys, c.Scale(12).Int(), tc)
+				} else {
+					cellW := (popR.W - c.Scale(20).Int()) / 7
+					cellH := c.Scale(28).Int()
+					daysY := gridY + c.Scale(22).Int()
+					firstWD := int(vm.Weekday())
+					if firstWD == 0 {
+						firstWD = 7 // Воскресенье -> 7
 					}
-				}
-			} else {
-				// Дни недели (Пн..Вс)
-				cellW := (popR.W - c.Scale(20).Int()) / 7
-				cellH := c.Scale(28).Int()
-
-				wdNames := c.str().Weekdays
-				if c.Font != nil {
-					pxSmall := c.Scale(11).Int()
-					for i, wd := range wdNames {
-						tw, th := c.Font.MeasureText(wd, pxSmall)
-						cx := gridX + i*cellW + (cellW-tw)/2
-						c.Font.DrawText(c.Canvas, cx, gridY+(c.Scale(20).Int()-th)/2, wd, pxSmall, c.Theme.TextMuted)
-					}
-				}
-
-				// Сетка чисел месяца
-				daysY := gridY + c.Scale(22).Int()
-				firstWD := int(vm.Weekday())
-				if firstWD == 0 {
-					firstWD = 7 // Воскресенье -> 7
-				}
-				offset := firstWD - 1
-				daysInMonth := time.Date(vm.Year(), vm.Month()+1, 0, 0, 0, 0, 0, vm.Location()).Day()
-				now := c.Now()
-
-				for d := 1; d <= daysInMonth; d++ {
-					slot := offset + d - 1
-					colIdx := slot % 7
-					rowIdx := slot / 7
-					dr := render.Rect{X: gridX + colIdx*cellW + c.Scale(1).Int(), Y: daysY + rowIdx*cellH + c.Scale(1).Int(), W: cellW - c.Scale(2).Int(), H: cellH - c.Scale(2).Int()}
-					c.RegisterHit(id+":d:"+strconv.Itoa(d), dr, platform.CursorHand)
-
-					isSel := date.Year() == vm.Year() && date.Month() == vm.Month() && date.Day() == d
-					isToday := now.Year() == vm.Year() && now.Month() == vm.Month() && now.Day() == d
-					dHover := dr.Contains(c.MouseX, c.MouseY)
-
-					if isSel {
-						c.Canvas.FillRoundedRect(dr, c.ScaleF(6), c.Theme.Accent)
-					} else if dHover {
-						c.Canvas.FillRoundedRect(dr, c.ScaleF(6), c.Theme.Surface)
-					} else if isToday {
-						c.Canvas.DrawRoundedBox(dr, c.ScaleF(6), render.RGBA(0, 0, 0, 0), 1.0, c.Theme.Accent)
-					}
-
-					if dHover {
-						c.nextCursor = platform.CursorHand
-						if c.MousePressed {
+					offset := firstWD - 1
+					daysInMonth := time.Date(vm.Year(), vm.Month()+1, 0, 0, 0, 0, 0, vm.Location()).Day()
+					for d := 1; d <= daysInMonth; d++ {
+						slot := offset + d - 1
+						colIdx := slot % 7
+						rowIdx := slot / 7
+						dr := render.Rect{X: gridX + colIdx*cellW + c.Scale(1).Int(), Y: daysY + rowIdx*cellH + c.Scale(1).Int(), W: cellW - c.Scale(2).Int(), H: cellH - c.Scale(2).Int()}
+						if dr.Contains(c.MouseX, c.MouseY) {
 							*date = time.Date(vm.Year(), vm.Month(), d, 0, 0, 0, 0, date.Location())
 							c.openState[id] = false
 							changed = true
 							c.RequestRedraw()
+							handled = true
+							break
 						}
 					}
+				}
+			}
 
+			if !handled && todayR.Contains(c.MouseX, c.MouseY) {
+				now := c.Now()
+				*date = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, date.Location())
+				c.dateViewMonth[id] = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, date.Location())
+				dpModeStore[id] = dpModeDays
+				c.openState[id] = false
+				changed = true
+				c.RequestRedraw()
+			}
+		}
+
+		// Отложенный этап: отрисовка календаря поверх основного UI, если попап ещё открыт
+		if c.openState[id] {
+			c.PushOverlay(popR, func() {
+				c.Canvas.DrawBoxShadow(popR, render.BoxShadow{
+					OffsetY: c.ScaleF(4),
+					Blur:    c.ScaleF(14),
+					Color:   render.RGBA(0, 0, 0, 120),
+					Radii:   render.UniformRadii(c.ScaleF(10)),
+				})
+				c.Canvas.DrawRoundedBox(popR, c.ScaleF(10), c.Theme.Card, 1.0, c.Theme.Border)
+
+				vm := c.dateViewMonth[id]
+				if vm.IsZero() {
+					vm = time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, date.Location())
+					c.dateViewMonth[id] = vm
+				}
+				mode := dpModeStore[id]
+
+				// Шапка месяца/года с кнопками < и >
+				c.RegisterHit(id+":prev", prevR, platform.CursorHand)
+				c.RegisterHit(id+":next", nextR, platform.CursorHand)
+
+				if prevR.Contains(c.MouseX, c.MouseY) {
+					c.nextCursor = platform.CursorHand
+					c.Canvas.FillRoundedRect(prevR, c.ScaleF(6), c.Theme.Surface)
+				}
+				if nextR.Contains(c.MouseX, c.MouseY) {
+					c.nextCursor = platform.CursorHand
+					c.Canvas.FillRoundedRect(nextR, c.ScaleF(6), c.Theme.Surface)
+				}
+
+				if c.Font != nil {
+					loc := c.str()
+					px := c.Scale(13).Int()
+					months := loc.Months
+					if mode == dpModeYears {
+						title := formatYearRangeTitle(vm.Year())
+						tw, th := c.Font.MeasureText(title, px)
+						c.Font.DrawText(c.Canvas, hdrR.X+(hdrR.W-tw)/2, hdrR.Y+(hdrR.H-th)/2, title, px, c.Theme.TextPrimary)
+					} else {
+						mName := months[int(vm.Month())-1]
+						yName := strconv.Itoa(vm.Year())
+						mw, mh := c.Font.MeasureText(mName, px)
+						yw, yh := c.Font.MeasureText(yName, px)
+						gap := c.Scale(6).Int()
+						totalW := mw + gap + yw
+						startX := hdrR.X + (hdrR.W-totalW)/2
+						mRect := render.Rect{X: startX - c.Scale(4).Int(), Y: hdrR.Y, W: mw + c.Scale(8).Int(), H: hdrR.H}
+						yRect := render.Rect{X: startX + mw + gap - c.Scale(4).Int(), Y: hdrR.Y, W: yw + c.Scale(8).Int(), H: hdrR.H}
+						c.RegisterHit(id+":month", mRect, platform.CursorHand)
+						c.RegisterHit(id+":year", yRect, platform.CursorHand)
+
+						mCol := c.Theme.TextPrimary
+						if mRect.Contains(c.MouseX, c.MouseY) {
+							c.nextCursor = platform.CursorHand
+							c.Canvas.FillRoundedRect(mRect, c.ScaleF(6), c.Theme.Surface)
+							mCol = c.Theme.Accent
+						}
+						yCol := c.Theme.TextPrimary
+						if yRect.Contains(c.MouseX, c.MouseY) {
+							c.nextCursor = platform.CursorHand
+							c.Canvas.FillRoundedRect(yRect, c.ScaleF(6), c.Theme.Surface)
+							yCol = c.Theme.Accent
+						}
+						c.Font.DrawText(c.Canvas, startX, hdrR.Y+(hdrR.H-mh)/2, mName, px, mCol)
+						c.Font.DrawText(c.Canvas, startX+mw+gap, hdrR.Y+(hdrR.H-yh)/2, yName, px, yCol)
+					}
+
+					pw, ph := c.Font.MeasureText("<", px)
+					c.Font.DrawText(c.Canvas, prevR.X+(prevR.W-pw)/2, prevR.Y+(prevR.H-ph)/2, "<", px, c.Theme.TextPrimary)
+					nw, nh := c.Font.MeasureText(">", px)
+					c.Font.DrawText(c.Canvas, nextR.X+(nextR.W-nw)/2, nextR.Y+(nextR.H-nh)/2, ">", px, c.Theme.TextPrimary)
+				}
+
+				if mode == dpModeMonths {
+					shortMonths := c.str().ShortMonths
+					mW := (popR.W - c.Scale(20).Int()) / 3
+					mH := c.Scale(42).Int()
+					for mi := 0; mi < 12; mi++ {
+						colIdx := mi % 3
+						rowIdx := mi / 3
+						mr := render.Rect{X: gridX + colIdx*mW + c.Scale(2).Int(), Y: gridY + rowIdx*mH + c.Scale(2).Int(), W: mW - c.Scale(4).Int(), H: mH - c.Scale(4).Int()}
+						c.RegisterHit(id+":m:"+strconv.Itoa(mi), mr, platform.CursorHand)
+						isCur := int(vm.Month())-1 == mi
+						hov := mr.Contains(c.MouseX, c.MouseY)
+						if isCur {
+							c.Canvas.FillRoundedRect(mr, c.ScaleF(6), c.Theme.Accent)
+						} else if hov {
+							c.Canvas.FillRoundedRect(mr, c.ScaleF(6), c.Theme.Surface)
+						}
+						if hov {
+							c.nextCursor = platform.CursorHand
+						}
+						if c.Font != nil {
+							tc := c.Theme.TextPrimary
+							if isCur {
+								tc = render.RGBA(255, 255, 255, 255)
+							}
+							tw, th := c.Font.MeasureText(shortMonths[mi], c.Scale(12).Int())
+							c.Font.DrawText(c.Canvas, mr.X+(mr.W-tw)/2, mr.Y+(mr.H-th)/2, shortMonths[mi], c.Scale(12).Int(), tc)
+						}
+					}
+				} else if mode == dpModeYears {
+					startYear := (vm.Year() / 12) * 12
+					yW := (popR.W - c.Scale(20).Int()) / 3
+					yH := c.Scale(42).Int()
+					for yi := 0; yi < 12; yi++ {
+						yr := startYear + yi
+						colIdx := yi % 3
+						rowIdx := yi / 3
+						yrRect := render.Rect{X: gridX + colIdx*yW + c.Scale(2).Int(), Y: gridY + rowIdx*yH + c.Scale(2).Int(), W: yW - c.Scale(4).Int(), H: yH - c.Scale(4).Int()}
+						c.RegisterHit(id+":y:"+strconv.Itoa(yr), yrRect, platform.CursorHand)
+						isCur := vm.Year() == yr
+						hov := yrRect.Contains(c.MouseX, c.MouseY)
+						if isCur {
+							c.Canvas.FillRoundedRect(yrRect, c.ScaleF(6), c.Theme.Accent)
+						} else if hov {
+							c.Canvas.FillRoundedRect(yrRect, c.ScaleF(6), c.Theme.Surface)
+						}
+						if hov {
+							c.nextCursor = platform.CursorHand
+						}
+						if c.Font != nil {
+							tc := c.Theme.TextPrimary
+							if isCur {
+								tc = render.RGBA(255, 255, 255, 255)
+							}
+							ys := strconv.Itoa(yr)
+							tw, th := c.Font.MeasureText(ys, c.Scale(12).Int())
+							c.Font.DrawText(c.Canvas, yrRect.X+(yrRect.W-tw)/2, yrRect.Y+(yrRect.H-th)/2, ys, c.Scale(12).Int(), tc)
+						}
+					}
+				} else {
+					// Дни недели (Пн..Вс)
+					cellW := (popR.W - c.Scale(20).Int()) / 7
+					cellH := c.Scale(28).Int()
+
+					wdNames := c.str().Weekdays
 					if c.Font != nil {
-						px := c.Scale(12).Int()
-						ds := strconv.Itoa(d)
-						tw, th := c.Font.MeasureText(ds, px)
-						tc := c.Theme.TextPrimary
-						if isSel {
-							tc = render.RGBA(255, 255, 255, 255)
+						pxSmall := c.Scale(11).Int()
+						for i, wd := range wdNames {
+							tw, th := c.Font.MeasureText(wd, pxSmall)
+							cx := gridX + i*cellW + (cellW-tw)/2
+							c.Font.DrawText(c.Canvas, cx, gridY+(c.Scale(20).Int()-th)/2, wd, pxSmall, c.Theme.TextMuted)
 						}
-						c.Font.DrawText(c.Canvas, dr.X+(dr.W-tw)/2, dr.Y+(dr.H-th)/2, ds, px, tc)
+					}
+
+					// Сетка чисел месяца
+					daysY := gridY + c.Scale(22).Int()
+					firstWD := int(vm.Weekday())
+					if firstWD == 0 {
+						firstWD = 7 // Воскресенье -> 7
+					}
+					offset := firstWD - 1
+					daysInMonth := time.Date(vm.Year(), vm.Month()+1, 0, 0, 0, 0, 0, vm.Location()).Day()
+					now := c.Now()
+
+					for d := 1; d <= daysInMonth; d++ {
+						slot := offset + d - 1
+						colIdx := slot % 7
+						rowIdx := slot / 7
+						dr := render.Rect{X: gridX + colIdx*cellW + c.Scale(1).Int(), Y: daysY + rowIdx*cellH + c.Scale(1).Int(), W: cellW - c.Scale(2).Int(), H: cellH - c.Scale(2).Int()}
+						c.RegisterHit(id+":d:"+strconv.Itoa(d), dr, platform.CursorHand)
+
+						isSel := date.Year() == vm.Year() && date.Month() == vm.Month() && date.Day() == d
+						isToday := now.Year() == vm.Year() && now.Month() == vm.Month() && now.Day() == d
+						dHover := dr.Contains(c.MouseX, c.MouseY)
+
+						if isSel {
+							c.Canvas.FillRoundedRect(dr, c.ScaleF(6), c.Theme.Accent)
+						} else if dHover {
+							c.Canvas.FillRoundedRect(dr, c.ScaleF(6), c.Theme.Surface)
+						} else if isToday {
+							c.Canvas.DrawRoundedBox(dr, c.ScaleF(6), render.RGBA(0, 0, 0, 0), 1.0, c.Theme.Accent)
+						}
+
+						if dHover {
+							c.nextCursor = platform.CursorHand
+						}
+
+						if c.Font != nil {
+							px := c.Scale(12).Int()
+							ds := strconv.Itoa(d)
+							tw, th := c.Font.MeasureText(ds, px)
+							tc := c.Theme.TextPrimary
+							if isSel {
+								tc = render.RGBA(255, 255, 255, 255)
+							}
+							c.Font.DrawText(c.Canvas, dr.X+(dr.W-tw)/2, dr.Y+(dr.H-th)/2, ds, px, tc)
+						}
 					}
 				}
-			}
 
-			// Кнопка "Сегодня" внизу календаря
-			todayR := render.Rect{X: popR.X + c.Scale(10).Int(), Y: popR.Y + popR.H - c.Scale(34).Int(), W: popR.W - c.Scale(20).Int(), H: c.Scale(24).Int()}
-			c.RegisterHit(id+":today", todayR, platform.CursorHand)
-			hovToday := todayR.Contains(c.MouseX, c.MouseY)
-			todayBg := c.Theme.Surface
-			if hovToday {
-				c.nextCursor = platform.CursorHand
-				todayBg = c.Theme.Accent.WithAlpha(40)
-				if c.MousePressed {
-					now := c.Now()
-					*date = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, date.Location())
-					c.dateViewMonth[id] = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, date.Location())
-					dpModeStore[id] = dpModeDays
-					c.openState[id] = false
-					changed = true
-					c.RequestRedraw()
+				// Кнопка "Сегодня" внизу календаря
+				c.RegisterHit(id+":today", todayR, platform.CursorHand)
+				hovToday := todayR.Contains(c.MouseX, c.MouseY)
+				todayBg := c.Theme.Surface
+				if hovToday {
+					c.nextCursor = platform.CursorHand
+					todayBg = c.Theme.Accent.WithAlpha(40)
 				}
-			}
-			c.Canvas.DrawRoundedBox(todayR, c.ScaleF(6), todayBg, 1.0, c.Theme.Border)
-			if c.Font != nil {
-				todayLbl := c.str().Today
-				tw, th := c.Font.MeasureText(todayLbl, c.Scale(11).Int())
-				c.Font.DrawText(c.Canvas, todayR.X+(todayR.W-tw)/2, todayR.Y+(todayR.H-th)/2, todayLbl, c.Scale(11).Int(), c.Theme.Accent)
-			}
-		})
+				c.Canvas.DrawRoundedBox(todayR, c.ScaleF(6), todayBg, 1.0, c.Theme.Border)
+				if c.Font != nil {
+					todayLbl := c.str().Today
+					tw, th := c.Font.MeasureText(todayLbl, c.Scale(11).Int())
+					c.Font.DrawText(c.Canvas, todayR.X+(todayR.W-tw)/2, todayR.Y+(todayR.H-th)/2, todayLbl, c.Scale(11).Int(), c.Theme.Accent)
+				}
+			})
+		}
 	}
 
 	return changed
