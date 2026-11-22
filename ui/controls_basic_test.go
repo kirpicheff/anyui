@@ -290,3 +290,40 @@ func TestScrollViewWheel(t *testing.T) {
 	}
 	_ = render.Rect{}
 }
+
+func TestModalAutoHeight(t *testing.T) {
+	ctx := newTestContext(800, 600)
+	open := true
+
+	var bodyRect render.Rect
+	renderModal := func(contentH int, opts ...Option) {
+		ctx.beginFrame()
+		ctx.Modal("auto_m", &open, "Заголовок", func() {
+			bodyRect = ctx.CurrentArea()
+			ctx.allocRect(200, contentH)
+		}, opts...)
+		ctx.endFrame()
+	}
+
+	// Первый кадр с AutoHeight(): измеряет контент (120px) -> 120 + header(42) + pad*2(36) = 198px
+	renderModal(120, AutoHeight())
+	// Второй кадр применяет измеренную высоту
+	renderModal(120, AutoHeight())
+	if bodyRect.H != 120 {
+		t.Fatalf("ожидалась высота тела модалки 120px при AutoHeight(), получено %d", bodyRect.H)
+	}
+
+	// Увеличение контента до 220px автоматически расширяет модалку
+	renderModal(220, Height(Auto))
+	renderModal(220, Height(Auto))
+	if bodyRect.H != 220 {
+		t.Fatalf("ожидалась высота тела модалки 220px при Height(Auto), получено %d", bodyRect.H)
+	}
+
+	// MaxHeight ограничивает итоговую высоту модалки (200px -> тело 200 - 42 - 36 = 122px)
+	renderModal(300, AutoHeight(), MaxHeight(200))
+	renderModal(300, AutoHeight(), MaxHeight(200))
+	if bodyRect.H != 122 {
+		t.Fatalf("ожидалась высота тела модалки 122px при MaxHeight(200), получено %d", bodyRect.H)
+	}
+}

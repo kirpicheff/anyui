@@ -192,7 +192,7 @@ AnyUI provides a dedicated set of containers for overlays and floating UI elemen
   - Automatically centers the dialog box and dims the backdrop across the rest of the window (`rgba(0, 0, 0, 140)`).
   - Blocks clicks and keyboard focus through the backdrop onto widgets beneath it, while all input inside the modal (`fn`) remains fully active.
   - Includes a header with title and close button `×`, automatically closes on `Escape` key press (`*open = false`).
-  - Options: `anyui.Width(wDp)` (default 400 dp), `anyui.Height(hDp)` (default 300 dp).
+  - Options: `anyui.Width(wDp)` (default 440 dp), `anyui.Height(hDp)` (default 280 dp), `anyui.AutoHeight()` / `anyui.Height(anyui.Auto)` (automatically fits height to content within window bounds), `anyui.MinHeight(...)`, `anyui.MaxHeight(...)`.
   - **Important:** always use `ui.Modal` for modal dialogs. Do not construct homemade modals with `PushOverlay(fullRect)` — this marks the entire screen as input-blocked on subsequent frames.
 
 ```go

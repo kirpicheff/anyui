@@ -411,6 +411,8 @@ func (c *Context) ScrollView(id string, fn func(), opts ...Option) {
 }
 
 // Modal рисует модальное окно с затемнением фона и блокировкой ввода под ним.
+// По умолчанию имеет размер 440×280 dp; при передаче AutoHeight() или Height(Auto)
+// автоматически подбирает высоту по содержимому (с учётом MinHeight/MaxHeight и высоты окна).
 func (c *Context) Modal(id string, open *bool, title string, fn func(), opts ...Option) {
 	if open == nil || !*open {
 		return
@@ -421,9 +423,40 @@ func (c *Context) Modal(id string, open *bool, title string, fn func(), opts ...
 	if st.WidthDp != nil && *st.WidthDp > 0 {
 		w = c.Scale(*st.WidthDp).Int()
 	}
+
+	headerH := c.Scale(42).Int()
+	pad := c.Scale(18).Int()
+	minChromeH := headerH + pad*2
+	maxModalH := c.Canvas.Height - c.Scale(32).Int()
+	if maxModalH < minChromeH {
+		maxModalH = minChromeH
+	}
+
+	useAutoHeight := st.AutoHeight || (st.HeightDp != nil && *st.HeightDp == Auto)
+	autoKey := "modal:" + id
+	// Для авто-высоты ограничиваем только MinHeight/MaxHeight, не позволяя Height(Auto)
+	// растягивать модалку на весь RemainingHeight внутри applySizeConstraints.
+	autoConstrSt := st
+	autoConstrSt.HeightDp = nil
+	autoConstrSt.FillHeight = false
+
 	h := c.Scale(280).Int()
-	if st.HeightDp != nil && *st.HeightDp > 0 {
+	if useAutoHeight {
+		if c.autoHeights != nil {
+			if cachedH, ok := c.autoHeights[autoKey]; ok && cachedH > 0 {
+				h = cachedH
+			}
+		}
+		_, h = c.applySizeConstraints(w, h, autoConstrSt)
+		if h > maxModalH {
+			h = maxModalH
+		}
+		if h < minChromeH {
+			h = minChromeH
+		}
+	} else if st.HeightDp != nil && *st.HeightDp > 0 {
 		h = c.Scale(*st.HeightDp).Int()
+		_, h = c.applySizeConstraints(w, h, st)
 	}
 
 	for _, kp := range c.KeyEvents {
@@ -447,7 +480,6 @@ func (c *Context) Modal(id string, open *bool, title string, fn func(), opts ...
 		c.drawDropShadow(box, c.Theme.RadiusLg, 24, 150)
 		c.Canvas.DrawRoundedBox(box, c.ScaleF(c.Theme.RadiusLg), c.Theme.Card, 1.0, c.Theme.Border)
 
-		headerH := c.Scale(42).Int()
 		if c.Font != nil && title != "" {
 			pxSize := c.Scale(15).Int()
 			_, th := c.Font.MeasureTextStyled(title, pxSize, render.FontBold)
@@ -473,18 +505,57 @@ func (c *Context) Modal(id string, open *bool, title string, fn func(), opts ...
 		c.Canvas.FillRect(render.Rect{X: box.X, Y: box.Y + headerH, W: box.W, H: 1}, c.Theme.Border)
 
 		if fn != nil {
-			pad := c.Scale(18).Int()
 			body := render.Rect{
 				X: box.X + pad,
 				Y: box.Y + headerH + pad,
 				W: box.W - pad*2,
 				H: box.H - headerH - pad*2,
 			}
+			if body.W < 0 {
+				body.W = 0
+			}
+			if body.H < 0 {
+				body.H = 0
+			}
 			c.Canvas.PushClip(body)
 			c.pushBox(body, dirColumn, AlignStart, c.Scale(10).Int())
 			fn()
+			lay := c.topLayout()
+			usedH := lay.maxUsedY - body.Y + minChromeH
 			c.popBox()
 			c.Canvas.PopClip()
+
+			if useAutoHeight {
+				if usedH < minChromeH {
+					usedH = minChromeH
+				}
+				_, constrainedH := c.applySizeConstraints(w, usedH, autoConstrSt)
+				if constrainedH > maxModalH {
+					constrainedH = maxModalH
+				}
+				if constrainedH < minChromeH {
+					constrainedH = minChromeH
+				}
+				if c.autoHeights == nil {
+					c.autoHeights = make(map[string]int)
+				}
+				if prev, ok := c.autoHeights[autoKey]; !ok || prev != constrainedH {
+					c.autoHeights[autoKey] = constrainedH
+					c.RequestRedraw()
+				}
+			}
+		} else if useAutoHeight {
+			_, constrainedH := c.applySizeConstraints(w, minChromeH, autoConstrSt)
+			if constrainedH > maxModalH {
+				constrainedH = maxModalH
+			}
+			if c.autoHeights == nil {
+				c.autoHeights = make(map[string]int)
+			}
+			if prev, ok := c.autoHeights[autoKey]; !ok || prev != constrainedH {
+				c.autoHeights[autoKey] = constrainedH
+				c.RequestRedraw()
+			}
 		}
 	})
 }

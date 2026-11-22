@@ -115,7 +115,7 @@ type MessageBoxResult uint8  // ResNone, ResOK, ResCancel, ResYes, ResNo
 | `TabBar`, `Collapsible`, `Accordion` | `Width`, `Height`, `FillWidth`, `FillHeight`, `TabOrientation`, `HideAddButton` (`TabBar`) |
 | `MenuBar`, `Toolbar`, `StatusBar`, `Breadcrumbs`, `Pagination`, `TitleBar` | `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg` (`MenuBar`, `Toolbar`, `StatusBar`, `TitleBar`), `FontSize` (`MenuBar`, `Breadcrumbs`, `TitleBar`), `TextColor` (`TitleBar`) |
 | `Badge`, `ProgressBar`, `Separator`, `Spinner` | `TextColor`, `Width`/`Height`/`Bg` (кроме `Spinner`), `Radius`/`Danger` (`Badge`, `ProgressBar`), `Padding`/`FontSize`/`Bold`/`Mono`/`Primary`/`Secondary` (`Badge`) |
-| `Modal`, `Popover`, `FloatingPanel`, `Drawer` | `Width`, `Height` |
+| `Modal`, `Popover`, `FloatingPanel`, `Drawer` | `Width`, `Height`, `AutoHeight`/`MinHeight`/`MaxHeight` (`Modal`) |
 | `ContextMenu`, `Tooltip` | `Width` (`ContextMenu`), `Padding` (`Tooltip`), `Bg`, `BorderColor`, `Radius`, `FontSize`, `Bold`, `Mono`, `TextColor`, `LetterSpacing`, `TextShadow` |
 
 ## Частые ошибки
