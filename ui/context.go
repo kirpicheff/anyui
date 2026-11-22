@@ -187,8 +187,10 @@ type Context struct {
 	autoHeights   map[string]int
 	justifySizes  map[string][]int
 	layoutSeq     int
-	nextCursor    platform.CursorType
-	lastCursor    platform.CursorType
+	nextCursor       platform.CursorType
+	lastCursor       platform.CursorType
+	nextCustomCursor *platform.CustomCursor
+	lastCustomCursor *platform.CustomCursor
 	needsRedraw   bool
 	inRender      bool
 	wakePending   atomic.Bool
@@ -1014,6 +1016,7 @@ func (c *Context) beginFrame() {
 	}
 	c.HotID = ""
 	c.nextCursor = platform.CursorArrow
+	c.nextCustomCursor = nil
 	c.needsRedraw = false
 	c.nextCaptureKeys = false
 	c.layoutSeq = 0
@@ -1053,6 +1056,9 @@ func (c *Context) endFrame() {
 	c.Overlays.FlushWithHook(func(bounds render.Rect) {
 		if !bounds.Empty() {
 			c.registerHitRegion("__overlay:"+strconv.Itoa(ovIdx), bounds, platform.CursorArrow, false)
+			if bounds.Contains(c.MouseX, c.MouseY) {
+				c.nextCustomCursor = nil
+			}
 		}
 		ovIdx++
 	})
@@ -1085,6 +1091,13 @@ func (c *Context) endFrame() {
 	if c.nextCursor != c.lastCursor {
 		c.Win.SetCursor(c.nextCursor)
 		c.lastCursor = c.nextCursor
+	}
+	if c.nextCustomCursor != nil {
+		c.Win.SetCustomCursor(c.nextCustomCursor)
+		c.lastCustomCursor = c.nextCustomCursor
+	} else if c.lastCustomCursor != nil {
+		c.Win.SetCustomCursor(nil)
+		c.lastCustomCursor = nil
 	}
 	c.captureKeysFocus = c.nextCaptureKeys
 	c.prevFocusID = c.FocusID

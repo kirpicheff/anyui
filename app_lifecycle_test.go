@@ -34,7 +34,8 @@ func (m *stylerMockWindow) Show()                                   {}
 func (m *stylerMockWindow) Hide()                                   {}
 func (m *stylerMockWindow) Close()                                  {}
 func (m *stylerMockWindow) SetTitle(string)                         {}
-func (m *stylerMockWindow) SetCursor(platform.CursorType)           {}
+func (m *stylerMockWindow) SetCursor(platform.CursorType)        {}
+func (m *stylerMockWindow) SetCustomCursor(*platform.CustomCursor) {}
 func (m *stylerMockWindow) Size() (int, int)                        { return m.w, m.h }
 func (m *stylerMockWindow) Scale() float32                          { return m.scale }
 func (m *stylerMockWindow) ClipboardText() (string, error)          { return "", nil }

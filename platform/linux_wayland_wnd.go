@@ -1056,6 +1056,12 @@ func (w *waylandWindow) SetCursor(cursor CursorType) {
 	}
 }
 
+func (w *waylandWindow) SetCustomCursor(cur *CustomCursor) {
+	// Кастомный BGRA-курсор на Wayland пока не реализован; откатываемся к текущему системному курсору.
+	_ = cur
+	w.SetCursor(w.currentCursor())
+}
+
 func (w *waylandWindow) Size() (int, int) {
 	barH := w.csdHeightPx()
 	w.mu.Lock()

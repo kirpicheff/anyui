@@ -876,6 +876,14 @@ static NSCursor* resolveDarwinCursor(int cursorType) {
             return [NSCursor crosshairCursor];
         case 9: // CursorMove
             return [NSCursor openHandCursor];
+        case 10: { // CursorNone
+            static NSCursor *emptyCursor = nil;
+            if (!emptyCursor) {
+                NSImage *img = [[NSImage alloc] initWithSize:NSMakeSize(1, 1)];
+                emptyCursor = [[NSCursor alloc] initWithImage:img hotSpot:NSZeroPoint];
+            }
+            return emptyCursor;
+        }
         default: // CursorArrow
             return [NSCursor arrowCursor];
     }

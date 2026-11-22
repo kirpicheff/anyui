@@ -172,6 +172,24 @@ func (d *x11Display) initCursors() {
 			d.cursors[ct] = cid
 		}
 	}
+
+	// Создаём прозрачный курсор 1x1 для CursorNone
+	if pix, err := xproto.NewPixmapId(d.conn); err == nil {
+		if err := xproto.CreatePixmapChecked(d.conn, 1, pix, xproto.Drawable(d.screen.Root), 1, 1).Check(); err == nil {
+			if gc, err := xproto.NewGcontextId(d.conn); err == nil {
+				if err := xproto.CreateGCChecked(d.conn, gc, xproto.Drawable(pix), xproto.GcForeground, []uint32{0}).Check(); err == nil {
+					_ = xproto.PolyFillRectangleChecked(d.conn, xproto.Drawable(pix), gc, []xproto.Rectangle{{X: 0, Y: 0, Width: 1, Height: 1}}).Check()
+					_ = xproto.FreeGCChecked(d.conn, gc).Check()
+				}
+			}
+			if cid, err := xproto.NewCursorId(d.conn); err == nil {
+				if err := xproto.CreateCursorChecked(d.conn, cid, pix, pix, 0, 0, 0, 0, 0, 0, 0, 0).Check(); err == nil {
+					d.cursors[CursorNone] = cid
+				}
+			}
+			_ = xproto.FreePixmapChecked(d.conn, pix).Check()
+		}
+	}
 }
 
 func (d *x11Display) wakeUp() {
@@ -361,6 +379,7 @@ type x11Window struct {
 	posX       int
 	posY       int
 	scale      float32
+	cursor     CursorType
 	maximized  bool
 	minimized  bool
 	fullscreen bool
@@ -736,9 +755,21 @@ func (w *x11Window) SetTitle(title string) {
 }
 
 func (w *x11Window) SetCursor(cursor CursorType) {
+	w.mu.Lock()
+	w.cursor = cursor
+	w.mu.Unlock()
 	if cid, ok := w.disp.cursors[cursor]; ok {
 		_ = xproto.ChangeWindowAttributesChecked(w.disp.conn, w.win, xproto.CwCursor, []uint32{uint32(cid)}).Check()
 	}
+}
+
+func (w *x11Window) SetCustomCursor(cur *CustomCursor) {
+	// Кастомный BGRA-курсор на X11 пока не реализован; откатываемся к текущему системному курсору.
+	_ = cur
+	w.mu.Lock()
+	c := w.cursor
+	w.mu.Unlock()
+	w.SetCursor(c)
 }
 
 func (w *x11Window) Size() (int, int) {

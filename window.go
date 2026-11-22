@@ -27,6 +27,14 @@ func (w *Window) SetTitle(title string) {
 	}
 }
 
+// SetCustomCursor задаёт нативный кастомный курсор окна из BGRA-буфера.
+// Передача nil или некорректных размеров сбрасывает кастомный курсор к системному CursorType.
+func (w *Window) SetCustomCursor(cur *CustomCursor) {
+	if w != nil && w.platWin != nil {
+		w.platWin.SetCustomCursor(cur)
+	}
+}
+
 // SetIcon программно устанавливает иконку окна из RGBA-буфера (widthPx * heightPx * 4).
 // Передача пустого буфера и нулевых размеров сбрасывает программную иконку к иконке класса окна.
 func (w *Window) SetIcon(rgba []byte, widthPx, heightPx int) error {

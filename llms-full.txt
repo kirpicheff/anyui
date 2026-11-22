@@ -1,4 +1,4 @@
-# AnyUI (v0.8.4) — Полный справочник API
+# AnyUI (v0.8.5) — Полный справочник API
 
 Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).
 
@@ -70,7 +70,7 @@ const Auto Dp = -1        // Sentinel-значение: занять всё до
 type Key = uint32         // Виртуальный код клавиши (VK-коды, передаётся в Shortcut / InjectKey / KeyEvent.KeyCode)
 type Modifiers struct { Shift, Ctrl, Alt, Win bool }
 type MouseButton uint8    // MouseLeft = 1, MouseRight = 2, MouseMiddle = 3
-type CursorType uint8     // Системный курсор (CursorArrow, CursorHand, CursorIBeam, CursorResizeH/V/NWSE/NESW, CursorNotAllowed, CursorCrosshair, CursorMove)
+type CursorType uint8     // Системный курсор (CursorArrow, CursorHand, CursorIBeam, CursorResizeH/V/NWSE/NESW, CursorNotAllowed, CursorCrosshair, CursorMove, CursorNone)
 type Orientation uint8    // Horizontal, Vertical
 type DropZone uint8       // DropAbove, DropBelow, DropInside (для DragEvent)
 type Align uint8          // AlignStart, AlignCenter, AlignEnd, AlignStretch
@@ -203,7 +203,7 @@ const (
 	MouseRight     MouseButton = 2
 	MouseMiddle    MouseButton = 3
 )
-const ( CursorArrow, CursorHand, CursorIBeam, CursorResizeH, CursorResizeV, CursorResizeNWSE, CursorResizeNESW, CursorNotAllowed, CursorCrosshair, CursorMove )
+const ( CursorArrow, CursorHand, CursorIBeam, CursorResizeH, CursorResizeV, CursorResizeNWSE, CursorResizeNESW, CursorNotAllowed, CursorCrosshair, CursorMove, CursorNone )
 const ( AlignStart, AlignCenter, AlignEnd, AlignStretch )
 const ( JustifyStart, JustifyCenter, JustifyEnd, JustifySpaceBetween, JustifySpaceAround )
 const ( DrawerLeft, DrawerRight, DrawerTop, DrawerBottom )
@@ -539,6 +539,10 @@ type CanvasCallbacks struct {
 	OnFocusLost func()
 	// Cursor задаёт системный курсор над областью холста (по умолчанию CursorArrow).
 	Cursor CursorType
+	// CustomCursor задаёт нативный кастомный курсор из BGRA-буфера над областью холста.
+	// Когда CustomCursor != nil и мышь находится над холстом, применяется SetCustomCursor;
+	// при уходе мыши с холста или CustomCursor == nil кастомный курсор сбрасывается.
+	CustomCursor *CustomCursor
 	// KeepFocusNavigation отключает перехват Tab/Escape/горячих клавиш при фокусе на холсте.
 	// По умолчанию (false) все клавиши передаются в OnKey без переключения фокуса по Tab/Escape.
 	KeepFocusNavigation bool
@@ -550,6 +554,14 @@ type CanvasCallbacks struct {
 	// когда курсор и фокус находятся внутри холста и нет открытых оверлеев.
 	// При необходимости перерисовать UI коллбек может вызвать RequestRedraw().
 	DirectInput bool
+}
+
+type CustomCursor struct {
+	BGRA   []byte
+	Width  int
+	Height int
+	HotX   int
+	HotY   int
 }
 
 type KeyEvent struct {
@@ -793,6 +805,7 @@ func (w *Window) RestoreState(state WindowState)
 func (w *Window) SetAlwaysOnTop(onTop bool)
 func (w *Window) SetClipboardImage(img image.Image) error
 func (w *Window) SetClipboardText(text string) error
+func (w *Window) SetCustomCursor(cur *CustomCursor)
 func (w *Window) SetDarkTitle(dark bool)
 func (w *Window) SetFullscreen(fullscreen bool)
 func (w *Window) SetHideOnClose(hide bool)

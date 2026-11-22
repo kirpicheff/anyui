@@ -56,6 +56,9 @@ type CanvasCallbacks = ui.CanvasCallbacks
 // CursorType задаёт системный курсор мыши.
 type CursorType = platform.CursorType
 
+// CustomCursor описывает кастомный курсор из BGRA-буфера (4 байта на пиксель, straight alpha).
+type CustomCursor = platform.CustomCursor
+
 const (
 	CursorArrow      = platform.CursorArrow
 	CursorHand       = platform.CursorHand
@@ -67,6 +70,7 @@ const (
 	CursorNotAllowed = platform.CursorNotAllowed
 	CursorCrosshair  = platform.CursorCrosshair
 	CursorMove       = platform.CursorMove
+	CursorNone       = platform.CursorNone
 )
 
 // UI предоставляет публичный Immediate Mode API для построения интерфейса в окне.

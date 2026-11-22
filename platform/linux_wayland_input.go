@@ -338,6 +338,19 @@ func (s *wlSeatState) applyCursor(cursor CursorType) {
 	s.lastCursorApplied = cursor
 	s.mu.Unlock()
 
+	if cursor == CursorNone {
+		if ptrID != 0 {
+			// В Wayland скрытие курсора выполняется передачей nil (0) surface в wl_pointer.set_cursor.
+			var pw wlWriter
+			pw.uint32(serial)
+			pw.uint32(0)
+			pw.int32(0)
+			pw.int32(0)
+			_ = s.disp.conn.send(ptrID, wlPointerSetCursor, pw.bytes())
+		}
+		return
+	}
+
 	if hasMgr && devID != 0 {
 		shape := waylandCursorShape(cursor)
 		var w wlWriter

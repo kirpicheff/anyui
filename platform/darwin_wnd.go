@@ -278,6 +278,11 @@ func (w *darwinWindow) SetCursor(cursor CursorType) {
 	}
 }
 
+func (w *darwinWindow) SetCustomCursor(cur *CustomCursor) {
+	// Кастомный BGRA-курсор на macOS пока не реализован; оставляем текущий системный курсор.
+	_ = cur
+}
+
 func (w *darwinWindow) Size() (int, int) {
 	w.mu.Lock()
 	defer w.mu.Unlock()

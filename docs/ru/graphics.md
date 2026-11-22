@@ -94,6 +94,8 @@ ui.InteractiveCanvas("rdp_view", anyui.CanvasCallbacks{
 	OnFocusLost: func() {
 		// Сброс зажатых модификаторов при уходе фокуса
 	},
+	Cursor:       anyui.CursorNone, // Скрыть системный курсор над холстом (или передать CustomCursor)
+	CustomCursor: remoteCursor,     // Опционально: нативный аппаратный курсор из BGRA-буфера
 })
 ```
 - Для обмена изображениями с ОС используйте `ui.ClipboardImage()` / `ui.SetClipboardImage(img)` или методы окна `win.ClipboardImage()` / `win.SetClipboardImage(img)` (поддерживается формат `CF_DIB` 24/32 bpp).
@@ -117,7 +119,7 @@ ui.Label("Заголовок", anyui.Bold(), anyui.FontSize(20), anyui.TextShado
   Контекст сравнивает `HotID` и активный курсор по зарегистрированным областям (`RegisterHoverArea` для кастомных зон) и пропускает лишние перерисовки при движении мыши внутри одного виджета или по пустому фону.
 - **LRU-кеш глифов и изображений:**
   Внутренний менеджер шрифтов кеширует цветные битмапы глифов по ключу `(style, rune, sizePx, color)` (статистика и сброс доступны через `ui.GlyphCacheStats`, `ui.ClearGlyphCache`), а холст `anyui.Canvas` кеширует масштабированные изображения (`ui.ScaledImageCacheStats`, `ui.ClearScaledImageCache`).
-- **Системные курсоры:**
-  Поддерживаются `CursorArrow`, `CursorHand`, `CursorIBeam`, `CursorResizeH`, `CursorResizeV`, `CursorResizeNWSE`, `CursorResizeNESW`, `CursorNotAllowed`, `CursorCrosshair`, `CursorMove` (`ui.SetCursor(...)`).
+- **Системные и кастомные курсоры:**
+  Поддерживаются `CursorArrow`, `CursorHand`, `CursorIBeam`, `CursorResizeH`, `CursorResizeV`, `CursorResizeNWSE`, `CursorResizeNESW`, `CursorNotAllowed`, `CursorCrosshair`, `CursorMove` и `CursorNone` (скрытие курсора над клиентской областью) через `ui.SetCursor(...)` или `CanvasCallbacks.Cursor`. Для аппаратного курсора ОС из BGRA-буфера (например, в клиенте удалённого рабочего стола без перерисовки на каждый `mousemove`) используйте `anyui.CustomCursor` в `CanvasCallbacks.CustomCursor` или `win.SetCustomCursor(cur)` (на Windows создаётся нативный 32-битный `HCURSOR` с альфа-каналом и кэшированием по содержимому).
 
 

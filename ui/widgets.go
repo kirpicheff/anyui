@@ -661,6 +661,10 @@ type CanvasCallbacks struct {
 	OnFocusLost func()
 	// Cursor задаёт системный курсор над областью холста (по умолчанию CursorArrow).
 	Cursor platform.CursorType
+	// CustomCursor задаёт нативный кастомный курсор из BGRA-буфера над областью холста.
+	// Когда CustomCursor != nil и мышь находится над холстом, применяется SetCustomCursor;
+	// при уходе мыши с холста или CustomCursor == nil кастомный курсор сбрасывается.
+	CustomCursor *platform.CustomCursor
 	// KeepFocusNavigation отключает перехват Tab/Escape/горячих клавиш при фокусе на холсте.
 	// По умолчанию (false) все клавиши передаются в OnKey без переключения фокуса по Tab/Escape.
 	KeepFocusNavigation bool
@@ -722,6 +726,9 @@ func (c *Context) InteractiveCanvas(id string, cb CanvasCallbacks, opts ...Optio
 	blocked := c.IsInputBlocked()
 	if !blocked && r.Contains(c.MouseX, c.MouseY) {
 		c.HotID = id
+		if cb.CustomCursor != nil {
+			c.nextCustomCursor = cb.CustomCursor
+		}
 	}
 
 	for _, mev := range c.rawMouseEvents {

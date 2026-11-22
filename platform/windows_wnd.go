@@ -205,10 +205,16 @@ type win32Window struct {
 	hIcon   windows.Handle
 	handler func(Event)
 
-	width  int
-	height int
-	scale  float32
-	cursor CursorType
+	width            int
+	height           int
+	scale            float32
+	cursor           CursorType
+	customHCursor    windows.Handle
+	customCursorHash uint64
+	customCursorW    int
+	customCursorH    int
+	customCursorHotX int
+	customCursorHotY int
 
 	mu                sync.Mutex
 	pixels            []byte
@@ -690,6 +696,14 @@ func win32CursorResourceID(cursor CursorType) uintptr {
 }
 
 func (w *win32Window) applyCursor() {
+	if w.customHCursor != 0 {
+		procSetCursor.Call(uintptr(w.customHCursor))
+		return
+	}
+	if w.cursor == CursorNone {
+		procSetCursor.Call(0)
+		return
+	}
 	id := win32CursorResourceID(w.cursor)
 	hCursor, _, _ := procLoadCursorW.Call(0, id)
 	if hCursor != 0 {
@@ -1068,6 +1082,7 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 			procDestroyIcon.Call(uintptr(w.hIcon))
 			w.hIcon = 0
 		}
+		w.clearCustomCursor(false)
 		windowMapMu.Lock()
 		delete(windowMap, hwnd)
 		remaining := len(windowMap)

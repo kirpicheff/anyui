@@ -48,7 +48,17 @@ const (
 	CursorNotAllowed
 	CursorCrosshair
 	CursorMove
+	CursorNone
 )
+
+// CustomCursor описывает кастомный курсор из BGRA-буфера (4 байта на пиксель, straight alpha).
+type CustomCursor struct {
+	BGRA   []byte
+	Width  int
+	Height int
+	HotX   int
+	HotY   int
+}
 
 // HitTestResult определяет роль точки клиентской области в режиме Frameless.
 type HitTestResult uint8
@@ -208,6 +218,10 @@ type Window interface {
 
 	// SetCursor меняет курсор мыши над окном.
 	SetCursor(cursor CursorType)
+
+	// SetCustomCursor задаёт нативный кастомный курсор из BGRA-буфера.
+	// Передача nil или некорректных размеров сбрасывает кастомный курсор к системному CursorType.
+	SetCustomCursor(cur *CustomCursor)
 
 	// Size возвращает текущий размер клиентской области в физических пикселях.
 	Size() (width, height int)

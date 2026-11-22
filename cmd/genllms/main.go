@@ -468,6 +468,7 @@ func sanitizeInternalTypes(s string) string {
 		"platform.Modifiers", "Modifiers",
 		"platform.MouseButton", "MouseButton",
 		"platform.CursorType", "CursorType",
+		"platform.CustomCursor", "CustomCursor",
 		"platform.HitTestResult", "HitTestResult",
 		"platform.FileFilter", "FileFilter",
 		"platform.WindowState", "WindowState",
@@ -682,7 +683,7 @@ func writeBaseTypes(out *bytes.Buffer, idx *apiIndex) {
 	out.WriteString("type Key = uint32         // Виртуальный код клавиши (VK-коды, передаётся в Shortcut / InjectKey / KeyEvent.KeyCode)\n")
 	out.WriteString("type Modifiers struct { Shift, Ctrl, Alt, Win bool }\n")
 	out.WriteString("type MouseButton uint8    // MouseLeft = 1, MouseRight = 2, MouseMiddle = 3\n")
-	out.WriteString("type CursorType uint8     // Системный курсор (CursorArrow, CursorHand, CursorIBeam, CursorResizeH/V/NWSE/NESW, CursorNotAllowed, CursorCrosshair, CursorMove)\n")
+	out.WriteString("type CursorType uint8     // Системный курсор (CursorArrow, CursorHand, CursorIBeam, CursorResizeH/V/NWSE/NESW, CursorNotAllowed, CursorCrosshair, CursorMove, CursorNone)\n")
 	out.WriteString("type Orientation uint8    // Horizontal, Vertical\n")
 	out.WriteString("type DropZone uint8       // DropAbove, DropBelow, DropInside (для DragEvent)\n")
 	out.WriteString("type Align uint8          // AlignStart, AlignCenter, AlignEnd, AlignStretch\n")
@@ -755,7 +756,7 @@ func writeShortLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
 
 	out.WriteString("## Карта API (полные сигнатуры и структуры — в `llms-full.txt`)\n\n")
 	out.WriteString("- **Приложение (`App`):** `anyui.NewApp`, `App.Run`, `App.Dispatch`, `App.OpenWindow`, `App.MainWindow`, `App.Show`, `App.Quit`, `App.SetStrings`, `App.SetTrayMenu`, `App.SetTrayIcon`, `App.SetTrayTooltip`, `App.ShowNotification`.\n")
-	out.WriteString("- **Окно (`Window`):** `Window.SetTitle`, `Window.SetSize`, `Window.SetPosition`, `Window.Position`, `Window.SetIcon`, `Window.SetTheme`, `Window.SetStrings`, `Window.SetDarkTitle`, `Window.SetTitleBarColors`, `Window.SetHideOnClose`, `Window.SetOnClose`, `Window.SetOnDropFiles`, `Window.Show`, `Window.Hide`, `Window.BringToFront`, `Window.Minimize`, `Window.Maximize`, `Window.Restore`, `Window.IsMinimized`, `Window.IsMaximized`, `Window.IsFullscreen`, `Window.SetFullscreen`, `Window.SetAlwaysOnTop`, `Window.IsAlwaysOnTop`, `Window.State`, `Window.RestoreState`, `Window.ClipboardText`, `Window.SetClipboardText`, `Window.ClipboardImage`, `Window.SetClipboardImage`, `Window.Invalidate`, `Window.WakeUp`, `Window.Close`.\n")
+	out.WriteString("- **Окно (`Window`):** `Window.SetTitle`, `Window.SetCustomCursor`, `Window.SetSize`, `Window.SetPosition`, `Window.Position`, `Window.SetIcon`, `Window.SetTheme`, `Window.SetStrings`, `Window.SetDarkTitle`, `Window.SetTitleBarColors`, `Window.SetHideOnClose`, `Window.SetOnClose`, `Window.SetOnDropFiles`, `Window.Show`, `Window.Hide`, `Window.BringToFront`, `Window.Minimize`, `Window.Maximize`, `Window.Restore`, `Window.IsMinimized`, `Window.IsMaximized`, `Window.IsFullscreen`, `Window.SetFullscreen`, `Window.SetAlwaysOnTop`, `Window.IsAlwaysOnTop`, `Window.State`, `Window.RestoreState`, `Window.ClipboardText`, `Window.SetClipboardText`, `Window.ClipboardImage`, `Window.SetClipboardImage`, `Window.Invalidate`, `Window.WakeUp`, `Window.Close`.\n")
 	out.WriteString("- **Раскладка и контейнеры (`UI`):** `Column`, `ColumnCentered`, `ColumnWith`, `ColumnFlex`, `Row`, `RowCentered`, `RowWith`, `RowFlex`, `Grid`, `Flow`, `FormLayout`, `FormRow`, `Padding`, `PaddingXY`, `Spacer`, `FlexSpacer`, `Expand`, `DockTop`, `DockBottom`, `Page`, `Card`, `ScrollView`, `Anchor`, `SplitPane`, `Collapsible`, `Accordion`, `LayoutRect`, `IDScope`, `PushID`, `PopID`.\n")
 	out.WriteString("- **Ввод и формы (`UI`):** `Button`, `IconButton`, `Hyperlink`, `Toggle`, `Checkbox`, `RadioButton`, `RadioGroup`, `TextInput`, `TextArea`, `MaskedInput`, `NumberInput`, `Slider`, `RangeSlider`, `Select`, `MultiSelect`, `TagInput`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`.\n")
 	out.WriteString("- **Списки, деревья, таблицы и графики (`UI`):** `ListView`, `ListViewEx`, `TreeView`, `TreeViewEx`, `Table`, `TableEx`, `LogView`, `VirtualTextView`, `Sparkline`, `LineChart`, `BarChart`.\n")
@@ -853,7 +854,7 @@ func writeFullLLMs(out *bytes.Buffer, version string, idx *apiIndex) {
 		"TabItem", "TabBarEvent", "SelectItem", "TreeNode",
 		"ToolbarItem", "ContextMenuItem", "MenuBarItem", "MenuBarEntry",
 		"StatusBarSection", "BreadcrumbItem", "AccordionItem",
-		"LogEntry", "ChartSeries", "CanvasCallbacks", "KeyEvent", "DragPayload", "DragEvent",
+		"LogEntry", "ChartSeries", "CanvasCallbacks", "CustomCursor", "KeyEvent", "DragPayload", "DragEvent",
 		"TrayConfig", "MenuItem", "Notification",
 		"FileDialogOptions", "FolderDialogOptions", "FileFilter",
 		"SingleInstanceConfig", "WindowState",

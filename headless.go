@@ -55,7 +55,8 @@ func (m *headlessWindow) Show()                           {}
 func (m *headlessWindow) Hide()                           {}
 func (m *headlessWindow) Close()                          {}
 func (m *headlessWindow) SetTitle(string)                 {}
-func (m *headlessWindow) SetCursor(c platform.CursorType) { m.cursor = c }
+func (m *headlessWindow) SetCursor(c platform.CursorType)        { m.cursor = c }
+func (m *headlessWindow) SetCustomCursor(*platform.CustomCursor) {}
 func (m *headlessWindow) Size() (int, int)                { return m.w, m.h }
 func (m *headlessWindow) Scale() float32 {
 	if m.scale > 0 {

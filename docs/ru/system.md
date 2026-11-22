@@ -96,6 +96,7 @@ if res == anyui.ResYes {
 - `SetAlwaysOnTop(bool)`, `IsAlwaysOnTop()` (также задаётся на старте через `Config.AlwaysOnTop` — закрепление окна поверх всех окон ОС)
 - `Position() (x, y int)`, `SetPosition(x, y int)`, `SetSize(width, height int)`
 - `SetHideOnClose(bool)` и `SetOnClose(func(w *Window) bool)` (возврат `false` отменяет закрытие)
+- `SetCustomCursor(*CustomCursor)` — установка нативного кастомного курсора из BGRA-буфера (`nil` возвращает системный `CursorType`)
 
 Для создания окна с кастомной шапкой (без системной рамки, но с сохранением теней DWM и Aero Snap):
 

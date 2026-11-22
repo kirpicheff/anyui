@@ -96,6 +96,7 @@ if res == anyui.ResYes {
 - `SetAlwaysOnTop(bool)`, `IsAlwaysOnTop()` (also configurable at creation via `Config.AlwaysOnTop` — keeps the window above all OS windows)
 - `Position() (x, y int)`, `SetPosition(x, y int)`, `SetSize(width, height int)`
 - `SetHideOnClose(bool)` and `SetOnClose(func(w *Window) bool)` (returning `false` cancels closing)
+- `SetCustomCursor(*CustomCursor)` — sets a native custom cursor from a BGRA buffer (`nil` restores the system `CursorType`)
 
 To build a custom title bar window (without OS chrome, preserving DWM shadows and Aero Snap on Windows):
 

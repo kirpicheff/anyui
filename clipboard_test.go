@@ -24,7 +24,8 @@ func (m *mockClipWindow) Show()                                   {}
 func (m *mockClipWindow) Hide()                                   {}
 func (m *mockClipWindow) Close()                                  {}
 func (m *mockClipWindow) SetTitle(string)                         {}
-func (m *mockClipWindow) SetCursor(platform.CursorType)           {}
+func (m *mockClipWindow) SetCursor(platform.CursorType)        {}
+func (m *mockClipWindow) SetCustomCursor(*platform.CustomCursor) {}
 func (m *mockClipWindow) Size() (int, int)                        { return m.w, m.h }
 func (m *mockClipWindow) Scale() float32                          { return m.scale }
 func (m *mockClipWindow) ClipboardText() (string, error)          { return m.clipText, nil }

@@ -94,6 +94,8 @@ ui.InteractiveCanvas("rdp_view", anyui.CanvasCallbacks{
 	OnFocusLost: func() {
 		// Release held modifier keys on blur
 	},
+	Cursor:       anyui.CursorNone, // Hide OS cursor over the canvas (or pass CustomCursor)
+	CustomCursor: remoteCursor,     // Optional: native hardware cursor from a BGRA buffer
 })
 ```
 - For OS image clipboard exchange, use `ui.ClipboardImage()` / `ui.SetClipboardImage(img)` or `win.ClipboardImage()` / `win.SetClipboardImage(img)`.
@@ -117,6 +119,6 @@ ui.Label("Heading", anyui.Bold(), anyui.FontSize(20), anyui.TextShadow(0, 0, 8, 
   The context tracks `HotID` and active cursor across registered hover regions (`RegisterHoverArea` for custom zones) and skips redundant redraws when moving the mouse within the same widget or over empty background.
 - **LRU glyph and image caches:**
   The internal font manager caches colored glyph bitmaps by `(style, rune, sizePx, color)` (inspect and clear via `ui.GlyphCacheStats`, `ui.ClearGlyphCache`), and `anyui.Canvas` caches scaled images (`ui.ScaledImageCacheStats`, `ui.ClearScaledImageCache`).
-- **System cursors:**
-  Supports `CursorArrow`, `CursorHand`, `CursorIBeam`, `CursorResizeH`, `CursorResizeV`, `CursorResizeNWSE`, `CursorResizeNESW`, `CursorNotAllowed`, `CursorCrosshair`, `CursorMove` (`ui.SetCursor(...)`).
+- **System and custom cursors:**
+  Supports `CursorArrow`, `CursorHand`, `CursorIBeam`, `CursorResizeH`, `CursorResizeV`, `CursorResizeNWSE`, `CursorResizeNESW`, `CursorNotAllowed`, `CursorCrosshair`, `CursorMove`, and `CursorNone` (hides the cursor over the client area) via `ui.SetCursor(...)` or `CanvasCallbacks.Cursor`. For a native OS hardware cursor from a BGRA buffer (e.g., remote desktop without redrawing on every `mousemove`), use `anyui.CustomCursor` via `CanvasCallbacks.CustomCursor` or `win.SetCustomCursor(cur)` (on Windows, creates a cached native 32-bit `HCURSOR` with alpha channel).
 
