@@ -11,13 +11,14 @@ func (st *demoState) drawTabOverlays(ui *anyui.UI) {
 	ui.ScrollView("sv_overlays", func() {
 		ui.Label("Модальные окна, Popover, FloatingPanel и Drawer", anyui.FontSize(16), anyui.Bold())
 		ui.RowCentered(10, 40, func() {
-			if ui.Button("ov_modal", "Открыть Modal", anyui.Primary()) {
+			if ui.Button("ov_modal", "Открыть Modal", anyui.Primary(), anyui.Width(140)) {
 				st.modalOpen = true
 			}
-			if ui.Button("ov_pop", "Открыть Popover") {
+			if ui.Button("ov_pop", "Открыть Popover", anyui.Width(160)) {
 				st.popoverOpen = !st.popoverOpen
 			}
 			popAnchor := ui.CurrentArea()
+			popAnchor.X += 150
 			popAnchor.W = 160
 			popAnchor.H = 38
 			ui.Popover("pop_demo", &st.popoverOpen, popAnchor, func() {
@@ -48,10 +49,9 @@ func (st *demoState) drawTabOverlays(ui *anyui.UI) {
 		ui.Separator()
 		ui.Label("ContextMenu (ПКМ) и Tooltip (наведение)", anyui.FontSize(16), anyui.Bold())
 
-		box := ui.CurrentArea()
-		box.W = 460
-		box.H = 74
+		var box anyui.Rect
 		ui.CanvasView(func(canvas *anyui.Canvas, r anyui.Rect) {
+			box = pxRectToDp(ui, r)
 			canvas.DrawRoundedBox(r, ui.ScaleF(8), th.Surface, 1.0, th.Border)
 		}, anyui.Width(460), anyui.Height(74))
 		ui.Label(st.contextLog, anyui.FontSize(13), anyui.TextColor(th.TextMuted))

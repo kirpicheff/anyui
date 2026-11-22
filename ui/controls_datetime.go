@@ -200,18 +200,25 @@ func (c *Context) DateTimePicker(id string, dt *time.Time, opts ...Option) bool 
 		return false
 	}
 	id = c.nextLocalID("dtp", id)
+	st := ApplyOptions(opts)
 	if dt.IsZero() {
 		*dt = c.Now()
 	}
 	changed := false
 	dCopy := *dt
 	tCopy := *dt
+	dateOpts := []Option{Width(150)}
+	timeOpts := []Option{Width(120)}
+	if st.Disabled {
+		dateOpts = append(dateOpts, Disabled())
+		timeOpts = append(timeOpts, Disabled())
+	}
 	c.Row(8, 34, func() {
-		if c.DatePicker(id+":date", &dCopy, Width(150)) {
+		if c.DatePicker(id+":date", &dCopy, dateOpts...) {
 			*dt = time.Date(dCopy.Year(), dCopy.Month(), dCopy.Day(), dt.Hour(), dt.Minute(), dt.Second(), 0, dt.Location())
 			changed = true
 		}
-		if c.TimePicker(id+":time", &tCopy, Width(120)) {
+		if c.TimePicker(id+":time", &tCopy, timeOpts...) {
 			*dt = time.Date(dt.Year(), dt.Month(), dt.Day(), tCopy.Hour(), tCopy.Minute(), tCopy.Second(), 0, dt.Location())
 			changed = true
 		}

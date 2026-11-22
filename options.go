@@ -101,9 +101,6 @@ func FillHeight(enabled ...bool) Option { return ui.FillHeight(enabled...) }
 // AutoHeight включает автоматический подбор высоты контейнера по содержимому.
 func AutoHeight(enabled ...bool) Option { return ui.AutoHeight(enabled...) }
 
-// Flex задаёт пропорциональный вес виджета при делении пространства.
-func Flex(weight float32) Option { return ui.Flex(weight) }
-
 // WordWrap включает перенос текста по ширине (для Label и SelectableLabel).
 func WordWrap(enabled ...bool) Option { return ui.WordWrap(enabled...) }
 

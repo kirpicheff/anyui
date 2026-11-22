@@ -57,7 +57,6 @@ custom.RadiusSm = 6
 | `anyui.FillWidth()` | Растянуть виджет на всю доступную ширину | `anyui.FillWidth()` |
 | `anyui.FillHeight()` | Растянуть виджет на всю доступную высоту | `anyui.FillHeight()` |
 | `anyui.AutoHeight()` | Автоматическая высота контейнера (`Card`) по содержимому | `anyui.AutoHeight()` |
-| `anyui.Flex(weight)` | Пропорциональный вес виджета | `anyui.Flex(2)` |
 | `anyui.WordWrap(enabled ...bool)` | Перенос текста по ширине (`Label`, `SelectableLabel`) | `anyui.WordWrap()` |
 | `anyui.Ellipsis(v)` | Обрезка текста с `...` при нехватке ширины (`Label`) | `anyui.Ellipsis(true)` |
 | `anyui.LineNumbers(v)` | Нумерация строк в `TextArea` | `anyui.LineNumbers(true)` |

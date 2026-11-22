@@ -20,7 +20,7 @@ This document tracks the status of strict scalar typing in the AnyUI library acc
 - **No mixed overloads**: exactly one form per concept (parallel overloads like `Width(dp int)` alongside `WidthDp(dp Dp)` are prohibited).
 - **Scalar Type Boundary**:
   - `int` is used only at the OS boundary (`Config`, `Window` window metrics, item counts/indices, column counts).
-  - `float32` is used for subpixel and dimensionless values (`Radius`, `LetterSpacing`, `TextShadow`, `FlexWeight`, `ScaleF`/`PxToDpf`).
+  - `float32` is used for subpixel and dimensionless values (`Radius`, `LetterSpacing`, `TextShadow`, `ScaleF`/`PxToDpf`).
   - `Rect` is the single rectangle type (in `Dp` for layouts/overlays and in `Px` for low-level canvas/table callbacks).
 
 ---
@@ -77,7 +77,6 @@ This document tracks the status of strict scalar typing in the AnyUI library acc
 | `WidgetStyle.MaxHeightDp *Dp` | | ✓ | Maximum height storage |
 | `WidgetStyle.FontSizeDp *Dp` | | ✓ | Font size storage |
 | `WidgetStyle.PadDp *Dp` | | ✓ | Internal padding storage |
-| `WidgetStyle.FlexWeight float32` | ✓ | | Kept intentionally: dimensionless proportion weight |
 | **Layouts and Containers** | | | |
 | `Column(gapDp Dp, fn func())` | | ✓ | Vertical column |
 | `ColumnCentered(gapDp Dp, fn func())` | | ✓ | Centered vertical column |

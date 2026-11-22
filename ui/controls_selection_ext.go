@@ -37,6 +37,7 @@ func (c *Context) ListViewEx(
 	if cfg == nil {
 		cfg = &ListViewExConfig{}
 	}
+	id = c.ResolveID("lvex", id)
 	selected := cfg.Selected
 	checked := cfg.Checked
 	if itemHeightDp <= 0 {
@@ -57,9 +58,23 @@ func (c *Context) ListViewEx(
 	if r.W <= 0 || r.H <= 0 {
 		return false
 	}
-	c.registerFocusable(id)
+	if !st.Disabled {
+		c.registerFocusable(id)
+	}
 
-	c.Canvas.DrawRoundedBox(r, c.ScaleF(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
+	bg := c.Theme.Card
+	if st.Bg != nil {
+		bg = *st.Bg
+	}
+	rad := c.Theme.RadiusSm
+	if st.Radius != nil {
+		rad = *st.Radius
+	}
+	borderCol := c.Theme.Border
+	if c.FocusID == id && !st.Disabled {
+		borderCol = c.Theme.BorderFocus
+	}
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), bg, 1.0, borderCol)
 
 	rowH := c.Scale(itemHeightDp).Int()
 	sbW := c.Scale(8).Int()
@@ -76,7 +91,29 @@ func (c *Context) ListViewEx(
 	if maxScroll < 0 {
 		maxScroll = 0
 	}
-	if !c.IsInputBlocked() && viewRect.Contains(c.MouseX, c.MouseY) && c.WheelY != 0 {
+
+	if st.ScrollToIndex != nil {
+		targetIdx := *st.ScrollToIndex
+		if targetIdx < 0 {
+			si.lastScrollIndex = -1
+		} else if targetIdx < count {
+			if si.lastScrollIndex != targetIdx {
+				targetY := targetIdx * rowH
+				if targetY > maxScroll {
+					targetY = maxScroll
+				}
+				if targetY < 0 {
+					targetY = 0
+				}
+				si.y = targetY
+				si.lastScrollIndex = targetIdx
+			}
+		}
+	} else {
+		si.lastScrollIndex = -1
+	}
+
+	if !st.Disabled && !c.IsInputBlocked() && viewRect.Contains(c.MouseX, c.MouseY) && c.WheelY != 0 {
 		si.y -= int(c.WheelY * float32(rowH*2))
 		if si.y < 0 {
 			si.y = 0
@@ -95,7 +132,7 @@ func (c *Context) ListViewEx(
 
 	changed := false
 	// Ctrl+A при фокусе
-	if c.FocusID == id && !c.IsInputBlocked() && selected != nil {
+	if !st.Disabled && c.FocusID == id && !c.IsInputBlocked() && selected != nil {
 		for _, kp := range c.KeyEvents {
 			if kp.Mods.Ctrl && kp.Code == KeyA {
 				for i := 0; i < count; i++ {
@@ -117,9 +154,11 @@ func (c *Context) ListViewEx(
 	for i := startIdx; i < endIdx; i++ {
 		iy := viewRect.Y + i*rowH - si.y
 		ir := render.Rect{X: contentRect.X, Y: iy, W: contentRect.W, H: rowH}
-		c.RegisterHit(id+":row:"+strconv.Itoa(i), contentRect.Intersect(ir), platform.CursorArrow)
+		if !st.Disabled {
+			c.RegisterHit(id+":row:"+strconv.Itoa(i), contentRect.Intersect(ir), platform.CursorArrow)
+		}
 		isSel := selected != nil && selected[i]
-		hov := !c.IsInputBlocked() && ir.Contains(c.MouseX, c.MouseY)
+		hov := !st.Disabled && !c.IsInputBlocked() && ir.Contains(c.MouseX, c.MouseY)
 
 		if isSel {
 			c.Canvas.FillRect(ir, c.Theme.Accent.WithAlpha(45))
@@ -137,7 +176,9 @@ func (c *Context) ListViewEx(
 		if showCheck {
 			cbSize := c.Scale(16).Int()
 			cbR := render.Rect{X: ir.X + c.Scale(8).Int(), Y: ir.Y + (ir.H-cbSize)/2, W: cbSize, H: cbSize}
-			c.RegisterHit(id+":cb:"+strconv.Itoa(i), contentRect.Intersect(cbR), platform.CursorHand)
+			if !st.Disabled {
+				c.RegisterHit(id+":cb:"+strconv.Itoa(i), contentRect.Intersect(cbR), platform.CursorHand)
+			}
 			c.drawMiniCheckbox(cbR, checked[i], false)
 
 			if hov && cbR.Contains(c.MouseX, c.MouseY) {
@@ -199,7 +240,7 @@ func (c *Context) ListViewEx(
 	c.Canvas.PopClip()
 
 	// Обработка перетаскивания (Reorder) строк ListViewEx
-	if st.Reorderable {
+	if !st.Disabled && st.Reorderable {
 		if c.HandleLinearReorder(id, viewRect, viewRect.X, contentW, rowH, count, si, maxScroll, st.OnReorder, func() {
 			delete(listAnchorStore, id)
 		}) {
@@ -275,6 +316,7 @@ func (c *Context) TreeViewEx(
 	if cfg == nil {
 		cfg = &TreeViewExConfig{}
 	}
+	id = c.ResolveID("tvex", id)
 	selectedIDs := cfg.SelectedIDs
 	showCheckboxes := cfg.ShowCheckboxes
 	st := ApplyOptions(opts)
@@ -287,9 +329,19 @@ func (c *Context) TreeViewEx(
 		h = c.Scale(*st.HeightDp).Int()
 	}
 	r := c.allocRectStyled(w, h, st)
-	c.registerFocusable(id)
+	if !st.Disabled {
+		c.registerFocusable(id)
+	}
 
-	c.Canvas.DrawRoundedBox(r, c.ScaleF(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
+	rad := c.Theme.RadiusSm
+	if st.Radius != nil {
+		rad = *st.Radius
+	}
+	borderCol := c.Theme.Border
+	if c.FocusID == id && !st.Disabled {
+		borderCol = c.Theme.BorderFocus
+	}
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), c.Theme.Card, 1.0, borderCol)
 
 	flat := FlattenTree(roots)
 	rowH := c.Scale(28).Int()
@@ -307,7 +359,7 @@ func (c *Context) TreeViewEx(
 	if maxScroll < 0 {
 		maxScroll = 0
 	}
-	if !c.IsInputBlocked() && viewRect.Contains(c.MouseX, c.MouseY) && c.WheelY != 0 {
+	if !st.Disabled && !c.IsInputBlocked() && viewRect.Contains(c.MouseX, c.MouseY) && c.WheelY != 0 {
 		si.y -= int(c.WheelY * float32(rowH*2))
 		if si.y < 0 {
 			si.y = 0
@@ -319,7 +371,7 @@ func (c *Context) TreeViewEx(
 	}
 
 	changed := false
-	if c.FocusID == id && !c.IsInputBlocked() && selectedIDs != nil {
+	if !st.Disabled && c.FocusID == id && !c.IsInputBlocked() && selectedIDs != nil {
 		for _, kp := range c.KeyEvents {
 			if kp.Mods.Ctrl && kp.Code == KeyA {
 				for _, item := range flat {
@@ -343,9 +395,11 @@ func (c *Context) TreeViewEx(
 		n := item.Node
 		iy := viewRect.Y + i*rowH - si.y
 		ir := render.Rect{X: contentRect.X, Y: iy, W: contentRect.W, H: rowH}
-		c.RegisterHit(id+":node:"+n.ID, contentRect.Intersect(ir), platform.CursorArrow)
+		if !st.Disabled {
+			c.RegisterHit(id+":node:"+n.ID, contentRect.Intersect(ir), platform.CursorArrow)
+		}
 		isSel := selectedIDs != nil && selectedIDs[n.ID]
-		hov := !c.IsInputBlocked() && ir.Contains(c.MouseX, c.MouseY)
+		hov := !st.Disabled && !c.IsInputBlocked() && ir.Contains(c.MouseX, c.MouseY)
 
 		if isSel {
 			c.Canvas.FillRect(ir, c.Theme.Accent.WithAlpha(45))
@@ -364,7 +418,9 @@ func (c *Context) TreeViewEx(
 		// Стрелка раскрытия/сворачивания
 		arrowR := render.Rect{X: curX, Y: ir.Y + (ir.H-c.Scale(16).Int())/2, W: c.Scale(16).Int(), H: c.Scale(16).Int()}
 		if len(n.Children) > 0 {
-			c.RegisterHit(id+":arrow:"+n.ID, contentRect.Intersect(arrowR), platform.CursorHand)
+			if !st.Disabled {
+				c.RegisterHit(id+":arrow:"+n.ID, contentRect.Intersect(arrowR), platform.CursorHand)
+			}
 			cx := float32(arrowR.X + arrowR.W/2)
 			cy := float32(arrowR.Y + arrowR.H/2)
 			if n.Expanded {
@@ -390,7 +446,9 @@ func (c *Context) TreeViewEx(
 		if showCheckboxes {
 			cbSize := c.Scale(15).Int()
 			cbR := render.Rect{X: curX, Y: ir.Y + (ir.H-cbSize)/2, W: cbSize, H: cbSize}
-			c.RegisterHit(id+":tcb:"+n.ID, contentRect.Intersect(cbR), platform.CursorHand)
+			if !st.Disabled {
+				c.RegisterHit(id+":tcb:"+n.ID, contentRect.Intersect(cbR), platform.CursorHand)
+			}
 			c.drawMiniCheckbox(cbR, n.Checked, n.Indeterminate)
 			if hov && cbR.Contains(c.MouseX, c.MouseY) {
 				c.nextCursor = platform.CursorHand
@@ -464,7 +522,7 @@ func (c *Context) TreeViewEx(
 	c.Canvas.PopClip()
 
 	// Обработка перетаскивания (Reorder) узлов TreeViewEx
-	if st.Reorderable {
+	if !st.Disabled && st.Reorderable {
 		if c.HandleTreeReorder(id, viewRect, contentW, rowH, flat, si, maxScroll, st.AllowReparent, st.OnReorder, func() {
 			delete(treeAnchorStore, id)
 		}) {
@@ -510,6 +568,7 @@ func (c *Context) TableEx(
 	if cfg == nil {
 		cfg = &TableExConfig{}
 	}
+	id = c.ResolveID("tblex", id)
 
 	st := ApplyOptions(opts)
 	w := c.RemainingWidth()
@@ -521,9 +580,19 @@ func (c *Context) TableEx(
 		h = c.Scale(*st.HeightDp).Int()
 	}
 	r := c.allocRectStyled(w, h, st)
-	c.registerFocusable(id)
+	if !st.Disabled {
+		c.registerFocusable(id)
+	}
 
-	c.Canvas.DrawRoundedBox(r, c.ScaleF(c.Theme.RadiusSm), c.Theme.Card, 1.0, c.Theme.Border)
+	rad := c.Theme.RadiusSm
+	if st.Radius != nil {
+		rad = *st.Radius
+	}
+	borderCol := c.Theme.Border
+	if c.FocusID == id && !st.Disabled {
+		borderCol = c.Theme.BorderFocus
+	}
+	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), c.Theme.Card, 1.0, borderCol)
 
 	// Инициализация ширин колонок
 	if c.tableColWidths == nil {
@@ -607,7 +676,28 @@ func (c *Context) TableEx(
 		maxScrollX = 0
 	}
 
-	if !c.IsInputBlocked() && viewRect.Contains(c.MouseX, c.MouseY) {
+	if st.ScrollToIndex != nil {
+		targetIdx := *st.ScrollToIndex
+		if targetIdx < 0 {
+			si.lastScrollIndex = -1
+		} else if targetIdx < rowCount {
+			if si.lastScrollIndex != targetIdx {
+				targetY := targetIdx * rowH
+				if targetY > maxScrollY {
+					targetY = maxScrollY
+				}
+				if targetY < 0 {
+					targetY = 0
+				}
+				si.y = targetY
+				si.lastScrollIndex = targetIdx
+			}
+		}
+	} else {
+		si.lastScrollIndex = -1
+	}
+
+	if !st.Disabled && !c.IsInputBlocked() && viewRect.Contains(c.MouseX, c.MouseY) {
 		if c.WheelY != 0 {
 			si.y -= int(c.WheelY * float32(rowH*2))
 			if si.y < 0 {
@@ -631,7 +721,7 @@ func (c *Context) TableEx(
 	}
 
 	// Ctrl+A при фокусе
-	if c.FocusID == id && !c.IsInputBlocked() && cfg.Selected != nil {
+	if !st.Disabled && c.FocusID == id && !c.IsInputBlocked() && cfg.Selected != nil {
 		for _, kp := range c.KeyEvents {
 			if kp.Mods.Ctrl && kp.Code == KeyA {
 				for i := 0; i < rowCount; i++ {
@@ -645,7 +735,7 @@ func (c *Context) TableEx(
 	// Обработка активного inline-редактирования
 	editRow, hasEdit := tableEditRow[id]
 	editCol := tableEditCol[id]
-	if hasEdit && editRow >= 0 && editCol >= 0 && !c.IsInputBlocked() {
+	if !st.Disabled && hasEdit && editRow >= 0 && editCol >= 0 && !c.IsInputBlocked() {
 		buf := []rune(tableEditBuf[id])
 		for _, kp := range c.KeyEvents {
 			if kp.Code == KeyEnter {
@@ -726,12 +816,14 @@ func (c *Context) TableEx(
 		cw := colWidths[ci]
 		cr := render.Rect{X: cx, Y: hdrRect.Y, W: cw, H: hdrH}
 		resZone := render.Rect{X: cr.X + cr.W - c.Scale(4).Int(), Y: cr.Y, W: c.Scale(8).Int(), H: cr.H}
-		if cols[ci].Sortable && sort != nil {
-			c.RegisterHit(id+":hdr:"+strconv.Itoa(ci), hdrRect.Intersect(cr), platform.CursorHand)
+		if !st.Disabled {
+			if cols[ci].Sortable && sort != nil {
+				c.RegisterHit(id+":hdr:"+strconv.Itoa(ci), hdrRect.Intersect(cr), platform.CursorHand)
+			}
+			c.RegisterHit(id+":res:"+strconv.Itoa(ci), hdrRect.Intersect(resZone), platform.CursorResizeH)
 		}
-		c.RegisterHit(id+":res:"+strconv.Itoa(ci), hdrRect.Intersect(resZone), platform.CursorResizeH)
 
-		if !c.IsInputBlocked() && resZone.Contains(c.MouseX, c.MouseY) {
+		if !st.Disabled && !c.IsInputBlocked() && resZone.Contains(c.MouseX, c.MouseY) {
 			c.nextCursor = platform.CursorResizeH
 			if c.DoubleClicked() && cfg.AutoFitOnDoubleClick && cfg.GetCellText != nil && c.Font != nil {
 				maxTw, _ := c.Font.MeasureText(cols[ci].Title, c.Scale(12).Int())
@@ -753,7 +845,7 @@ func (c *Context) TableEx(
 				c.tableResizeStartX[id] = c.MouseX
 				c.tableResizeStartW[id] = cw
 			}
-		} else if cols[ci].Sortable && sort != nil && !c.IsInputBlocked() && cr.Contains(c.MouseX, c.MouseY) {
+		} else if !st.Disabled && cols[ci].Sortable && sort != nil && !c.IsInputBlocked() && cr.Contains(c.MouseX, c.MouseY) {
 			c.nextCursor = platform.CursorHand
 			if c.MousePressed {
 				if sort.Column == ci {
@@ -811,9 +903,11 @@ func (c *Context) TableEx(
 			}
 			cbSize := c.Scale(15).Int()
 			cbR := render.Rect{X: viewRect.X + (checkColW-cbSize)/2, Y: hdrRect.Y + (hdrH-cbSize)/2, W: cbSize, H: cbSize}
-			c.RegisterHit(id+":allcb", cbR, platform.CursorHand)
+			if !st.Disabled {
+				c.RegisterHit(id+":allcb", cbR, platform.CursorHand)
+			}
 			c.drawMiniCheckbox(cbR, allChecked, anyChecked && !allChecked)
-			if !c.IsInputBlocked() && cbR.Contains(c.MouseX, c.MouseY) {
+			if !st.Disabled && !c.IsInputBlocked() && cbR.Contains(c.MouseX, c.MouseY) {
 				c.nextCursor = platform.CursorHand
 				if c.MousePressed {
 					target := !allChecked
@@ -843,9 +937,11 @@ func (c *Context) TableEx(
 		for ri := startRow; ri < endRow; ri++ {
 			ry := bodyRect.Y + ri*rowH - si.y
 			rowR := render.Rect{X: clipR.X, Y: ry, W: clipR.W, H: rowH}
-			c.RegisterHit(id+":row:"+strconv.Itoa(ri), clipR.Intersect(rowR), platform.CursorArrow)
+			if !st.Disabled {
+				c.RegisterHit(id+":row:"+strconv.Itoa(ri), clipR.Intersect(rowR), platform.CursorArrow)
+			}
 			isSel := cfg.Selected != nil && cfg.Selected[ri]
-			hovRow := !c.IsInputBlocked() && render.Rect{X: bodyRect.X, Y: ry, W: bodyRect.W, H: rowH}.Contains(c.MouseX, c.MouseY)
+			hovRow := !st.Disabled && !c.IsInputBlocked() && render.Rect{X: bodyRect.X, Y: ry, W: bodyRect.W, H: rowH}.Contains(c.MouseX, c.MouseY)
 
 			if isSel {
 				c.Canvas.FillRect(rowR, c.Theme.Accent.WithAlpha(40))
@@ -864,9 +960,11 @@ func (c *Context) TableEx(
 			if colStart == 0 && cfg.ShowCheckboxes && cfg.Checked != nil && len(cfg.Checked) >= rowCount {
 				cbSize := c.Scale(15).Int()
 				cbR := render.Rect{X: viewRect.X + (checkColW-cbSize)/2, Y: ry + (rowH-cbSize)/2, W: cbSize, H: cbSize}
-				c.RegisterHit(id+":rcb:"+strconv.Itoa(ri), clipR.Intersect(cbR), platform.CursorHand)
+				if !st.Disabled {
+					c.RegisterHit(id+":rcb:"+strconv.Itoa(ri), clipR.Intersect(cbR), platform.CursorHand)
+				}
 				c.drawMiniCheckbox(cbR, cfg.Checked[ri], false)
-				if !c.IsInputBlocked() && cbR.Contains(c.MouseX, c.MouseY) {
+				if !st.Disabled && !c.IsInputBlocked() && cbR.Contains(c.MouseX, c.MouseY) {
 					c.nextCursor = platform.CursorHand
 					if c.MousePressed {
 						cfg.Checked[ri] = !cfg.Checked[ri]
@@ -882,7 +980,7 @@ func (c *Context) TableEx(
 				cellR := render.Rect{X: cx, Y: ry, W: cw, H: rowH}
 
 				// Двойной клик по ячейке запускает inline-редактирование
-				if !c.IsInputBlocked() && cellR.Contains(c.MouseX, c.MouseY) && c.DoubleClicked() {
+				if !st.Disabled && !c.IsInputBlocked() && cellR.Contains(c.MouseX, c.MouseY) && c.DoubleClicked() {
 					ev.RowDoubleClicked = ri
 					if cfg.OnCellEdit != nil && cfg.GetCellText != nil {
 						tableEditRow[id] = ri
@@ -960,7 +1058,7 @@ func (c *Context) TableEx(
 	}
 
 	// Обработка перетаскивания (Reorder) строк TableEx
-	if st.Reorderable {
+	if !st.Disabled && st.Reorderable {
 		c.HandleLinearReorder(id, bodyRect, bodyRect.X, contentW, rowH, rowCount, si, maxScrollY, func(dragEv DragEvent) {
 			ev.Drag = &dragEv
 			if st.OnReorder != nil {

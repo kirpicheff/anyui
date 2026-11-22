@@ -160,10 +160,14 @@ func (st *demoState) drawTabDesktop(ui *anyui.UI) {
 				{Name: "Трафик", Values: []float64{120, 185, 160, 240, 210, 290, 265}},
 				{Name: "Ошибки", Values: []float64{12, 8, 15, 6, 9, 4, 5}},
 			}
-			ui.Row(12, 200, func() {
-				ui.LineChart("demo_linechart", chartLabels, chartSeries, anyui.Flex(1), anyui.Height(195))
-				ui.BarChart("demo_barchart", chartLabels, chartSeries, anyui.Flex(1), anyui.Height(195))
-			})
+			ui.RowFlex(12, 200,
+				anyui.FlexItem{Weight: 1, Fn: func() {
+					ui.LineChart("demo_linechart", chartLabels, chartSeries, anyui.Height(195))
+				}},
+				anyui.FlexItem{Weight: 1, Fn: func() {
+					ui.BarChart("demo_barchart", chartLabels, chartSeries, anyui.Height(195))
+				}},
+			)
 
 			// 3. LogView
 			ui.Label("LogView (поиск, Follow tail, Ctrl+A / Ctrl+C)", anyui.FontSize(13), anyui.Bold())
@@ -181,24 +185,28 @@ func (st *demoState) drawTabDesktop(ui *anyui.UI) {
 			}
 			ui.Row(12, 36, func() {
 				ui.MultiSelect("demo_ms", msItems, deskTab.multiSel, anyui.Width(260))
-				ui.TagInput("demo_tags", &deskTab.tags, "Введите тег и Enter...", anyui.Flex(1))
+				ui.TagInput("demo_tags", &deskTab.tags, "Введите тег и Enter...")
 			})
 
 			// 5. Мультивыбор в ListViewEx, TreeViewEx и TableEx
 			ui.Label("Мультивыбор (Ctrl+Клик, Shift+Клик, Ctrl+A) и чекбоксы", anyui.FontSize(13), anyui.Bold())
-			ui.Row(12, 190, func() {
-				ui.ListViewEx("demo_lvex", len(deskTab.listMultiChk), 28, &anyui.ListViewExConfig{
-					Selected:       deskTab.listMultiSel,
-					ShowCheckboxes: true,
-					Checked:        deskTab.listMultiChk,
-				}, func(idx int, area anyui.Rect, isSel bool) {
-					ui.DrawText(anyui.Px(area.X+6), anyui.Px(area.Y+7), fmt.Sprintf("Элемент #%d", idx+1), 12, th.TextPrimary)
-				}, anyui.Flex(1), anyui.Height(185))
-				ui.TreeViewEx("demo_tvex", ensureDesktopTree(), &anyui.TreeViewExConfig{
-					SelectedIDs:    deskTab.treeMultiSel,
-					ShowCheckboxes: true,
-				}, anyui.Flex(1), anyui.Height(185))
-			})
+			ui.RowFlex(12, 190,
+				anyui.FlexItem{Weight: 1, Fn: func() {
+					ui.ListViewEx("demo_lvex", len(deskTab.listMultiChk), 28, &anyui.ListViewExConfig{
+						Selected:       deskTab.listMultiSel,
+						ShowCheckboxes: true,
+						Checked:        deskTab.listMultiChk,
+					}, func(idx int, area anyui.Rect, isSel bool) {
+						ui.DrawText(anyui.Px(area.X+6), anyui.Px(area.Y+7), fmt.Sprintf("Элемент #%d", idx+1), 12, th.TextPrimary)
+					}, anyui.Height(185))
+				}},
+				anyui.FlexItem{Weight: 1, Fn: func() {
+					ui.TreeViewEx("demo_tvex", ensureDesktopTree(), &anyui.TreeViewExConfig{
+						SelectedIDs:    deskTab.treeMultiSel,
+						ShowCheckboxes: true,
+					}, anyui.Height(185))
+				}},
+			)
 
 			cols := []anyui.TableColumn{
 				{Title: "ID", WidthDp: 65, Sortable: true},

@@ -5,7 +5,6 @@ import (
 	"math"
 
 	"github.com/kirpicheff/anyui"
-	"github.com/kirpicheff/anyui/render"
 )
 
 func (st *demoState) drawTabGraphicsSystem(ui *anyui.UI) {
@@ -19,37 +18,37 @@ func (st *demoState) drawTabGraphicsSystem(ui *anyui.UI) {
 
 				// 1. Линейный градиент + тень
 				g1 := anyui.Rect{X: r.X + ui.Scale(14).Int(), Y: r.Y + ui.Scale(16).Int(), W: ui.Scale(120).Int(), H: ui.Scale(70).Int()}
-				c.DrawBoxShadow(g1, render.BoxShadow{
+				c.DrawBoxShadow(g1, anyui.BoxShadow{
 					OffsetY: ui.ScaleF(4),
 					Blur:    ui.ScaleF(10),
-					Color:   render.RGBA(0, 0, 0, 120),
-					Radii:   render.UniformRadii(ui.ScaleF(10)),
+					Color:   anyui.RGBA(0, 0, 0, 120),
+					Radii:   anyui.UniformRadii(ui.ScaleF(10)),
 				})
-				c.FillLinearGradient(g1, render.CornerRadii{TL: ui.ScaleF(14), TR: ui.ScaleF(4), BR: ui.ScaleF(14), BL: ui.ScaleF(4)}, render.LinearGradient{
+				c.FillLinearGradient(g1, anyui.CornerRadii{TL: ui.ScaleF(14), TR: ui.ScaleF(4), BR: ui.ScaleF(14), BL: ui.ScaleF(4)}, anyui.LinearGradient{
 					StartX: 0, StartY: 0, EndX: 1, EndY: 1,
-					Stops: []render.GradientStop{
+					Stops: []anyui.GradientStop{
 						{Pos: 0, Color: th.Accent},
-						{Pos: 1, Color: render.RGB(168, 85, 247)},
+						{Pos: 1, Color: anyui.RGB(168, 85, 247)},
 					},
 				})
 
 				// 2. BackdropBlur поверх градиента
 				blurR := anyui.Rect{X: g1.X + ui.Scale(40).Int(), Y: g1.Y + ui.Scale(34).Int(), W: ui.Scale(100).Int(), H: ui.Scale(54).Int()}
-				c.BackdropBlur(blurR, ui.Scale(6).Int(), render.UniformRadii(ui.ScaleF(8)))
-				c.DrawRoundedBox(blurR, ui.ScaleF(8), render.RGBA(255, 255, 255, 28), 1.0, render.RGBA(255, 255, 255, 70))
+				c.BackdropBlur(blurR, ui.Scale(6).Int(), anyui.UniformRadii(ui.ScaleF(8)))
+				c.DrawRoundedBox(blurR, ui.ScaleF(8), anyui.RGBA(255, 255, 255, 28), 1.0, anyui.RGBA(255, 255, 255, 70))
 
 				// 3. Радиальный градиент
 				g2 := anyui.Rect{X: r.X + ui.Scale(175).Int(), Y: r.Y + ui.Scale(16).Int(), W: ui.Scale(90).Int(), H: ui.Scale(90).Int()}
-				c.FillRadialGradient(g2, render.UniformRadii(ui.ScaleF(45)), render.RadialGradient{
+				c.FillRadialGradient(g2, anyui.UniformRadii(ui.ScaleF(45)), anyui.RadialGradient{
 					CenterX: 0.4, CenterY: 0.4, Radius: 0.6,
-					Stops: []render.GradientStop{
-						{Pos: 0, Color: render.RGB(56, 189, 248)},
-						{Pos: 1, Color: render.RGB(30, 58, 138)},
+					Stops: []anyui.GradientStop{
+						{Pos: 0, Color: anyui.RGB(56, 189, 248)},
+						{Pos: 1, Color: anyui.RGB(30, 58, 138)},
 					},
 				})
 
 				// 4. Векторные примитивы (Polyline + Arc) и SVG с tint
-				pts := []render.PointF{
+				pts := []anyui.PointF{
 					{X: float32(r.X + ui.Scale(285).Int()), Y: float32(r.Y + ui.Scale(85).Int())},
 					{X: float32(r.X + ui.Scale(315).Int()), Y: float32(r.Y + ui.Scale(45).Int())},
 					{X: float32(r.X + ui.Scale(345).Int()), Y: float32(r.Y + ui.Scale(68).Int())},

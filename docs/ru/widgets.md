@@ -34,7 +34,7 @@ ui.Checkbox("agree", "Принимаю условия", &agreed)
 ### `RadioButton` и `RadioGroup`
 - **Сигнатуры:**
   - `ui.RadioButton(id, label string, selected *string, value string, opts ...Option) bool`
-  - `ui.RadioGroup(id string, options []string, selected *int, opts ...Option) bool`
+  - `ui.RadioGroup(id string, items []SelectItem, selected *string, opts ...Option) bool`
 - **Пример:**
 ```go
 // Одиночные переключатели по ключу
@@ -42,7 +42,7 @@ ui.RadioButton("mode_perf", "Производительность", &mode, "perf
 ui.RadioButton("mode_eco", "Энергосбережение", &mode, "eco")
 
 // Группа переключателей
-ui.RadioGroup("theme", []string{"Navy", "Dark", "Light"}, &themeIdx)
+ui.RadioGroup("theme", anyui.SelectItems("Navy", "Dark", "Light"), &themeKey)
 ```
 
 ### `Toggle`
@@ -126,39 +126,35 @@ if ui.Hyperlink("docs_link", "Открыть документацию") {
 
 ## Списки и навигация
 
-### `Select` и `ComboBox`
+### `Select`
 - **Модель элементов:** `anyui.SelectItem{Key string, Label string, Icon string}` (или хелпер `anyui.SelectItems("Пункт 1", "Пункт 2")`).
-- **Сигнатуры:**
-  - `ui.Select(id string, items []anyui.SelectItem, selected *string, opts ...Option) bool`
-  - `ui.ComboBox(id string, items []anyui.SelectItem, selected *string, opts ...Option) bool` (с полем фильтрации/поиска)
+- **Сигнатура:** `ui.Select(id string, items []anyui.SelectItem, selected *string, opts ...Option) bool` (с опцией `anyui.Searchable()` — со встроенным полем фильтрации/поиска).
 - **Пример:**
 ```go
 countries := anyui.SelectItems("Россия", "Казахстан", "Беларусь")
-ui.ComboBox("country", countries, &countryKey, anyui.Width(260))
+ui.Select("country", countries, &countryKey, anyui.Searchable(), anyui.Width(260))
 ```
 
 ### `ListView`
-- **Сигнатура:** `ui.ListView(id string, count int, itemHeightDp int, selected *int, drawItem func(index int, area Rect, selected bool), opts ...Option) bool`
+- **Сигнатура:** `ui.ListView(id string, count int, itemHeightDp Dp, selected *int, drawItem func(index int, areaPx Rect, selected bool), opts ...Option) bool`
 - **Возможности:** виртуализация (рисуются только видимые строки), прокрутка колесом мыши.
 - **Пример:**
 ```go
-ui.ListView("files", len(files), 36, &selectedIdx, func(i int, area anyui.Rect, sel bool) {
-	// отрисовка строки i внутри area
+ui.ListView("files", len(files), 36, &selectedIdx, func(i int, areaPx anyui.Rect, sel bool) {
+	// отрисовка строки i внутри areaPx (в физических пикселях Px)
 }, anyui.Height(240))
 ```
 
-### `Tabs` и `TabBar`
-- **Сигнатуры:**
-  - `ui.Tabs(id string, items []string, active *int, orient anyui.Orientation, opts ...Option) bool`
-  - `ui.TabBar(id string, tabs []TabItem, active *int, opts ...Option) TabBarEvent`
+### `TabBar`
+- **Сигнатура:** `ui.TabBar(id string, tabs []TabItem, activeID *string, opts ...Option) TabBarEvent` (хелпер `anyui.TabItems("Вкладка 1", "Вкладка 2")` создаёт срез вкладок, где `ID` и `Title` совпадают).
 - **Пример `TabBar`:**
 ```go
-ev := ui.TabBar("editor_tabs", tabs, &activeTab)
+ev := ui.TabBar("editor_tabs", tabs, &activeTabID)
 if ev.Added {
 	// добавить новую вкладку
 }
-if ev.Closed >= 0 {
-	// закрыть вкладку ev.Closed
+if ev.ClosedID != "" {
+	// закрыть вкладку с идентификатором ev.ClosedID
 }
 ```
 
@@ -251,7 +247,7 @@ ui.Popover("pop_filters", &popoverOpen, btnArea, func() {
   - Перетаскивается за заголовок мышью (курсор `CursorMove`).
   - Поддерживает сворачивание тела по кнопке в шапке и закрытие крестиком.
   - Запоминает координаты перемещения между кадрами по `id`.
-  - Опции: `anyui.Width(wDp)`, `anyui.Height(hDp)`, `anyui.Pos(xDp, yDp)`.
+  - Опции: `anyui.Width(wDp)`, `anyui.Height(hDp)`.
 
 #### `Drawer` (выезжающая панель от любого края окна)
 - **Сигнатура:** `ui.Drawer(id string, open *bool, side DrawerSide, fn func(), opts ...Option)`
@@ -266,11 +262,11 @@ ui.Popover("pop_filters", &popoverOpen, btnArea, func() {
   - Затемняет остальной экран и автоматически закрывается по клику на затемнённую область вне панели или клавише `Escape`.
 
 #### `ContextMenu` (контекстное меню по правому клику)
-- **Сигнатура:** `ui.ContextMenu(id string, anchor Rect, items []ContextMenuItem)`
-- **Поведение:** открывается в точке клика курсора, поддерживает разделители (`Separator: true`), иконки, статус `Disabled`, горячие клавиши и подменю. Закрывается по клику вне меню или Escape.
+- **Сигнатура:** `ui.ContextMenu(id string, anchor Rect, items []ContextMenuItem, opts ...Option)`
+- **Поведение:** открывается в точке клика курсора, поддерживает разделители (`Separator: true`), иконки, статус `Disabled`, горячие клавиши. Закрывается по клику вне меню или Escape.
 
 #### `Tooltip` (всплывающая подсказка)
-- **Сигнатура:** `ui.Tooltip(text string, anchor Rect)`
+- **Сигнатура:** `ui.Tooltip(text string, anchor Rect, opts ...Option)`
 - **Поведение:** всплывает поверх экрана рядом с элементом `anchor` при наведении курсора с автоматическим расчётом размера и скруглением.
 
 #### `PushOverlay` и `LayoutRect` (низкоуровневые оверлеи)
@@ -302,27 +298,27 @@ cols := []anyui.TableColumn{
 	{Title: "ID", WidthDp: 64, MinWidthDp: 48, Sortable: true},
 	{Title: "Имя", WidthDp: 200, Sortable: true},
 }
-ev := ui.Table("tbl", cols, len(rows), &selectedRow, &sortState, func(row, col int, area anyui.Rect, sel bool) {
-	ui.DrawText(area.X+ui.Scale(8).Int(), area.Y+ui.Scale(7).Int(), rows[row].Name, 12, ui.Theme().TextPrimary)
+ev := ui.Table("tbl", cols, len(rows), &selectedRow, &sortState, func(row, col int, areaPx anyui.Rect, sel bool) {
+	ui.DrawText(anyui.Px(areaPx.X)+ui.Scale(8), anyui.Px(areaPx.Y)+ui.Scale(7), rows[row].Name, 12, ui.Theme().TextPrimary)
 }, anyui.Height(240), anyui.Reorderable(), anyui.OnReorder(func(ev anyui.DragEvent) {
-	// ev.FromWidget, ev.ToWidget, ev.FromKey, ev.ToKey, ev.Drop (DropAbove / DropBelow)
+	// ev.FromWidget, ev.ToWidget, ev.FromIndex, ev.ToIndex, ev.Drop (DropAbove / DropBelow)
 }))
 ```
 
 ### `TreeView`
-Древовидный список с раскрытием узлов и виртуализацией. Поддерживает перетаскивание узлов (`Reorderable`), зоны сброса `DropAbove`, `DropBelow`, `DropInside` (вставка внутрь каталогов с подсветкой строки), визуальный индикатор вставки, полупрозрачное ghost-превью и кросс-виджетный перенос между деревьями:
+Древовидный список с раскрытием узлов и виртуализацией. Поддерживает перетаскивание узлов внутри дерева (`Reorderable`), зоны сброса `DropAbove`, `DropBelow`, а с опцией `AllowReparent` — смену родителя и вложение внутрь каталогов (`DropInside` с подсветкой строки и защитой от циклов):
 ```go
-ui.TreeView("tree", roots, &selectedNodeID, anyui.Height(220), anyui.Reorderable(), anyui.OnReorder(func(ev anyui.DragEvent) {
-	// ev.FromWidget, ev.ToWidget — ID исходного и целевого виджета
+ui.TreeView("tree", roots, &selectedNodeID, anyui.Height(220), anyui.Reorderable(), anyui.AllowReparent(), anyui.OnReorder(func(ev anyui.DragEvent) {
+	// ev.FromWidget, ev.ToWidget — ID виджета дерева
 	// ev.FromKey, ev.ToKey — ID перетаскиваемого и целевого узлов
-	// ev.Drop — anyui.DropAbove, anyui.DropBelow или anyui.DropInside (внутрь каталога)
+	// ev.Drop — anyui.DropAbove, anyui.DropBelow или anyui.DropInside (внутрь каталога при AllowReparent)
 }))
 ```
 
 ### `SplitPane`
-Разделение области на 2 панели (`SplitHorizontal` или `SplitVertical`) с перетаскиваемым разделителем:
+Разделение области на 2 панели (`Horizontal` или `Vertical`) с перетаскиваемым разделителем:
 ```go
-ui.SplitPane("split", anyui.SplitHorizontal, &ratio, func() {
+ui.SplitPane("split", anyui.Horizontal, &ratio, func() {
 	// Первая панель
 }, func() {
 	// Вторая панель
@@ -342,7 +338,7 @@ ui.Accordion("acc", items, openSections)
 ```
 
 ### Расширение `TabBar` (Drag & Detach)
-`TabBarEvent` возвращает `MovedFrom`, `MovedTo` при перетаскивании вкладок и `Detached` при вытягивании вкладки за пределы панели (для открытия в отдельном окне через `app.OpenWindow`).
+`TabBarEvent` возвращает `MovedFrom`, `MovedTo` при перетаскивании вкладок и `DetachedID` при вытягивании вкладки за пределы панели (для открытия в отдельном окне через `app.OpenWindow`).
 
 ### `NumberInput`, `Slider`, `RangeSlider`
 ```go
@@ -425,7 +421,7 @@ ui.Card(func() {
 ## Расширенные события мыши, клавиатуры и фокуса
 
 ### Двойной клик (`DoubleClick`) и средняя кнопка мыши (`MiddleClick`)
-- В `UI` и `ui.Context` доступны методы `MousePosDp() (int, int)` (координаты курсора в логических единицах dp), `MousePosPx() (int, int)` (координаты в физических пикселях окна), `MousePressed() bool` (клик ЛКМ в текущем кадре), `MouseDown() bool` (зажата ли ЛКМ), `DoubleClicked() bool` и `MiddleClicked() bool` (в `ui.Context` — `MiddleMousePressed` / `MiddleMouseDown` / `MiddleMouseReleased`).
+- В `UI` доступны методы `MousePosDp() (Dp, Dp)` (координаты курсора в логических единицах dp), `MousePosPx() (Px, Px)` (координаты в физических пикселях окна), `MousePressed() bool` (клик ЛКМ в текущем кадре), `MouseDown() bool` (зажата ли ЛКМ), `DoubleClicked() bool` и `MiddleClicked() bool` (в `ui.Context` — `MiddleMousePressed` / `MiddleMouseDown` / `MiddleMouseReleased`).
 - В `Table` структура `TableEvent` возвращает поля `RowDoubleClicked` и `RowMiddleClicked` (`-1`, если события не было):
 ```go
 ev := ui.Table("tbl", cols, len(rows), &sel, &sort, drawCell)
@@ -436,7 +432,7 @@ if ev.RowMiddleClicked >= 0 {
 	// Действие по средней кнопке мыши
 }
 ```
-- В `TabBar` клик средней кнопкой мыши по вкладке с `Closable: true` закрывает её (`ev.Closed`).
+- В `TabBar` клик средней кнопкой мыши по вкладке с `Closable: true` закрывает её (`ev.ClosedID`).
 - В `TreeView` двойной клик по узлу с дочерними элементами переключает его состояние `Expanded`.
 
 ### Горизонтальная прокрутка (`WheelX` и `Shift + WheelY`)
@@ -455,7 +451,7 @@ if ev.RowMiddleClicked >= 0 {
 - **`ListView`**: `Up`, `Down`, `PageUp`, `PageDown`, `Home`, `End`, `Space` (с автопрокруткой к выбранному элементу).
 - **`Table`**: `Up`, `Down`, `PageUp`, `PageDown`, `Home`, `End`, `Left`, `Right` (горизонтальный скролл), `Space` / `Enter`.
 - **`TreeView`**: `Up`, `Down`, `PageUp`, `PageDown`, `Home`, `End`, `Right` (раскрыть узел или перейти к дочернему), `Left` (свернуть узел или перейти к родителю), `Space` / `Enter` (переключить `Expanded`).
-- **`Select` / `ComboBox`**: `Space` / `Enter` (открыть/закрыть список), `Up`, `Down`, `PageUp`, `PageDown`, `Home`, `End` (выбор элемента как в закрытом, так и в открытом состоянии).
+- **`Select`**: `Space` / `Enter` (открыть/закрыть список), `Up`, `Down`, `PageUp`, `PageDown`, `Home`, `End` (выбор элемента как в закрытом, так и в открытом состоянии).
 
 ### Декларативная программная навигация (`ScrollToIndex`, `ScrollToID`, `Anchor`)
 AnyUI поддерживает программную прокрутку непосредственно внутри кадра отрисовки виджета без межпоточных каналов и отложенных очередей:
@@ -521,8 +517,8 @@ ui.StatusBar("sb", []anyui.StatusBarSection{{Text: "Готово", Flex: 1}, {Te
 - `DatePicker`: клик по названию месяца или году в шапке открывает сетку 12 месяцев или 12 лет; кнопка «Сегодня» внизу календаря; двойной клик по полю включает ручной ввод даты (`YYYY-MM-DD`).
 - `ui.TimePicker(id, &t, opts...)` и `ui.DateTimePicker(id, &dt, opts...)`: выбор времени `ЧЧ:ММ:СС` с кнопками `+`/`-` и колесом мыши.
 
-### `MultiSelect` / `CheckComboBox` и `TagInput`
-- `ui.MultiSelect(id, items, selectedIDs, opts...)` (алиас `CheckComboBox`): выпадающий список с чекбоксами на базе `map[string]bool`, поиском, кнопками «Выбрать все / Сбросить» и отображением тегов/сводки. Принимает `[]anyui.SelectItem`.
+### `MultiSelect` и `TagInput`
+- `ui.MultiSelect(id, items, selectedIDs, opts...)`: выпадающий список с чекбоксами на базе `map[string]bool`, поиском, кнопками «Выбрать все / Сбросить» и отображением тегов/сводки. Принимает `[]anyui.SelectItem`.
 - `ui.TagInput(id, &tags, placeholder, opts...)`: ввод тегов (добавление по `Enter` или `,`, удаление по `x` или `Backspace`).
 
 ### Расширенный мультивыбор: `ListViewEx`, `TreeViewEx`, `TableEx`
@@ -545,7 +541,7 @@ app := anyui.NewApp(anyui.Config{
 	Frameless: true,
 	HitTest: func(x, y int) anyui.HitTestResult {
 		if currentUI != nil {
-			return currentUI.TitleBarHitTest(x, y)
+			return currentUI.TitleBarHitTest(anyui.Px(x), anyui.Px(y))
 		}
 		return anyui.HitClient
 	},

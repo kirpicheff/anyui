@@ -108,6 +108,7 @@ func (c *Context) TextInputOpts(id string, value *string, placeholder string, op
 	if st.HeightDp != nil && *st.HeightDp > 0 {
 		h = c.Scale(*st.HeightDp).Int()
 	}
+	w, h = c.applySizeConstraints(w, h, st)
 	errH := c.inputErrorExtraH(st.ErrorText)
 	r := c.allocRect(w, h+errH)
 	r.H = h
@@ -744,6 +745,7 @@ func (c *Context) TextArea(id string, value *string, placeholder string, opts ..
 	if st.HeightDp != nil && *st.HeightDp > 0 {
 		h = c.Scale(*st.HeightDp).Int()
 	}
+	w, h = c.applySizeConstraints(w, h, st)
 	errH := c.inputErrorExtraH(st.ErrorText)
 	r := c.allocRect(w, h+errH)
 	r.H = h

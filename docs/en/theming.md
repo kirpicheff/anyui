@@ -57,7 +57,6 @@ Every widget accepts variadic `opts ...anyui.Option` to override appearance and 
 | `anyui.FillWidth()` | Stretch widget to full available width | `anyui.FillWidth()` |
 | `anyui.FillHeight()` | Stretch widget to full available height | `anyui.FillHeight()` |
 | `anyui.AutoHeight()` | Auto-size container (`Card`) height to content | `anyui.AutoHeight()` |
-| `anyui.Flex(weight)` | Proportional flex weight | `anyui.Flex(2)` |
 | `anyui.WordWrap(enabled ...bool)` | Wrap text to width (`Label`, `SelectableLabel`) | `anyui.WordWrap()` |
 | `anyui.Ellipsis(v)` | Truncate text with `...` (`Label`) | `anyui.Ellipsis(true)` |
 | `anyui.LineNumbers(v)` | Show line numbers in `TextArea` | `anyui.LineNumbers(true)` |

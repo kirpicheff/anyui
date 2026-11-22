@@ -102,7 +102,7 @@ To build a custom title bar window (without OS chrome, preserving DWM shadows an
 app := anyui.NewApp(anyui.Config{
 	Title:          "Custom Chrome",
 	Frameless:      true,
-	TitleBarHeight: 38, // Drag area height (dp) if HitTest is not provided
+	TitleBarHeight: 38, // Drag area height (px) if HitTest is not provided
 	HitTest: func(x, y int) anyui.HitTestResult {
 		// Leave the top-right corner clickable for window control buttons
 		if y < 38 && x < 760 {

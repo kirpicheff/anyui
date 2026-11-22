@@ -173,9 +173,9 @@ func newDemoState() *demoState {
 		treeRoots:     makeDemoTree(),
 		treeSelected:  "f_data",
 		treeFavRoots: []*anyui.TreeNode{
-			{ID: "fav_root", Label: "Избранное (drag сюда)", Expanded: true, Children: []*anyui.TreeNode{
-				{ID: "fav_item", Label: "Быстрый доступ.go"},
-			}},
+			{ID: "fav_fast", Label: "Быстрый доступ.go"},
+			{ID: "fav_cfg", Label: "Настройки.json"},
+			{ID: "fav_mon", Label: "Мониторинг.md"},
 		},
 		splitRatio:      0.45,
 		collapsibleOpen: true,

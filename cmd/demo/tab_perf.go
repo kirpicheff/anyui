@@ -5,7 +5,6 @@ import (
 	"math"
 
 	"github.com/kirpicheff/anyui"
-	"github.com/kirpicheff/anyui/render"
 )
 
 type perfTabState struct {
@@ -44,6 +43,15 @@ func ensurePerfLines() []string {
 	return perfTab.vtvLinesA
 }
 
+func pxRectToDp(ui *anyui.UI, r anyui.Rect) anyui.Rect {
+	return anyui.Rect{
+		X: ui.PxToDp(anyui.Px(r.X)).Int(),
+		Y: ui.PxToDp(anyui.Px(r.Y)).Int(),
+		W: ui.PxToDp(anyui.Px(r.W)).Int(),
+		H: ui.PxToDp(anyui.Px(r.H)).Int(),
+	}
+}
+
 func (st *demoState) drawTabPerf(ui *anyui.UI) {
 	th := ui.Theme()
 	perfTab.renderCount++
@@ -65,79 +73,83 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 
 			// 1. Стенд слоёв (Static / Dynamic / Overlay) и Dirty Rectangles
 			ui.Label("1. Слои (Static / Dynamic / Overlay) и Dirty Rectangles", anyui.FontSize(13), anyui.Bold())
-			ui.Row(12, 182, func() {
-				// Статический блок: не перерисовывается при кликах по Dynamic Layer
-				ui.StaticLayer("perf_static_card", func() {
-					perfTab.staticDraws++
-					ui.Card(func() {
-						ui.Column(6, func() {
-							ui.Label(fmt.Sprintf("Static Layer (перерисовок: #%d)", perfTab.staticDraws), anyui.FontSize(13), anyui.Bold(), anyui.TextColor(th.Accent))
-							ui.Label("Этот блок с градиентом и SVG кешируется в отдельный буфер.", anyui.FontSize(11), anyui.TextColor(th.TextMuted))
-							ui.CanvasView(func(c *anyui.Canvas, r anyui.Rect) {
-								c.FillLinearGradient(r, render.UniformRadii(ui.ScaleF(8)), render.LinearGradient{
-									StartX: 0, StartY: 0, EndX: 1, EndY: 1,
-									Stops: []render.GradientStop{
-										{Pos: 0, Color: th.SurfaceDark},
-										{Pos: 1, Color: th.Accent.WithAlpha(90)},
-									},
-								})
-								c.DrawSVG(svgStar, r.X+ui.Scale(12).Int(), r.Y+ui.Scale(18).Int(), ui.Scale(36).Int(), th.Warning)
-								c.DrawSVG(svgGear, r.X+ui.Scale(58).Int(), r.Y+ui.Scale(18).Int(), ui.Scale(36).Int(), th.Success)
-								pts := make([]render.PointF, 0, 12)
-								for k := 0; k < 12; k++ {
-									px := float32(r.X+ui.Scale(115).Int()) + float32(k)*ui.ScaleF(16)
-									py := float32(r.Y+ui.Scale(38).Int()) + float32(math.Sin(float64(k)*0.8))*ui.ScaleF(18)
-									pts = append(pts, render.PointF{X: px, Y: py})
-								}
-								c.DrawPolyline(pts, ui.ScaleF(2), th.Accent, false)
-							}, anyui.Width(320), anyui.Height(74))
-						})
-					}, anyui.Width(370), anyui.Height(176), anyui.Padding(12))
-				})
-
-				// Динамический блок справа
-				ui.Card(func() {
-					ui.Column(8, func() {
-						ui.Label("Dynamic Layer (обновляется отдельно)", anyui.FontSize(13), anyui.Bold())
-						ui.RowCentered(8, 34, func() {
-							if ui.Button("perf_dyn_btn", fmt.Sprintf("Обновить Dynamic (%d)", perfTab.dynamicClicks), anyui.Primary()) {
-								perfTab.dynamicClicks++
-								st.statusMsg = fmt.Sprintf("Обновлён только Dynamic Layer (#%d)", perfTab.dynamicClicks)
-							}
-							if ui.Button("perf_inv_btn", "Сбросить Static") {
-								ui.InvalidateStatic()
-								st.statusMsg = "Static Layer принудительно сброшен (InvalidateStatic)"
-							}
-						})
-						ui.RowCentered(10, 28, func() {
-							ui.Toggle("perf_ov_tog", "Overlay-подсказка", &perfTab.showOverlayTest)
-							if ui.Checkbox("perf_dirty_hl", "Рамка DirtyRect", &perfTab.highlightDirty) {
-								ui.SetDebugDirtyRect(perfTab.highlightDirty)
-							}
-						})
-
-						blittedText := "Нет (полная отрисовка статики)"
-						if ui.LastFrameStaticBlitted() {
-							blittedText = "Да (BlitFrom из Static Layer)"
-						}
-						winArea := ui.Canvas().Width * ui.Canvas().Height
-						dirtyPct := 0.0
-						if winArea > 0 {
-							dirtyPct = float64(perfTab.lastDirty.W*perfTab.lastDirty.H) * 100.0 / float64(winArea)
-						}
-						ui.Label(fmt.Sprintf("Static Blit: %s | Перерисовок статики: %d", blittedText, perfTab.staticDraws), anyui.FontSize(11), anyui.TextColor(th.TextMuted))
-						ui.Label(fmt.Sprintf("Последний DirtyRect: (%d, %d) %dx%d (%.1f%% экрана)",
-							perfTab.lastDirty.X, perfTab.lastDirty.Y, perfTab.lastDirty.W, perfTab.lastDirty.H, dirtyPct),
-							anyui.FontSize(11), anyui.TextColor(th.Success))
+			var staticSlotDp anyui.Rect
+			ui.RowFlex(12, 182,
+				anyui.FlexItem{FixedDp: 370, Fn: func() {
+					staticSlotDp = ui.CurrentArea()
+					// Статический блок: не перерисовывается при кликах по Dynamic Layer
+					ui.StaticLayer("perf_static_card", func() {
+						perfTab.staticDraws++
+						ui.Card(func() {
+							ui.Column(6, func() {
+								ui.Label(fmt.Sprintf("Static Layer (перерисовок: #%d)", perfTab.staticDraws), anyui.FontSize(13), anyui.Bold(), anyui.TextColor(th.Accent))
+								ui.Label("Этот блок с градиентом и SVG кешируется в отдельный буфер.", anyui.FontSize(11), anyui.TextColor(th.TextMuted))
+								ui.CanvasView(func(c *anyui.Canvas, r anyui.Rect) {
+									c.FillLinearGradient(r, anyui.UniformRadii(ui.ScaleF(8)), anyui.LinearGradient{
+										StartX: 0, StartY: 0, EndX: 1, EndY: 1,
+										Stops: []anyui.GradientStop{
+											{Pos: 0, Color: th.SurfaceDark},
+											{Pos: 1, Color: th.Accent.WithAlpha(90)},
+										},
+									})
+									c.DrawSVG(svgStar, r.X+ui.Scale(12).Int(), r.Y+ui.Scale(18).Int(), ui.Scale(36).Int(), th.Warning)
+									c.DrawSVG(svgGear, r.X+ui.Scale(58).Int(), r.Y+ui.Scale(18).Int(), ui.Scale(36).Int(), th.Success)
+									pts := make([]anyui.PointF, 0, 12)
+									for k := 0; k < 12; k++ {
+										px := float32(r.X+ui.Scale(115).Int()) + float32(k)*ui.ScaleF(16)
+										py := float32(r.Y+ui.Scale(38).Int()) + float32(math.Sin(float64(k)*0.8))*ui.ScaleF(18)
+										pts = append(pts, anyui.PointF{X: px, Y: py})
+									}
+									c.DrawPolyline(pts, ui.ScaleF(2), th.Accent, false)
+								}, anyui.Width(320), anyui.Height(74))
+							})
+						}, anyui.Width(370), anyui.Height(176), anyui.Padding(12))
 					})
-				}, anyui.Flex(1), anyui.Height(176), anyui.Padding(12))
-			})
+				}},
+				anyui.FlexItem{Weight: 1, Fn: func() {
+					// Динамический блок справа
+					ui.Card(func() {
+						ui.Column(8, func() {
+							ui.Label("Dynamic Layer (обновляется отдельно)", anyui.FontSize(13), anyui.Bold())
+							ui.RowCentered(8, 34, func() {
+								if ui.Button("perf_dyn_btn", fmt.Sprintf("Обновить Dynamic (%d)", perfTab.dynamicClicks), anyui.Primary()) {
+									perfTab.dynamicClicks++
+									st.statusMsg = fmt.Sprintf("Обновлён только Dynamic Layer (#%d)", perfTab.dynamicClicks)
+								}
+								if ui.Button("perf_inv_btn", "Сбросить Static") {
+									ui.InvalidateStatic()
+									st.statusMsg = "Static Layer принудительно сброшен (InvalidateStatic)"
+								}
+							})
+							ui.RowCentered(10, 28, func() {
+								ui.Toggle("perf_ov_tog", "Overlay-подсказка", &perfTab.showOverlayTest)
+								if ui.Checkbox("perf_dirty_hl", "Рамка DirtyRect", &perfTab.highlightDirty) {
+									ui.SetDebugDirtyRect(perfTab.highlightDirty)
+								}
+							})
+
+							blittedText := "Нет (полная отрисовка статики)"
+							if ui.LastFrameStaticBlitted() {
+								blittedText = "Да (BlitFrom из Static Layer)"
+							}
+							winArea := ui.Canvas().Width * ui.Canvas().Height
+							dirtyPct := 0.0
+							if winArea > 0 {
+								dirtyPct = float64(perfTab.lastDirty.W*perfTab.lastDirty.H) * 100.0 / float64(winArea)
+							}
+							ui.Label(fmt.Sprintf("Static Blit: %s | Перерисовок статики: %d", blittedText, perfTab.staticDraws), anyui.FontSize(11), anyui.TextColor(th.TextMuted))
+							ui.Label(fmt.Sprintf("Последний DirtyRect: (%d, %d) %dx%d (%.1f%% экрана)",
+								perfTab.lastDirty.X, perfTab.lastDirty.Y, perfTab.lastDirty.W, perfTab.lastDirty.H, dirtyPct),
+								anyui.FontSize(11), anyui.TextColor(th.Success))
+						})
+					}, anyui.Height(176), anyui.Padding(12))
+				}},
+			)
 
 			if perfTab.showOverlayTest {
-				area := ui.CurrentArea()
 				ovRect := anyui.Rect{
-					X: area.X + 24,
-					Y: area.Y + 90,
+					X: staticSlotDp.X + 24,
+					Y: staticSlotDp.Y + 56,
 					W: 260,
 					H: 64,
 				}
@@ -148,8 +160,8 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 						W: ui.Scale(anyui.Dp(ovRect.W)).Int(),
 						H: ui.Scale(anyui.Dp(ovRect.H)).Int(),
 					}
-					ui.Canvas().DrawBoxShadow(ovRectPx, render.BoxShadow{
-						OffsetY: ui.ScaleF(4), Blur: ui.ScaleF(12), Color: render.RGBA(0, 0, 0, 130), Radii: render.UniformRadii(ui.ScaleF(8)),
+					ui.Canvas().DrawBoxShadow(ovRectPx, anyui.BoxShadow{
+						OffsetY: ui.ScaleF(4), Blur: ui.ScaleF(12), Color: anyui.RGBA(0, 0, 0, 130), Radii: anyui.UniformRadii(ui.ScaleF(8)),
 					})
 					ui.Canvas().DrawRoundedBox(ovRectPx, ui.ScaleF(8), th.Card, 1.5, th.Accent)
 					ui.DrawText(anyui.Px(ovRectPx.X)+ui.Scale(12), anyui.Px(ovRectPx.Y)+ui.Scale(12), "Overlay Layer поверх Static", 12, th.TextPrimary)
@@ -169,11 +181,8 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 					anyui.FontSize(12), anyui.TextColor(th.Accent))
 			})
 			ui.Row(12, 54, func() {
-				rStatic := ui.CurrentArea()
-				rStatic.W = 340
-				rStatic.H = 50
-				ui.RegisterHoverArea("perf_hover_static", rStatic, anyui.CursorHand, false)
 				ui.CanvasView(func(c *anyui.Canvas, r anyui.Rect) {
+					ui.RegisterHoverArea("perf_hover_static", pxRectToDp(ui, r), anyui.CursorHand, false)
 					mx, my := ui.MousePosPx()
 					hov := r.Contains(mx.Int(), my.Int())
 					bg := th.Surface
@@ -184,11 +193,8 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 					ui.DrawText(anyui.Px(r.X)+ui.Scale(12), anyui.Px(r.Y)+ui.Scale(10), "Зона без перерисовки внутри (trackMove=false)", 12, th.TextPrimary)
 					ui.DrawText(anyui.Px(r.X)+ui.Scale(12), anyui.Px(r.Y)+ui.Scale(28), "Водите мышью здесь — Render не вызывается", 11, th.TextMuted)
 				}, anyui.Width(340), anyui.Height(50))
-				rTrack := ui.CurrentArea()
-				rTrack.W = 340
-				rTrack.H = 50
-				ui.RegisterHoverArea("perf_hover_track", rTrack, anyui.CursorCrosshair, true)
 				ui.CanvasView(func(c *anyui.Canvas, r anyui.Rect) {
+					ui.RegisterHoverArea("perf_hover_track", pxRectToDp(ui, r), anyui.CursorCrosshair, true)
 					mx, my := ui.MousePosPx()
 					hov := r.Contains(mx.Int(), my.Int())
 					bg := th.Surface
@@ -228,11 +234,8 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 			ui.Flow(8, 8, func() {
 				for _, ci := range cursorItems {
 					item := ci
-					itemRect := ui.CurrentArea()
-					itemRect.W = 134
-					itemRect.H = 34
-					ui.RegisterHoverArea("perf_"+item.id, itemRect, item.cursor, false)
 					ui.CanvasView(func(c *anyui.Canvas, r anyui.Rect) {
+						ui.RegisterHoverArea("perf_"+item.id, pxRectToDp(ui, r), item.cursor, false)
 						mx, my := ui.MousePosPx()
 						hov := r.Contains(mx.Int(), my.Int())
 						bg := th.Surface
@@ -252,62 +255,65 @@ func (st *demoState) drawTabPerf(ui *anyui.UI) {
 
 			// 4. LRU-кеш глифов и масштабированных изображений
 			ui.Label("4. LRU-кеш глифов (FontManager) и масштабированных изображений", anyui.FontSize(13), anyui.Bold())
-			ui.Row(12, 175, func() {
-				// Кеш глифов + VirtualTextView
-				ui.Card(func() {
-					ui.Column(6, func() {
-						gEntries, gBytes := ui.GlyphCacheStats()
-						ui.RowCentered(8, 28, func() {
-							ui.Label(fmt.Sprintf("Кеш глифов: %d шт. (%.1f КБ)", gEntries, float64(gBytes)/1024.0), anyui.FontSize(12), anyui.Bold())
-							if ui.Button("perf_vtv_swap", "Сменить текст", anyui.Height(26), anyui.Padding(8)) {
-								perfTab.vtvAltSet = !perfTab.vtvAltSet
-							}
-							if ui.Button("perf_glyph_clr", "Очистить кеш", anyui.Height(26), anyui.Padding(8)) {
-								ui.ClearGlyphCache()
-							}
-						})
-						ui.VirtualTextView("perf_vtv", ensurePerfLines(), anyui.Height(110))
-					})
-				}, anyui.Flex(1), anyui.Height(170), anyui.Padding(10))
-
-				// Кеш масштабированных изображений
-				ui.Card(func() {
-					ui.Column(6, func() {
-						iEntries, iBytes := ui.ScaledImageCacheStats()
-						ui.Label(fmt.Sprintf("Кеш изображений: %d шт. (%.1f КБ)", iEntries, float64(iBytes)/1024.0), anyui.FontSize(12), anyui.Bold())
-						ui.Row(10, 120, func() {
-							ui.Image(st.sampleImg, perfTab.imgScaleMode, anyui.Width(perfTab.imgSizeDp), anyui.Height(perfTab.imgSizeDp))
-							ui.Column(4, func() {
-								ui.RowCentered(4, 26, func() {
-									if ui.Button("perf_img_64", "64dp", anyui.Height(24), anyui.Padding(6)) {
-										perfTab.imgSizeDp = 64
-									}
-									if ui.Button("perf_img_96", "96dp", anyui.Height(24), anyui.Padding(6)) {
-										perfTab.imgSizeDp = 96
-									}
-									if ui.Button("perf_img_116", "116dp", anyui.Height(24), anyui.Padding(6)) {
-										perfTab.imgSizeDp = 116
-									}
-								})
-								ui.RowCentered(4, 26, func() {
-									if ui.Button("perf_mode_fit", "Fit", anyui.Height(24), anyui.Padding(6)) {
-										perfTab.imgScaleMode = anyui.ScaleFit
-									}
-									if ui.Button("perf_mode_fill", "Fill", anyui.Height(24), anyui.Padding(6)) {
-										perfTab.imgScaleMode = anyui.ScaleFill
-									}
-									if ui.Button("perf_mode_1x", "1:1", anyui.Height(24), anyui.Padding(6)) {
-										perfTab.imgScaleMode = anyui.ScaleOneToOne
-									}
-								})
-								if ui.Button("perf_img_clr", "Очистить кеш изображений", anyui.Height(26), anyui.Padding(8)) {
-									ui.ClearScaledImageCache()
+			ui.RowFlex(12, 175,
+				anyui.FlexItem{Weight: 1, Fn: func() {
+					// Кеш глифов + VirtualTextView
+					ui.Card(func() {
+						ui.Column(6, func() {
+							gEntries, gBytes := ui.GlyphCacheStats()
+							ui.RowCentered(8, 28, func() {
+								ui.Label(fmt.Sprintf("Кеш глифов: %d шт. (%.1f КБ)", gEntries, float64(gBytes)/1024.0), anyui.FontSize(12), anyui.Bold())
+								if ui.Button("perf_vtv_swap", "Сменить текст", anyui.Height(26), anyui.Padding(8)) {
+									perfTab.vtvAltSet = !perfTab.vtvAltSet
+								}
+								if ui.Button("perf_glyph_clr", "Очистить кеш", anyui.Height(26), anyui.Padding(8)) {
+									ui.ClearGlyphCache()
 								}
 							})
+							ui.VirtualTextView("perf_vtv", ensurePerfLines(), anyui.Height(110))
 						})
-					})
-				}, anyui.Width(355), anyui.Height(170), anyui.Padding(10))
-			})
+					}, anyui.Height(170), anyui.Padding(10))
+				}},
+				anyui.FlexItem{FixedDp: 355, Fn: func() {
+					// Кеш масштабированных изображений
+					ui.Card(func() {
+						ui.Column(6, func() {
+							iEntries, iBytes := ui.ScaledImageCacheStats()
+							ui.Label(fmt.Sprintf("Кеш изображений: %d шт. (%.1f КБ)", iEntries, float64(iBytes)/1024.0), anyui.FontSize(12), anyui.Bold())
+							ui.Row(10, 120, func() {
+								ui.Image(st.sampleImg, perfTab.imgScaleMode, anyui.Width(perfTab.imgSizeDp), anyui.Height(perfTab.imgSizeDp))
+								ui.Column(4, func() {
+									ui.RowCentered(4, 26, func() {
+										if ui.Button("perf_img_64", "64dp", anyui.Height(24), anyui.Padding(6)) {
+											perfTab.imgSizeDp = 64
+										}
+										if ui.Button("perf_img_96", "96dp", anyui.Height(24), anyui.Padding(6)) {
+											perfTab.imgSizeDp = 96
+										}
+										if ui.Button("perf_img_116", "116dp", anyui.Height(24), anyui.Padding(6)) {
+											perfTab.imgSizeDp = 116
+										}
+									})
+									ui.RowCentered(4, 26, func() {
+										if ui.Button("perf_mode_fit", "Fit", anyui.Height(24), anyui.Padding(6)) {
+											perfTab.imgScaleMode = anyui.ScaleFit
+										}
+										if ui.Button("perf_mode_fill", "Fill", anyui.Height(24), anyui.Padding(6)) {
+											perfTab.imgScaleMode = anyui.ScaleFill
+										}
+										if ui.Button("perf_mode_1x", "1:1", anyui.Height(24), anyui.Padding(6)) {
+											perfTab.imgScaleMode = anyui.ScaleOneToOne
+										}
+									})
+									if ui.Button("perf_img_clr", "Очистить кеш изображений", anyui.Height(26), anyui.Padding(8)) {
+										ui.ClearScaledImageCache()
+									}
+								})
+							})
+						})
+					}, anyui.Width(355), anyui.Height(170), anyui.Padding(10))
+				}},
+			)
 		})
 	})
 }

@@ -159,16 +159,18 @@ func (c *Context) drawTitleBarMinBtn(id string, r render.Rect) {
 	cy := float32(r.Y) + float32(r.H)/2
 	half := c.ScaleF(5)
 	c.Canvas.DrawLine(cx-half, cy, cx+half, cy, c.ScaleF(1.3), c.Theme.TextPrimary)
+	c.Tooltip(c.str().MinimizeTooltip, r)
 }
 
 func (c *Context) drawTitleBarMaxBtn(id string, r render.Rect) {
 	c.titleBarInteractive = append(c.titleBarInteractive, r)
 	c.RegisterHit(id, r, platform.CursorArrow)
+	isMax := c.Win != nil && c.Win.IsMaximized()
 	hov := !c.IsInputBlocked() && r.Contains(c.MouseX, c.MouseY)
 	if hov {
 		c.Canvas.FillRect(r, c.Theme.Card)
 		if c.MousePressed && c.Win != nil {
-			if c.Win.IsMaximized() {
+			if isMax {
 				c.Win.Restore()
 			} else {
 				c.Win.Maximize()
@@ -176,7 +178,6 @@ func (c *Context) drawTitleBarMaxBtn(id string, r render.Rect) {
 		}
 	}
 
-	isMax := c.Win != nil && c.Win.IsMaximized()
 	cx := r.X + r.W/2
 	cy := r.Y + r.H/2
 	sz := c.Scale(9).Int()
@@ -186,9 +187,11 @@ func (c *Context) drawTitleBarMaxBtn(id string, r render.Rect) {
 		front := render.Rect{X: cx - sz/2 - c.Scale(1).Int(), Y: cy - sz/2 + c.Scale(2).Int(), W: sz - c.Scale(2).Int(), H: sz - c.Scale(2).Int()}
 		c.Canvas.DrawRoundedBox(back, 0, render.RGBA(0, 0, 0, 0), 1.2, c.Theme.TextPrimary)
 		c.Canvas.DrawRoundedBox(front, 0, c.Theme.Surface, 1.2, c.Theme.TextPrimary)
+		c.Tooltip(c.str().RestoreTooltip, r)
 	} else {
 		box := render.Rect{X: cx - sz/2, Y: cy - sz/2, W: sz, H: sz}
 		c.Canvas.DrawRoundedBox(box, 0, render.RGBA(0, 0, 0, 0), 1.2, c.Theme.TextPrimary)
+		c.Tooltip(c.str().MaximizeTooltip, r)
 	}
 }
 
@@ -210,6 +213,7 @@ func (c *Context) drawTitleBarCloseBtn(id string, r render.Rect) {
 	stroke := c.ScaleF(1.4)
 	c.Canvas.DrawLine(cx-half, cy-half, cx+half, cy+half, stroke, iconCol)
 	c.Canvas.DrawLine(cx+half, cy-half, cx-half, cy+half, stroke, iconCol)
+	c.Tooltip(c.str().CloseTooltip, r)
 }
 
 func (c *Context) isPointInTitleBarInteractive(x, y int) bool {

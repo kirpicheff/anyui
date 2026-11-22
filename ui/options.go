@@ -86,7 +86,6 @@ type WidgetStyle struct {
 	FillWidth        bool
 	FillHeight       bool
 	AutoHeight       bool
-	FlexWeight       float32
 	FontSizeDp       *Dp
 	PadDp            *Dp
 	IconSVG          string
@@ -399,13 +398,6 @@ func AutoHeight(enabled ...bool) Option {
 	val := optBool(enabled)
 	return func(s *WidgetStyle) {
 		s.AutoHeight = val
-	}
-}
-
-// Flex задаёт пропорциональный вес виджета при делении пространства.
-func Flex(weight float32) Option {
-	return func(s *WidgetStyle) {
-		s.FlexWeight = weight
 	}
 }
 

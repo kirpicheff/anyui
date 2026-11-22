@@ -518,11 +518,12 @@ func writeCommonHeader(out *bytes.Buffer, version string, isFull bool, idx *apiI
 	out.WriteString("- **Холст (`Canvas`) и текст на нём:** все методы `Canvas` принимают и возвращают физические `Px` (конвертация — через `Scale`/`ScaleF`/`PxToDp`/`PxToDpf`). У `UI.DrawText` и `UI.DrawSVG` единицы смешанные: координаты `(xPx, yPx)` — в `Px`, а размер (`sizeDp`) — в `Dp`; у `Canvas.DrawSVG` и координаты, и размер — в `Px`. У `Canvas` нет метода рисования текста: внутри `CanvasView` / `InteractiveCanvas` текст выводится через `UI.DrawText` в абсолютных координатах `Px` (`areaPx.X + offset`, `areaPx.Y + offset`). `UI.Canvas` возвращает холст текущего кадра для прямой отрисовки вне `CanvasView` (например, в `ListView`/`Table`/`PushOverlay`) — координаты абсолютные `Px` окна с активным клипом.\n")
 	out.WriteString("- **Статический слой (`StaticLayer`):** `StaticLayer` кеширует результат `fn` между кадрами в отдельный буфер; после изменения данных внутри слоя вызывайте `InvalidateStatic`, иначе слой не перерисуется.\n")
 	out.WriteString("- **Единственный экземпляр (`SingleInstanceGuard`):** порядок вызовов — `anyui.AcquireSingleInstance` → `SingleInstanceGuard.SetCallback` (получает `args []string` второго экземпляра) → `SingleInstanceGuard.StartIPC` → `SingleInstanceGuard.Close` при выходе (либо передайте `guard` в `Config.SingleInstance.Guard`, чтобы `App` закрыл его автоматически).\n")
-	out.WriteString("- **Единое задание размеров через опции:** `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image`, `ListView`, `Table`, `TextArea`, `LogView` по умолчанию занимают доступное пространство (`Auto`); явные размеры задаются опциями `Width`, `Height`, `FillWidth`, `FillHeight`. `Card` по умолчанию подбирает высоту по содержимому (`AutoHeight`); для растягивания передайте `FillHeight`.\n")
+	out.WriteString("- **Единое задание размеров через опции:** `ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image`, `ListView`, `ListViewEx`, `SplitPane` по умолчанию занимают всё доступное пространство по ширине и высоте (`Auto`). `TextArea` (120 dp), `Table`, `TableEx`, `LogView`, `VirtualTextView` (260 dp), `TreeView`, `TreeViewEx` (240 dp), `LineChart`, `BarChart` (220 dp) и `Sparkline` (44 dp) по умолчанию занимают доступную ширину, но имеют фиксированную дефолтную высоту — для растягивания на остаток высоты контейнера передайте `FillHeight` (или `Height(Auto)`). Явные размеры и ограничения задаются опциями `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`. `Card` по умолчанию подбирает высоту по содержимому (`AutoHeight`); для растягивания передайте `FillHeight`.\n")
+	out.WriteString("- **Потоковый холст (`InteractiveCanvas`):** в `CanvasCallbacks` флаг `Streaming: true` включает быстрый путь обновления по `Window.WakeUp` (перерисовывается только `OnDraw` холста без прохода всего дерева `UI` и без полного diff буфера), а `DirectInput: true` доставляет события мыши и клавиатуры напрямую в колбэки холста. Если в обработчике изменилось внешнее состояние интерфейса за пределами холста, вызовите `UI.RequestRedraw`.\n")
 	out.WriteString("- **Колонки таблиц:** в `Table` и `TableEx` колонки с `WidthDp <= 0` автоматически делят оставшуюся ширину таблицы.\n")
-	out.WriteString("- **Декларативная навигация:** для программной прокрутки используйте `ScrollToIndex` в `ListView` и `Table`, а для `ScrollView` — `ScrollToID` в паре с маркером `Anchor` (или `id` дочернего виджета).\n")
+	out.WriteString("- **Декларативная навигация:** для программной прокрутки используйте `ScrollToIndex` в `ListView`, `ListViewEx`, `Table` и `TableEx`, а для `ScrollView` — `ScrollToID` в паре с маркером `Anchor` (или `id` дочернего виджета).\n")
 	out.WriteString("- **Иконка окна:** подхватывается автоматически из `.syso`-ресурсов, либо задаётся через `Config.IconRGBA` или `Window.SetIcon`.\n")
-	out.WriteString("- **Идентификаторы, ключи и `IDScope`:** `IDScope` (или `PushID`/`PopID`) изолирует `id` виджетов внутри циклов и переиспользуемых компонентов. В `Select`, `MultiSelect`, `TabBar`, `TreeView`, `TreeViewEx` и `Breadcrumbs` ключи элементов (`Key` / `ID`) локальны для конкретного виджета и должны быть уникальны в его пределах — при дублировании ключей выделение и клик совпадут для всех дубликатов. В `Breadcrumbs`, если у сегмента `ID == \"\"`, возвращается его `Label`.\n")
+	out.WriteString("- **Идентификаторы, ключи и `IDScope`:** `IDScope` (или `PushID`/`PopID`) изолирует `id` виджетов внутри циклов и переиспользуемых компонентов. Передача пустого `id == \"\"` автоматически генерирует детерминированный идентификатор по порядковому номеру виджета в текущем `IDScope`. В `Select`, `MultiSelect`, `TabBar`, `TreeView`, `TreeViewEx` и `Breadcrumbs` ключи элементов (`Key` / `ID`) локальны для конкретного виджета и должны быть уникальны в его пределах — при дублировании ключей выделение и клик совпадут для всех дубликатов. В `Breadcrumbs`, если у сегмента `ID == \"\"`, возвращается его `Label`.\n")
 	out.WriteString("- **Выпадающие списки и вкладки:** `Select` с опцией `Searchable` заменяет комбобокс; `MultiSelect` работает с `map[string]bool`; `TabBar` и `TabItems` работают на строковых ключах.\n")
 	out.WriteString("- **Раскладка и оверлеи:** для типового экрана используйте `Page` или `DockTop` / `DockBottom` / `ColumnFlex`. Для диалогов всегда используйте `Modal` — `PushOverlay` предназначен только для небольших всплывающих контролов.\n")
 	out.WriteString("- **Drag & Drop (Reorder):** `Reorderable` + `OnReorder` работают в `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы `FromIndex`/`ToIndex`) и `TreeView`, `TreeViewEx` (ключи `FromKey`/`ToKey`; с `AllowReparent` доступны смена родителя и `DropInside`).\n\n")
@@ -582,48 +583,76 @@ type optionMatrixRow struct {
 // optionMatrixRows проверена по реальным обращениям к WidgetStyle в ui/*.go.
 var optionMatrixRows = []optionMatrixRow{
 	{
-		"`Label`, `SelectableLabel`, `StatusDot`",
-		"`FontSize`, `Bold`, `Mono`, `TextColor`, `TextAlignLeft`, `TextAlignCenter`, `TextAlignRight`, `LetterSpacing`, `TextShadow`, `WordWrap`, `Ellipsis`, `Width`, `MaxWidth`, `Disabled`",
+		"`Label`, `SelectableLabel`, `StatusDot`, `Hyperlink`",
+		"`FontSize`, `Bold`, `Mono`, `TextColor`, `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Disabled` (кроме `StatusDot`), `WordWrap` (`Label`, `SelectableLabel`), `Ellipsis` (`Label`), `TextAlignLeft`/`TextAlignCenter`/`TextAlignRight` (`Label`), `LetterSpacing`/`TextShadow` (`Label`, `StatusDot`)",
 	},
 	{
-		"`Button`, `IconButton`, `Hyperlink`",
-		"`Primary`, `Secondary`, `Danger`, `Ghost`, `Icon`, `IconRight`, `Width`, `Height`, `FillWidth`, `Flex`, `Padding`, `Radius`, `FontSize`, `Bold`, `Bg`, `HoverBg`, `TextColor`, `HoverTextColor`, `BorderColor`, `HoverBorderColor`, `Disabled`",
+		"`Button`, `IconButton`",
+		"`Primary`, `Secondary`, `Danger`, `Ghost`, `Icon`, `Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `Radius`, `FontSize`, `Bold`, `Mono`, `LetterSpacing`, `TextShadow`, `Bg`, `HoverBg`, `TextColor`, `HoverTextColor`, `BorderColor`, `HoverBorderColor`, `Disabled`",
 	},
 	{
-		"`Checkbox`, `Toggle`, `RadioButton`",
-		"`Width`, `FillWidth`, `Flex`, `Disabled`, `Indeterminate` (`Checkbox`)",
+		"`Checkbox`, `Toggle`, `RadioButton`, `RadioGroup`",
+		"`Disabled`, `FontSize`, `Bold`/`Mono` (кроме `Toggle`), `TextColor` (`Checkbox`, `Toggle`), `Bg` (`Toggle`), `Height`/`Radius`/`Indeterminate` (`Checkbox`)",
 	},
 	{
-		"`TextInput`, `MaskedInput`",
-		"`Width`, `Height`, `FillWidth`, `Flex`, `FontSize`, `Mono`, `Password`, `PasswordToggle`, `Clearable`, `ReadOnly`, `Disabled`, `InputFilter`, `Error`, `Icon`, `IconRight`, `FocusBorderColor`",
+		"`TextInput`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `FocusBorderColor`, `Radius`, `TextAlignLeft`, `TextAlignCenter`, `TextAlignRight`, `Password`, `PasswordToggle`, `Clearable`, `ReadOnly`, `Disabled`, `InputFilter`, `Error`, `Icon`, `IconRight`",
+	},
+	{
+		"`MaskedInput`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `FocusBorderColor`, `Radius`, `ReadOnly`, `Disabled`, `Error`",
 	},
 	{
 		"`TextArea`",
-		"`Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `Padding`, `FontSize`, `Mono`, `LineNumbers`, `ReadOnly`, `Disabled`, `InputFilter`, `Error`, `Bg`, `BorderColor`, `Radius`, `TextColor`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding`, `FontSize`, `Bold`, `Mono`, `TextColor`, `Bg`, `BorderColor`, `Radius`, `LineNumbers`, `ReadOnly`, `Disabled`, `InputFilter`, `Error`",
 	},
 	{
-		"`Card`",
-		"`Width`, `Height`, `FillWidth`, `FillHeight`, `AutoHeight`, `Flex`, `Padding`, `Radius`, `Bg`, `BorderColor`",
-	},
-	{
-		"`ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image`",
-		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Flex`, `Padding` (`ScrollView`), `ScrollToID` (`ScrollView`)",
+		"`NumberInput`, `Slider`, `RangeSlider`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`",
+		"`Disabled`, `Width` (кроме `DateTimePicker`), `Height`/`Radius` (`NumberInput`)",
 	},
 	{
 		"`Select`, `MultiSelect`",
-		"`Width`, `Height`, `FillWidth`, `Flex`, `Searchable` (`Select`), `Bg` (`Select`), `Radius` (`Select`), `Disabled`",
+		"`Width`, `Height`, `Disabled`, `Searchable` (`Select`), `Bg` (`Select`), `Radius` (`Select`), `Bold`/`Mono` (`Select`)",
+	},
+	{
+		"`TagInput`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Disabled`",
+	},
+	{
+		"`Card`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `AutoHeight`, `Padding`, `Radius`, `Bg`, `BorderColor`",
+	},
+	{
+		"`ScrollView`, `CanvasView`, `InteractiveCanvas`, `Image`, `SplitPane`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Padding` (`ScrollView`), `ScrollToID` (`ScrollView`), `Radius` (`SplitPane`)",
 	},
 	{
 		"`ListView`, `ListViewEx`",
-		"`Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `Bg` (`ListView`), `Radius` (`ListView`), `Disabled` (`ListView`), `ScrollToIndex` (`ListView`), `Reorderable`, `OnReorder`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `Radius`, `Disabled`, `ScrollToIndex`, `Reorderable`, `OnReorder`",
 	},
 	{
 		"`Table`, `TableEx`",
-		"`Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `Radius` (`Table`), `Disabled` (`Table`), `ScrollToIndex` (`Table`), `Reorderable`, `OnReorder`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Radius`, `Disabled`, `ScrollToIndex`, `Reorderable`, `OnReorder`",
 	},
 	{
 		"`TreeView`, `TreeViewEx`",
-		"`Width`, `Height`, `FillWidth`, `FillHeight`, `Flex`, `Radius` (`TreeView`), `Disabled` (`TreeView`), `Reorderable`, `AllowReparent`, `OnReorder`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Radius`, `Disabled`, `Reorderable`, `AllowReparent`, `OnReorder`",
+	},
+	{
+		"`LogView`, `VirtualTextView`, `LineChart`, `BarChart`, `Sparkline`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg`, `TextColor` (`Sparkline`)",
+	},
+	{
+		"`TabBar`, `Collapsible`, `Accordion`",
+		"`Width`, `Height` (`TabBar`)",
+	},
+	{
+		"`MenuBar`, `Toolbar`, `StatusBar`, `Breadcrumbs`, `Pagination`, `TitleBar`",
+		"`Width`, `Height`, `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`, `FillWidth`, `FillHeight`, `Bg` (`MenuBar`, `Toolbar`, `StatusBar`, `TitleBar`), `FontSize` (`MenuBar`, `Breadcrumbs`, `TitleBar`), `TextColor` (`TitleBar`)",
+	},
+	{
+		"`Badge`, `ProgressBar`, `Separator`, `Spinner`",
+		"`TextColor`, `Width`/`Height`/`Bg` (кроме `Spinner`), `Radius`/`Danger` (`Badge`, `ProgressBar`), `Padding`/`FontSize`/`Bold`/`Mono`/`Primary`/`Secondary` (`Badge`)",
 	},
 	{
 		"`Modal`, `Popover`, `FloatingPanel`, `Drawer`",
@@ -631,7 +660,7 @@ var optionMatrixRows = []optionMatrixRow{
 	},
 	{
 		"`ContextMenu`, `Tooltip`",
-		"`Width` (`ContextMenu`), `Bg`, `BorderColor`, `Radius`, `FontSize`, `TextColor`, `Padding` (`Tooltip`)",
+		"`Width` (`ContextMenu`), `Padding` (`Tooltip`), `Bg`, `BorderColor`, `Radius`, `FontSize`, `Bold`, `Mono`, `TextColor`, `LetterSpacing`, `TextShadow`",
 	},
 }
 
@@ -1045,6 +1074,7 @@ func lintOutputs(idx *apiIndex, shortText, fullText string) error {
 		"FromIndex": true, "ToIndex": true, "FromKey": true, "ToKey": true,
 		"SelectedID": true, "ClosedID": true, "Added": true, "MovedFrom": true, "MovedTo": true, "DetachedID": true,
 		"RowClicked": true, "RowDoubleClicked": true, "RowMiddleClicked": true, "SortChanged": true, "ColumnResized": true, "Drag": true,
+		"Streaming": true, "DirectInput": true, "OnDraw": true,
 	}
 
 	inCode := false

@@ -102,7 +102,7 @@ if res == anyui.ResYes {
 app := anyui.NewApp(anyui.Config{
 	Title:          "Custom Chrome",
 	Frameless:      true,
-	TitleBarHeight: 38, // Область перетаскивания (dp), если не задан HitTest
+	TitleBarHeight: 38, // Область перетаскивания (px), если не задан HitTest
 	HitTest: func(x, y int) anyui.HitTestResult {
 		// Например, оставляем правый верхний угол кликабельным для кнопок управления
 		if y < 38 && x < 760 {
@@ -247,14 +247,15 @@ child, err := app.OpenWindow(anyui.Config{
 
 ---
 
-## Linux (X11)
+## Linux (X11 и Wayland)
 
-- Бэкенд Linux X11 полностью реализован на чистом Go без CGO (`CGO_ENABLED=0`) поверх `github.com/jezek/xgb` и `golang.org/x/sys/unix`, что позволяет кросс-компилировать бинарник с Windows (`GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build`).
-- **Рендеринг:** используется `MIT-SHM` (`ShmPutImage`) с автоматическим переключением на `PutImage` (например, при работе по SSH / X11-forwarding).
-- **Окна и ввод:** поддерживаются DPI (`Xft.dpi`), системные курсоры, `Frameless` (`_MOTIF_WM_HINTS` + `_NET_WM_MOVERESIZE`), Drag & Drop файлов (`XDND`), захват мыши (`GrabPointer`) и буфер обмена `CLIPBOARD` (текст UTF-8 и изображения `image/png`).
+- Бэкенды Linux X11 и Wayland полностью реализованы на чистом Go без CGO (`CGO_ENABLED=0`), что позволяет кросс-компилировать бинарник с Windows (`GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build`).
+- При запуске бэкенд выбирается автоматически (`WAYLAND_DISPLAY` → Wayland, иначе X11, с автоматическим откатом на X11 и переопределением через переменную окружения `ANYUI_BACKEND`).
+- **X11:** используется `MIT-SHM` (`ShmPutImage`) с автоматическим переключением на `PutImage` (например, при работе по SSH / X11-forwarding), `Xft.dpi`, системные курсоры, `Frameless` (`_MOTIF_WM_HINTS` + `_NET_WM_MOVERESIZE`), Drag & Drop файлов (`XDND`), захват мыши (`GrabPointer`) и буфер обмена `CLIPBOARD` (текст UTF-8 и изображения `image/png`).
+- **Wayland:** используются `wl_compositor`, `wl_shm`, `xdg_shell`, `wl_seat` / `wl_pointer` / `wl_keyboard`, `wp_cursor_shape_manager_v1`, `wp_fractional_scale_manager_v1` / `wp_viewporter` для HiDPI и `wl_data_device_manager` для буфера обмена и Drag & Drop.
 - **Системная интеграция:**
   - Диалоги (`OpenFileDialog`, `OpenFilesDialog`, `SaveFileDialog`, `SelectFolderDialog`, `MessageBox`) работают через `zenity`, `yad` или `kdialog` (автоопределение в `PATH`).
-  - Системный трей (`NewTray`) работает через `XEmbed` (`_NET_SYSTEM_TRAY_S0`), уведомления — через `notify-send`.
+  - Системный трей (`NewTray`) поддерживает `StatusNotifierItem` (D-Bus) и `XEmbed` (`_NET_SYSTEM_TRAY_S0`), уведомления — через `notify-send`.
   - `SingleInstance` использует `flock` и UNIX domain socket в `$XDG_RUNTIME_DIR`.
   - `IsSystemDarkTheme` проверяет `gsettings` (`color-scheme` / `gtk-theme`), `GTK_THEME` и `~/.config/kdeglobals`.
   - `OpenURL` использует `xdg-open`, а `RevealInFileManager` — D-Bus `org.freedesktop.FileManager1.ShowItems` с откатом на `xdg-open`.

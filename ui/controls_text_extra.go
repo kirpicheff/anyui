@@ -387,6 +387,7 @@ func (c *Context) MaskedInput(id string, value *string, mask string, opts ...Opt
 	if st.HeightDp != nil && *st.HeightDp > 0 {
 		h = c.Scale(*st.HeightDp).Int()
 	}
+	w, h = c.applySizeConstraints(w, h, st)
 	errH := c.inputErrorExtraH(st.ErrorText)
 	r := c.allocRect(w, h+errH)
 	r.H = h
@@ -647,7 +648,11 @@ func (c *Context) MaskedInput(id string, value *string, mask string, opts ...Opt
 	if st.BorderColor != nil {
 		baseBorder = *st.BorderColor
 	}
-	borderCol := render.LerpColor(baseBorder, c.Theme.BorderFocus, focusAnim)
+	focusBorder := c.Theme.BorderFocus
+	if st.FocusBorderColor != nil {
+		focusBorder = *st.FocusBorderColor
+	}
+	borderCol := render.LerpColor(baseBorder, focusBorder, focusAnim)
 	if st.ErrorText != "" {
 		borderCol = c.Theme.Danger
 	}

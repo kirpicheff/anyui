@@ -235,22 +235,23 @@ func (st *demoState) drawTabData(ui *anyui.UI) {
 			var moved *anyui.TreeNode
 			if ev.FromWidget == "tree_proj" {
 				moved, st.treeRoots = findAndRemoveNode(st.treeRoots, ev.FromKey)
+				if moved != nil {
+					st.treeRoots = insertNode(st.treeRoots, ev.ToKey, moved, ev.Drop)
+				}
 			} else if ev.FromWidget == "tree_fav" {
 				moved, st.treeFavRoots = findAndRemoveNode(st.treeFavRoots, ev.FromKey)
-			}
-			if moved != nil {
-				if ev.ToWidget == "tree_proj" {
-					st.treeRoots = insertNode(st.treeRoots, ev.ToKey, moved, ev.Drop)
-				} else if ev.ToWidget == "tree_fav" {
+				if moved != nil {
 					st.treeFavRoots = insertNode(st.treeFavRoots, ev.ToKey, moved, ev.Drop)
 				}
+			}
+			if moved != nil {
 				zoneName := "внутрь"
 				if ev.Drop == anyui.DropAbove {
 					zoneName = "выше"
 				} else if ev.Drop == anyui.DropBelow {
 					zoneName = "ниже"
 				}
-				st.statusMsg = fmt.Sprintf("Drag&Drop: %s (%s -> %s, %s)", moved.Label, ev.FromWidget, ev.ToWidget, zoneName)
+				st.statusMsg = fmt.Sprintf("Drag&Drop (%s): %s (%s %s)", ev.FromWidget, moved.Label, zoneName, ev.ToKey)
 				ui.ShowToast("Drag & Drop", st.statusMsg, anyui.ToastSuccess)
 			}
 		}

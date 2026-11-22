@@ -272,3 +272,99 @@ func TestTreeCheckCascadeAndSelectionEx(t *testing.T) {
 		t.Fatalf("ожидалось выделение всех 3 элементов по Ctrl+A, got len=%d changed=%v", len(listSel), changed)
 	}
 }
+
+func TestSelectionExIDScopeDisabledAndScrollToIndex(t *testing.T) {
+	ctx := newTestContext(700, 600)
+
+	// 1. Проверка IDScope и пустого id == "" для ListViewEx, TreeViewEx, TableEx
+	ctx.beginFrame()
+	ctx.IDScope("scopeA", func() {
+		ctx.ListViewEx("", 5, 28, &ListViewExConfig{}, nil, Height(100))
+		ctx.TreeViewEx("", []*TreeNode{{ID: "n1", Label: "N1"}}, &TreeViewExConfig{}, Height(100))
+		ctx.TableEx("", []TableColumn{{Title: "C", WidthDp: 80}}, 5, &TableExConfig{}, nil, nil, Height(100))
+	})
+	ctx.endFrame()
+
+	order := ctx.FocusOrder()
+	if len(order) != 3 || order[0] != "scopeA/lvex#0" || order[1] != "scopeA/tvex#1" || order[2] != "scopeA/tblex#2" {
+		t.Fatalf("неожиданный порядок и имена FocusOrder в IDScope: %v", order)
+	}
+
+	// 2. Проверка Disabled() — виджеты не должны регистрироваться в FocusOrder и реагировать на Ctrl+A
+	selList := map[int]bool{}
+	selTree := map[string]bool{}
+	selTbl := map[int]bool{}
+
+	ctx.beginFrame()
+	ctx.FocusID = "dis_lv"
+	ctx.KeyEvents = []KeyPress{{Code: KeyA, Mods: platform.Modifiers{Ctrl: true}}}
+	ctx.ListViewEx("dis_lv", 5, 28, &ListViewExConfig{Selected: selList}, nil, Height(100), Disabled(), Bg(render.RGB(10, 20, 30)), Radius(6))
+	ctx.TreeViewEx("dis_tv", []*TreeNode{{ID: "n1", Label: "N1"}}, &TreeViewExConfig{SelectedIDs: selTree}, Height(100), Disabled(), Radius(6))
+	ctx.TableEx("dis_tbl", []TableColumn{{Title: "C", WidthDp: 80}}, 5, &TableExConfig{Selected: selTbl}, nil, nil, Height(100), Disabled(), Radius(6))
+	ctx.endFrame()
+
+	if len(ctx.FocusOrder()) != 0 {
+		t.Fatalf("Disabled-виджеты не должны попадать в FocusOrder, получено: %v", ctx.FocusOrder())
+	}
+	if len(selList) != 0 {
+		t.Fatalf("Disabled ListViewEx не должен выделять элементы по Ctrl+A, получено: %v", selList)
+	}
+
+	// 3. Проверка ScrollToIndex в ListViewEx и TableEx
+	ctx.beginFrame()
+	ctx.ListViewEx("sc_lvex", 50, 28, &ListViewExConfig{}, nil, Height(100), ScrollToIndex(20))
+	ctx.TableEx("sc_tblex", []TableColumn{{Title: "C", WidthDp: 80}}, 50, &TableExConfig{}, nil, nil, Height(120), ScrollToIndex(15))
+	ctx.endFrame()
+
+	if si := ctx.getScrollInfo("sc_lvex"); si.y != 20*28 {
+		t.Fatalf("ожидалось смещение ListViewEx si.y=%d, получено %d", 20*28, si.y)
+	}
+	if si := ctx.getScrollInfo("sc_tblex"); si.y != 15*30 {
+		t.Fatalf("ожидалось смещение TableEx si.y=%d, получено %d", 15*30, si.y)
+	}
+}
+
+func TestTextAreaFillHeightMaskedInputFocusBorderDateTimeDisabledAndTitleBarTooltips(t *testing.T) {
+	ctx := newTestContext(600, 400)
+
+	// 1. TextArea с FillHeight() должна занять всю оставшуюся высоту контейнера
+	val := "многострочный текст"
+	ctx.beginFrame()
+	ctx.TextArea("ta_fill", &val, "", FillHeight())
+	remAfter := ctx.RemainingHeight()
+	ctx.endFrame()
+	if remAfter != 0 {
+		t.Fatalf("ожидалось, что TextArea с FillHeight займёт весь остаток высоты (remAfter=0), получено %d", remAfter)
+	}
+
+	// 2. MaskedInput с FocusBorderColor
+	phone := "9991234567"
+	ctx.beginFrame()
+	ctx.FocusID = "mask_focus"
+	ctx.MaskedInput("mask_focus", &phone, "+7 (999) 999-99-99", FocusBorderColor(render.RGB(255, 0, 128)), MinWidth(180), MaxWidth(300))
+	ctx.endFrame()
+
+	// 3. DateTimePicker с Disabled() не должен открывать попапы при клике
+	dt := ctx.Now()
+	ctx.beginFrame()
+	ctx.MouseX, ctx.MouseY = 40, 16
+	ctx.MousePressed = true
+	ctx.DateTimePicker("dtp_dis", &dt, Disabled())
+	ctx.endFrame()
+	if ctx.openState["dtp_dis:date"] || ctx.openState["dtp_dis:time"] {
+		t.Fatalf("DateTimePicker с Disabled() не должен открывать попапы даты/времени: openState=%v", ctx.openState)
+	}
+
+	// 4. TitleBar должен отображать локализованный тултип (оверлей) при наведении на кнопку закрытия
+	ctx.Font = &render.FontManager{}
+	ctx.beginFrame()
+	// Кнопка Close находится в правом верхнем углу окна 600x400 (x ~ 577, y ~ 19)
+	ctx.MouseX, ctx.MouseY = 580, 18
+	ctx.MousePressed = false
+	ctx.TitleBar("tb_tips", "Тест тултипов", TitleBarConfig{})
+	overlayCount := len(ctx.Overlays.items)
+	ctx.endFrame()
+	if overlayCount == 0 {
+		t.Fatalf("ожидался оверлей тултипа для кнопки закрытия TitleBar, но Overlays пуст")
+	}
+}

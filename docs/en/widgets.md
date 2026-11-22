@@ -34,7 +34,7 @@ ui.Checkbox("agree", "I accept the terms", &agreed)
 ### `RadioButton` and `RadioGroup`
 - **Signatures:**
   - `ui.RadioButton(id, label string, selected *string, value string, opts ...Option) bool`
-  - `ui.RadioGroup(id string, options []string, selected *int, opts ...Option) bool`
+  - `ui.RadioGroup(id string, items []SelectItem, selected *string, opts ...Option) bool`
 - **Example:**
 ```go
 // Key-based individual radio buttons
@@ -42,7 +42,7 @@ ui.RadioButton("mode_perf", "Performance", &mode, "perf")
 ui.RadioButton("mode_eco", "Power saving", &mode, "eco")
 
 // Radio group
-ui.RadioGroup("theme", []string{"Navy", "Dark", "Light"}, &themeIdx)
+ui.RadioGroup("theme", anyui.SelectItems("Navy", "Dark", "Light"), &themeKey)
 ```
 
 ### `Toggle`
@@ -126,39 +126,35 @@ if ui.Hyperlink("docs_link", "Open Documentation") {
 
 ## Lists & Navigation
 
-### `Select` and `ComboBox`
+### `Select`
 - **Item Model:** `anyui.SelectItem{Key string, Label string, Icon string}` (or convenience helper `anyui.SelectItems("Item 1", "Item 2")`).
-- **Signatures:**
-  - `ui.Select(id string, items []anyui.SelectItem, selected *string, opts ...Option) bool`
-  - `ui.ComboBox(id string, items []anyui.SelectItem, selected *string, opts ...Option) bool` (with search/filter input)
+- **Signature:** `ui.Select(id string, items []anyui.SelectItem, selected *string, opts ...Option) bool` (pass `anyui.Searchable()` to enable built-in search/filter input).
 - **Example:**
 ```go
 countries := anyui.SelectItems("United States", "Germany", "Japan")
-ui.ComboBox("country", countries, &countryKey, anyui.Width(260))
+ui.Select("country", countries, &countryKey, anyui.Searchable(), anyui.Width(260))
 ```
 
 ### `ListView`
-- **Signature:** `ui.ListView(id string, count int, itemHeightDp int, selected *int, drawItem func(index int, area Rect, selected bool), opts ...Option) bool`
+- **Signature:** `ui.ListView(id string, count int, itemHeightDp Dp, selected *int, drawItem func(index int, areaPx Rect, selected bool), opts ...Option) bool`
 - **Features:** virtualized rendering (only visible rows are drawn), mouse wheel scrolling.
 - **Example:**
 ```go
-ui.ListView("files", len(files), 36, &selectedIdx, func(i int, area anyui.Rect, sel bool) {
-	// draw row i inside area
+ui.ListView("files", len(files), 36, &selectedIdx, func(i int, areaPx anyui.Rect, sel bool) {
+	// draw row i inside areaPx (in physical pixels Px)
 }, anyui.Height(240))
 ```
 
-### `Tabs` and `TabBar`
-- **Signatures:**
-  - `ui.Tabs(id string, items []string, active *int, orient anyui.Orientation, opts ...Option) bool`
-  - `ui.TabBar(id string, tabs []TabItem, active *int, opts ...Option) TabBarEvent`
+### `TabBar`
+- **Signature:** `ui.TabBar(id string, tabs []TabItem, activeID *string, opts ...Option) TabBarEvent` (convenience helper `anyui.TabItems("Tab 1", "Tab 2")` creates tabs where `ID` and `Title` match).
 - **`TabBar` Example:**
 ```go
-ev := ui.TabBar("editor_tabs", tabs, &activeTab)
+ev := ui.TabBar("editor_tabs", tabs, &activeTabID)
 if ev.Added {
 	// add new tab
 }
-if ev.Closed >= 0 {
-	// close tab ev.Closed
+if ev.ClosedID != "" {
+	// close tab with ID ev.ClosedID
 }
 ```
 
@@ -251,7 +247,7 @@ ui.Popover("pop_filters", &popoverOpen, btnArea, func() {
   - Can be dragged by its header using the mouse (`CursorMove`).
   - Supports collapsing the panel body via header toggle and closing via `×`.
   - Persists dragged window coordinates between frames by `id`.
-  - Options: `anyui.Width(wDp)`, `anyui.Height(hDp)`, `anyui.Pos(xDp, yDp)`.
+  - Options: `anyui.Width(wDp)`, `anyui.Height(hDp)`.
 
 #### `Drawer` (Slide-Out Panel from Any Screen Edge)
 - **Signature:** `ui.Drawer(id string, open *bool, side DrawerSide, fn func(), opts ...Option)`
@@ -266,11 +262,11 @@ ui.Popover("pop_filters", &popoverOpen, btnArea, func() {
   - Dims the remaining screen area and automatically closes when clicking the dimmed backdrop outside the panel or pressing `Escape`.
 
 #### `ContextMenu` (Right-Click Popup Menu)
-- **Signature:** `ui.ContextMenu(id string, anchor Rect, items []ContextMenuItem)`
-- **Behavior:** opens at click location or anchor rect, supports separators (`Separator: true`), icons, `Disabled` items, keyboard shortcuts, and submenus. Closes on outside click or `Escape`.
+- **Signature:** `ui.ContextMenu(id string, anchor Rect, items []ContextMenuItem, opts ...Option)`
+- **Behavior:** opens at click location or anchor rect, supports separators (`Separator: true`), icons, `Disabled` items, and keyboard shortcuts. Closes on outside click or `Escape`.
 
 #### `Tooltip` (Hover Tooltip)
-- **Signature:** `ui.Tooltip(text string, anchor Rect)`
+- **Signature:** `ui.Tooltip(text string, anchor Rect, opts ...Option)`
 - **Behavior:** renders a rounded floating card with shadow above the UI near `anchor` on hover, automatically sized to content.
 
 #### `PushOverlay` and `LayoutRect` (Low-Level Overlays)
@@ -301,27 +297,27 @@ cols := []anyui.TableColumn{
 	{Title: "ID", WidthDp: 64, MinWidthDp: 48, Sortable: true},
 	{Title: "Name", WidthDp: 200, Sortable: true},
 }
-ev := ui.Table("tbl", cols, len(rows), &selectedRow, &sortState, func(row, col int, area anyui.Rect, sel bool) {
-	ui.DrawText(area.X+ui.Scale(8).Int(), area.Y+ui.Scale(7).Int(), rows[row].Name, 12, ui.Theme().TextPrimary)
+ev := ui.Table("tbl", cols, len(rows), &selectedRow, &sortState, func(row, col int, areaPx anyui.Rect, sel bool) {
+	ui.DrawText(anyui.Px(areaPx.X)+ui.Scale(8), anyui.Px(areaPx.Y)+ui.Scale(7), rows[row].Name, 12, ui.Theme().TextPrimary)
 }, anyui.Height(240), anyui.Reorderable(), anyui.OnReorder(func(ev anyui.DragEvent) {
-	// ev.FromWidget, ev.ToWidget, ev.FromKey, ev.ToKey, ev.Drop (DropAbove / DropBelow)
+	// ev.FromWidget, ev.ToWidget, ev.FromIndex, ev.ToIndex, ev.Drop (DropAbove / DropBelow)
 }))
 ```
 
 ### `TreeView`
-Expandable hierarchical tree with virtualization. Supports node reordering (`Reorderable`), drop zones `DropAbove`, `DropBelow`, `DropInside` (nesting inside folders with row highlight), visual drop insertion indicator, translucent ghost drag preview, and cross-widget drag & drop:
+Expandable hierarchical tree with virtualization. Supports node reordering within the tree (`Reorderable`), drop zones `DropAbove`, `DropBelow`, and with `AllowReparent` — parent change and nesting inside folders (`DropInside` with row highlight and cycle prevention):
 ```go
-ui.TreeView("tree", roots, &selectedNodeID, anyui.Height(220), anyui.Reorderable(), anyui.OnReorder(func(ev anyui.DragEvent) {
-	// ev.FromWidget, ev.ToWidget — source and target widget IDs
+ui.TreeView("tree", roots, &selectedNodeID, anyui.Height(220), anyui.Reorderable(), anyui.AllowReparent(), anyui.OnReorder(func(ev anyui.DragEvent) {
+	// ev.FromWidget, ev.ToWidget — tree widget ID
 	// ev.FromKey, ev.ToKey — dragged node ID and target node ID
-	// ev.Drop — anyui.DropAbove, anyui.DropBelow, or anyui.DropInside (nested inside folder)
+	// ev.Drop — anyui.DropAbove, anyui.DropBelow, or anyui.DropInside (nested inside folder when AllowReparent is enabled)
 }))
 ```
 
 ### `SplitPane`
-Splits an area into 2 panes (`SplitHorizontal` or `SplitVertical`) with a draggable divider:
+Splits an area into 2 panes (`Horizontal` or `Vertical`) with a draggable divider:
 ```go
-ui.SplitPane("split", anyui.SplitHorizontal, &ratio, func() {
+ui.SplitPane("split", anyui.Horizontal, &ratio, func() {
 	// First pane
 }, func() {
 	// Second pane
@@ -341,7 +337,7 @@ ui.Accordion("acc", items, openSections)
 ```
 
 ### `TabBar` Drag & Detach
-`TabBarEvent` returns `MovedFrom`, `MovedTo` when reordering tabs via drag, and `Detached` when a tab is dragged out of the bar (for opening in a separate window via `app.OpenWindow`).
+`TabBarEvent` returns `MovedFrom`, `MovedTo` when reordering tabs via drag, and `DetachedID` when a tab is dragged out of the bar (for opening in a separate window via `app.OpenWindow`).
 
 ### `NumberInput`, `Slider`, `RangeSlider`
 ```go
@@ -426,7 +422,7 @@ ui.Card(func() {
 ## Extended Mouse, Keyboard & Focus Events
 
 ### `DoubleClick` and `MiddleClick`
-- `UI` and `ui.Context` expose `MousePosDp() (int, int)` (cursor position in logical dp units), `MousePosPx() (int, int)` (cursor position in physical window pixels), `MousePressed() bool` (LMB pressed this frame), `MouseDown() bool` (LMB held down), `DoubleClicked() bool`, and `MiddleClicked() bool` (`MiddleMousePressed` / `MiddleMouseDown` / `MiddleMouseReleased` on `ui.Context`).
+- `UI` exposes `MousePosDp() (Dp, Dp)` (cursor position in logical dp units), `MousePosPx() (Px, Px)` (cursor position in physical window pixels), `MousePressed() bool` (LMB pressed this frame), `MouseDown() bool` (LMB held down), `DoubleClicked() bool`, and `MiddleClicked() bool` (`MiddleMousePressed` / `MiddleMouseDown` / `MiddleMouseReleased` on `ui.Context`).
 - `TableEvent` returns `RowDoubleClicked` and `RowMiddleClicked` (`-1` if none):
 ```go
 ev := ui.Table("tbl", cols, len(rows), &sel, &sort, drawCell)
@@ -437,7 +433,7 @@ if ev.RowMiddleClicked >= 0 {
 	// Action on middle click
 }
 ```
-- In `TabBar`, middle-clicking a tab with `Closable: true` closes it (`ev.Closed`).
+- In `TabBar`, middle-clicking a tab with `Closable: true` closes it (`ev.ClosedID`).
 - In `TreeView`, double-clicking a parent node toggles `Expanded`.
 
 ### Horizontal Scrolling (`WheelX` and `Shift + WheelY`)
@@ -449,7 +445,7 @@ if ev.RowMiddleClicked >= 0 {
 - On window focus loss (`Alt+Tab`), `EventFocusLost` and `EventCaptureLost` reset `FocusID`, `MouseDown`, and `ActiveID` cleanly.
 
 ### Keyboard Navigation (`Navigable`)
-`ListView`, `Table`, `TreeView`, and `Select`/`ComboBox` implement `ui.Navigable` for consistent keyboard navigation (`Up`, `Down`, `Left`, `Right`, `PageUp`, `PageDown`, `Home`, `End`, `Space`, `Enter`).
+`ListView`, `Table`, `TreeView`, and `Select` implement `ui.Navigable` for consistent keyboard navigation (`Up`, `Down`, `Left`, `Right`, `PageUp`, `PageDown`, `Home`, `End`, `Space`, `Enter`).
 
 ### Declarative Programmatic Navigation (`ScrollToIndex`, `ScrollToID`, `Anchor`)
 AnyUI provides declarative scrolling directly within the frame rendering pipeline without deferred queues or async channels:
@@ -512,8 +508,8 @@ ui.StatusBar("sb", []anyui.StatusBarSection{{Text: "Ready", Flex: 1}, {Text: "UT
 - `DatePicker`: clicking the month or year in the header opens a 12-month or 12-year picker grid; includes a "Today" button; double-clicking the field enables manual `YYYY-MM-DD` input.
 - `ui.TimePicker(id, &t, opts...)` and `ui.DateTimePicker(id, &dt, opts...)`: `HH:MM:SS` time selection with `+`/`-` buttons and mouse wheel support.
 
-### `MultiSelect` / `CheckComboBox` and `TagInput`
-- `ui.MultiSelect(id, items, selectedIDs, opts...)` (alias `CheckComboBox`): dropdown with checkboxes using `map[string]bool`, search, "Select All / Clear", and tag/summary display. Accepts `[]anyui.SelectItem`.
+### `MultiSelect` and `TagInput`
+- `ui.MultiSelect(id, items, selectedIDs, opts...)`: dropdown with checkboxes using `map[string]bool`, search, "Select All / Clear", and tag/summary display. Accepts `[]anyui.SelectItem`.
 - `ui.TagInput(id, &tags, placeholder, opts...)`: tag editor (add with `Enter` or `,`, remove with `x` or `Backspace`).
 
 ### Multi-Selection Variants: `ListViewEx`, `TreeViewEx`, `TableEx`
@@ -536,7 +532,7 @@ app := anyui.NewApp(anyui.Config{
 	Frameless: true,
 	HitTest: func(x, y int) anyui.HitTestResult {
 		if currentUI != nil {
-			return currentUI.TitleBarHitTest(x, y)
+			return currentUI.TitleBarHitTest(anyui.Px(x), anyui.Px(y))
 		}
 		return anyui.HitClient
 	},
