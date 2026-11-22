@@ -147,6 +147,9 @@ ui.ListView("files", len(files), 36, &selectedIdx, func(i int, areaPx anyui.Rect
 
 ### `TabBar`
 - **Signature:** `ui.TabBar(id string, tabs []TabItem, activeID *string, opts ...Option) TabBarEvent` (convenience helper `anyui.TabItems("Tab 1", "Tab 2")` creates tabs where `ID` and `Title` match).
+- **Orientation & `+` Button Options:**
+  - `anyui.TabOrientation(anyui.Vertical)` — switches `TabBar` to vertical layout (ideal for sidebar navigation and settings screens; defaults to `anyui.Horizontal`).
+  - `anyui.HideAddButton()` — hides the `+` button for static tab sets.
 - **`TabBar` Example:**
 ```go
 ev := ui.TabBar("editor_tabs", tabs, &activeTabID)
@@ -156,6 +159,13 @@ if ev.Added {
 if ev.ClosedID != "" {
 	// close tab with ID ev.ClosedID
 }
+
+// Vertical static tabs without '+' button:
+ui.TabBar("settings_tabs", anyui.TabItems("General", "Network", "Appearance"), &section,
+	anyui.TabOrientation(anyui.Vertical),
+	anyui.HideAddButton(),
+	anyui.Width(180),
+)
 ```
 
 ---

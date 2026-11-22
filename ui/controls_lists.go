@@ -617,7 +617,8 @@ func (c *Context) ListView(id string, count int, itemHeightDp Dp, selected *int,
 	return changed
 }
 
-// TabBar рисует динамические закрываемые вкладки (как в браузере/IDE) с кнопками '×' и '+',
+// TabBar рисует панель вкладок (горизонтальную или вертикальную через TabOrientation)
+// с опциональными кнопками '×' (TabItem.Closable) и '+' (скрывается через HideAddButton),
 // а также поддержкой перетаскивания (drag-reorder) и открепления вкладки за пределы панели.
 func (c *Context) TabBar(id string, tabs []TabItem, activeID *string, opts ...Option) TabBarEvent {
 	ev := TabBarEvent{MovedFrom: -1, MovedTo: -1}
@@ -630,6 +631,10 @@ func (c *Context) TabBar(id string, tabs []TabItem, activeID *string, opts ...Op
 	}
 
 	st := ApplyOptions(opts)
+	if st.TabOrientation == Vertical {
+		return c.tabBarVertical(id, tabs, activeID, st)
+	}
+
 	w := c.RemainingWidth()
 	if st.WidthDp != nil && *st.WidthDp > 0 {
 		w = c.Scale(*st.WidthDp).Int()
@@ -640,8 +645,15 @@ func (c *Context) TabBar(id string, tabs []TabItem, activeID *string, opts ...Op
 	}
 	barRect := c.allocRect(w, h)
 
-	addBtnW := c.Scale(32).Int()
-	tabsArea := render.Rect{X: barRect.X, Y: barRect.Y, W: barRect.W - addBtnW - c.Scale(4).Int(), H: barRect.H}
+	addBtnW := 0
+	tabsArea := barRect
+	if !st.HideAddButton {
+		addBtnW = c.Scale(32).Int()
+		tabsArea = render.Rect{X: barRect.X, Y: barRect.Y, W: barRect.W - addBtnW - c.Scale(4).Int(), H: barRect.H}
+		if tabsArea.W < 0 {
+			tabsArea.W = 0
+		}
+	}
 	tabW := c.Scale(160).Int()
 	if len(tabs) > 0 && len(tabs)*tabW > tabsArea.W {
 		// Минимальная ширина вкладки до включения скролла
@@ -821,22 +833,283 @@ func (c *Context) TabBar(id string, tabs []TabItem, activeID *string, opts ...Op
 	}
 
 	// Кнопка '+' добавления вкладки
-	addR := render.Rect{X: barRect.X + barRect.W - addBtnW, Y: barRect.Y + c.Scale(2).Int(), W: addBtnW, H: barRect.H - c.Scale(4).Int()}
-	c.RegisterHit(id+":add", addR, platform.CursorHand)
-	addHover := !c.IsInputBlocked() && addR.Contains(c.MouseX, c.MouseY)
-	if addHover {
-		c.nextCursor = platform.CursorHand
-		c.Canvas.FillRoundedRect(addR, c.ScaleF(6), c.Theme.Surface)
-		if c.MousePressed {
-			ev.Added = true
-			c.RequestRedraw()
+	if !st.HideAddButton {
+		addR := render.Rect{X: barRect.X + barRect.W - addBtnW, Y: barRect.Y + c.Scale(2).Int(), W: addBtnW, H: barRect.H - c.Scale(4).Int()}
+		c.RegisterHit(id+":add", addR, platform.CursorHand)
+		addHover := !c.IsInputBlocked() && addR.Contains(c.MouseX, c.MouseY)
+		if addHover {
+			c.nextCursor = platform.CursorHand
+			c.Canvas.FillRoundedRect(addR, c.ScaleF(6), c.Theme.Surface)
+			if c.MousePressed {
+				ev.Added = true
+				c.RequestRedraw()
+			}
+		}
+		cx := float32(addR.X) + float32(addR.W)*0.5
+		cy := float32(addR.Y) + float32(addR.H)*0.5
+		arm := c.ScaleF(5)
+		c.Canvas.DrawLine(cx-arm, cy, cx+arm, cy, c.ScaleF(1.6), c.Theme.TextMuted)
+		c.Canvas.DrawLine(cx, cy-arm, cx, cy+arm, c.ScaleF(1.6), c.Theme.TextMuted)
+	}
+
+	return ev
+}
+
+// tabBarVertical рисует вертикальную панель вкладок (например, для боковой навигации и настроек).
+func (c *Context) tabBarVertical(id string, tabs []TabItem, activeID *string, st WidgetStyle) TabBarEvent {
+	ev := TabBarEvent{MovedFrom: -1, MovedTo: -1}
+
+	tabH := c.Scale(34).Int()
+	gap := c.Scale(2).Int()
+	addBtnH := 0
+	if !st.HideAddButton {
+		addBtnH = c.Scale(32).Int()
+	}
+
+	// Ширина вертикальной панели вкладок
+	w := c.Scale(180).Int()
+	if st.FillWidth || (st.WidthDp != nil && *st.WidthDp == Auto) {
+		w = c.RemainingWidth()
+	} else if st.WidthDp != nil && *st.WidthDp > 0 {
+		w = c.Scale(*st.WidthDp).Int()
+	}
+
+	// Высота вертикальной панели вкладок
+	contentH := len(tabs) * (tabH + gap)
+	if contentH > 0 {
+		contentH -= gap
+	}
+	if addBtnH > 0 {
+		if contentH > 0 {
+			contentH += c.Scale(4).Int()
+		}
+		contentH += addBtnH
+	}
+	if contentH < tabH {
+		contentH = tabH
+	}
+
+	h := contentH
+	if st.HeightDp != nil && *st.HeightDp > 0 {
+		h = c.Scale(*st.HeightDp).Int()
+	} else if st.FillHeight || (st.HeightDp != nil && *st.HeightDp == Auto) {
+		h = c.RemainingHeight()
+	} else if remH := c.RemainingHeight(); remH > 0 && h > remH {
+		h = remH
+	}
+
+	barRect := c.allocRect(w, h)
+	tabsArea := barRect
+	if addBtnH > 0 {
+		tabsArea = render.Rect{X: barRect.X, Y: barRect.Y, W: barRect.W, H: barRect.H - addBtnH - c.Scale(4).Int()}
+		if tabsArea.H < 0 {
+			tabsArea.H = 0
 		}
 	}
-	cx := float32(addR.X) + float32(addR.W)*0.5
-	cy := float32(addR.Y) + float32(addR.H)*0.5
-	arm := c.ScaleF(5)
-	c.Canvas.DrawLine(cx-arm, cy, cx+arm, cy, c.ScaleF(1.6), c.Theme.TextMuted)
-	c.Canvas.DrawLine(cx, cy-arm, cx, cy+arm, c.ScaleF(1.6), c.Theme.TextMuted)
+
+	totalH := len(tabs) * (tabH + gap)
+	maxSc := totalH - tabsArea.H
+	if maxSc < 0 {
+		maxSc = 0
+	}
+	if tabsArea.Contains(c.MouseX, c.MouseY) && c.WheelY != 0 {
+		c.tabScroll[id] -= int(c.WheelY * float32(c.Scale(40).Int()))
+		c.RequestRedraw()
+	}
+	if c.tabScroll[id] < 0 {
+		c.tabScroll[id] = 0
+	}
+	if c.tabScroll[id] > maxSc {
+		c.tabScroll[id] = maxSc
+	}
+	scrollY := c.tabScroll[id]
+
+	c.Canvas.PushClip(tabsArea)
+	pxSize := c.Scale(12).Int()
+	for i, tab := range tabs {
+		ty := tabsArea.Y + i*(tabH+gap) - scrollY
+		tr := render.Rect{X: tabsArea.X, Y: ty, W: tabsArea.W, H: tabH}
+		if tr.Y+tr.H < tabsArea.Y || tr.Y > tabsArea.Y+tabsArea.H {
+			continue
+		}
+
+		isAct := *activeID == tab.ID
+		visTab := tabsArea.Intersect(tr)
+		c.RegisterHit(id+":tab:"+strconv.Itoa(i), visTab, platform.CursorHand)
+		hovered := !c.IsInputBlocked() && tabsArea.Contains(c.MouseX, c.MouseY) && tr.Contains(c.MouseX, c.MouseY)
+
+		closeR := render.Rect{X: tr.X + tr.W - c.Scale(22).Int(), Y: tr.Y + (tr.H-c.Scale(16).Int())/2, W: c.Scale(16).Int(), H: c.Scale(16).Int()}
+		if tab.Closable {
+			c.RegisterHit(id+":close:"+strconv.Itoa(i), tabsArea.Intersect(closeR), platform.CursorHand)
+		}
+		closeHover := tab.Closable && hovered && closeR.Contains(c.MouseX, c.MouseY)
+
+		if hovered {
+			c.nextCursor = platform.CursorHand
+			if c.MiddleMousePressed && tab.Closable {
+				ev.ClosedID = tab.ID
+				c.RequestRedraw()
+			} else if c.MousePressed {
+				if closeHover {
+					ev.ClosedID = tab.ID
+					c.RequestRedraw()
+				} else {
+					if *activeID != tab.ID {
+						*activeID = tab.ID
+						ev.SelectedID = tab.ID
+						c.RequestRedraw()
+					}
+					c.tabDragID = id
+					c.tabDragIndex = i
+					c.tabDragStartX = c.MouseX
+					c.tabDragStartY = c.MouseY
+					c.tabDragging = false
+				}
+			}
+		}
+
+		isDragged := c.tabDragID == id && c.tabDragging && c.tabDragIndex == i
+		bg := c.Theme.SurfaceDark
+		border := c.Theme.Border
+		if isDragged {
+			bg = c.Theme.Accent.WithAlpha(60)
+		} else if isAct {
+			bg = c.Theme.Card
+		} else if hovered {
+			bg = c.Theme.Surface
+		}
+		c.Canvas.DrawRoundedBox(tr, c.ScaleF(6), bg, 1.0, border)
+		if isAct {
+			indW := c.Scale(3).Int()
+			if indW < 2 {
+				indW = 2
+			}
+			indPad := c.Scale(6).Int()
+			indR := render.Rect{X: tr.X + c.Scale(2).Int(), Y: tr.Y + indPad, W: indW, H: tr.H - indPad*2}
+			if indR.H > 0 {
+				c.Canvas.FillRoundedRect(indR, c.ScaleF(2), c.Theme.Accent)
+			}
+		}
+
+		curX := tr.X + c.Scale(12).Int()
+		if tab.StatusColor != nil {
+			c.Canvas.FillCircle(float32(curX+c.Scale(4).Int()), float32(tr.Y+tr.H/2), c.ScaleF(4), *tab.StatusColor)
+			curX += c.Scale(12).Int()
+		} else if tab.IconSVG != "" {
+			icSz := c.Scale(14).Int()
+			c.Canvas.DrawSVG(tab.IconSVG, curX, tr.Y+(tr.H-icSz)/2, icSz, c.Theme.TextPrimary)
+			curX += icSz + c.Scale(6).Int()
+		}
+
+		if c.Font != nil {
+			textMaxW := (tr.X + tr.W - c.Scale(8).Int()) - curX
+			if tab.Closable {
+				textMaxW -= c.Scale(20).Int()
+			}
+			if textMaxW > 0 {
+				c.Canvas.PushClip(render.Rect{X: curX, Y: tr.Y, W: textMaxW, H: tr.H})
+				_, th := c.Font.MeasureText(tab.Title, pxSize)
+				col := c.Theme.TextMuted
+				if isAct {
+					col = c.Theme.TextPrimary
+				}
+				c.Font.DrawText(c.Canvas, curX, tr.Y+(tr.H-th)/2, tab.Title, pxSize, col)
+				c.Canvas.PopClip()
+			}
+		}
+
+		if tab.Closable {
+			xCol := c.Theme.TextMuted
+			if closeHover {
+				xCol = c.Theme.Danger
+			}
+			p := float32(c.Scale(4).Int())
+			c.Canvas.DrawLine(float32(closeR.X)+p, float32(closeR.Y)+p, float32(closeR.X+closeR.W)-p, float32(closeR.Y+closeR.H)-p, c.ScaleF(1.4), xCol)
+			c.Canvas.DrawLine(float32(closeR.X+closeR.W)-p, float32(closeR.Y)+p, float32(closeR.X)+p, float32(closeR.Y+closeR.H)-p, c.ScaleF(1.4), xCol)
+		}
+	}
+	c.Canvas.PopClip()
+
+	// Обработка перетаскивания (drag-reorder) и открепления вкладки (detach) по горизонтали
+	if c.tabDragID == id && c.tabDragIndex >= 0 && c.tabDragIndex < len(tabs) {
+		dx := c.MouseX - (barRect.X + barRect.W/2)
+		if dx < 0 {
+			dx = -dx
+		}
+		if c.MouseDown {
+			dxStart := c.MouseX - c.tabDragStartX
+			dyStart := c.MouseY - c.tabDragStartY
+			if dxStart < 0 {
+				dxStart = -dxStart
+			}
+			if dyStart < 0 {
+				dyStart = -dyStart
+			}
+			if dxStart > c.Scale(6).Int() || dyStart > c.Scale(6).Int() {
+				c.tabDragging = true
+			}
+			if c.tabDragging {
+				detachThreshold := barRect.W/2 + c.Scale(48).Int()
+				if dx <= detachThreshold && len(tabs) > 1 {
+					step := tabH + gap
+					if step > 0 {
+						targetIdx := (c.MouseY - tabsArea.Y + scrollY) / step
+						if targetIdx < 0 {
+							targetIdx = 0
+						}
+						if targetIdx >= len(tabs) {
+							targetIdx = len(tabs) - 1
+						}
+						if targetIdx != c.tabDragIndex {
+							ev.MovedFrom = c.tabDragIndex
+							ev.MovedTo = targetIdx
+							c.tabDragIndex = targetIdx
+							c.RequestRedraw()
+						}
+					}
+				} else if dx > detachThreshold {
+					dragTitle := tabs[c.tabDragIndex].Title
+					ghostR := render.Rect{X: c.MouseX + c.Scale(8).Int(), Y: c.MouseY + c.Scale(8).Int(), W: c.Scale(150).Int(), H: c.Scale(30).Int()}
+					c.PushOverlay(ghostR, func() {
+						c.Canvas.DrawRoundedBox(ghostR, c.ScaleF(6), c.Theme.Card.WithAlpha(235), 1.5, c.Theme.Accent)
+						if c.Font != nil {
+							_, th := c.Font.MeasureText(dragTitle, pxSize)
+							c.Font.DrawText(c.Canvas, ghostR.X+c.Scale(10).Int(), ghostR.Y+(ghostR.H-th)/2, dragTitle, pxSize, c.Theme.TextPrimary)
+						}
+					})
+				}
+			}
+		} else if c.MouseReleased {
+			detachThreshold := barRect.W/2 + c.Scale(48).Int()
+			if c.tabDragging && dx > detachThreshold {
+				ev.DetachedID = tabs[c.tabDragIndex].ID
+				c.RequestRedraw()
+			}
+			c.tabDragID = ""
+			c.tabDragging = false
+			c.tabDragIndex = -1
+		}
+	}
+
+	// Кнопка '+' добавления вкладки внизу вертикальной панели
+	if addBtnH > 0 {
+		addR := render.Rect{X: barRect.X, Y: barRect.Y + barRect.H - addBtnH, W: barRect.W, H: addBtnH}
+		c.RegisterHit(id+":add", addR, platform.CursorHand)
+		addHover := !c.IsInputBlocked() && addR.Contains(c.MouseX, c.MouseY)
+		if addHover {
+			c.nextCursor = platform.CursorHand
+			c.Canvas.FillRoundedRect(addR, c.ScaleF(6), c.Theme.Surface)
+			if c.MousePressed {
+				ev.Added = true
+				c.RequestRedraw()
+			}
+		}
+		cx := float32(addR.X) + float32(addR.W)*0.5
+		cy := float32(addR.Y) + float32(addR.H)*0.5
+		arm := c.ScaleF(5)
+		c.Canvas.DrawLine(cx-arm, cy, cx+arm, cy, c.ScaleF(1.6), c.Theme.TextMuted)
+		c.Canvas.DrawLine(cx, cy-arm, cx, cy+arm, c.ScaleF(1.6), c.Theme.TextMuted)
+	}
 
 	return ev
 }

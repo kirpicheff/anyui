@@ -129,6 +129,8 @@ type WidgetStyle struct {
 	DragSourceFn     func(index int, key string) DragPayload
 	AcceptDropTypes  []string
 	OnDrop           func(ev DragEvent)
+	TabOrientation   Orientation
+	HideAddButton    bool
 }
 
 // Auto — константа sentinel-значения для автоматического занятия доступного остатка области контейнера.
@@ -600,5 +602,21 @@ func AcceptDrop(types ...string) Option {
 func OnDrop(fn func(ev DragEvent)) Option {
 	return func(s *WidgetStyle) {
 		s.OnDrop = fn
+	}
+}
+
+// TabOrientation задаёт ориентацию панели вкладок TabBar (Horizontal или Vertical).
+// По умолчанию TabBar располагается горизонтально.
+func TabOrientation(orient Orientation) Option {
+	return func(s *WidgetStyle) {
+		s.TabOrientation = orient
+	}
+}
+
+// HideAddButton скрывает кнопку '+' добавления новой вкладки в TabBar.
+func HideAddButton(enabled ...bool) Option {
+	val := optBool(enabled)
+	return func(s *WidgetStyle) {
+		s.HideAddButton = val
 	}
 }

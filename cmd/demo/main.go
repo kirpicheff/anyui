@@ -113,6 +113,7 @@ type demoState struct {
 	rangeHigh       float32
 	pickedColor     anyui.Color
 	pickedDate      time.Time
+	vertTabID       string
 	shortcutsInit   bool
 
 	// Раздел Фазы 6.1 (продвинутая раскладка)

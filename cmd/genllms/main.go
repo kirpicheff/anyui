@@ -648,7 +648,7 @@ var optionMatrixRows = []optionMatrixRow{
 	},
 	{
 		"`TabBar`, `Collapsible`, `Accordion`",
-		"`Width`, `Height` (`TabBar`)",
+		"`Width`, `Height`, `FillWidth`, `FillHeight`, `TabOrientation`, `HideAddButton` (`TabBar`)",
 	},
 	{
 		"`MenuBar`, `Toolbar`, `StatusBar`, `Breadcrumbs`, `Pagination`, `TitleBar`",

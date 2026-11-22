@@ -198,6 +198,69 @@ func TestTabBarEvents(t *testing.T) {
 	}
 }
 
+func TestTabBarHideAddButton(t *testing.T) {
+	ctx := newTestContext(600, 200)
+	tabs := []TabItem{
+		{ID: "t1", Title: "Первая"},
+		{ID: "t2", Title: "Вторая"},
+	}
+	active := "t1"
+
+	// Клик в область правого края, где обычно расположена кнопка '+'
+	ctx.MouseX, ctx.MouseY = 584, 15
+	ctx.MousePressed = true
+	ctx.beginFrame()
+	ev := ctx.TabBar("tb_no_add", tabs, &active, Width(600), HideAddButton())
+	ctx.endFrame()
+
+	if ev.Added {
+		t.Fatal("при HideAddButton() кнопка '+' не должна срабатывать")
+	}
+}
+
+func TestTabBarVertical(t *testing.T) {
+	ctx := newTestContext(400, 300)
+	tabs := []TabItem{
+		{ID: "general", Title: "Общие", Closable: true},
+		{ID: "network", Title: "Сеть", Closable: true},
+		{ID: "security", Title: "Безопасность"},
+	}
+	active := "general"
+
+	// Клик по второй вкладке (tabH = 34, gap = 2 -> вторая вкладка по y в [36..70))
+	ctx.MouseX, ctx.MouseY = 60, 50
+	ctx.MousePressed = true
+	ctx.beginFrame()
+	ev := ctx.TabBar("tb_vert", tabs, &active, TabOrientation(Vertical), Width(180), Height(200))
+	ctx.endFrame()
+
+	if ev.SelectedID != "network" || active != "network" {
+		t.Fatalf("ожидался выбор вкладки network, получено SelectedID=%q active=%q", ev.SelectedID, active)
+	}
+
+	// Клик по кнопке '+' внизу вертикальной панели (y в [168..200))
+	ctx.MouseX, ctx.MouseY = 90, 184
+	ctx.MousePressed = true
+	ctx.beginFrame()
+	ev = ctx.TabBar("tb_vert", tabs, &active, TabOrientation(Vertical), Width(180), Height(200))
+	ctx.endFrame()
+
+	if !ev.Added {
+		t.Fatal("ожидалось событие Added=true при клике на '+' внизу вертикального TabBar")
+	}
+
+	// С HideAddButton() клик по нижней области не генерирует Added
+	ctx.MouseX, ctx.MouseY = 90, 184
+	ctx.MousePressed = true
+	ctx.beginFrame()
+	ev = ctx.TabBar("tb_vert_static", tabs, &active, TabOrientation(Vertical), HideAddButton(), Width(180), Height(200))
+	ctx.endFrame()
+
+	if ev.Added {
+		t.Fatal("при HideAddButton() в вертикальном TabBar не должно быть события Added")
+	}
+}
+
 func TestScrollViewWheel(t *testing.T) {
 	ctx := newTestContext(400, 300)
 

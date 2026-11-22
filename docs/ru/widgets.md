@@ -147,6 +147,9 @@ ui.ListView("files", len(files), 36, &selectedIdx, func(i int, areaPx anyui.Rect
 
 ### `TabBar`
 - **Сигнатура:** `ui.TabBar(id string, tabs []TabItem, activeID *string, opts ...Option) TabBarEvent` (хелпер `anyui.TabItems("Вкладка 1", "Вкладка 2")` создаёт срез вкладок, где `ID` и `Title` совпадают).
+- **Опции ориентации и кнопки `+`:**
+  - `anyui.TabOrientation(anyui.Vertical)` — переключает `TabBar` в вертикальный режим (удобно для боковой навигации и экранов настроек; по умолчанию `anyui.Horizontal`).
+  - `anyui.HideAddButton()` — скрывает кнопку `+` добавления новой вкладки для статичных наборов вкладок.
 - **Пример `TabBar`:**
 ```go
 ev := ui.TabBar("editor_tabs", tabs, &activeTabID)
@@ -156,6 +159,13 @@ if ev.Added {
 if ev.ClosedID != "" {
 	// закрыть вкладку с идентификатором ev.ClosedID
 }
+
+// Вертикальные статичные вкладки без кнопки '+':
+ui.TabBar("settings_tabs", anyui.TabItems("Общие", "Сеть", "Вид"), &section,
+	anyui.TabOrientation(anyui.Vertical),
+	anyui.HideAddButton(),
+	anyui.Width(180),
+)
 ```
 
 ---

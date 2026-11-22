@@ -185,3 +185,10 @@ func AcceptDrop(types ...string) Option { return ui.AcceptDrop(types...) }
 // OnDrop регистрирует обработчик события внешнего кросс-виджетного сброса (Drop).
 // Работает совместно с AcceptDrop(...). Действует для Table, TableEx, ListView, ListViewEx, TreeView, TreeViewEx.
 func OnDrop(fn func(ev DragEvent)) Option { return ui.OnDrop(fn) }
+
+// TabOrientation задаёт ориентацию панели вкладок TabBar (Horizontal или Vertical).
+// По умолчанию TabBar располагается горизонтально.
+func TabOrientation(orient Orientation) Option { return ui.TabOrientation(orient) }
+
+// HideAddButton скрывает кнопку '+' добавления новой вкладки в TabBar.
+func HideAddButton(enabled ...bool) Option { return ui.HideAddButton(enabled...) }

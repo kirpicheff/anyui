@@ -87,7 +87,8 @@ func (u *UI) ListView(id string, count int, itemHeightDp Dp, selected *int, draw
 	return u.ctx.ListView(id, count, itemHeightDp, selected, drawItem, opts...)
 }
 
-// TabBar рисует динамические закрываемые вкладки с кнопками '×' и '+'.
+// TabBar рисует панель вкладок (горизонтальную или вертикальную через TabOrientation)
+// с опциональными кнопками '×' (TabItem.Closable) и '+' (скрывается через HideAddButton).
 func (u *UI) TabBar(id string, tabs []TabItem, activeID *string, opts ...Option) TabBarEvent {
 	return u.ctx.TabBar(id, tabs, activeID, opts...)
 }

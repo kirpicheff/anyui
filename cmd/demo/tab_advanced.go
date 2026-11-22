@@ -66,8 +66,24 @@ func (st *demoState) drawTabAdvanced(ui *anyui.UI) {
 		})
 
 		ui.Spacer(14)
-		ui.Label("TabBar Drag & Detach", anyui.FontSize(15), anyui.Bold())
+		ui.Label("TabBar: Drag & Detach и вертикальный режим", anyui.FontSize(15), anyui.Bold())
 		ui.Label("Попробуйте перетащить вкладку в верхнем TabBar влево/вправо (drag-reorder) или потянуть её вниз за пределы панели, чтобы открепить в отдельное окно!", anyui.FontSize(12), anyui.TextColor(th.TextMuted))
+		ui.Spacer(8)
+		if st.vertTabID == "" {
+			st.vertTabID = "Общие"
+		}
+		ui.Row(14, 114, func() {
+			ui.TabBar("tb_vert_demo", anyui.TabItems("Общие", "Сеть", "Вид"), &st.vertTabID,
+				anyui.TabOrientation(anyui.Vertical),
+				anyui.HideAddButton(),
+				anyui.Width(160),
+			)
+			ui.Card(func() {
+				ui.Label("Раздел настроек: "+st.vertTabID, anyui.FontSize(14), anyui.Bold())
+				ui.Spacer(4)
+				ui.Label("Пример вертикального TabBar с опциями TabOrientation(Vertical) и HideAddButton().", anyui.FontSize(12), anyui.TextColor(th.TextMuted), anyui.WordWrap())
+			}, anyui.FillWidth(), anyui.Height(110))
+		})
 	})
 }
 
