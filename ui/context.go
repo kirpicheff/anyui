@@ -804,7 +804,7 @@ func (c *Context) Render(drawFn func(ctx *Context)) {
 	if c.canSkipFullFrameForStreaming() {
 		c.renderStreamingOnly()
 		if !c.needsRedraw {
-			c.presentFrame()
+			c.presentFrame(true)
 			c.syncAnimTimer()
 			return
 		}
@@ -822,7 +822,7 @@ func (c *Context) Render(drawFn func(ctx *Context)) {
 		}
 	}
 
-	c.presentFrame()
+	c.presentFrame(false)
 	c.syncAnimTimer()
 }
 
@@ -841,8 +841,14 @@ func (c *Context) canSkipFullFrameForStreaming() bool {
 	if c.Theme != c.lastTheme || c.DpiScale != c.lastScale {
 		return false
 	}
-	if c.Overlays.HasActive() || len(c.toasts) > 0 {
-		return false
+	if len(c.toasts) > 0 {
+		now := c.Now()
+		for _, t := range c.toasts {
+			if now.Sub(t.CreatedAt) >= t.Duration {
+				// Просроченный тост требует полного кадра, чтобы стереть его область вне видеохолста.
+				return false
+			}
+		}
 	}
 	if c.Animator != nil && c.Animator.HasActive() {
 		return false
@@ -852,15 +858,69 @@ func (c *Context) canSkipFullFrameForStreaming() bool {
 
 func (c *Context) renderStreamingOnly() {
 	c.streamingDirty = render.Rect{}
+	shadowPad := c.Scale(32).Int()
 	for _, entry := range c.streamingCanvases {
 		if entry.onDraw == nil || entry.rect.Empty() {
 			continue
 		}
 		focused := c.FocusID == entry.id
+		c.Canvas.ResetDirtyRects()
 		c.Canvas.PushClip(entry.rect)
 		entry.onDraw(c.Canvas, entry.rect, focused)
 		c.Canvas.PopClip()
-		c.SetStreamingDirtyRect(entry.rect)
+
+		// Берём реально перезаписанную видеокадром область (например, fitRect без letterbox-полос),
+		// чтобы не накладывать полупрозрачные тени/backdrop повторно на неперезаписанные полосы.
+		drawnRect := c.Canvas.DirtyBounds().Intersect(entry.rect)
+		if drawnRect.Empty() {
+			drawnRect = entry.rect
+		}
+
+		needOverlays := c.Overlays.IntersectsAny(drawnRect, shadowPad)
+		needToasts := len(c.toasts) > 0
+		if needOverlays || needToasts {
+			// Сохраняем временные буферы кадра, чтобы повторная отрисовка оверлеев/тостов
+			// не накапливала записи между полными кадрами при длительном стриминге.
+			savedHitLen := len(c.nextHitRegions)
+			savedFocusLen := len(c.nextFocusOrder)
+			savedDirectLen := len(c.nextDirectCanvases)
+			savedStreamLen := len(c.nextStreamingCanvases)
+			savedCursor := c.nextCursor
+			savedCustomCursor := c.nextCustomCursor
+			savedHotID := c.HotID
+			savedLayoutSeq := c.layoutSeq
+			savedScopeLen := len(c.idScopeStack)
+			savedSeqLen := len(c.idSeqStack)
+			var savedSeqTop int
+			if savedSeqLen > 0 {
+				savedSeqTop = c.idSeqStack[savedSeqLen-1]
+			}
+
+			c.Canvas.PushClip(drawnRect)
+			if needOverlays {
+				c.Overlays.RedrawIntersecting(drawnRect, shadowPad)
+			}
+			if needToasts {
+				c.drawToasts()
+			}
+			c.Canvas.PopClip()
+
+			c.nextHitRegions = c.nextHitRegions[:savedHitLen]
+			c.nextFocusOrder = c.nextFocusOrder[:savedFocusLen]
+			c.nextDirectCanvases = c.nextDirectCanvases[:savedDirectLen]
+			c.nextStreamingCanvases = c.nextStreamingCanvases[:savedStreamLen]
+			c.nextCursor = savedCursor
+			c.nextCustomCursor = savedCustomCursor
+			c.HotID = savedHotID
+			c.layoutSeq = savedLayoutSeq
+			c.idScopeStack = c.idScopeStack[:savedScopeLen]
+			c.idSeqStack = c.idSeqStack[:savedSeqLen]
+			if savedSeqLen > 0 {
+				c.idSeqStack[savedSeqLen-1] = savedSeqTop
+			}
+		}
+
+		c.SetStreamingDirtyRect(drawnRect)
 	}
 }
 
@@ -874,7 +934,7 @@ func (c *Context) SetDebugDirtyRect(enabled bool) {
 	c.RequestRedraw()
 }
 
-func (c *Context) presentFrame() {
+func (c *Context) presentFrame(streamingOnly bool) {
 	w, h := c.Canvas.Width, c.Canvas.Height
 	need := w * h * 4
 	wakeOnly := c.wakeOnlyFrame
@@ -885,8 +945,10 @@ func (c *Context) presentFrame() {
 
 	// Fast-path для потокового обновления InteractiveCanvas (например, видеокадр по EventWakeUp):
 	// пропускаем computeDiffRect и копирование в prevPresentPixels, отправляя известную область напрямую.
+	// При streamingOnly == true оверлеи поверх streamingDirty уже перерисованы, поэтому PresentRect
+	// безопасен и при c.Overlays.HasActive().
 	if !forceFull && wakeOnly && !c.streamingDirty.Empty() && !c.debugDirtyRect &&
-		!c.Overlays.HasActive() && (c.Animator == nil || !c.Animator.HasActive()) {
+		(streamingOnly || !c.Overlays.HasActive()) && (c.Animator == nil || !c.Animator.HasActive()) {
 		sr := c.streamingDirty.Intersect(render.Rect{X: 0, Y: 0, W: w, H: h})
 		if !sr.Empty() {
 			c.prevPresentStale = true

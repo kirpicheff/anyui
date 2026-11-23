@@ -76,3 +76,57 @@ func (o *OverlayLayer) FlushWithHook(onItem func(bounds render.Rect)) {
 	}
 	o.inOverlay = false
 }
+
+// overlayBoundsIntersects проверяет пересечение прямоугольника r с областью оверлея bounds,
+// расширенной на padPx (для учёта теней, выходящих за пределы bounds).
+// При пустом bounds оверлей считается потенциально пересекающимся.
+func overlayBoundsIntersects(bounds, r render.Rect, padPx int) bool {
+	if r.Empty() {
+		return false
+	}
+	if bounds.Empty() {
+		return true
+	}
+	if padPx > 0 {
+		bounds = render.Rect{
+			X: bounds.X - padPx,
+			Y: bounds.Y - padPx,
+			W: bounds.W + padPx*2,
+			H: bounds.H + padPx*2,
+		}
+	}
+	return bounds.Intersects(r)
+}
+
+// IntersectsAny возвращает true, если хотя бы один оверлей с последнего полного кадра
+// пересекается с прямоугольником r (с учётом запаса padPx под тень).
+func (o *OverlayLayer) IntersectsAny(r render.Rect, padPx int) bool {
+	for _, it := range o.items {
+		if overlayBoundsIntersects(it.bounds, r, padPx) {
+			return true
+		}
+	}
+	return false
+}
+
+// RedrawIntersecting повторно отрисовывает только те оверлеи с последнего полного кадра,
+// чьи области (с запасом padPx под тень) пересекаются с r.
+// Сохраняет и восстанавливает длины внутренних срезов, чтобы вложенные Push на wakeOnly-кадре
+// не накапливали элементы между полными кадрами.
+func (o *OverlayLayer) RedrawIntersecting(r render.Rect, padPx int) {
+	n := len(o.items)
+	if n == 0 || r.Empty() {
+		return
+	}
+	savedBlocksLen := len(o.nextBlocks)
+	o.inOverlay = true
+	for i := 0; i < n; i++ {
+		it := o.items[i]
+		if overlayBoundsIntersects(it.bounds, r, padPx) {
+			it.draw()
+		}
+	}
+	o.inOverlay = false
+	o.items = o.items[:n]
+	o.nextBlocks = o.nextBlocks[:savedBlocksLen]
+}

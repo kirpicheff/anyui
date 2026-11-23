@@ -19,15 +19,19 @@ type stylerMockWindow struct {
 	borderCol   *platform.WindowColor
 	brought     int
 	wakeUps     int
-	presents     int
-	presentRects int
-	alwaysOnTop  bool
+	presents        int
+	presentRects    int
+	lastPresentRect render.Rect
+	alwaysOnTop     bool
 }
 
-func (m *stylerMockWindow) Run(func(platform.Event)) error          { return nil }
-func (m *stylerMockWindow) Open(func(platform.Event)) error         { return nil }
-func (m *stylerMockWindow) Present([]byte, int, int)                { m.presents++ }
-func (m *stylerMockWindow) PresentRect([]byte, int, int, int, int, int, int) { m.presentRects++ }
+func (m *stylerMockWindow) Run(func(platform.Event)) error  { return nil }
+func (m *stylerMockWindow) Open(func(platform.Event)) error { return nil }
+func (m *stylerMockWindow) Present([]byte, int, int)        { m.presents++ }
+func (m *stylerMockWindow) PresentRect(_ []byte, _, _, x, y, w, h int) {
+	m.presentRects++
+	m.lastPresentRect = render.Rect{X: x, Y: y, W: w, H: h}
+}
 func (m *stylerMockWindow) Invalidate()                             {}
 func (m *stylerMockWindow) WakeUp()                                 { m.wakeUps++ }
 func (m *stylerMockWindow) Show()                                   {}
@@ -422,5 +426,148 @@ func TestUIMousePressedAndMouseDown(t *testing.T) {
 		t.Fatalf("ожидалось false для MousePressed и MouseDown")
 	}
 }
+
+func TestStreamingWakeUpWithNonIntersectingOverlay(t *testing.T) {
+	app := NewApp(Config{})
+	mw := &stylerMockWindow{w: 400, h: 300, scale: 1.0}
+	ctx := ui.NewContext(mw, nil)
+
+	renders := 0
+	canvasDraws := 0
+	overlayDraws := 0
+
+	w := &Window{
+		app:     app,
+		platWin: mw,
+		ctx:     ctx,
+		drawFn: func(u *UI) {
+			renders++
+			u.ctx.InteractiveCanvas("viewer", ui.CanvasCallbacks{
+				Streaming: true,
+				OnDraw: func(cv *render.Canvas, area render.Rect, _ bool) {
+					canvasDraws++
+					cv.FillRect(area, render.RGB(20, 40, 60))
+				},
+			}, ui.Width(200), ui.Height(150))
+
+			// Оверлей далеко справа от видеохолста (вне 200 + 32px запаса под тень)
+			ovRect := render.Rect{X: 280, Y: 100, W: 80, H: 80}
+			u.ctx.PushOverlay(ovRect, func() {
+				overlayDraws++
+				u.ctx.Canvas.FillRect(ovRect, render.RGB(200, 200, 200))
+			})
+		},
+	}
+	w.ui = &UI{ctx: ctx, win: w}
+	app.windows = []*Window{w}
+	app.mainWin = w
+
+	w.handleEvent(platform.Event{Type: platform.EventPaint})
+	if renders != 1 || canvasDraws != 1 || overlayDraws != 1 {
+		t.Fatalf("ожидался 1 полный кадр: renders=%d canvas=%d overlay=%d", renders, canvasDraws, overlayDraws)
+	}
+
+	mw.presents, mw.presentRects = 0, 0
+	renders, canvasDraws, overlayDraws = 0, 0, 0
+
+	w.handleEvent(platform.Event{Type: platform.EventWakeUp})
+	if renders != 0 {
+		t.Fatalf("при непересекающемся оверлее полный drawFn должен пропускаться: got renders=%d", renders)
+	}
+	if canvasDraws != 1 {
+		t.Fatalf("ожидался 1 вызов OnDraw на EventWakeUp: got %d", canvasDraws)
+	}
+	if overlayDraws != 0 {
+		t.Fatalf("непересекающийся оверлей не должен перерисовываться: got %d", overlayDraws)
+	}
+	if mw.presentRects != 1 || mw.presents != 0 {
+		t.Fatalf("ожидался fast-path PresentRect без Present: presentRects=%d presents=%d", mw.presentRects, mw.presents)
+	}
+}
+
+func TestStreamingWakeUpWithIntersectingOverlayAndLetterbox(t *testing.T) {
+	app := NewApp(Config{})
+	mw := &stylerMockWindow{w: 400, h: 300, scale: 1.0}
+	ctx := ui.NewContext(mw, nil)
+
+	renders := 0
+	canvasDraws := 0
+	overlayDraws := 0
+	// Вписанный прямоугольник видео внутри entry.rect (0,0,200,150), оставляя letterbox-полосы по краям
+	videoDst := render.Rect{X: 20, Y: 20, W: 100, H: 80}
+	ovRect := render.Rect{X: 0, Y: 0, W: 160, H: 140}
+
+	w := &Window{
+		app:     app,
+		platWin: mw,
+		ctx:     ctx,
+		drawFn: func(u *UI) {
+			renders++
+			u.ctx.InteractiveCanvas("viewer", ui.CanvasCallbacks{
+				Streaming: true,
+				OnDraw: func(cv *render.Canvas, area render.Rect, _ bool) {
+					canvasDraws++
+					// Рисуем только в videoDst, не трогая letterbox-полосы вокруг него
+					cv.FillRect(videoDst, render.RGB(200, 100, 50))
+				},
+			}, ui.Width(200), ui.Height(150))
+
+			// Полупрозрачный оверлей, перекрывающий и videoDst, и letterbox-полосы
+			u.ctx.PushOverlay(ovRect, func() {
+				overlayDraws++
+				u.ctx.RegisterHit("ov_btn", render.Rect{X: 10, Y: 10, W: 40, H: 20}, platform.CursorHand)
+				u.ctx.Canvas.FillRect(ovRect, render.RGBA(0, 0, 0, 140))
+			})
+		},
+	}
+	w.ui = &UI{ctx: ctx, win: w}
+	app.windows = []*Window{w}
+	app.mainWin = w
+
+	w.handleEvent(platform.Event{Type: platform.EventPaint})
+
+	pixelAt := func(x, y int) [4]byte {
+		off := (y*ctx.Canvas.Width + x) * 4
+		return [4]byte{
+			ctx.Canvas.Pixels[off],
+			ctx.Canvas.Pixels[off+1],
+			ctx.Canvas.Pixels[off+2],
+			ctx.Canvas.Pixels[off+3],
+		}
+	}
+
+	// Запоминаем эталонные пиксели после первого полного кадра:
+	// (5, 5) — на letterbox-полосе под полупрозрачным оверлеем,
+	// (50, 50) — внутри videoDst под полупрозрачным оверлеем.
+	letterboxAfterFull := pixelAt(5, 5)
+	videoAfterFull := pixelAt(50, 50)
+
+	mw.presents, mw.presentRects = 0, 0
+	renders, canvasDraws, overlayDraws = 0, 0, 0
+
+	for i := 0; i < 10; i++ {
+		w.handleEvent(platform.Event{Type: platform.EventWakeUp})
+	}
+
+	if renders != 0 {
+		t.Fatalf("при пересекающемся оверлее полный drawFn должен пропускаться: got renders=%d", renders)
+	}
+	if canvasDraws != 10 || overlayDraws != 10 {
+		t.Fatalf("ожидались 10 перерисовок видео и оверлея: canvas=%d overlay=%d", canvasDraws, overlayDraws)
+	}
+	if mw.presentRects != 10 || mw.presents != 0 {
+		t.Fatalf("ожидался fast-path PresentRect на всех 10 кадрах: presentRects=%d presents=%d", mw.presentRects, mw.presents)
+	}
+	if mw.lastPresentRect != videoDst {
+		t.Fatalf("ожидался PresentRect строго по videoDst %+v, got %+v", videoDst, mw.lastPresentRect)
+	}
+	if got := pixelAt(5, 5); got != letterboxAfterFull {
+		t.Fatalf("альфа-накопление на letterbox-полосе: было %v, стало %v", letterboxAfterFull, got)
+	}
+	if got := pixelAt(50, 50); got != videoAfterFull {
+		t.Fatalf("цвет внутри videoDst под полупрозрачным оверлеем изменился: было %v, стало %v", videoAfterFull, got)
+	}
+}
+
 
 
