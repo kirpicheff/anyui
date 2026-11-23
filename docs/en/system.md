@@ -97,6 +97,7 @@ if res == anyui.ResYes {
 - `Position() (x, y int)`, `SetPosition(x, y int)`, `SetSize(width, height int)`
 - `SetHideOnClose(bool)` and `SetOnClose(func(w *Window) bool)` (returning `false` cancels closing)
 - `SetCustomCursor(*CustomCursor)` — sets a native custom cursor from a BGRA buffer (`nil` restores the system `CursorType`)
+- `NativeHandle() uintptr` — returns the native OS window handle (`HWND` on Windows, `XID` on X11, `wl_surface` ID on Wayland, `NSWindow*` on macOS; `0` in `Headless` or before window creation)
 
 To build a custom title bar window (without OS chrome, preserving DWM shadows and Aero Snap on Windows):
 
@@ -233,6 +234,15 @@ child, err := app.OpenWindow(anyui.Config{
 
 - Closing a child window does not exit `App` as long as at least one window remains open (or the app is running in tray mode).
 - `app.Dispatch(fn)` safely updates state from background goroutines and wakes up active windows.
+
+---
+
+## Extension Hooks for Native Integrations
+
+The `anyui` core stays strictly software-rendered (no GPU/D3D11/OpenGL), while exposing two minimal hooks for external native integrations (such as embedding a child `HWND`/D3D11 surface over `InteractiveCanvas` in an application package):
+
+- `win.NativeHandle() uintptr` — returns the native OS window handle (`HWND` on Windows, `XID` on Linux X11, `wl_surface` ID on Linux Wayland, `NSWindow*` pointer on macOS; `0` in `Headless` or before window creation).
+- `ui.HasActiveOverlays() bool` — returns `true` when any overlay is active in the current or previous frame (`Modal`, `Popover`, `FloatingPanel`, `Drawer`, `ContextMenu`, `Select`, `MultiSelect`, `Tooltip`, `PushOverlay`; non-blocking `Toast` notifications are excluded). This allows external native surfaces to yield z-order cleanly (for example, hiding the child surface and falling back to software rendering via `Canvas.DrawBGRAFast`).
 
 ---
 

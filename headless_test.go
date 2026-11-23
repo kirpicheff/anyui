@@ -341,3 +341,137 @@ func BenchmarkFrameBudget1000Widgets(b *testing.B) {
 		h.Step()
 	}
 }
+
+type mockHandleWindow struct {
+	headlessWindow
+	handle uintptr
+}
+
+func (m *mockHandleWindow) NativeHandle() uintptr { return m.handle }
+
+func TestWindowNativeHandle(t *testing.T) {
+	var nilWin *Window
+	if got := nilWin.NativeHandle(); got != 0 {
+		t.Fatalf("ожидалось NativeHandle() == 0 для nil-окна, получено %d", got)
+	}
+
+	emptyWin := &Window{}
+	if got := emptyWin.NativeHandle(); got != 0 {
+		t.Fatalf("ожидалось NativeHandle() == 0 для неинициализированного окна, получено %d", got)
+	}
+
+	reg, bold, mono := DefaultTestFonts()
+	h, err := NewHeadless(Config{
+		Width:       400,
+		Height:      300,
+		FontRegular: reg,
+		FontBold:    bold,
+		FontMono:    mono,
+	})
+	if err != nil {
+		t.Fatalf("ошибка создания Headless: %v", err)
+	}
+	defer h.Close()
+
+	if got := h.Window().NativeHandle(); got != 0 {
+		t.Fatalf("в Headless ожидалось NativeHandle() == 0, получено %d", got)
+	}
+
+	const wantHandle uintptr = 0x1234ABCD
+	winWithHandle := &Window{platWin: &mockHandleWindow{handle: wantHandle}}
+	if got := winWithHandle.NativeHandle(); got != wantHandle {
+		t.Fatalf("ожидалось NativeHandle() == 0x%X, получено 0x%X", wantHandle, got)
+	}
+}
+
+func TestHeadlessHasActiveOverlays(t *testing.T) {
+	var nilUI *UI
+	if nilUI.HasActiveOverlays() {
+		t.Fatal("ожидалось HasActiveOverlays() == false для nil *UI")
+	}
+
+	reg, bold, mono := DefaultTestFonts()
+	h, err := NewHeadless(Config{
+		Width:       640,
+		Height:      480,
+		FontRegular: reg,
+		FontBold:    bold,
+		FontMono:    mono,
+	})
+	if err != nil {
+		t.Fatalf("ошибка создания Headless: %v", err)
+	}
+	defer h.Close()
+
+	modalOpen := false
+	pushOverlay := false
+	seenBeforeOverlay := false
+	seenAfterOverlay := false
+
+	h.SetDraw(func(ui *UI) {
+		seenBeforeOverlay = ui.HasActiveOverlays()
+		ui.Label("Базовый экран")
+		if modalOpen {
+			ui.Modal("dlg_test", &modalOpen, "Подтверждение", func() {
+				ui.Label("Содержимое модалки")
+			})
+		}
+		if pushOverlay {
+			ui.PushOverlay(Rect{X: 20, Y: 20, W: 160, H: 80}, func() {
+				ui.Label("Оверлей")
+			})
+		}
+		seenAfterOverlay = ui.HasActiveOverlays()
+	})
+
+	// 1. Без оверлеев — false
+	h.Step()
+	if seenBeforeOverlay || seenAfterOverlay || h.UI().HasActiveOverlays() {
+		t.Fatalf("без оверлеев ожидалось false, получено before=%v after=%v post=%v",
+			seenBeforeOverlay, seenAfterOverlay, h.UI().HasActiveOverlays())
+	}
+
+	// 2. Только Toast — не является блокирующим оверлеем
+	h.UI().ShowToast("Уведомление", "Проверка", ToastInfo, 3*time.Second)
+	h.Step()
+	if seenBeforeOverlay || seenAfterOverlay || h.UI().HasActiveOverlays() {
+		t.Fatalf("для Toast ожидалось HasActiveOverlays() == false, получено before=%v after=%v post=%v",
+			seenBeforeOverlay, seenAfterOverlay, h.UI().HasActiveOverlays())
+	}
+
+	// 3. Активный Modal — true сразу после вызова в кадре, а на следующем кадре и до вызова (prevBlocks)
+	modalOpen = true
+	h.Step()
+	if !seenAfterOverlay || !h.UI().HasActiveOverlays() {
+		t.Fatalf("при открытом Modal ожидалось HasActiveOverlays() == true, получено after=%v post=%v",
+			seenAfterOverlay, h.UI().HasActiveOverlays())
+	}
+	h.Step()
+	if !seenBeforeOverlay || !seenAfterOverlay {
+		t.Fatalf("на втором кадре с Modal ожидалось true до и после вызова, получено before=%v after=%v",
+			seenBeforeOverlay, seenAfterOverlay)
+	}
+
+	// 4. После закрытия Modal — на кадре закрытия ещё сохраняется prevBlocks, на следующем кадре false
+	modalOpen = false
+	h.Step()
+	h.Step()
+	if seenBeforeOverlay || seenAfterOverlay || h.UI().HasActiveOverlays() {
+		t.Fatalf("после закрытия Modal ожидалось false, получено before=%v after=%v post=%v",
+			seenBeforeOverlay, seenAfterOverlay, h.UI().HasActiveOverlays())
+	}
+
+	// 5. PushOverlay также переводит HasActiveOverlays в true и затем сбрасывается
+	pushOverlay = true
+	h.Step()
+	if !seenAfterOverlay || !h.UI().HasActiveOverlays() {
+		t.Fatalf("при активном PushOverlay ожидалось true, получено after=%v post=%v",
+			seenAfterOverlay, h.UI().HasActiveOverlays())
+	}
+	pushOverlay = false
+	h.Step()
+	h.Step()
+	if h.UI().HasActiveOverlays() {
+		t.Fatal("после снятия PushOverlay ожидалось HasActiveOverlays() == false")
+	}
+}

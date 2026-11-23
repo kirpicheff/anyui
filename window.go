@@ -275,6 +275,16 @@ func (w *Window) SetSize(widthPx, heightPx int) {
 	}
 }
 
+// NativeHandle возвращает нативный дескриптор окна ОС:
+// HWND на Windows, XID на Linux X11, ID поверхности wl_surface на Linux Wayland,
+// указатель NSWindow* на macOS; возвращает 0 в Headless-режиме или до создания окна.
+func (w *Window) NativeHandle() uintptr {
+	if w == nil || w.platWin == nil {
+		return 0
+	}
+	return w.platWin.NativeHandle()
+}
+
 // SetHideOnClose управляет скрытием окна вместо закрытия (например, для сворачивания в трей).
 func (w *Window) SetHideOnClose(hide bool) {
 	w.hideOnClose = hide

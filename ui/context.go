@@ -345,6 +345,15 @@ func (c *Context) PushOverlay(bounds render.Rect, drawFn func()) {
 	c.Overlays.Push(bounds, drawFn)
 }
 
+// HasActiveOverlays возвращает true, если в текущем или предыдущем кадре есть активные оверлеи
+// (Modal, Popover, FloatingPanel, Drawer, ContextMenu, Select, Tooltip, PushOverlay и др.).
+func (c *Context) HasActiveOverlays() bool {
+	if c == nil {
+		return false
+	}
+	return c.Overlays.HasActive()
+}
+
 // IsInputBlocked возвращает true, если текущая позиция курсора перекрыта активным оверлеем.
 func (c *Context) IsInputBlocked() bool {
 	return c.Overlays.IsBlocked(c.MouseX, c.MouseY)

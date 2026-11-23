@@ -97,6 +97,7 @@ if res == anyui.ResYes {
 - `Position() (x, y int)`, `SetPosition(x, y int)`, `SetSize(width, height int)`
 - `SetHideOnClose(bool)` и `SetOnClose(func(w *Window) bool)` (возврат `false` отменяет закрытие)
 - `SetCustomCursor(*CustomCursor)` — установка нативного кастомного курсора из BGRA-буфера (`nil` возвращает системный `CursorType`)
+- `NativeHandle() uintptr` — нативный дескриптор окна ОС (`HWND` на Windows, `XID` на X11, ID `wl_surface` на Wayland, `NSWindow*` на macOS; `0` в `Headless` или до создания окна)
 
 Для создания окна с кастомной шапкой (без системной рамки, но с сохранением теней DWM и Aero Snap):
 
@@ -233,6 +234,15 @@ child, err := app.OpenWindow(anyui.Config{
 
 - Закрытие дочернего окна не завершает `App`, пока открыто хотя бы одно окно (или приложение работает через трей).
 - `app.Dispatch(fn)` безопасно обновляет данные из фоновых горутин и пробуждает активные окна.
+
+---
+
+## Точки расширения для нативных интеграций
+
+Ядро `anyui` остаётся полностью софтверным (без GPU/D3D11/OpenGL), но предоставляет два минимальных хука для внешних нативных интеграций (например, дочерней поверхности `HWND`/D3D11 поверх `InteractiveCanvas` в прикладном пакете):
+
+- `win.NativeHandle() uintptr` — возвращает нативный дескриптор окна ОС (`HWND` на Windows, `XID` на Linux X11, ID `wl_surface` на Linux Wayland, указатель `NSWindow*` на macOS; `0` в `Headless` или до создания окна).
+- `ui.HasActiveOverlays() bool` — возвращает `true`, если в текущем или предыдущем кадре присутствуют активные оверлеи (`Modal`, `Popover`, `FloatingPanel`, `Drawer`, `ContextMenu`, `Select`, `MultiSelect`, `Tooltip`, `PushOverlay`; всплывающие `Toast` не считаются блокирующими оверлеями). Позволяет внешней нативной поверхности корректно уступать z-order (например, скрываться и переключаться на софтверный фолбэк `Canvas.DrawBGRAFast`).
 
 ---
 

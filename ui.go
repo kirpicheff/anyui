@@ -465,6 +465,16 @@ func (u *UI) PushOverlay(bounds Rect, drawFn func()) {
 	u.ctx.PushOverlay(u.scaleRect(bounds), drawFn)
 }
 
+// HasActiveOverlays возвращает true, если в текущем кадре есть активные оверлеи
+// (Modal, Popover, FloatingPanel, Drawer, ContextMenu, Select, Tooltip, PushOverlay и др.).
+// Полезно внешним нативным поверхностям, чтобы корректно уступать z-order и переключаться на софтверный вывод.
+func (u *UI) HasActiveOverlays() bool {
+	if u == nil || u.ctx == nil {
+		return false
+	}
+	return u.ctx.HasActiveOverlays()
+}
+
 // LayoutRect создаёт область раскладки (колонку без отступов) строго по заданному прямоугольнику rect
 // (в логических пикселях Dp / CurrentArea()) с клиппингом содержимого. Удобно для размещения виджетов внутри PushOverlay.
 func (u *UI) LayoutRect(rect Rect, fn func()) {
