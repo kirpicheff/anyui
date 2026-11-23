@@ -73,6 +73,9 @@ func (c *Context) ListViewEx(
 	borderCol := c.Theme.Border
 	if c.FocusID == id && !st.Disabled {
 		borderCol = c.Theme.BorderFocus
+		if st.FocusBorderColor != nil {
+			borderCol = *st.FocusBorderColor
+		}
 	}
 	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), bg, 1.0, borderCol)
 
@@ -353,6 +356,9 @@ func (c *Context) TreeViewEx(
 	borderCol := c.Theme.Border
 	if c.FocusID == id && !st.Disabled {
 		borderCol = c.Theme.BorderFocus
+		if st.FocusBorderColor != nil {
+			borderCol = *st.FocusBorderColor
+		}
 	}
 	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), bg, 1.0, borderCol)
 
@@ -617,6 +623,9 @@ func (c *Context) TableEx(
 	borderCol := c.Theme.Border
 	if c.FocusID == id && !st.Disabled {
 		borderCol = c.Theme.BorderFocus
+		if st.FocusBorderColor != nil {
+			borderCol = *st.FocusBorderColor
+		}
 	}
 	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), bg, 1.0, borderCol)
 

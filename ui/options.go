@@ -472,7 +472,7 @@ func HoverBorderColor(c render.Color) Option {
 	}
 }
 
-// FocusBorderColor переопределяет цвет рамки при фокусе (для TextInput, MaskedInput и TextArea).
+// FocusBorderColor переопределяет цвет рамки при фокусе (для Button, TextInput, MaskedInput, TextArea, ListView, ListViewEx, Table, TableEx, TreeView и TreeViewEx).
 func FocusBorderColor(c render.Color) Option {
 	return func(s *WidgetStyle) {
 		s.FocusBorderColor = &c

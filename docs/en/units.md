@@ -41,6 +41,7 @@ This document tracks the status of strict scalar typing in the AnyUI library acc
 | `const Auto Dp = -1` | | ✓ | Canonical sentinel value for automatic sizing |
 | **Overlays and Interaction (All in Dp)** | | | |
 | `func (u *UI) PushOverlay(bounds Rect, drawFn func())` | | ✓ | Overlay bounds strictly in Dp (scaled to Px at boundary) |
+| `func (u *UI) PushNonBlockingOverlay(bounds Rect, drawFn func())` | | ✓ | Non-blocking overlay bounds strictly in Dp |
 | `func (u *UI) LayoutRect(rect Rect, fn func())` | | ✓ | Direct layout box strictly in Dp |
 | `func (u *UI) Tooltip(text string, anchor Rect, opts ...Option)` | | ✓ | Tooltip anchor strictly in Dp |
 | `func (u *UI) Popover(id string, open *bool, anchor Rect, fn func(), opts ...Option)` | | ✓ | Popover anchor strictly in Dp |

@@ -552,8 +552,11 @@ func TestStreamingWakeUpWithIntersectingOverlayAndLetterbox(t *testing.T) {
 	if renders != 0 {
 		t.Fatalf("при пересекающемся оверлее полный drawFn должен пропускаться: got renders=%d", renders)
 	}
-	if canvasDraws != 10 || overlayDraws != 10 {
-		t.Fatalf("ожидались 10 перерисовок видео и оверлея: canvas=%d overlay=%d", canvasDraws, overlayDraws)
+	if canvasDraws != 10 {
+		t.Fatalf("ожидались 10 перерисовок видео: canvas=%d", canvasDraws)
+	}
+	if overlayDraws != 0 {
+		t.Fatalf("благодаря кэшированию оверлея в OverlayLayer функция draw оверлея не должна вызываться на wakeOnly-кадрах: overlayDraws=%d", overlayDraws)
 	}
 	if mw.presentRects != 10 || mw.presents != 0 {
 		t.Fatalf("ожидался fast-path PresentRect на всех 10 кадрах: presentRects=%d presents=%d", mw.presentRects, mw.presents)
@@ -629,8 +632,8 @@ func TestStreamingWakeUpOverlayLayoutSeqPreserved(t *testing.T) {
 	if canvasDraws != 10 {
 		t.Fatalf("OnDraw должен вызываться ровно 1 раз на EventWakeUp (без двойного прохода): got %d", canvasDraws)
 	}
-	if overlayDraws != 10 {
-		t.Fatalf("ожидались 10 перерисовок оверлея: got %d", overlayDraws)
+	if overlayDraws != 0 {
+		t.Fatalf("благодаря кэшированию оверлея в OverlayLayer функция draw оверлея не должна вызываться на wakeOnly-кадрах: got %d", overlayDraws)
 	}
 	if mw.presentRects != 10 || mw.presents != 0 {
 		t.Fatalf("ожидался fast-path PresentRect на всех 10 кадрах: presentRects=%d presents=%d", mw.presentRects, mw.presents)

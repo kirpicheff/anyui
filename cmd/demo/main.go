@@ -83,6 +83,8 @@ type demoState struct {
 
 	// Раздел оверлеев
 	modalOpen    bool
+	modalSrcItems []string
+	modalDstItems []string
 	popoverOpen  bool
 	floatOpen    bool
 	drawerLeft   bool
@@ -92,7 +94,10 @@ type demoState struct {
 	contextLog   string
 
 	// Раздел графики и системы
-	sampleImg  image.Image
+	sampleImg       image.Image
+	isDraggingFiles bool
+	dragPosXPx      int
+	dragPosYPx      int
 	dialogLog  string
 	childCount int
 
@@ -167,6 +172,8 @@ func newDemoState() *demoState {
 		listItems:     listItems,
 		sampleImg:     makeSampleImage(96, 96),
 		contextLog:    "Нажмите ПКМ по области ниже для ContextMenu",
+		modalSrcItems: []string{"Модуль core.sys", "Конфиг config.yaml", "База state.db", "Журнал audit.log"},
+		modalDstItems: []string{"Архив backup.tar"},
 		dialogLog:     "Нажмите любую кнопку диалога",
 		tableRows:     makeDemoTableRows(),
 		tableSelected: -1,
@@ -221,8 +228,24 @@ func main() {
 		Theme:           anyui.NavyTheme(),
 		AcceptDropFiles: true,
 		HideOnClose:     false,
+		OnDragEnter: func(xPx, yPx int, hasFiles bool) {
+			st.isDraggingFiles = hasFiles
+			st.dragPosXPx = xPx
+			st.dragPosYPx = yPx
+			st.statusMsg = fmt.Sprintf("Перетаскивание файлов над окном: %d, %d", xPx, yPx)
+		},
+		OnDragOver: func(xPx, yPx int, hasFiles bool) {
+			st.isDraggingFiles = hasFiles
+			st.dragPosXPx = xPx
+			st.dragPosYPx = yPx
+		},
+		OnDragLeave: func() {
+			st.isDraggingFiles = false
+			st.statusMsg = "Курсор покинул окно при перетаскивании"
+		},
 		OnDropFiles: func(files []string, x, y int) {
-			st.droppedInfo = fmt.Sprintf("Drop (%d файл.): %s", len(files), files[0])
+			st.isDraggingFiles = false
+			st.droppedInfo = fmt.Sprintf("Сброшено (%d файл.): %s", len(files), files[0])
 			st.statusMsg = st.droppedInfo
 		},
 		Tray: &anyui.TrayConfig{
@@ -464,6 +487,23 @@ func main() {
 
 		// Глобальные оверлеи (Modal, FloatingPanel, Drawer)
 		st.drawGlobalOverlays(ui)
+
+		// Оверлей подсказки при внешнем перетаскивании файлов из Проводника
+		if st.isDraggingFiles {
+			hintW, hintH := 440, 90
+			area := ui.CurrentArea()
+			hintX := (area.W - hintW) / 2
+			hintY := (area.H - hintH) / 2
+			hintRect := anyui.Rect{X: hintX, Y: hintY, W: hintW, H: hintH}
+			ui.PushNonBlockingOverlay(hintRect, func() {
+				ui.LayoutRect(hintRect, func() {
+					ui.Card(func() {
+						ui.Label("Сбросьте файлы в окно (OLE Drag & Drop)", anyui.FontSize(15), anyui.Bold(), anyui.TextAlignCenter(), anyui.FillWidth())
+						ui.Label(fmt.Sprintf("Координаты курсора: X = %d Px, Y = %d Px (UAC активен)", st.dragPosXPx, st.dragPosYPx), anyui.FontSize(12), anyui.TextColor(ui.Theme().TextMuted), anyui.TextAlignCenter(), anyui.FillWidth())
+					}, anyui.Width(anyui.Dp(hintW)), anyui.Height(anyui.Dp(hintH)), anyui.Bg(ui.Theme().Surface.WithAlpha(245)), anyui.BorderColor(ui.Theme().Accent))
+				})
+			})
+		}
 	})
 	if err != nil {
 		log.Fatal(err)

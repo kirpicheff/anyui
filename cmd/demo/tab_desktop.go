@@ -2,16 +2,18 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/kirpicheff/anyui"
 )
 
 type desktopTabState struct {
-	init          bool
-	page          int
-	followTail    bool
-	logs          []anyui.LogEntry
+	init           bool
+	page           int
+	followTail     bool
+	hideFocusBorder bool
+	logs           []anyui.LogEntry
 	dt            time.Time
 	multiSel      map[string]bool
 	tags          []string
@@ -51,6 +53,51 @@ var deskTab = desktopTabState{
 		{Level: anyui.LogError, Timestamp: "10:00:05", Text: "Таймаут подключения к узлу #4"},
 		{Level: anyui.LogInfo, Timestamp: "10:00:06", Text: "Повторное подключение выполнено успешно"},
 	},
+}
+
+func (s *desktopTabState) sortDesktopTable() {
+	col := s.tableSort.Column
+	desc := s.tableSort.Desc
+	type rowItem struct {
+		cells []string
+		chk   bool
+		sel   bool
+	}
+	items := make([]rowItem, len(s.tableCells))
+	for i := range s.tableCells {
+		var chk, sel bool
+		if i < len(s.tableChk) {
+			chk = s.tableChk[i]
+		}
+		if s.tableSel != nil {
+			sel = s.tableSel[i]
+		}
+		items[i] = rowItem{cells: s.tableCells[i], chk: chk, sel: sel}
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		valA := ""
+		valB := ""
+		if col < len(items[i].cells) {
+			valA = items[i].cells[col]
+		}
+		if col < len(items[j].cells) {
+			valB = items[j].cells[col]
+		}
+		if desc {
+			return valA > valB
+		}
+		return valA < valB
+	})
+	clear(s.tableSel)
+	for i, it := range items {
+		s.tableCells[i] = it.cells
+		if i < len(s.tableChk) {
+			s.tableChk[i] = it.chk
+		}
+		if it.sel {
+			s.tableSel[i] = true
+		}
+	}
 }
 
 func ensureDesktopTree() []*anyui.TreeNode {
@@ -214,7 +261,14 @@ func (st *demoState) drawTabDesktop(ui *anyui.UI) {
 				{Title: "Статус", WidthDp: 120},
 				{Title: "Пинг", WidthDp: 100},
 			}
-			ui.TableEx("demo_tblex", cols, len(deskTab.tableCells), &anyui.TableExConfig{
+			ui.RowCentered(10, 26, func() {
+				ui.Toggle("demo_focus_border_tgl", "Отключить рамку фокуса таблицы (FocusBorderColor transparent)", &deskTab.hideFocusBorder)
+			})
+			tblOpts := []anyui.Option{anyui.Height(175)}
+			if deskTab.hideFocusBorder {
+				tblOpts = append(tblOpts, anyui.FocusBorderColor(anyui.RGBA(0, 0, 0, 0)))
+			}
+			tev := ui.TableEx("demo_tblex", cols, len(deskTab.tableCells), &anyui.TableExConfig{
 				Selected:             deskTab.tableSel,
 				ShowCheckboxes:       true,
 				Checked:              deskTab.tableChk,
@@ -228,7 +282,10 @@ func (st *demoState) drawTabDesktop(ui *anyui.UI) {
 				},
 			}, &deskTab.tableSort, func(row, col int, area anyui.Rect, isSel bool) {
 				ui.DrawText(anyui.Px(area.X+8), anyui.Px(area.Y+8), deskTab.tableCells[row][col], 12, th.TextPrimary)
-			}, anyui.Height(175))
+			}, tblOpts...)
+			if tev.SortChanged {
+				deskTab.sortDesktopTable()
+			}
 
 			// 6. StatusBar
 			okCol := th.Success

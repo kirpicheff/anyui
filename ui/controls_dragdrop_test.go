@@ -213,3 +213,73 @@ func TestCrossWidgetDrop_ListViewToTreeViewInside(t *testing.T) {
 		t.Fatalf("неверный payload: %+v", gotDrop.Payload)
 	}
 }
+
+func TestCrossWidgetDrop_TableExInsideModal(t *testing.T) {
+	ctx := newTestContext(800, 600)
+	cols := []TableColumn{{Title: "Name", WidthDp: 120}}
+	open := true
+
+	var gotDrop *DragEvent
+	var gotTableEv TableEvent
+
+	renderModal := func() {
+		ctx.Render(func(c *Context) {
+			c.Modal("test_modal", &open, "Диалог переноса", func() {
+				c.Row(10, 200, func() {
+					c.TableEx("src_table", cols, 3, nil, nil, nil,
+						Width(180), Height(160),
+						DragSource("transfer_item", func(idx int, _ string) DragPayload {
+							return DragPayload{Type: "transfer_item", Data: idx, Label: "File" + string(rune('A'+idx))}
+						}),
+					)
+					tev := c.TableEx("dst_table", cols, 2, nil, nil, nil,
+						Width(180), Height(160),
+						AcceptDrop("transfer_item"),
+						OnDrop(func(ev DragEvent) {
+							gotDrop = &ev
+						}),
+					)
+					if tev.Drag != nil {
+						gotTableEv = tev
+					}
+				})
+			}, Width(500), Height(350))
+		})
+	}
+
+	// 1. Зажимаем строку 0 в src_table внутри Modal
+	// Модалка центрирована: box.X = (800 - 500) / 2 = 150, box.Y = (600 - 350) / 2 = 125.
+	// body: box.X + 16 = 166, box.Y + header(40) + 16 = 181.
+	// src_table: x ~ 170..340, y ~ 181..340.
+	// Заголовок таблицы TableEx: 32 px. Строка 0: y ~ 181 + 32 + 10 = 223.
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 200, Y: 225})
+	renderModal()
+
+	// 2. Перетаскиваем в dst_table: x ~ 166 + 180 + 10 + 20 = 376, y ~ 225.
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 380, Y: 225})
+	renderModal()
+
+	if !ctx.reorderActive || ctx.reorderPayload == nil || ctx.reorderPayload.Type != "transfer_item" {
+		t.Fatalf("ожидался активный DragPayload transfer_item, active=%v payload=%+v", ctx.reorderActive, ctx.reorderPayload)
+	}
+	if ctx.reorderPayload.Label != "FileA" {
+		t.Fatalf("ожидался Label 'FileA', получено %q", ctx.reorderPayload.Label)
+	}
+
+	// 3. Отпускаем ЛКМ над dst_table
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 380, Y: 225})
+	renderModal()
+
+	if gotDrop == nil || gotTableEv.Drag == nil {
+		t.Fatalf("ожидалось успешное срабатывание OnDrop в TableEx внутри Modal, gotDrop=%v, tableDrag=%v", gotDrop, gotTableEv.Drag)
+	}
+	if gotDrop.FromWidget != "src_table" || gotDrop.ToWidget != "dst_table" {
+		t.Fatalf("неверные виджеты: From=%q, To=%q", gotDrop.FromWidget, gotDrop.ToWidget)
+	}
+	if gotDrop.FromIndex != 0 {
+		t.Fatalf("ожидался FromIndex=0, получено %d", gotDrop.FromIndex)
+	}
+	if gotDrop.Payload == nil || gotDrop.Payload.Label != "FileA" {
+		t.Fatalf("неверный payload: %+v", gotDrop.Payload)
+	}
+}

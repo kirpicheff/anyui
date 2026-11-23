@@ -406,6 +406,9 @@ func (c *Context) ButtonOpts(id, label string, opts ...Option) bool {
 
 	if c.FocusID == id && !st.Disabled {
 		border = c.Theme.BorderFocus
+		if st.FocusBorderColor != nil {
+			border = *st.FocusBorderColor
+		}
 	}
 
 	rad := c.Theme.RadiusSm

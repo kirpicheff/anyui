@@ -252,6 +252,9 @@ func (c *Context) shouldRedrawOnMouseMove(x, y int) bool {
 	if !c.smartMouseMove {
 		return true
 	}
+	if c.reorderWidgetID != "" {
+		return true
+	}
 	if c.MouseDown || c.RightMouseDown || c.MiddleMouseDown || c.ActiveID != "" || c.tabDragging || c.reorderActive {
 		return true
 	}

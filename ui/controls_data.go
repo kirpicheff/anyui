@@ -118,6 +118,9 @@ func (c *Context) Table(
 	borderCol := c.Theme.Border
 	if c.FocusID == id && !st.Disabled {
 		borderCol = c.Theme.BorderFocus
+		if st.FocusBorderColor != nil {
+			borderCol = *st.FocusBorderColor
+		}
 	}
 	c.Canvas.DrawRoundedBox(rect, radius, bg, 1.0, borderCol)
 
@@ -589,6 +592,9 @@ func (c *Context) TreeView(id string, roots []*TreeNode, selectedID *string, opt
 	borderCol := c.Theme.Border
 	if c.FocusID == id && !st.Disabled {
 		borderCol = c.Theme.BorderFocus
+		if st.FocusBorderColor != nil {
+			borderCol = *st.FocusBorderColor
+		}
 	}
 	c.Canvas.DrawRoundedBox(rect, radius, bg, 1.0, borderCol)
 

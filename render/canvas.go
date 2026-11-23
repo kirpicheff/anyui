@@ -395,6 +395,8 @@ func (c *Canvas) blendPixelUnchecked(x, y int, col Color, cov uint8) {
 		return
 	}
 	i := (y*c.Width + x) * 4
+	dstA := uint32(c.Pixels[i+3])
+
 	if a >= 255 {
 		c.Pixels[i+0] = col.B
 		c.Pixels[i+1] = col.G
@@ -403,11 +405,36 @@ func (c *Canvas) blendPixelUnchecked(x, y int, col Color, cov uint8) {
 		return
 	}
 
-	invA := 255 - a
-	c.Pixels[i+0] = uint8((uint32(col.B)*a + uint32(c.Pixels[i+0])*invA + 127) / 255)
-	c.Pixels[i+1] = uint8((uint32(col.G)*a + uint32(c.Pixels[i+1])*invA + 127) / 255)
-	c.Pixels[i+2] = uint8((uint32(col.R)*a + uint32(c.Pixels[i+2])*invA + 127) / 255)
-	c.Pixels[i+3] = 255
+	if dstA == 255 {
+		invA := 255 - a
+		c.Pixels[i+0] = uint8((uint32(col.B)*a + uint32(c.Pixels[i+0])*invA + 127) / 255)
+		c.Pixels[i+1] = uint8((uint32(col.G)*a + uint32(c.Pixels[i+1])*invA + 127) / 255)
+		c.Pixels[i+2] = uint8((uint32(col.R)*a + uint32(c.Pixels[i+2])*invA + 127) / 255)
+		c.Pixels[i+3] = 255
+		return
+	}
+
+	if dstA == 0 {
+		c.Pixels[i+0] = col.B
+		c.Pixels[i+1] = col.G
+		c.Pixels[i+2] = col.R
+		c.Pixels[i+3] = uint8(a)
+		return
+	}
+
+	// Общий случай Porter-Duff Over для прозрачных буферов (0 < dstA < 255):
+	dstWeight := (dstA*(255-a) + 127) / 255
+	outA := a + dstWeight
+	if outA > 255 {
+		outA = 255
+	}
+	if outA == 0 {
+		return
+	}
+	c.Pixels[i+0] = uint8((uint32(col.B)*a + uint32(c.Pixels[i+0])*dstWeight + outA/2) / outA)
+	c.Pixels[i+1] = uint8((uint32(col.G)*a + uint32(c.Pixels[i+1])*dstWeight + outA/2) / outA)
+	c.Pixels[i+2] = uint8((uint32(col.R)*a + uint32(c.Pixels[i+2])*dstWeight + outA/2) / outA)
+	c.Pixels[i+3] = uint8(outA)
 }
 
 func minInt(a, b int) int {

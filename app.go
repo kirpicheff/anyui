@@ -81,6 +81,9 @@ type Config struct {
 	HideOnClose         bool
 	OnClose             func(w *Window) bool
 	OnDropFiles         func(files []string, xPx, yPx int)
+	OnDragEnter         func(xPx, yPx int, hasFiles bool)
+	OnDragOver          func(xPx, yPx int, hasFiles bool)
+	OnDragLeave         func()
 }
 
 // App управляет единым циклом событий ОС, реестром окон и потокобезопасной очередью Dispatch.
@@ -263,6 +266,9 @@ func (a *App) createWindow(cfg Config, drawFn func(*UI)) (*Window, error) {
 		hideOnClose: cfg.HideOnClose,
 		onClose:     cfg.OnClose,
 		onDropFiles: cfg.OnDropFiles,
+		onDragEnter: cfg.OnDragEnter,
+		onDragOver:  cfg.OnDragOver,
+		onDragLeave: cfg.OnDragLeave,
 	}
 	w.ui = &UI{
 		ctx: ctx,

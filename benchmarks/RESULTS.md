@@ -7,10 +7,10 @@ Measured after 5s warmup over a 5s idle window (including child processes such a
 
 | Framework | CGO | Binary Size | Startup Time | Processes | Working Set (RAM) | Private Memory | Idle CPU |
 | --- | :---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| AnyUI | 0 | 2.95 MB | 22.82 ms | 1 | 38.82 MB | 25.55 MB | 0% |
-| Gio | 0 | 6.52 MB | 170.28 ms | 1 | 55.34 MB | 39.39 MB | 0% |
-| Fyne | 1 | 23.29 MB | 250.43 ms | 1 | 166.21 MB | 158.45 MB | 0% |
-| Wails | 0 | 10.66 MB | 515.67 ms | 7 | 399.33 MB | 193.79 MB | 0% |
+| AnyUI | 0 | 2.95 MB | 23.50 ms | 1 | 38.86 MB | 25.93 MB | 0% |
+| Gio | 0 | 6.52 MB | 197.11 ms | 1 | 55.28 MB | 38.55 MB | 0% |
+| Fyne | 1 | 23.29 MB | 247.87 ms | 1 | 166.66 MB | 159.27 MB | 0% |
+| Wails | 0 | 10.66 MB | 782.88 ms | 7 | 399.79 MB | 193.25 MB | 0% |
 
 - **WebView2 Runtime (required by Wails):** 878,0 MB (v157.0.4341.60) on disk.
 - **Startup Time measurement:** time from main() start to first rendered frame (AnyUI, Gio), foreground lifecycle (Fyne), or OnDomReady (Wails).

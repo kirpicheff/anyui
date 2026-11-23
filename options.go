@@ -131,7 +131,7 @@ func HoverBg(c Color) Option { return ui.HoverBg(c) }
 // HoverBorderColor переопределяет цвет рамки при наведении (для Button).
 func HoverBorderColor(c Color) Option { return ui.HoverBorderColor(c) }
 
-// FocusBorderColor переопределяет цвет рамки при фокусе (для TextInput, MaskedInput и TextArea).
+// FocusBorderColor переопределяет цвет рамки при фокусе (для Button, TextInput, MaskedInput, TextArea, ListView, ListViewEx, Table, TableEx, TreeView и TreeViewEx).
 func FocusBorderColor(c Color) Option { return ui.FocusBorderColor(c) }
 
 // TextAlignCenter выравнивает текст и placeholder по центру (для TextInput и Label).

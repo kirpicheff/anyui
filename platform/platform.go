@@ -20,6 +20,9 @@ const (
 	EventKeyUp
 	EventChar
 	EventDropFiles
+	EventDragEnter
+	EventDragOver
+	EventDragLeave
 	EventCaptureLost
 	EventFocusLost
 	EventThemeChange
@@ -101,6 +104,7 @@ type Event struct {
 	Char      rune       // Для EventChar (введённый символ Unicode)
 	Mods      Modifiers
 	Files     []string    // Для EventDropFiles (список путей перетащенных файлов)
+	HasFiles  bool        // Для EventDragEnter / EventDragOver (true, если перетаскиваются файлы)
 	DarkTheme bool        // Для EventThemeChange (true, если системная тема тёмная)
 }
 

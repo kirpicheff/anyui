@@ -44,7 +44,7 @@ custom.RadiusSm = 6
 | `anyui.HoverTextColor(c)` | Цвет текста и иконки при наведении (`Button`) | `anyui.HoverTextColor(ui.Theme().Accent)` |
 | `anyui.BorderColor(c)` | Переопределение цвета рамки | `anyui.BorderColor(anyui.Hex(0x475569))` |
 | `anyui.HoverBorderColor(c)` | Цвет рамки при наведении (`Button`) | `anyui.HoverBorderColor(ui.Theme().Accent)` |
-| `anyui.FocusBorderColor(c)` | Цвет рамки при фокусе (`TextInput`, `MaskedInput`, `TextArea`) | `anyui.FocusBorderColor(ui.Theme().Accent)` |
+| `anyui.FocusBorderColor(c)` | Цвет рамки при фокусе (`Button`, `TextInput`, `MaskedInput`, `TextArea`, `ListView`, `ListViewEx`, `Table`, `TableEx`, `TreeView`, `TreeViewEx`) | `anyui.FocusBorderColor(ui.Theme().Accent)` |
 | `anyui.Radius(dp)` | Радиус скругления в `dp` | `anyui.Radius(10)` |
 | `anyui.Width(dp)` | Фиксированная ширина в `dp` | `anyui.Width(220)` |
 | `anyui.Height(dp)` | Фиксированная высота в `dp` | `anyui.Height(42)` |

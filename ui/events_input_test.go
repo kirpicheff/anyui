@@ -2,6 +2,7 @@ package ui
 
 import (
 	"testing"
+	"time"
 
 	"github.com/kirpicheff/anyui/platform"
 	"github.com/kirpicheff/anyui/render"
@@ -691,5 +692,120 @@ func TestBackBufferProviderZeroCopy(t *testing.T) {
 	ctx.HandleEvent(platform.Event{Type: platform.EventClose})
 	if ctx.Canvas.Pixels != nil {
 		t.Fatal("после EventClose Canvas.Pixels должен быть отвязан (nil)")
+	}
+}
+
+func TestWakeUpDoesNotDropInputAndDragState(t *testing.T) {
+	ctx := newTestContext(400, 300)
+
+	// Нажатие кнопки мыши на строке виджета
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 50, Y: 50})
+	ctx.ArmDrag("test_widget", 2, "row_2", WidgetStyle{})
+	if ctx.reorderWidgetID != "test_widget" || ctx.reorderSourceIdx != 2 {
+		t.Fatalf("ArmDrag не выставил состояние: id=%q idx=%d", ctx.reorderWidgetID, ctx.reorderSourceIdx)
+	}
+
+	// Серия тиков EventWakeUp (анимации, таймеры, фоновые задачи)
+	for i := 0; i < 5; i++ {
+		ctx.HandleEvent(platform.Event{Type: platform.EventWakeUp})
+		ctx.Render(func(c *Context) {
+			// Внутри кадра проверяем сохранность состояния
+			if c.reorderWidgetID != "test_widget" {
+				t.Fatalf("reorderWidgetID сбросился на тике EventWakeUp #%d", i)
+			}
+		})
+	}
+
+	if ctx.reorderWidgetID != "test_widget" || !ctx.MouseDown {
+		t.Fatalf("состояние перетаскивания потеряно после серии EventWakeUp: id=%q down=%v",
+			ctx.reorderWidgetID, ctx.MouseDown)
+	}
+
+	// Перемещение мыши с превышением порога (4 dp)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 50, Y: 70})
+	if !ctx.UpdateReorderDrag("test_widget") {
+		t.Fatal("UpdateReorderDrag должен активировать перетаскивание при движении мыши")
+	}
+	if !ctx.reorderActive {
+		t.Fatal("ожидалось reorderActive == true")
+	}
+
+	// Отпускание кнопки мыши завершает drag
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 50, Y: 70})
+	ctx.Render(func(c *Context) {})
+	if ctx.reorderActive || ctx.reorderWidgetID != "" {
+		t.Fatalf("перетаскивание не сбросилось после MouseUp: active=%v id=%q", ctx.reorderActive, ctx.reorderWidgetID)
+	}
+}
+
+func TestPushNonBlockingOverlayDoesNotBlockInput(t *testing.T) {
+	ctx := newTestContext(400, 300)
+
+	// Регистрируем неблокирующий оверлей
+	ctx.Render(func(c *Context) {
+		c.PushNonBlockingOverlay(render.Rect{X: 50, Y: 50, W: 150, H: 100}, func() {})
+	})
+	// Второй кадр переносит nextBlocks в prevBlocks
+	ctx.Render(func(c *Context) {})
+
+	// Координаты внутри оверлея не должны блокировать ввод
+	if ctx.Overlays.IsBlocked(100, 80) {
+		t.Fatal("PushNonBlockingOverlay не должен блокировать ввод под своими границами")
+	}
+	ctx.MouseX = 100
+	ctx.MouseY = 80
+	if ctx.IsInputBlocked() {
+		t.Fatal("IsInputBlocked() должен возвращать false под неблокирующим оверлеем")
+	}
+
+	// Сравнение со стандартным PushOverlay (который обязан блокировать)
+	ctx.Render(func(c *Context) {
+		c.PushOverlay(render.Rect{X: 50, Y: 50, W: 150, H: 100}, func() {})
+	})
+	// Второй кадр переносит nextBlocks в prevBlocks
+	ctx.Render(func(c *Context) {})
+
+	if !ctx.Overlays.IsBlocked(100, 80) {
+		t.Fatal("стандартный PushOverlay должен блокировать ввод под своими границами")
+	}
+}
+
+func TestToastFastPathAndTimerLifecycle(t *testing.T) {
+	ctx := newTestContext(500, 400)
+
+	now := time.Now()
+	ctx.Clock = func() time.Time { return now }
+
+	ctx.ShowToast("Заголовок", "Текст сообщения", ToastInfo, 200*time.Millisecond)
+	if ctx.ToastsCount() != 1 {
+		t.Fatalf("ожидался 1 активный тост, получено %d", ctx.ToastsCount())
+	}
+	bounds := ctx.toastsBoundingRect()
+	if bounds.Empty() {
+		t.Fatal("toastsBoundingRect() не должен быть пустым при наличии активных тостов")
+	}
+
+	// Первый полный кадр для отрисовки тоста и сохранения подложки
+	ctx.Render(func(c *Context) {})
+	if ctx.toastUnderlayRect.Empty() || len(ctx.toastUnderlay) == 0 {
+		t.Fatal("toastUnderlay не сохранился после первого рендера тоста")
+	}
+
+	// Кадр таймера EventWakeUp должен использовать быстрый путь перерисовки
+	ctx.HandleEvent(platform.Event{Type: platform.EventWakeUp})
+	if !ctx.canSkipFullFrameForToasts() {
+		t.Fatal("canSkipFullFrameForToasts() должен возвращать true для живого тоста на EventWakeUp")
+	}
+
+	// Прокручиваем время за пределы жизни тоста
+	now = now.Add(300 * time.Millisecond)
+	if ctx.canSkipFullFrameForToasts() {
+		t.Fatal("canSkipFullFrameForToasts() должен возвращать false после истечения срока жизни тоста для полного кадра очистки")
+	}
+
+	// Полный рендер очищает просроченный тост
+	ctx.Render(func(c *Context) {})
+	if ctx.ToastsCount() != 0 {
+		t.Fatalf("просроченный тост должен быть удалён, осталось %d", ctx.ToastsCount())
 	}
 }

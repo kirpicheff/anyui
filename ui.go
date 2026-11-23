@@ -465,6 +465,16 @@ func (u *UI) PushOverlay(bounds Rect, drawFn func()) {
 	u.ctx.PushOverlay(u.scaleRect(bounds), drawFn)
 }
 
+// PushNonBlockingOverlay регистрирует отложенную отрисовку элемента поверх основного интерфейса,
+// но не блокирует ввод и клики по нижележащему интерфейсу.
+// Прямоугольник bounds задаётся в логических пикселях (Dp / CurrentArea()).
+func (u *UI) PushNonBlockingOverlay(bounds Rect, drawFn func()) {
+	if u == nil || u.ctx == nil || drawFn == nil {
+		return
+	}
+	u.ctx.PushNonBlockingOverlay(u.scaleRect(bounds), drawFn)
+}
+
 // HasActiveOverlays возвращает true, если в текущем кадре есть активные оверлеи
 // (Modal, Popover, FloatingPanel, Drawer, ContextMenu, Select, Tooltip, PushOverlay и др.).
 // Полезно внешним нативным поверхностям, чтобы корректно уступать z-order и переключаться на софтверный вывод.

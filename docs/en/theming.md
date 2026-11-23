@@ -44,7 +44,7 @@ Every widget accepts variadic `opts ...anyui.Option` to override appearance and 
 | `anyui.HoverTextColor(c)` | Text and icon color on hover (`Button`) | `anyui.HoverTextColor(ui.Theme().Accent)` |
 | `anyui.BorderColor(c)` | Override border color | `anyui.BorderColor(anyui.Hex(0x475569))` |
 | `anyui.HoverBorderColor(c)` | Border color on hover (`Button`) | `anyui.HoverBorderColor(ui.Theme().Accent)` |
-| `anyui.FocusBorderColor(c)` | Border color when focused (`TextInput`, `MaskedInput`, `TextArea`) | `anyui.FocusBorderColor(ui.Theme().Accent)` |
+| `anyui.FocusBorderColor(c)` | Border color when focused (`Button`, `TextInput`, `MaskedInput`, `TextArea`, `ListView`, `ListViewEx`, `Table`, `TableEx`, `TreeView`, `TreeViewEx`) | `anyui.FocusBorderColor(ui.Theme().Accent)` |
 | `anyui.Radius(dp)` | Corner radius in `dp` | `anyui.Radius(10)` |
 | `anyui.Width(dp)` | Fixed width in `dp` | `anyui.Width(220)` |
 | `anyui.Height(dp)` | Fixed height in `dp` | `anyui.Height(42)` |

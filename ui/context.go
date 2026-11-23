@@ -128,6 +128,16 @@ type Context struct {
 	ActiveID string
 	FocusID  string
 
+	// Признак кадра с реальными событиями пользовательского ввода (мышь/клавиатура)
+	isInputFrame bool
+
+	// Быстрый путь локальной перерисовки Toast без полного Render
+	toastMu           sync.Mutex
+	toastTimerActive  bool
+	toastStopCh       chan struct{}
+	toastUnderlay     []byte
+	toastUnderlayRect render.Rect
+
 	// Внутреннее состояние для текстовых полей и контролов
 	caretPos        map[string]int
 	textSelStart    map[string]int
@@ -344,6 +354,12 @@ func (c *Context) SetCursor(cursor platform.CursorType) {
 // PushOverlay регистрирует отложенную отрисовку всплывающего элемента поверх основного UI.
 func (c *Context) PushOverlay(bounds render.Rect, drawFn func()) {
 	c.Overlays.Push(bounds, drawFn)
+}
+
+// PushNonBlockingOverlay регистрирует отложенную отрисовку всплывающего элемента поверх основного UI,
+// не блокируя ввод и клики по нижележащему интерфейсу.
+func (c *Context) PushNonBlockingOverlay(bounds render.Rect, drawFn func()) {
+	c.Overlays.PushNonBlocking(bounds, drawFn)
 }
 
 // HasActiveOverlays возвращает true, если в текущем или предыдущем кадре есть активные оверлеи
@@ -566,6 +582,7 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 	if handled, needRedraw := c.tryDirectCanvasEvent(ev); handled {
 		if needRedraw {
 			c.wakeOnlyFrame = false
+			c.isInputFrame = true
 		}
 		return needRedraw && c.Canvas.Width > 0 && c.Canvas.Height > 0
 	}
@@ -573,8 +590,22 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 	redraw := false
 
 	switch ev.Type {
+	case platform.EventMouseMove, platform.EventMouseDown, platform.EventMouseUp, platform.EventMouseWheel,
+		platform.EventKeyDown, platform.EventKeyUp, platform.EventChar:
+		c.isInputFrame = true
+	case platform.EventWakeUp:
+		c.wakePending.Store(false)
+		c.wakeOnlyFrame = true
+		c.isInputFrame = false
+		redraw = true
+	default:
+		c.isInputFrame = false
+	}
+
+	switch ev.Type {
 	case platform.EventClose:
 		c.stopAnimTimer()
+		c.stopToastTimer()
 		if _, ok := c.Win.(platform.BackBufferProvider); ok {
 			c.Canvas.Pixels = nil
 			c.Canvas.Width = 0
@@ -602,9 +633,7 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 		c.wakeOnlyFrame = false
 		redraw = true
 	case platform.EventWakeUp:
-		c.wakePending.Store(false)
-		c.wakeOnlyFrame = true
-		redraw = true
+		// wakeOnlyFrame и redraw уже выставлены в первом switch выше
 	case platform.EventMouseMove:
 		c.MouseX = ev.X
 		c.MouseY = ev.Y
@@ -810,6 +839,20 @@ func (c *Context) Render(drawFn func(ctx *Context)) {
 		if !c.needsRedraw {
 			c.presentFrame(true)
 			c.syncAnimTimer()
+			c.syncToastTimer()
+			return
+		}
+		c.wakeOnlyFrame = false
+	}
+
+	// Быстрый путь для фонового кадра уведомлений Toast (EventWakeUp + Toasts):
+	// перерисовываем только полоску времени активных тостов в локальной области toastsBoundingRect
+	// без вызова drawFn(c) всего дерева виджетов окна 2K/4K.
+	if c.canSkipFullFrameForToasts() {
+		c.renderToastsOnly()
+		if !c.needsRedraw {
+			c.syncAnimTimer()
+			c.syncToastTimer()
 			return
 		}
 		c.wakeOnlyFrame = false
@@ -828,6 +871,152 @@ func (c *Context) Render(drawFn func(ctx *Context)) {
 
 	c.presentFrame(false)
 	c.syncAnimTimer()
+	c.syncToastTimer()
+}
+
+func (c *Context) canSkipFullFrameForToasts() bool {
+	if !c.wakeOnlyFrame || c.paintRequested || len(c.toasts) == 0 {
+		return false
+	}
+	w, h := c.Canvas.Width, c.Canvas.Height
+	need := w * h * 4
+	if c.prevPresentW != w || c.prevPresentH != h || len(c.prevPresentPixels) != need {
+		return false
+	}
+	if c.debugDirtyRect || c.needsRedraw || c.layers.staticDirty {
+		return false
+	}
+	if c.Theme != c.lastTheme || c.DpiScale != c.lastScale {
+		return false
+	}
+	if c.Animator != nil && c.Animator.HasActive() {
+		return false
+	}
+	if len(c.streamingCanvases) > 0 {
+		return false
+	}
+	now := c.Now()
+	for _, t := range c.toasts {
+		if now.Sub(t.CreatedAt) >= t.Duration {
+			return false
+		}
+	}
+	if c.toastUnderlayRect.Empty() || len(c.toastUnderlay) == 0 {
+		return false
+	}
+	return true
+}
+
+func (c *Context) renderToastsOnly() {
+	c.wakeOnlyFrame = false
+	c.restoreToastUnderlay()
+	c.drawToasts()
+
+	w, h := c.Canvas.Width, c.Canvas.Height
+	sendRect := c.toastUnderlayRect.Intersect(render.Rect{X: 0, Y: 0, W: w, H: h})
+	if sendRect.Empty() {
+		return
+	}
+
+	if len(c.prevPresentPixels) == w*h*4 {
+		dst := c.prevPresentPixels
+		src := c.Canvas.Pixels
+		bytesPerRow := sendRect.W * 4
+		for y := 0; y < sendRect.H; y++ {
+			off := ((sendRect.Y + y) * w + sendRect.X) * 4
+			copy(dst[off:off+bytesPerRow], src[off:off+bytesPerRow])
+		}
+	}
+
+	c.lastDirtyRects = append(c.lastDirtyRects[:0], sendRect)
+	if dp, ok := c.Win.(platform.DirtyPresenter); ok && (sendRect.W < w || sendRect.H < h) {
+		dp.PresentRect(c.Canvas.Pixels, w, h, sendRect.X, sendRect.Y, sendRect.W, sendRect.H)
+	} else {
+		c.Win.Present(c.Canvas.Pixels, w, h)
+	}
+	c.Canvas.ResetDirtyRects()
+}
+
+func (c *Context) saveToastUnderlay(r render.Rect) {
+	if c.Canvas == nil {
+		return
+	}
+	w, h := c.Canvas.Width, c.Canvas.Height
+	clamped := r.Intersect(render.Rect{X: 0, Y: 0, W: w, H: h})
+	if clamped.Empty() {
+		c.toastUnderlayRect = render.Rect{}
+		c.toastUnderlay = nil
+		return
+	}
+	c.toastUnderlayRect = clamped
+	bytesPerRow := clamped.W * 4
+	need := bytesPerRow * clamped.H
+	if cap(c.toastUnderlay) < need {
+		c.toastUnderlay = make([]byte, need)
+	} else {
+		c.toastUnderlay = c.toastUnderlay[:need]
+	}
+	src := c.Canvas.Pixels
+	for y := 0; y < clamped.H; y++ {
+		srcOff := ((clamped.Y + y) * w + clamped.X) * 4
+		dstOff := y * bytesPerRow
+		copy(c.toastUnderlay[dstOff:dstOff+bytesPerRow], src[srcOff:srcOff+bytesPerRow])
+	}
+}
+
+func (c *Context) restoreToastUnderlay() {
+	if c.Canvas == nil || c.toastUnderlayRect.Empty() || len(c.toastUnderlay) == 0 {
+		return
+	}
+	w := c.Canvas.Width
+	clamped := c.toastUnderlayRect
+	bytesPerRow := clamped.W * 4
+	dst := c.Canvas.Pixels
+	for y := 0; y < clamped.H; y++ {
+		dstOff := ((clamped.Y + y) * w + clamped.X) * 4
+		srcOff := y * bytesPerRow
+		copy(dst[dstOff:dstOff+bytesPerRow], c.toastUnderlay[srcOff:srcOff+bytesPerRow])
+	}
+}
+
+func (c *Context) syncToastTimer() {
+	c.toastMu.Lock()
+	defer c.toastMu.Unlock()
+	need := len(c.toasts) > 0
+	if need && !c.toastTimerActive {
+		stopCh := make(chan struct{})
+		c.toastStopCh = stopCh
+		c.toastTimerActive = true
+		win := c.Win
+		go func() {
+			ticker := time.NewTicker(50 * time.Millisecond) // 20 FPS
+			defer ticker.Stop()
+			for {
+				select {
+				case <-stopCh:
+					return
+				case <-ticker.C:
+					if c.wakePending.CompareAndSwap(false, true) {
+						win.WakeUp()
+					}
+				}
+			}
+		}()
+	} else if !need && c.toastTimerActive {
+		close(c.toastStopCh)
+		c.toastStopCh = nil
+		c.toastTimerActive = false
+	}
+}
+
+func (c *Context) stopToastTimer() {
+	c.toastMu.Lock()
+	defer c.toastMu.Unlock()
+	if c.toastTimerActive {
+		close(c.toastStopCh)
+		c.toastStopCh = nil
+		c.toastTimerActive = false
+	}
 }
 
 func (c *Context) canSkipFullFrameForStreaming() bool {
@@ -902,7 +1091,7 @@ func (c *Context) renderStreamingOnly() {
 
 			c.Canvas.PushClip(drawnRect)
 			if needOverlays {
-				c.Overlays.RedrawIntersecting(drawnRect, shadowPad, func(layoutSeq, idSeqTop int) {
+				c.Overlays.RedrawIntersecting(c.Canvas, drawnRect, shadowPad, func(layoutSeq, idSeqTop int) {
 					c.layoutSeq = layoutSeq
 					c.idScopeStack = c.idScopeStack[:0]
 					if len(c.idSeqStack) == 0 {
@@ -1092,7 +1281,7 @@ func (c *Context) stopAnimTimer() {
 }
 
 func (c *Context) beginFrame() {
-	if !c.MouseDown && !c.MouseReleased {
+	if !c.wakeOnlyFrame && !c.MouseDown && !c.MouseReleased {
 		c.reorderActive = false
 		c.reorderWidgetID = ""
 		c.reorderSourceKey = ""
@@ -1137,8 +1326,8 @@ func (c *Context) beginFrame() {
 
 func (c *Context) endFrame() {
 	ovIdx := 0
-	c.Overlays.FlushWithState(func(bounds render.Rect) (int, int) {
-		if !bounds.Empty() {
+	c.Overlays.FlushWithStateAndCache(func(bounds render.Rect, nonBlocking bool) (int, int) {
+		if !bounds.Empty() && !nonBlocking {
 			c.registerHitRegion("__overlay:"+strconv.Itoa(ovIdx), bounds, platform.CursorArrow, false)
 			if bounds.Contains(c.MouseX, c.MouseY) {
 				c.nextCustomCursor = nil
@@ -1150,8 +1339,28 @@ func (c *Context) endFrame() {
 			idSeqTop = c.idSeqStack[len(c.idSeqStack)-1]
 		}
 		return c.layoutSeq, idSeqTop
+	}, func(it *overlayItem, bounds render.Rect) {
+		mainCanvas := c.Canvas
+		if mainCanvas != nil && mainCanvas.Width > 0 && mainCanvas.Height > 0 {
+			cache := c.Overlays.AllocCache(mainCanvas.Width, mainCanvas.Height)
+			if cache != nil {
+				c.Canvas = cache
+				it.draw()
+				c.Canvas = mainCanvas
+				it.cache = cache
+				mainCanvas.CompositeFrom(cache, render.Rect{X: 0, Y: 0, W: mainCanvas.Width, H: mainCanvas.Height})
+				return
+			}
+		}
+		it.draw()
 	})
 	c.drawDragGhostBadge()
+	if len(c.toasts) > 0 {
+		c.saveToastUnderlay(c.toastsBoundingRect())
+	} else {
+		c.toastUnderlayRect = render.Rect{}
+		c.toastUnderlay = nil
+	}
 	c.drawToasts()
 	c.focusOrder, c.nextFocusOrder = c.nextFocusOrder, c.focusOrder[:0]
 	c.hitRegions, c.nextHitRegions = c.nextHitRegions, c.hitRegions[:0]
@@ -1163,19 +1372,45 @@ func (c *Context) endFrame() {
 		c.layers.staticDirty = false
 	}
 
-	if (c.MouseReleased || c.RightMouseReleased || c.MiddleMouseReleased) &&
-		!c.MouseDown && !c.RightMouseDown && !c.MiddleMouseDown {
-		c.ActiveID = ""
-	}
-	if c.MouseReleased || !c.MouseDown {
-		c.reorderActive = false
-		c.reorderWidgetID = ""
-		c.reorderSourceIdx = -1
-		c.reorderSourceKey = ""
-		c.reorderScrollAccum = 0
-		c.reorderSourceType = ""
-		c.reorderSourceFn = nil
-		c.reorderPayload = nil
+	if !c.wakeOnlyFrame {
+		if (c.MouseReleased || c.RightMouseReleased || c.MiddleMouseReleased) &&
+			!c.MouseDown && !c.RightMouseDown && !c.MiddleMouseDown {
+			c.ActiveID = ""
+		}
+		if c.MouseReleased || !c.MouseDown {
+			c.reorderActive = false
+			c.reorderWidgetID = ""
+			c.reorderSourceIdx = -1
+			c.reorderSourceKey = ""
+			c.reorderScrollAccum = 0
+			c.reorderSourceType = ""
+			c.reorderSourceFn = nil
+			c.reorderPayload = nil
+		}
+		c.MousePressed = false
+		c.MouseReleased = false
+		c.WheelX = 0
+		c.WheelY = 0
+		c.RightMousePressed = false
+		c.RightMouseReleased = false
+		c.MiddleMousePressed = false
+		c.MiddleMouseReleased = false
+		c.TypedRunes = c.TypedRunes[:0]
+		c.KeyEvents = c.KeyEvents[:0]
+		c.rawKeyEvents = c.rawKeyEvents[:0]
+		c.rawMouseEvents = c.rawMouseEvents[:0]
+		c.isInputFrame = false
+	} else {
+		// На кадре EventWakeUp сбрасываем нажатие только если кнопка мыши физически не зажата
+		if !c.MouseDown {
+			c.MousePressed = false
+		}
+		if !c.RightMouseDown {
+			c.RightMousePressed = false
+		}
+		if !c.MiddleMouseDown {
+			c.MiddleMousePressed = false
+		}
 	}
 	if c.nextCursor != c.lastCursor {
 		c.Win.SetCursor(c.nextCursor)
@@ -1190,18 +1425,6 @@ func (c *Context) endFrame() {
 	}
 	c.captureKeysFocus = c.nextCaptureKeys
 	c.prevFocusID = c.FocusID
-	c.MousePressed = false
-	c.MouseReleased = false
-	c.WheelX = 0
-	c.WheelY = 0
-	c.RightMousePressed = false
-	c.RightMouseReleased = false
-	c.MiddleMousePressed = false
-	c.MiddleMouseReleased = false
-	c.TypedRunes = c.TypedRunes[:0]
-	c.KeyEvents = c.KeyEvents[:0]
-	c.rawKeyEvents = c.rawKeyEvents[:0]
-	c.rawMouseEvents = c.rawMouseEvents[:0]
 }
 
 func formatIDKey(key any) string {
@@ -1384,11 +1607,18 @@ func (c *Context) acceptsExternalDrop(targetID string, acceptTypes []string) (*D
 }
 
 func (c *Context) drawDragGhostBadge() {
-	if !c.reorderActive || c.reorderPayload == nil || c.reorderPayload.Label == "" || c.Font == nil {
+	if !c.reorderActive || c.reorderPayload == nil || c.Font == nil {
+		return
+	}
+	label := c.reorderPayload.Label
+	if label == "" {
+		label = c.reorderPayload.Type
+	}
+	if label == "" {
 		return
 	}
 	pxSize := c.Scale(12).Int()
-	tw, th := c.Font.MeasureText(c.reorderPayload.Label, pxSize)
+	tw, th := c.Font.MeasureText(label, pxSize)
 	padX := c.Scale(8).Int()
 	padY := c.Scale(4).Int()
 	bw := tw + padX*2
@@ -1403,7 +1633,7 @@ func (c *Context) drawDragGhostBadge() {
 	}
 	r := render.Rect{X: bx, Y: by, W: bw, H: bh}
 	c.Canvas.DrawRoundedBox(r, c.ScaleF(6), c.Theme.Surface.WithAlpha(230), 1.0, c.Theme.Accent)
-	c.Font.DrawText(c.Canvas, r.X+padX, r.Y+padY, c.reorderPayload.Label, pxSize, c.Theme.TextPrimary)
+	c.Font.DrawText(c.Canvas, r.X+padX, r.Y+padY, label, pxSize, c.Theme.TextPrimary)
 }
 
 // DrawDropLine отрисовывает горизонтальную линию-индикатор места вставки Accent толщиной 2 Dp, центрированную по yPx.

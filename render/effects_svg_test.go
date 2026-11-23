@@ -263,3 +263,38 @@ func BenchmarkFillLinearGradientDiagonal(b *testing.B) {
 	}
 }
 
+func TestBoxShadowOnTransparentCanvasAndComposite(t *testing.T) {
+	// 1. Прозрачный буфер оверлея
+	cache := NewCanvas(80, 80)
+	cache.Clear(RGBA(0, 0, 0, 0))
+
+	// Рисуем мягкую полупрозрачную тень
+	cache.DrawBoxShadow(Rect{X: 20, Y: 20, W: 40, H: 40}, BoxShadow{
+		OffsetY: 4,
+		Blur:    10,
+		Color:   RGBA(0, 0, 0, 100),
+		Radii:   UniformRadii(6),
+	})
+
+	// Пиксель тени должен быть полупрозрачным, а не глухим черным (A < 255)
+	shPx := pixelAt(cache, 40, 63)
+	if shPx.A == 0 || shPx.A == 255 {
+		t.Fatalf("ожидалась полупрозрачная альфа тени (0 < A < 255), получено %+v", shPx)
+	}
+
+	// 2. Наложение кэша поверх белого фона основного окна
+	mainCv := NewCanvas(80, 80)
+	mainCv.Clear(RGB(255, 255, 255))
+	mainCv.CompositeFrom(cache, Rect{X: 0, Y: 0, W: 80, H: 80})
+
+	resPx := pixelAt(mainCv, 40, 63)
+	// Цвет должен мягко затемниться от белого (например 180-240), но ни в коем случае не стать сплошным черным (0, 0, 0)
+	if resPx.R < 150 || resPx.R >= 255 {
+		t.Fatalf("ожидалось мягкое затенение белого фона, получено %+v", resPx)
+	}
+	if resPx.A != 255 {
+		t.Fatalf("ожидалась непрозрачная альфа окна 255 после CompositeFrom, получено %d", resPx.A)
+	}
+}
+
+

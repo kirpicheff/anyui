@@ -120,17 +120,29 @@ app := anyui.NewApp(anyui.Config{
 
 ## File Drag & Drop
 
-Enable `AcceptDropFiles: true` in `Config` and provide an `OnDropFiles` handler:
+Enable `AcceptDropFiles: true` in `Config` and provide `OnDropFiles`, `OnDragEnter`, `OnDragOver`, `OnDragLeave` handlers:
 
 ```go
 app := anyui.NewApp(anyui.Config{
 	Title:           "Drop Target",
 	AcceptDropFiles: true,
-	OnDropFiles: func(files []string, x, y int) {
+	OnDragEnter: func(xPx, yPx int, hasFiles bool) {
+		// Called when dragging files over the window (draw drop zone hint overlay)
+	},
+	OnDragOver: func(xPx, yPx int, hasFiles bool) {
+		// Cursor position updates during drag
+	},
+	OnDragLeave: func() {
+		// Drag left window boundaries
+	},
+	OnDropFiles: func(files []string, xPx, yPx int) {
 		// files contains paths to the dropped files
 	},
 })
 ```
+
+Handlers can also be updated dynamically on `*anyui.Window`: `SetOnDragEnter`, `SetOnDragOver`, `SetOnDragLeave`, `SetOnDropFiles`.
+On Windows, OLE `IDropTarget` and `ChangeWindowMessageFilterEx` bypass UAC restrictions when running elevated.
 
 ---
 

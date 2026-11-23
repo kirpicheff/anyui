@@ -18,6 +18,9 @@ type Window struct {
 	hideOnClose bool
 	onClose     func(*Window) bool
 	onDropFiles func(files []string, xPx, yPx int)
+	onDragEnter func(xPx, yPx int, hasFiles bool)
+	onDragOver  func(xPx, yPx int, hasFiles bool)
+	onDragLeave func()
 }
 
 // SetTitle меняет заголовок окна.
@@ -300,6 +303,21 @@ func (w *Window) SetOnDropFiles(fn func(files []string, xPx, yPx int)) {
 	w.onDropFiles = fn
 }
 
+// SetOnDragEnter задаёт обработчик входа курсора при перетаскивании OLE Drag & Drop (xPx, yPx — координаты в физических пикселях).
+func (w *Window) SetOnDragEnter(fn func(xPx, yPx int, hasFiles bool)) {
+	w.onDragEnter = fn
+}
+
+// SetOnDragOver задаёт обработчик перемещения курсора при перетаскивании OLE Drag & Drop (xPx, yPx — координаты в физических пикселях).
+func (w *Window) SetOnDragOver(fn func(xPx, yPx int, hasFiles bool)) {
+	w.onDragOver = fn
+}
+
+// SetOnDragLeave задаёт обработчик выхода курсора за пределы окна при перетаскивании OLE Drag & Drop.
+func (w *Window) SetOnDragLeave(fn func()) {
+	w.onDragLeave = fn
+}
+
 func (w *Window) handleCloseRequest() bool {
 	if w.app != nil && w.app.isQuitting() {
 		return true
@@ -334,7 +352,56 @@ func (w *Window) handleEvent(ev platform.Event) {
 	if ev.Type == platform.EventDropFiles {
 		if w.onDropFiles != nil {
 			w.onDropFiles(ev.Files, ev.X, ev.Y)
-			w.Invalidate()
+		}
+		if w.drawFn != nil {
+			w.ctx.Render(func(_ *ui.Context) {
+				w.drawFn(w.ui)
+			})
+		}
+		if dispatched {
+			w.WakeUp()
+		}
+		return
+	}
+
+	if ev.Type == platform.EventDragEnter {
+		if w.onDragEnter != nil {
+			w.onDragEnter(ev.X, ev.Y, ev.HasFiles)
+		}
+		if w.drawFn != nil {
+			w.ctx.Render(func(_ *ui.Context) {
+				w.drawFn(w.ui)
+			})
+		}
+		if dispatched {
+			w.WakeUp()
+		}
+		return
+	}
+
+	if ev.Type == platform.EventDragOver {
+		if w.onDragOver != nil {
+			w.onDragOver(ev.X, ev.Y, ev.HasFiles)
+		}
+		if w.drawFn != nil {
+			w.ctx.Render(func(_ *ui.Context) {
+				w.drawFn(w.ui)
+			})
+		}
+		if dispatched {
+			w.WakeUp()
+		}
+		return
+	}
+
+	if ev.Type == platform.EventDragLeave {
+		if w.onDragLeave != nil {
+			w.onDragLeave()
+		}
+		if w.drawFn != nil {
+			w.ctx.Render(func(_ *ui.Context) {
+				w.drawFn(w.ui)
+			})
 		}
 		if dispatched {
 			w.WakeUp()

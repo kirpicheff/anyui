@@ -60,9 +60,7 @@ func (c *Context) ShowToast(title, text string, kind ToastKind, duration ...time
 	if len(c.toasts) > 5 {
 		c.toasts = c.toasts[len(c.toasts)-5:]
 	}
-	if c.Animator != nil {
-		c.Animator.MarkActive()
-	}
+	c.syncToastTimer()
 	c.RequestRedraw()
 }
 
@@ -89,9 +87,51 @@ func (c *Context) SetToastOffset(xDp, yDp Dp) {
 	c.toastHasOffset = true
 }
 
+func (c *Context) toastsBoundingRect() render.Rect {
+	if len(c.toasts) == 0 {
+		return render.Rect{}
+	}
+	toastW := c.Scale(300).Int()
+	toastH := c.Scale(64).Int()
+	gap := c.Scale(10).Int()
+	offX := c.Scale(16).Int()
+	offY := c.Scale(16).Int()
+	if c.toastHasOffset {
+		offX = c.Scale(c.toastOffsetXDp).Int()
+		offY = c.Scale(c.toastOffsetYDp).Int()
+	}
+	minPad := c.Scale(8).Int()
+	shadowPad := c.Scale(16).Int()
+
+	var bounds render.Rect
+	for i := len(c.toasts) - 1; i >= 0; i-- {
+		idxFromEdge := len(c.toasts) - 1 - i
+		rx, ry, ok := c.calcToastRectPos(toastW, toastH, gap, offX, offY, minPad, idxFromEdge)
+		if !ok {
+			continue
+		}
+		tr := render.Rect{
+			X: rx - shadowPad,
+			Y: ry - shadowPad,
+			W: toastW + shadowPad*2,
+			H: toastH + shadowPad*2,
+		}
+		if bounds.Empty() {
+			bounds = tr
+		} else {
+			bounds = bounds.Union(tr)
+		}
+	}
+	if c.Canvas != nil {
+		bounds = bounds.Intersect(render.Rect{X: 0, Y: 0, W: c.Canvas.Width, H: c.Canvas.Height})
+	}
+	return bounds
+}
+
 // drawToasts удаляет просроченные уведомления и рисует активные поверх UI.
 func (c *Context) drawToasts() {
 	if len(c.toasts) == 0 {
+		c.syncToastTimer()
 		return
 	}
 
@@ -104,12 +144,11 @@ func (c *Context) drawToasts() {
 	}
 	c.toasts = alive
 	if len(c.toasts) == 0 {
+		c.syncToastTimer()
 		return
 	}
 
-	if c.Animator != nil {
-		c.Animator.MarkActive()
-	}
+	c.syncToastTimer()
 
 	toastW := c.Scale(300).Int()
 	toastH := c.Scale(64).Int()

@@ -137,3 +137,52 @@ func TestDateTimePickerWidthAndMultiSelectStyles(t *testing.T) {
 	})
 	ctx.endFrame()
 }
+
+func TestFocusBorderColorListsTablesAndButton(t *testing.T) {
+	ctx := newTestContext(400, 300)
+	focusCol := render.RGB(255, 40, 50)
+
+	// 1. Button с FocusBorderColor
+	ctx.beginFrame()
+	ctx.FocusID = "btn_f"
+	ctx.ButtonOpts("btn_f", "Кнопка", Width(100), Height(30), FocusBorderColor(focusCol))
+	ctx.endFrame()
+	off := (0*ctx.Canvas.Width + 50) * 4
+	if ctx.Canvas.Pixels[off+2] != focusCol.R || ctx.Canvas.Pixels[off+1] != focusCol.G || ctx.Canvas.Pixels[off] != focusCol.B {
+		t.Fatalf("ожидался цвет рамки Button %v, получено RGB(%d,%d,%d)", focusCol, ctx.Canvas.Pixels[off+2], ctx.Canvas.Pixels[off+1], ctx.Canvas.Pixels[off])
+	}
+
+	// 2. Table с FocusBorderColor
+	selRow := -1
+	cols := []TableColumn{{Title: "Col1", WidthDp: 80}}
+	ctx.beginFrame()
+	ctx.FocusID = "tbl_f"
+	ctx.Table("tbl_f", cols, 2, &selRow, nil, nil, Width(100), Height(60), FocusBorderColor(focusCol))
+	ctx.endFrame()
+	off = (0*ctx.Canvas.Width + 50) * 4
+	if ctx.Canvas.Pixels[off+2] != focusCol.R || ctx.Canvas.Pixels[off+1] != focusCol.G || ctx.Canvas.Pixels[off] != focusCol.B {
+		t.Fatalf("ожидался цвет рамки Table %v, получено RGB(%d,%d,%d)", focusCol, ctx.Canvas.Pixels[off+2], ctx.Canvas.Pixels[off+1], ctx.Canvas.Pixels[off])
+	}
+
+	// 3. ListView с FocusBorderColor
+	selIdx := -1
+	ctx.beginFrame()
+	ctx.FocusID = "lv_f"
+	ctx.ListView("lv_f", 2, 25, &selIdx, nil, Width(100), Height(50), FocusBorderColor(focusCol))
+	ctx.endFrame()
+	off = (0*ctx.Canvas.Width + 50) * 4
+	if ctx.Canvas.Pixels[off+2] != focusCol.R || ctx.Canvas.Pixels[off+1] != focusCol.G || ctx.Canvas.Pixels[off] != focusCol.B {
+		t.Fatalf("ожидался цвет рамки ListView %v, получено RGB(%d,%d,%d)", focusCol, ctx.Canvas.Pixels[off+2], ctx.Canvas.Pixels[off+1], ctx.Canvas.Pixels[off])
+	}
+
+	// 4. TableEx с FocusBorderColor
+	cfg := &TableExConfig{}
+	ctx.beginFrame()
+	ctx.FocusID = "tblex_f"
+	ctx.TableEx("tblex_f", cols, 2, cfg, nil, nil, Width(100), Height(60), FocusBorderColor(focusCol))
+	ctx.endFrame()
+	off = (0*ctx.Canvas.Width + 50) * 4
+	if ctx.Canvas.Pixels[off+2] != focusCol.R || ctx.Canvas.Pixels[off+1] != focusCol.G || ctx.Canvas.Pixels[off] != focusCol.B {
+		t.Fatalf("ожидался цвет рамки TableEx %v, получено RGB(%d,%d,%d)", focusCol, ctx.Canvas.Pixels[off+2], ctx.Canvas.Pixels[off+1], ctx.Canvas.Pixels[off])
+	}
+}

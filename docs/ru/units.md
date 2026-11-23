@@ -41,6 +41,7 @@
 | `const Auto Dp = -1` | | ✓ | Каноническое sentinel-значение автоматического размера |
 | **Оверлеи и интерактивные зоны (все строго в Dp)** | | | |
 | `func (u *UI) PushOverlay(bounds Rect, drawFn func())` | | ✓ | Границы оверлея в Dp (масштабируются в Px на границе) |
+| `func (u *UI) PushNonBlockingOverlay(bounds Rect, drawFn func())` | | ✓ | Границы неблокирующего оверлея в Dp |
 | `func (u *UI) LayoutRect(rect Rect, fn func())` | | ✓ | Область явной раскладки строго в Dp |
 | `func (u *UI) Tooltip(text string, anchor Rect, opts ...Option)` | | ✓ | Якорь всплывающей подсказки строго в Dp |
 | `func (u *UI) Popover(id string, open *bool, anchor Rect, fn func(), opts ...Option)` | | ✓ | Якорь поповера строго в Dp |

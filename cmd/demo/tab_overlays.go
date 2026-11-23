@@ -87,19 +87,47 @@ func (st *demoState) drawTabOverlays(ui *anyui.UI) {
 }
 
 func (st *demoState) drawGlobalOverlays(ui *anyui.UI) {
-	ui.Modal("mdl_demo", &st.modalOpen, "Модальное окно AnyUI", func() {
-		ui.Label("Фон затемнён, клики под модалкой заблокированы.")
-		ui.Label("Нажмите Escape или кнопку ниже для закрытия.", anyui.TextColor(ui.Theme().TextMuted))
-		ui.Spacer(16)
-		ui.Row(10, 38, func() {
-			if ui.Button("mdl_ok", "Понятно", anyui.Primary()) {
+	ui.Modal("mdl_demo", &st.modalOpen, "Модальное окно AnyUI — Кросс-виджетный Drag & Drop в оверлее", func() {
+		ui.Label("Фон затемнён. Попробуйте перетащить строку из левой таблицы в правую:")
+		ui.Label("Ghost-плашка следует за курсором, а drop гарантированно срабатывает внутри оверлея.", anyui.TextColor(ui.Theme().TextMuted))
+		ui.Spacer(8)
+
+		cols := []anyui.TableColumn{{Title: "Элемент", WidthDp: 240}}
+		ui.Row(12, 170, func() {
+			ui.Column(4, func() {
+				ui.Label(fmt.Sprintf("Доступные файлы (%d)", len(st.modalSrcItems)), anyui.Bold())
+				ui.TableEx("mdl_tbl_src", cols, len(st.modalSrcItems), nil, nil, func(row, col int, area anyui.Rect, isSel bool) {
+					ui.DrawText(anyui.Px(area.X+8), anyui.Px(area.Y+7), st.modalSrcItems[row], 12, ui.Theme().TextPrimary)
+				}, anyui.Width(260), anyui.Height(140), anyui.DragSource("modal_item", func(idx int, _ string) anyui.DragPayload {
+					return anyui.DragPayload{Type: "modal_item", Data: idx, Label: st.modalSrcItems[idx]}
+				}))
+			})
+
+			ui.Column(4, func() {
+				ui.Label(fmt.Sprintf("Очередь передачи (%d)", len(st.modalDstItems)), anyui.Bold())
+				ui.TableEx("mdl_tbl_dst", cols, len(st.modalDstItems), nil, nil, func(row, col int, area anyui.Rect, isSel bool) {
+					ui.DrawText(anyui.Px(area.X+8), anyui.Px(area.Y+7), st.modalDstItems[row], 12, ui.Theme().TextPrimary)
+				}, anyui.Width(260), anyui.Height(140), anyui.AcceptDrop("modal_item"), anyui.OnDrop(func(ev anyui.DragEvent) {
+					if ev.Payload != nil && ev.FromIndex >= 0 && ev.FromIndex < len(st.modalSrcItems) {
+						item := st.modalSrcItems[ev.FromIndex]
+						st.modalDstItems = append(st.modalDstItems, item)
+						ui.ShowToast("Перенос в Modal", fmt.Sprintf("Добавлен: %s", item), anyui.ToastSuccess)
+					}
+				}))
+			})
+		})
+
+		ui.Spacer(12)
+		ui.Row(10, 34, func() {
+			if ui.Button("mdl_ok", "Закрыть", anyui.Primary()) {
 				st.modalOpen = false
 			}
-			if ui.Button("mdl_cancel", "Отмена", anyui.Secondary()) {
-				st.modalOpen = false
+			if ui.Button("mdl_reset", "Сбросить списки", anyui.Secondary()) {
+				st.modalSrcItems = []string{"Модуль core.sys", "Конфиг config.yaml", "База state.db", "Журнал audit.log"}
+				st.modalDstItems = []string{"Архив backup.tar"}
 			}
 		})
-	}, anyui.Width(460), anyui.Height(220))
+	}, anyui.Width(580), anyui.Height(380))
 
 	ui.FloatingPanel("fp_demo", "Плавающая панель", &st.floatOpen, func() {
 		ui.Label("Перетаскивается за заголовок и сворачивается кнопкой '-'.")

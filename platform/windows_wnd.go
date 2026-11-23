@@ -232,6 +232,7 @@ type win32Window struct {
 	releasingCapture  bool
 	wakePending       atomic.Bool
 	invalidatePending atomic.Bool
+	dropTarget        *dropTarget
 }
 
 // NewWindow создаёт нативное окно для текущей операционной системы.
@@ -412,9 +413,7 @@ func (w *win32Window) Open(handler func(Event)) error {
 	if w.cfg.Frameless {
 		w.enableFramelessShadow()
 	}
-	if w.cfg.AcceptDropFiles {
-		procDragAcceptFiles.Call(uintptr(w.hwnd), 1)
-	}
+	w.setupDragDrop()
 	if len(w.cfg.IconRGBA) > 0 && w.cfg.IconWidth > 0 && w.cfg.IconHeight > 0 {
 		_ = w.SetIcon(w.cfg.IconRGBA, w.cfg.IconWidth, w.cfg.IconHeight)
 	}
@@ -1083,6 +1082,7 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 			w.hIcon = 0
 		}
 		w.clearCustomCursor(false)
+		w.revokeDropTarget()
 		windowMapMu.Lock()
 		delete(windowMap, hwnd)
 		remaining := len(windowMap)

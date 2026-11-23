@@ -513,8 +513,11 @@ func (c *Context) ListView(id string, count int, itemHeightDp Dp, selected *int,
 		rad = *st.Radius
 	}
 	borderCol := c.Theme.Border
-	if c.FocusID == id {
+	if c.FocusID == id && !st.Disabled {
 		borderCol = c.Theme.BorderFocus
+		if st.FocusBorderColor != nil {
+			borderCol = *st.FocusBorderColor
+		}
 	}
 	c.Canvas.DrawRoundedBox(r, c.ScaleF(rad), bg, 1.0, borderCol)
 

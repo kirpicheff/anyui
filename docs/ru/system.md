@@ -120,17 +120,29 @@ app := anyui.NewApp(anyui.Config{
 
 ## Drag & Drop файлов
 
-Включите `AcceptDropFiles: true` в `Config` и передайте обработчик `OnDropFiles`:
+Включите `AcceptDropFiles: true` в `Config` и передайте обработчики `OnDropFiles`, `OnDragEnter`, `OnDragOver`, `OnDragLeave`:
 
 ```go
 app := anyui.NewApp(anyui.Config{
 	Title:           "Drop Target",
 	AcceptDropFiles: true,
-	OnDropFiles: func(files []string, x, y int) {
+	OnDragEnter: func(xPx, yPx int, hasFiles bool) {
+		// Вызывается при входе курсора с файлами в окно (для показа оверлея зон сброса)
+	},
+	OnDragOver: func(xPx, yPx int, hasFiles bool) {
+		// Обновление координат курсора над окном
+	},
+	OnDragLeave: func() {
+		// Курсор покинул границы окна
+	},
+	OnDropFiles: func(files []string, xPx, yPx int) {
 		// files содержит пути к перетащенным файлам
 	},
 })
 ```
+
+Обработчики также можно задавать динамически на уровне `*anyui.Window`: `SetOnDragEnter`, `SetOnDragOver`, `SetOnDragLeave`, `SetOnDropFiles`.
+На Windows используется OLE `IDropTarget` и `ChangeWindowMessageFilterEx`, что обеспечивает работу дропа даже при запуске процесса от администратора (UAC / UIPI).
 
 ---
 

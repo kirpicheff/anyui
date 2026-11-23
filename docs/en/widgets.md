@@ -285,6 +285,9 @@ ui.Popover("pop_filters", &popoverOpen, btnArea, func() {
   - Defers `drawFn` execution to the end of the frame (`endFrame`), ensuring the element renders **on top of all other UI** without being clipped by parent containers (`ScrollView`, `Card`).
   - The `bounds` rectangle is recorded to block input clicks on the underlying layer on the next frame (`IsInputBlocked()`).
   - **Rule:** use `PushOverlay` strictly for custom floating controls (custom dropdowns, pickers, menus). Never pass a full-window `fullRect` to emulate a modal dialog — use `ui.Modal()` instead.
+- **`ui.PushNonBlockingOverlay(bounds Rect, drawFn func())`**:
+  - Defers `drawFn` execution to the end of the frame like `PushOverlay`, but **does not block input and clicks** for widgets beneath it.
+  - Ideal for floating informational cards, HUD overlays, and external Drag & Drop hints.
 - **`ui.LayoutRect(rect Rect, fn func())`**:
   - Creates an isolated vertical layout box strictly matching `rect` with clipping enabled (`PushClip`).
   - Ideal for arranging widgets inside custom `PushOverlay` callbacks, floating windows, or custom cards.
