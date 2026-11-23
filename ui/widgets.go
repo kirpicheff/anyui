@@ -705,9 +705,10 @@ func (c *Context) InteractiveCanvas(id string, cb CanvasCallbacks, opts ...Optio
 	if cb.DirectInput {
 		c.RegisterHit(id, r, cb.Cursor)
 		c.nextDirectCanvases = append(c.nextDirectCanvases, directCanvasEntry{
-			id:   id,
-			rect: r,
-			cb:   cb,
+			id:        id,
+			rect:      r,
+			cb:        cb,
+			inOverlay: c.Overlays.inOverlay,
 		})
 	} else {
 		c.RegisterHitTrack(id, r, cb.Cursor)

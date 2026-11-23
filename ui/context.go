@@ -71,9 +71,10 @@ type RawMouseEvent struct {
 }
 
 type directCanvasEntry struct {
-	id   string
-	rect render.Rect
-	cb   CanvasCallbacks
+	id        string
+	rect      render.Rect
+	cb        CanvasCallbacks
+	inOverlay bool
 }
 
 type streamingCanvasEntry struct {
@@ -410,6 +411,9 @@ func (c *Context) findDirectCanvasAt(x, y int) *directCanvasEntry {
 	for i := len(c.directCanvases) - 1; i >= 0; i-- {
 		e := &c.directCanvases[i]
 		if e.id == hitID && e.rect.Contains(x, y) {
+			if !e.inOverlay && c.Overlays.IsBlockedCurrent(x, y) {
+				return nil
+			}
 			return e
 		}
 	}
@@ -419,7 +423,7 @@ func (c *Context) findDirectCanvasAt(x, y int) *directCanvasEntry {
 // tryDirectCanvasEvent пытается доставить событие напрямую в InteractiveCanvas с DirectInput=true
 // без запуска полного цикла Render(). Возвращает (handled, needRedraw).
 func (c *Context) tryDirectCanvasEvent(ev platform.Event) (bool, bool) {
-	if len(c.directCanvases) == 0 || c.Overlays.HasActive() {
+	if len(c.directCanvases) == 0 {
 		return false, false
 	}
 

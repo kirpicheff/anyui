@@ -637,6 +637,86 @@ func TestStreamingWakeUpOverlayLayoutSeqPreserved(t *testing.T) {
 	}
 }
 
+func TestDirectInputWithOpenOverlay(t *testing.T) {
+	app := NewApp(Config{})
+	mw := &stylerMockWindow{w: 400, h: 300, scale: 1.0}
+	ctx := ui.NewContext(mw, nil)
+
+	renders := 0
+	mouseDowns := 0
+	mouseMoves := 0
+	mouseUps := 0
+	mouseWheels := 0
+	ovRect := render.Rect{X: 200, Y: 100, W: 150, H: 120}
+
+	w := &Window{
+		app:     app,
+		platWin: mw,
+		ctx:     ctx,
+		drawFn: func(u *UI) {
+			renders++
+			u.ctx.InteractiveCanvas("viewer", ui.CanvasCallbacks{
+				DirectInput: true,
+				Streaming:   true,
+				OnMouseDown: func(_, _ int, _ platform.MouseButton, _ platform.Modifiers) {
+					mouseDowns++
+				},
+				OnMouseMove: func(_, _ int, _ platform.Modifiers) {
+					mouseMoves++
+				},
+				OnMouseUp: func(_, _ int, _ platform.MouseButton, _ platform.Modifiers) {
+					mouseUps++
+				},
+				OnMouseWheel: func(_, _ int, _, _ float32, _ platform.Modifiers) {
+					mouseWheels++
+				},
+			}, ui.Width(400), ui.Height(300))
+
+			u.ctx.PushOverlay(ovRect, func() {
+				u.ctx.Canvas.FillRect(ovRect, render.RGB(40, 40, 40))
+			})
+		},
+	}
+	w.ui = &UI{ctx: ctx, win: w}
+	app.windows = []*Window{w}
+	app.mainWin = w
+
+	// Первый кадр: рисуем холст и открытый оверлей, затем ставим фокус на холст кликом мимо оверлея
+	w.handleEvent(platform.Event{Type: platform.EventPaint})
+	w.handleEvent(platform.Event{Type: platform.EventMouseDown, X: 50, Y: 50, Button: platform.MouseLeft})
+	w.handleEvent(platform.Event{Type: platform.EventMouseUp, X: 50, Y: 50, Button: platform.MouseLeft})
+	w.handleEvent(platform.Event{Type: platform.EventMouseMove, X: 50, Y: 50})
+
+	renders, mouseDowns, mouseMoves, mouseUps, mouseWheels = 0, 0, 0, 0, 0
+
+	// Взаимодействие мышью МИМО оверлея (x=60, y=60) должно идти по DirectInput без вызова drawFn
+	w.handleEvent(platform.Event{Type: platform.EventMouseMove, X: 60, Y: 60})
+	w.handleEvent(platform.Event{Type: platform.EventMouseDown, X: 60, Y: 60, Button: platform.MouseLeft})
+	w.handleEvent(platform.Event{Type: platform.EventMouseMove, X: 70, Y: 70})
+	w.handleEvent(platform.Event{Type: platform.EventMouseMove, X: 80, Y: 80})
+	w.handleEvent(platform.Event{Type: platform.EventMouseUp, X: 80, Y: 80, Button: platform.MouseLeft})
+	w.handleEvent(platform.Event{Type: platform.EventMouseWheel, X: 80, Y: 80, WheelY: 1})
+
+	if renders != 0 {
+		t.Fatalf("события мыши мимо оверлея не должны вызывать полный drawFn: got renders=%d", renders)
+	}
+	if mouseDowns != 1 || mouseMoves != 3 || mouseUps != 1 || mouseWheels != 1 {
+		t.Fatalf("ожидались прямые колбэки холста мимо оверлея: down=%d move=%d up=%d wheel=%d",
+			mouseDowns, mouseMoves, mouseUps, mouseWheels)
+	}
+
+	// Клик ВНУТРИ оверлея (x=250, y=150) НЕ должен перехватываться DirectInput-холстом
+	renders, mouseDowns, mouseMoves, mouseUps = 0, 0, 0, 0
+	w.handleEvent(platform.Event{Type: platform.EventMouseDown, X: 250, Y: 150, Button: platform.MouseLeft})
+	if renders == 0 {
+		t.Fatalf("клик внутри оверлея должен идти через полный HandleEvent/Render, а не DirectInput")
+	}
+	if mouseDowns != 0 {
+		t.Fatalf("основной DirectInput-холст не должен получать клик внутри оверлея: got mouseDowns=%d", mouseDowns)
+	}
+}
+
+
 
 
 

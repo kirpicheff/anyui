@@ -54,6 +54,17 @@ func (o *OverlayLayer) IsBlocked(x, y int) bool {
 	return false
 }
 
+// IsBlockedCurrent возвращает true, если точка (x, y) перекрыта оверлеем из последнего отрисованного кадра.
+// Используется между кадрами (в HandleEvent / tryDirectCanvasEvent), где актуальные границы лежат в nextBlocks.
+func (o *OverlayLayer) IsBlockedCurrent(x, y int) bool {
+	for _, b := range o.nextBlocks {
+		if b.Contains(x, y) {
+			return true
+		}
+	}
+	return false
+}
+
 // HasActive возвращает true, если в текущем или предыдущем кадре были активные оверлеи (меню, попапы, модалки).
 func (o *OverlayLayer) HasActive() bool {
 	return len(o.prevBlocks) > 0 || len(o.nextBlocks) > 0 || len(o.items) > 0
