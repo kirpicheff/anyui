@@ -3,8 +3,10 @@ package ui
 import "github.com/kirpicheff/anyui/render"
 
 type overlayItem struct {
-	bounds render.Rect
-	draw   func()
+	bounds    render.Rect
+	draw      func()
+	layoutSeq int
+	idSeqTop  int
 }
 
 // OverlayLayer управляет отложенной отрисовкой всплывающих элементов поверх основного UI
@@ -64,15 +66,27 @@ func (o *OverlayLayer) Flush() {
 
 // FlushWithHook отрисовывает оверлеи поверх основного интерфейса, вызывая onItem перед каждым элементом.
 func (o *OverlayLayer) FlushWithHook(onItem func(bounds render.Rect)) {
+	o.FlushWithState(func(bounds render.Rect) (int, int) {
+		if onItem != nil {
+			onItem(bounds)
+		}
+		return 0, 0
+	})
+}
+
+// FlushWithState отрисовывает оверлеи поверх основного интерфейса, сохраняя для каждого элемента
+// значения счётчиков layoutSeq и idSeqTop на момент начала его draw(), чтобы последующая
+// перерисовка на wakeOnly-кадре генерировала идентичные ключи justifySizes и ResolveID.
+func (o *OverlayLayer) FlushWithState(onItem func(bounds render.Rect) (layoutSeq, idSeqTop int)) {
 	if len(o.items) == 0 {
 		return
 	}
 	o.inOverlay = true
-	for _, it := range o.items {
+	for i := 0; i < len(o.items); i++ {
 		if onItem != nil {
-			onItem(it.bounds)
+			o.items[i].layoutSeq, o.items[i].idSeqTop = onItem(o.items[i].bounds)
 		}
-		it.draw()
+		o.items[i].draw()
 	}
 	o.inOverlay = false
 }
@@ -111,9 +125,10 @@ func (o *OverlayLayer) IntersectsAny(r render.Rect, padPx int) bool {
 
 // RedrawIntersecting повторно отрисовывает только те оверлеи с последнего полного кадра,
 // чьи области (с запасом padPx под тень) пересекаются с r.
+// Перед вызовом каждого it.draw() вызывается beforeDraw с сохранёнными layoutSeq и idSeqTop.
 // Сохраняет и восстанавливает длины внутренних срезов, чтобы вложенные Push на wakeOnly-кадре
 // не накапливали элементы между полными кадрами.
-func (o *OverlayLayer) RedrawIntersecting(r render.Rect, padPx int) {
+func (o *OverlayLayer) RedrawIntersecting(r render.Rect, padPx int, beforeDraw func(layoutSeq, idSeqTop int)) {
 	n := len(o.items)
 	if n == 0 || r.Empty() {
 		return
@@ -123,6 +138,9 @@ func (o *OverlayLayer) RedrawIntersecting(r render.Rect, padPx int) {
 	for i := 0; i < n; i++ {
 		it := o.items[i]
 		if overlayBoundsIntersects(it.bounds, r, padPx) {
+			if beforeDraw != nil {
+				beforeDraw(it.layoutSeq, it.idSeqTop)
+			}
 			it.draw()
 		}
 	}

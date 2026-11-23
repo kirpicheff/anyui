@@ -569,5 +569,74 @@ func TestStreamingWakeUpWithIntersectingOverlayAndLetterbox(t *testing.T) {
 	}
 }
 
+func TestStreamingWakeUpOverlayLayoutSeqPreserved(t *testing.T) {
+	app := NewApp(Config{})
+	mw := &stylerMockWindow{w: 400, h: 300, scale: 1.0}
+	ctx := ui.NewContext(mw, nil)
+
+	renders := 0
+	canvasDraws := 0
+	overlayDraws := 0
+	ovRect := render.Rect{X: 10, Y: 10, W: 180, H: 120}
+
+	w := &Window{
+		app:     app,
+		platWin: mw,
+		ctx:     ctx,
+		drawFn: func(u *UI) {
+			renders++
+			u.ctx.InteractiveCanvas("viewer", ui.CanvasCallbacks{
+				Streaming: true,
+				OnDraw: func(cv *render.Canvas, area render.Rect, _ bool) {
+					canvasDraws++
+					cv.FillRect(area, render.RGB(30, 60, 90))
+				},
+			}, ui.Width(200), ui.Height(150))
+
+			// Оверлей с RowWith/ColumnWith (используют nextJustifyKey -> c.layoutSeq и c.justifySizes)
+			// и виджетом с пустым id (использует c.idSeqStack).
+			u.ctx.PushOverlay(ovRect, func() {
+				overlayDraws++
+				u.ctx.LayoutRect(ovRect, func() {
+					u.ctx.ColumnWith(ui.AlignStart, ui.JustifySpaceBetween, 4, func() {
+						u.ctx.RowWith(ui.AlignStart, ui.JustifyCenter, 4, 32, func() {
+							u.ctx.Button("", "OK", false, 80)
+						})
+					})
+				})
+			})
+		},
+	}
+	w.ui = &UI{ctx: ctx, win: w}
+	app.windows = []*Window{w}
+	app.mainWin = w
+
+	// Первый полный кадр прогревает justifySizes (внутри Render выполняется 2 прохода)
+	w.handleEvent(platform.Event{Type: platform.EventPaint})
+
+	mw.presents, mw.presentRects = 0, 0
+	renders, canvasDraws, overlayDraws = 0, 0, 0
+
+	// На серии EventWakeUp ключи justifySizes и ResolveID в оверлее должны совпадать с полным кадром,
+	// без ложного RequestRedraw() и без повторного вызова drawFn/OnDraw.
+	for i := 0; i < 10; i++ {
+		w.handleEvent(platform.Event{Type: platform.EventWakeUp})
+	}
+
+	if renders != 0 {
+		t.Fatalf("оверлей с ColumnWith/RowWith не должен вызывать ложный RequestRedraw и полный drawFn: renders=%d", renders)
+	}
+	if canvasDraws != 10 {
+		t.Fatalf("OnDraw должен вызываться ровно 1 раз на EventWakeUp (без двойного прохода): got %d", canvasDraws)
+	}
+	if overlayDraws != 10 {
+		t.Fatalf("ожидались 10 перерисовок оверлея: got %d", overlayDraws)
+	}
+	if mw.presentRects != 10 || mw.presents != 0 {
+		t.Fatalf("ожидался fast-path PresentRect на всех 10 кадрах: presentRects=%d presents=%d", mw.presentRects, mw.presents)
+	}
+}
+
+
 
 

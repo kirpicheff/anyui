@@ -898,7 +898,16 @@ func (c *Context) renderStreamingOnly() {
 
 			c.Canvas.PushClip(drawnRect)
 			if needOverlays {
-				c.Overlays.RedrawIntersecting(drawnRect, shadowPad)
+				c.Overlays.RedrawIntersecting(drawnRect, shadowPad, func(layoutSeq, idSeqTop int) {
+					c.layoutSeq = layoutSeq
+					c.idScopeStack = c.idScopeStack[:0]
+					if len(c.idSeqStack) == 0 {
+						c.idSeqStack = append(c.idSeqStack, idSeqTop)
+					} else {
+						c.idSeqStack = c.idSeqStack[:1]
+						c.idSeqStack[0] = idSeqTop
+					}
+				})
 			}
 			if needToasts {
 				c.drawToasts()
@@ -1124,7 +1133,7 @@ func (c *Context) beginFrame() {
 
 func (c *Context) endFrame() {
 	ovIdx := 0
-	c.Overlays.FlushWithHook(func(bounds render.Rect) {
+	c.Overlays.FlushWithState(func(bounds render.Rect) (int, int) {
 		if !bounds.Empty() {
 			c.registerHitRegion("__overlay:"+strconv.Itoa(ovIdx), bounds, platform.CursorArrow, false)
 			if bounds.Contains(c.MouseX, c.MouseY) {
@@ -1132,6 +1141,11 @@ func (c *Context) endFrame() {
 			}
 		}
 		ovIdx++
+		idSeqTop := 0
+		if len(c.idSeqStack) > 0 {
+			idSeqTop = c.idSeqStack[len(c.idSeqStack)-1]
+		}
+		return c.layoutSeq, idSeqTop
 	})
 	c.drawDragGhostBadge()
 	c.drawToasts()
