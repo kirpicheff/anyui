@@ -142,7 +142,7 @@ app := anyui.NewApp(anyui.Config{
 ```
 
 Обработчики также можно задавать динамически на уровне `*anyui.Window`: `SetOnDragEnter`, `SetOnDragOver`, `SetOnDragLeave`, `SetOnDropFiles`.
-На Windows используется OLE `IDropTarget` и `ChangeWindowMessageFilterEx`, что обеспечивает работу дропа даже при запуске процесса от администратора (UAC / UIPI).
+На Windows под обычным пользователем используется OLE `IDropTarget`, а при запуске с правами Администратора (UAC / UIPI) задействуется прямой приём через `ChangeWindowMessageFilter` / `ChangeWindowMessageFilterEx` с разблокировкой сообщений `WM_DROPFILES`, `WM_COPYDATA` и `WM_COPYGLOBALDATA`, а события `OnDragEnter` / `OnDragOver` отслеживаются окном автоматически, что гарантирует работу оверлеев и приёма файлов из Проводника без запрещающего курсора.
 
 ---
 

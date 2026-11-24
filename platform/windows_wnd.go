@@ -48,6 +48,9 @@ var (
 	procSetCapture                = modUser32.NewProc("SetCapture")
 	procReleaseCapture            = modUser32.NewProc("ReleaseCapture")
 	procGetDoubleClickTime        = modUser32.NewProc("GetDoubleClickTime")
+	procGetAsyncKeyState          = modUser32.NewProc("GetAsyncKeyState")
+	procSetTimer                  = modUser32.NewProc("SetTimer")
+	procKillTimer                 = modUser32.NewProc("KillTimer")
 	procOpenClipboard             = modUser32.NewProc("OpenClipboard")
 	procCloseClipboard            = modUser32.NewProc("CloseClipboard")
 	procEmptyClipboard            = modUser32.NewProc("EmptyClipboard")
@@ -100,6 +103,8 @@ const (
 	wmChar           = 0x0102
 	wmSysKeyDown     = 0x0104
 	wmSysKeyUp       = 0x0105
+	wmTimer          = 0x0113
+	timerIDDragTrack = 0x4452
 	wmMouseMove      = 0x0200
 	wmLButtonDown    = 0x0201
 	wmLButtonUp      = 0x0202
@@ -116,6 +121,7 @@ const (
 
 	htClient = 1
 
+	vkLButton = 0x01
 	vkShift   = 0x10
 	vkControl = 0x11
 	vkMenu    = 0x12
@@ -232,7 +238,10 @@ type win32Window struct {
 	releasingCapture  bool
 	wakePending       atomic.Bool
 	invalidatePending atomic.Bool
-	dropTarget        *dropTarget
+	dropTarget         *dropTarget
+	elevatedDragDrop   bool
+	externalDragActive bool
+	lbuttonDownInside  bool
 }
 
 // NewWindow создаёт нативное окно для текущей операционной системы.
@@ -880,7 +889,14 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 		}
 		return 0
 
+	case wmTimer:
+		if wParam == timerIDDragTrack && w.elevatedDragDrop {
+			w.pollElevatedDrag()
+			return 0
+		}
+
 	case wmDropFiles:
+		w.externalDragActive = false
 		hDrop := wParam
 		var pt point
 		procDragQueryPoint.Call(hDrop, uintptr(unsafe.Pointer(&pt)))
@@ -975,6 +991,9 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 		return 0
 
 	case wmLButtonDown, wmRButtonDown, wmMButtonDown:
+		if msg == wmLButtonDown {
+			w.lbuttonDownInside = true
+		}
 		procSetCapture.Call(uintptr(hwnd))
 		btn := MouseLeft
 		if msg == wmRButtonDown {
@@ -992,6 +1011,9 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 		return 0
 
 	case wmLButtonUp, wmRButtonUp, wmMButtonUp:
+		if msg == wmLButtonUp {
+			w.lbuttonDownInside = false
+		}
 		btn := MouseLeft
 		if msg == wmRButtonUp {
 			btn = MouseRight
@@ -1082,7 +1104,7 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 			w.hIcon = 0
 		}
 		w.clearCustomCursor(false)
-		w.revokeDropTarget()
+		w.revokeDragDrop()
 		windowMapMu.Lock()
 		delete(windowMap, hwnd)
 		remaining := len(windowMap)
@@ -1159,4 +1181,59 @@ func (w *win32Window) SetIcon(rgba []byte, width, height int) error {
 	}
 	w.hIcon = hIcon
 	return nil
+}
+
+func (w *win32Window) pollElevatedDrag() {
+	st, _, _ := procGetAsyncKeyState.Call(vkLButton)
+	lbuttonDown := int16(st) < 0
+
+	if !lbuttonDown {
+		w.lbuttonDownInside = false
+		if w.externalDragActive {
+			w.externalDragActive = false
+			w.emit(Event{Type: EventDragLeave})
+		}
+		return
+	}
+
+	// Если клик начался внутри нашего окна — это внутреннее выделение/перетаскивание
+	if w.lbuttonDownInside {
+		return
+	}
+
+	// Кнопка зажата снаружи окна — проверяем попадание курсора в клиентскую область
+	var pt point
+	procGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
+	runtime.KeepAlive(&pt)
+
+	procScreenToClient.Call(uintptr(w.hwnd), uintptr(unsafe.Pointer(&pt)))
+	runtime.KeepAlive(&pt)
+
+	x := int(pt.x)
+	y := int(pt.y)
+
+	inside := x >= 0 && y >= 0 && x < w.width && y < w.height
+	if inside {
+		if !w.externalDragActive {
+			w.externalDragActive = true
+			w.emit(Event{
+				Type:     EventDragEnter,
+				X:        x,
+				Y:        y,
+				HasFiles: true,
+			})
+		} else {
+			w.emit(Event{
+				Type:     EventDragOver,
+				X:        x,
+				Y:        y,
+				HasFiles: true,
+			})
+		}
+	} else {
+		if w.externalDragActive {
+			w.externalDragActive = false
+			w.emit(Event{Type: EventDragLeave})
+		}
+	}
 }

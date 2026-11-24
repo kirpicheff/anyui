@@ -17,6 +17,7 @@ var (
 	procRevokeDragDrop   = modOle32.NewProc("RevokeDragDrop")
 	procReleaseStgMedium = modOle32.NewProc("ReleaseStgMedium")
 
+	procChangeWindowMessageFilter   = modUser32.NewProc("ChangeWindowMessageFilter")
 	procChangeWindowMessageFilterEx = modUser32.NewProc("ChangeWindowMessageFilterEx")
 )
 
@@ -46,8 +47,6 @@ type comGUID struct {
 var (
 	iidIUnknown    = comGUID{0x00000000, 0x0000, 0x0000, [8]byte{0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46}}
 	iidIDropTarget = comGUID{0x00000122, 0x0000, 0x0000, [8]byte{0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46}}
-
-	oleInitOnce sync.Once
 )
 
 type dropTargetVtbl struct {
@@ -179,21 +178,16 @@ func dragEnter(this uintptr, pDataObj uintptr, grfKeyState uintptr, pt uintptr, 
 	if dt == nil || dt.w == nil {
 		return sOK
 	}
-	hasFiles := checkDataObjectHasFiles(pDataObj)
 	if pdwEffect != 0 {
 		effPtr := (*uint32)(ptrFromWin32(pdwEffect))
-		if hasFiles {
-			*effPtr = dropEffectCopy
-		} else {
-			*effPtr = dropEffectNone
-		}
+		*effPtr = dropEffectCopy
 	}
 	x, y := screenToClientPoint(uintptr(dt.w.hwnd), pt)
 	dt.w.emit(Event{
 		Type:     EventDragEnter,
 		X:        x,
 		Y:        y,
-		HasFiles: hasFiles,
+		HasFiles: true,
 	})
 	return sOK
 }
@@ -267,24 +261,51 @@ func initGlobalDropTargetVtbl() {
 	})
 }
 
+func isCurrentProcessElevated() bool {
+	var token windows.Token
+	err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &token)
+	if err != nil {
+		return false
+	}
+	defer token.Close()
+	return token.IsElevated()
+}
+
 func (w *win32Window) setupDragDrop() {
 	if !w.cfg.AcceptDropFiles {
 		return
 	}
 
+	elevated := isCurrentProcessElevated()
+
 	// 1. Изменяем фильтр сообщений окон для обхода ограничений UAC (UIPI) при запуске под администратором
+	// Разблокируем на уровне процесса и на уровне конкретного окна
+	if procChangeWindowMessageFilter.Find() == nil {
+		procChangeWindowMessageFilter.Call(wmDropFiles, 1)
+		procChangeWindowMessageFilter.Call(wmCopyData, 1)
+		procChangeWindowMessageFilter.Call(wmCopyGlobalData, 1)
+	}
 	if procChangeWindowMessageFilterEx.Find() == nil {
 		procChangeWindowMessageFilterEx.Call(uintptr(w.hwnd), wmDropFiles, msgfltAllow, 0)
+		procChangeWindowMessageFilterEx.Call(uintptr(w.hwnd), wmCopyData, msgfltAllow, 0)
 		procChangeWindowMessageFilterEx.Call(uintptr(w.hwnd), wmCopyGlobalData, msgfltAllow, 0)
 	}
 
-	// 2. Классический DragAcceptFiles для обратной совместимости
+	// 2. Классический DragAcceptFiles для прямого приёма файлов из Проводника и сторонних программ
 	procDragAcceptFiles.Call(uintptr(w.hwnd), 1)
 
-	// 3. OLE Drag & Drop (IDropTarget)
-	oleInitOnce.Do(func() {
-		procOleInitialize.Call(0)
-	})
+	// 3. Если процесс запущен от администратора (High IL), не регистрируем OLE RegisterDragDrop:
+	// Проводник Windows (Medium IL) блокирует OLE COM-маршалинг и показывает перечёркнутый круг.
+	// Приём файлов выполняется через разрешённый WM_DROPFILES, а подсветка оверлея
+	// отслеживается окном в реальном времени.
+	if elevated {
+		w.elevatedDragDrop = true
+		procSetTimer.Call(uintptr(w.hwnd), timerIDDragTrack, 30, 0)
+		return
+	}
+
+	// 4. Для обычного (неэливированного) процесса регистрируем полноценный OLE Drag & Drop (IDropTarget)
+	procOleInitialize.Call(0)
 	initGlobalDropTargetVtbl()
 
 	dt := &dropTarget{
@@ -294,13 +315,14 @@ func (w *win32Window) setupDragDrop() {
 	hr, _, _ := procRegisterDragDrop.Call(uintptr(w.hwnd), uintptr(unsafe.Pointer(dt)))
 	if hr == 0 {
 		w.dropTarget = dt
-		// OLE зарегистрирован успешно: отключаем устаревший DragAcceptFiles,
-		// чтобы Проводник не уходил в устаревший протокол WM_DROPFILES.
-		procDragAcceptFiles.Call(uintptr(w.hwnd), 0)
 	}
 }
 
-func (w *win32Window) revokeDropTarget() {
+func (w *win32Window) revokeDragDrop() {
+	if w.elevatedDragDrop {
+		procKillTimer.Call(uintptr(w.hwnd), timerIDDragTrack)
+		w.elevatedDragDrop = false
+	}
 	if w.dropTarget != nil {
 		procRevokeDragDrop.Call(uintptr(w.hwnd))
 		w.dropTarget = nil

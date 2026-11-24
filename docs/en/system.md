@@ -142,7 +142,7 @@ app := anyui.NewApp(anyui.Config{
 ```
 
 Handlers can also be updated dynamically on `*anyui.Window`: `SetOnDragEnter`, `SetOnDragOver`, `SetOnDragLeave`, `SetOnDropFiles`.
-On Windows, OLE `IDropTarget` and `ChangeWindowMessageFilterEx` bypass UAC restrictions when running elevated.
+On Windows, standard execution uses OLE `IDropTarget`. When running elevated as Administrator (UAC / UIPI), direct reception via `ChangeWindowMessageFilter` / `ChangeWindowMessageFilterEx` is used to allow `WM_DROPFILES`, `WM_COPYDATA`, and `WM_COPYGLOBALDATA`, while `OnDragEnter` / `OnDragOver` events are tracked by the window automatically, ensuring drop overlays and file acceptance work from Windows Explorer without a prohibition cursor.
 
 ---
 
