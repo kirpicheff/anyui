@@ -744,6 +744,10 @@ func (fm *FontManager) drawTextCore(c *Canvas, x, y int, text string, sizePx int
 							c.Pixels[do+3] = 255
 							continue
 						}
+						if c.Pixels[do+3] != 255 {
+							blendPremulOverStraight(c.Pixels, do, uint32(cg.bgra[so+0]), uint32(cg.bgra[so+1]), uint32(cg.bgra[so+2]), uint32(a))
+							continue
+						}
 						invA := uint32(255 - a)
 						b := uint32(cg.bgra[so+0]) + (uint32(c.Pixels[do+0])*invA+127)/255
 						g := uint32(cg.bgra[so+1]) + (uint32(c.Pixels[do+1])*invA+127)/255
@@ -887,29 +891,101 @@ func (fm *FontManager) drawTextShadow(c *Canvas, x, y int, text string, sizePx i
 			if a == 0 {
 				continue
 			}
-			sb := (uint32(col.B)*a + 127) / 255
-			sg := (uint32(col.G)*a + 127) / 255
-			sr := (uint32(col.R)*a + 127) / 255
-			invA := 255 - a
 			do := dstRow + px*4
-			b := sb + (uint32(c.Pixels[do+0])*invA+127)/255
-			g := sg + (uint32(c.Pixels[do+1])*invA+127)/255
-			r := sr + (uint32(c.Pixels[do+2])*invA+127)/255
-			if b > 255 {
-				b = 255
+			if a >= 255 {
+				c.Pixels[do+0] = col.B
+				c.Pixels[do+1] = col.G
+				c.Pixels[do+2] = col.R
+				c.Pixels[do+3] = 255
+				continue
 			}
-			if g > 255 {
-				g = 255
+			dstA := uint32(c.Pixels[do+3])
+			if dstA == 255 {
+				sb := (uint32(col.B)*a + 127) / 255
+				sg := (uint32(col.G)*a + 127) / 255
+				sr := (uint32(col.R)*a + 127) / 255
+				invA := 255 - a
+				b := sb + (uint32(c.Pixels[do+0])*invA+127)/255
+				g := sg + (uint32(c.Pixels[do+1])*invA+127)/255
+				r := sr + (uint32(c.Pixels[do+2])*invA+127)/255
+				if b > 255 {
+					b = 255
+				}
+				if g > 255 {
+					g = 255
+				}
+				if r > 255 {
+					r = 255
+				}
+				c.Pixels[do+0] = uint8(b)
+				c.Pixels[do+1] = uint8(g)
+				c.Pixels[do+2] = uint8(r)
+				c.Pixels[do+3] = 255
+				continue
 			}
-			if r > 255 {
-				r = 255
+			if dstA == 0 {
+				c.Pixels[do+0] = col.B
+				c.Pixels[do+1] = col.G
+				c.Pixels[do+2] = col.R
+				c.Pixels[do+3] = uint8(a)
+				continue
 			}
-			c.Pixels[do+0] = uint8(b)
-			c.Pixels[do+1] = uint8(g)
-			c.Pixels[do+2] = uint8(r)
-			c.Pixels[do+3] = 255
+			dstWeight := (dstA*(255-a) + 127) / 255
+			outA := a + dstWeight
+			if outA > 255 {
+				outA = 255
+			}
+			c.Pixels[do+0] = uint8((uint32(col.B)*a + uint32(c.Pixels[do+0])*dstWeight + outA/2) / outA)
+			c.Pixels[do+1] = uint8((uint32(col.G)*a + uint32(c.Pixels[do+1])*dstWeight + outA/2) / outA)
+			c.Pixels[do+2] = uint8((uint32(col.R)*a + uint32(c.Pixels[do+2])*dstWeight + outA/2) / outA)
+			c.Pixels[do+3] = uint8(outA)
 		}
 	}
+}
+
+// blendPremulOverStraight смешивает premultiplied-источник (sb, sg, sr, a) поверх straight-alpha буфера с dstA < 255.
+func blendPremulOverStraight(dst []byte, do int, sb, sg, sr, a uint32) {
+	dstA := uint32(dst[do+3])
+	if dstA == 0 {
+		b := (sb*255 + a/2) / a
+		g := (sg*255 + a/2) / a
+		r := (sr*255 + a/2) / a
+		if b > 255 {
+			b = 255
+		}
+		if g > 255 {
+			g = 255
+		}
+		if r > 255 {
+			r = 255
+		}
+		dst[do+0] = uint8(b)
+		dst[do+1] = uint8(g)
+		dst[do+2] = uint8(r)
+		dst[do+3] = uint8(a)
+		return
+	}
+	dstWeight := (dstA*(255-a) + 127) / 255
+	outA := a + dstWeight
+	if outA > 255 {
+		outA = 255
+	}
+	b := (sb*255 + uint32(dst[do+0])*dstWeight + outA/2) / outA
+	g := (sg*255 + uint32(dst[do+1])*dstWeight + outA/2) / outA
+	r := (sr*255 + uint32(dst[do+2])*dstWeight + outA/2) / outA
+	if b > 255 {
+		b = 255
+	}
+	if g > 255 {
+		g = 255
+	}
+	if r > 255 {
+		r = 255
+	}
+	dst[do+0] = uint8(b)
+	dst[do+1] = uint8(g)
+	dst[do+2] = uint8(r)
+	dst[do+3] = uint8(outA)
 }
 
 func blurAlphaMask(mask []byte, w, h, rad int) {
