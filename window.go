@@ -15,12 +15,15 @@ type Window struct {
 	ctx         *ui.Context
 	ui          *UI
 	drawFn      func(*UI)
-	hideOnClose bool
-	onClose     func(*Window) bool
-	onDropFiles func(files []string, xPx, yPx int)
-	onDragEnter func(xPx, yPx int, hasFiles bool)
-	onDragOver  func(xPx, yPx int, hasFiles bool)
-	onDragLeave func()
+	hideOnClose   bool
+	onClose       func(*Window) bool
+	onDropFiles   func(files []string, xPx, yPx int)
+	onDragEnter   func(xPx, yPx int, hasFiles bool)
+	onDragOver    func(xPx, yPx int, hasFiles bool)
+	onDragLeave   func()
+	onMove        func(xPx, yPx int)
+	onMoveEnd     func(xPx, yPx int)
+	reattachTabID string
 }
 
 // SetTitle меняет заголовок окна.
@@ -318,6 +321,54 @@ func (w *Window) SetOnDragLeave(fn func()) {
 	w.onDragLeave = fn
 }
 
+// SetOnMove задаёт обработчик перетаскивания окна пользователем (xPx, yPx — экранные координаты окна в Px).
+func (w *Window) SetOnMove(fn func(xPx, yPx int)) {
+	w.onMove = fn
+}
+
+// SetOnMoveEnd задаёт обработчик завершения перетаскивания окна пользователем (xPx, yPx — экранные координаты окна в Px).
+func (w *Window) SetOnMoveEnd(fn func(xPx, yPx int)) {
+	w.onMoveEnd = fn
+}
+
+// SetReattachTabID помечает окно как откреплённую вкладку с идентификатором tabID,
+// позволяя вернуть её перетаскиванием обратно в TabBar любого другого окна приложения.
+// Передача пустой строки отключает режим перетаскивания вкладки.
+func (w *Window) SetReattachTabID(tabID string) {
+	if w != nil {
+		w.reattachTabID = tabID
+	}
+}
+
+// ReattachTabID возвращает идентификатор откреплённой вкладки, назначенный окну для обратного прикрепления.
+func (w *Window) ReattachTabID() string {
+	if w == nil {
+		return ""
+	}
+	return w.reattachTabID
+}
+
+func (w *Window) clientOrigin() (xPx, yPx int) {
+	if w == nil || w.platWin == nil {
+		return 0, 0
+	}
+	if cp, ok := w.platWin.(platform.ClientOriginProvider); ok {
+		return cp.ClientOrigin()
+	}
+	return w.platWin.Position()
+}
+
+func (w *Window) renderNow() {
+	if w == nil || w.ctx == nil {
+		return
+	}
+	if w.ctx.HandleEvent(platform.Event{Type: platform.EventPaint}) && w.drawFn != nil {
+		w.ctx.Render(func(_ *ui.Context) {
+			w.drawFn(w.ui)
+		})
+	}
+}
+
 func (w *Window) handleCloseRequest() bool {
 	if w.app != nil && w.app.isQuitting() {
 		return true
@@ -412,6 +463,32 @@ func (w *Window) handleEvent(ev platform.Event) {
 	if ev.Type == platform.EventThemeChange {
 		if w.app != nil && w.app.isPrimaryEventWindow(w) {
 			w.app.handleSystemThemeChange(ev.DarkTheme)
+		}
+		if dispatched {
+			w.WakeUp()
+		}
+		return
+	}
+
+	if ev.Type == platform.EventWindowMove {
+		if w.onMove != nil {
+			w.onMove(ev.X, ev.Y)
+		}
+		if w.app != nil && w.reattachTabID != "" {
+			w.app.handleWindowMove(w)
+		}
+		if dispatched {
+			w.WakeUp()
+		}
+		return
+	}
+
+	if ev.Type == platform.EventWindowMoveEnd {
+		if w.onMoveEnd != nil {
+			w.onMoveEnd(ev.X, ev.Y)
+		}
+		if w.app != nil && w.reattachTabID != "" {
+			w.app.handleWindowMoveEnd(w)
 		}
 		if dispatched {
 			w.WakeUp()

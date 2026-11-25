@@ -872,3 +872,8 @@ func goDarwinOnDropFiles(winID C.uint64_t, pathsNewlineSep *C.char) {
 	}
 }
 
+// CursorScreenPos возвращает текущие экранные координаты курсора мыши (пока не поддерживается на macOS).
+func CursorScreenPos() (xPx, yPx int, ok bool) {
+	return 0, 0, false
+}
+

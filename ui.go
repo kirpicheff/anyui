@@ -485,6 +485,16 @@ func (u *UI) HasActiveOverlays() bool {
 	return u.ctx.HasActiveOverlays()
 }
 
+// ActiveOverlayRects возвращает прямоугольники всех активных оверлеев (включая неблокирующие
+// вроде Tooltip и PushNonBlockingOverlay) и уведомлений Toast в физических пикселях (Px).
+// Полезно для точечной проверки пересечения оверлеев с областью нативной поверхности без отключения GPU-вывода на всём окне.
+func (u *UI) ActiveOverlayRects() []Rect {
+	if u == nil || u.ctx == nil {
+		return nil
+	}
+	return u.ctx.ActiveOverlayRects()
+}
+
 // LayoutRect создаёт область раскладки (колонку без отступов) строго по заданному прямоугольнику rect
 // (в логических пикселях Dp / CurrentArea()) с клиппингом содержимого. Удобно для размещения виджетов внутри PushOverlay.
 func (u *UI) LayoutRect(rect Rect, fn func()) {

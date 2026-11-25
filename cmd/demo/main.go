@@ -52,12 +52,18 @@ const (
 	svgPlus = `<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>`
 )
 
+type detachedTabInfo struct {
+	item anyui.TabItem
+	win  *anyui.Window
+}
+
 type demoState struct {
-	app         *anyui.App
-	activeNav   string
-	activeTab   string
-	tabs        []anyui.TabItem
-	nextTabNum  int
+	app          *anyui.App
+	activeNav    string
+	activeTab    string
+	tabs         []anyui.TabItem
+	detachedTabs map[string]detachedTabInfo
+	nextTabNum   int
 	statusMsg   string
 	droppedInfo string
 
@@ -385,7 +391,7 @@ func main() {
 								}
 							}
 							st.statusMsg = fmt.Sprintf("Откреплена вкладка: %s", detachedTab.Title)
-							_, _ = st.app.OpenWindow(anyui.Config{
+							detWin, err := st.app.OpenWindow(anyui.Config{
 								Title:  "Откреплённая вкладка — " + detachedTab.Title,
 								Width:  460,
 								Height: 300,
@@ -394,12 +400,46 @@ func main() {
 								wui.Padding(20, func() {
 									wui.Column(10, func() {
 										wui.Label(detachedTab.Title, anyui.FontSize(18), anyui.Bold())
-										wui.Label("Это отдельное окно, созданное при вытягивании вкладки из TabBar (app.OpenWindow).", anyui.FontSize(13), anyui.TextColor(wui.Theme().TextMuted))
+										wui.Label("Это отдельное окно, созданное при вытягивании вкладки из TabBar (app.OpenWindow). Перетащите окно обратно на TabBar главного окна, чтобы вернуть вкладку.", anyui.FontSize(13), anyui.TextColor(wui.Theme().TextMuted), anyui.WordWrap())
 										wui.Spinner("det_spin", 28)
 									})
 								})
 							})
+							if err == nil && detWin != nil {
+								if st.detachedTabs == nil {
+									st.detachedTabs = make(map[string]detachedTabInfo)
+								}
+								detWin.SetReattachTabID(detachedTab.ID)
+								st.detachedTabs[detachedTab.ID] = detachedTabInfo{
+									item: detachedTab,
+									win:  detWin,
+								}
+								detID := detachedTab.ID
+								detWin.SetOnClose(func(_ *anyui.Window) bool {
+									delete(st.detachedTabs, detID)
+									return true
+								})
+							}
 							break
+						}
+					}
+				}
+				if ev.AttachedID != "" {
+					if info, ok := st.detachedTabs[ev.AttachedID]; ok {
+						delete(st.detachedTabs, ev.AttachedID)
+						idx := ev.AttachedIndex
+						if idx < 0 {
+							idx = 0
+						}
+						if idx > len(st.tabs) {
+							idx = len(st.tabs)
+						}
+						st.tabs = append(st.tabs[:idx], append([]anyui.TabItem{info.item}, st.tabs[idx:]...)...)
+						st.activeTab = info.item.ID
+						st.statusMsg = fmt.Sprintf("Возвращена вкладка: %s", info.item.Title)
+						ui.RequestRedraw()
+						if info.win != nil {
+							info.win.Close()
 						}
 					}
 				}

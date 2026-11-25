@@ -77,6 +77,17 @@ type directCanvasEntry struct {
 	inOverlay bool
 }
 
+type tabBarRegion struct {
+	id        string
+	barRect   render.Rect
+	tabsRect  render.Rect
+	vertical  bool
+	tabCount  int
+	tabSizePx int
+	gapPx     int
+	scrollPx  int
+}
+
 type streamingCanvasEntry struct {
 	id     string
 	rect   render.Rect
@@ -164,6 +175,12 @@ type Context struct {
 	tabDragStartX      int
 	tabDragStartY      int
 	tabDragging        bool
+	tabBars            []tabBarRegion
+	extTabHighlightID  string
+	extTabInsertIdx    int
+	extTabPendingBarID string
+	extTabPendingID    string
+	extTabPendingIdx   int
 	reorderWidgetID    string
 	reorderSourceIdx   int
 	reorderSourceKey   string
@@ -369,6 +386,101 @@ func (c *Context) HasActiveOverlays() bool {
 		return false
 	}
 	return c.Overlays.HasActive()
+}
+
+// ActiveOverlayRects возвращает прямоугольники всех активных оверлеев (включая неблокирующие
+// вроде Tooltip и PushNonBlockingOverlay) и уведомлений Toast в физических пикселях (Px).
+func (c *Context) ActiveOverlayRects() []render.Rect {
+	if c == nil {
+		return nil
+	}
+	rects := c.Overlays.ActiveRects()
+	if len(c.toasts) > 0 {
+		if tr := c.toastsBoundingRect(); !tr.Empty() {
+			rects = append(rects, tr)
+		}
+	}
+	return rects
+}
+
+func (c *Context) registerTabBar(r tabBarRegion) {
+	if c == nil {
+		return
+	}
+	c.tabBars = append(c.tabBars, r)
+}
+
+// TabBarAtClient проверяет, попадает ли клиентская координата (cx, cy) в область одного из TabBar,
+// и возвращает идентификатор TabBar и индекс вставки [0..tabCount].
+func (c *Context) TabBarAtClient(cx, cy int) (id string, insertIdx int, ok bool) {
+	if c == nil {
+		return "", -1, false
+	}
+	for i := len(c.tabBars) - 1; i >= 0; i-- {
+		tb := c.tabBars[i]
+		if !tb.barRect.Contains(cx, cy) {
+			continue
+		}
+		step := tb.tabSizePx + tb.gapPx
+		idx := tb.tabCount
+		if step > 0 && tb.tabCount > 0 {
+			if tb.vertical {
+				rel := cy - tb.tabsRect.Y + tb.scrollPx
+				idx = (rel + step/2) / step
+			} else {
+				rel := cx - tb.tabsRect.X + tb.scrollPx
+				idx = (rel + step/2) / step
+			}
+			if idx < 0 {
+				idx = 0
+			}
+			if idx > tb.tabCount {
+				idx = tb.tabCount
+			}
+		} else {
+			idx = 0
+		}
+		return tb.id, idx, true
+	}
+	return "", -1, false
+}
+
+// SetExternalTabInsert включает или сбрасывает визуальную подсветку вставки внешней вкладки в TabBar.
+func (c *Context) SetExternalTabInsert(tabBarID string, insertIdx int) {
+	if c == nil {
+		return
+	}
+	if c.extTabHighlightID == tabBarID && c.extTabInsertIdx == insertIdx {
+		return
+	}
+	c.extTabHighlightID = tabBarID
+	c.extTabInsertIdx = insertIdx
+	c.RequestRedraw()
+}
+
+// EnqueueExternalTabAttach регистрирует прикрепление внешней вкладки tabID к TabBar tabBarID на позицию insertIdx.
+func (c *Context) EnqueueExternalTabAttach(tabBarID, tabID string, insertIdx int) {
+	if c == nil || tabBarID == "" || tabID == "" {
+		return
+	}
+	c.extTabPendingBarID = tabBarID
+	c.extTabPendingID = tabID
+	c.extTabPendingIdx = insertIdx
+	c.extTabHighlightID = ""
+	c.extTabInsertIdx = -1
+	c.RequestRedraw()
+}
+
+func (c *Context) consumeExternalTabAttach(tabBarID string) (tabID string, insertIdx int, ok bool) {
+	if c == nil || c.extTabPendingBarID != tabBarID || c.extTabPendingID == "" {
+		return "", -1, false
+	}
+	tabID = c.extTabPendingID
+	insertIdx = c.extTabPendingIdx
+	c.extTabPendingBarID = ""
+	c.extTabPendingID = ""
+	c.extTabPendingIdx = -1
+	return tabID, insertIdx, true
 }
 
 // IsInputBlocked возвращает true, если текущая позиция курсора перекрыта активным оверлеем.
@@ -1300,6 +1412,7 @@ func (c *Context) beginFrame() {
 	c.nextHitRegions = c.nextHitRegions[:0]
 	c.nextDirectCanvases = c.nextDirectCanvases[:0]
 	c.nextStreamingCanvases = c.nextStreamingCanvases[:0]
+	c.tabBars = c.tabBars[:0]
 	c.streamingDirty = render.Rect{}
 	c.layers.lastFrameBlitted = false
 	c.layers.activeLayer = LayerDynamic

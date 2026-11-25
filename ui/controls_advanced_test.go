@@ -157,6 +157,43 @@ func TestTabBarDragReorderAndDetach(t *testing.T) {
 	}
 }
 
+func TestTabBarExternalReattach(t *testing.T) {
+	ctx := newTestContext(600, 300)
+	tabs := []TabItem{
+		{ID: "t1", Title: "One"},
+		{ID: "t2", Title: "Two"},
+	}
+	active := "t1"
+	ctx.Render(func(c *Context) {
+		ev := c.TabBar("tb_ext", tabs, &active)
+		if ev.AttachedID != "" || ev.AttachedIndex != -1 {
+			t.Fatalf("без внешнего прикрепления ожидались пустые AttachedID/AttachedIndex, got %+v", ev)
+		}
+	})
+
+	id, idx, ok := ctx.TabBarAtClient(180, 18)
+	if !ok || id != "tb_ext" || idx != 1 {
+		t.Fatalf("ожидалось попадание в tb_ext на позицию 1, получено id=%q idx=%d ok=%v", id, idx, ok)
+	}
+	if _, _, hitOut := ctx.TabBarAtClient(180, 120); hitOut {
+		t.Fatal("вне области TabBar ожидалось ok=false")
+	}
+
+	ctx.SetExternalTabInsert(id, idx)
+	ctx.Render(func(c *Context) {
+		c.TabBar("tb_ext", tabs, &active)
+	})
+
+	ctx.EnqueueExternalTabAttach(id, "t3", idx)
+	var gotEv TabBarEvent
+	ctx.Render(func(c *Context) {
+		gotEv = c.TabBar("tb_ext", tabs, &active)
+	})
+	if gotEv.AttachedID != "t3" || gotEv.AttachedIndex != 1 {
+		t.Fatalf("ожидалось AttachedID=t3 AttachedIndex=1, получено %+v", gotEv)
+	}
+}
+
 func TestNumberInputSliderAndRangeSlider(t *testing.T) {
 	ctx := newTestContext(400, 300)
 	val := 10.0

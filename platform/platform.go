@@ -26,6 +26,8 @@ const (
 	EventCaptureLost
 	EventFocusLost
 	EventThemeChange
+	EventWindowMove
+	EventWindowMoveEnd
 )
 
 // MouseButton определяет кнопку мыши.
@@ -188,6 +190,11 @@ type WindowIconSetter interface {
 type WindowTopMoster interface {
 	SetAlwaysOnTop(onTop bool)
 	IsAlwaysOnTop() bool
+}
+
+// ClientOriginProvider — опциональный интерфейс окна для получения экранных координат (0, 0) клиентской области.
+type ClientOriginProvider interface {
+	ClientOrigin() (xPx, yPx int)
 }
 
 // Window — кроссплатформенный интерфейс нативного окна.

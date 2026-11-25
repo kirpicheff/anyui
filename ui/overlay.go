@@ -16,6 +16,7 @@ type overlayItem struct {
 type OverlayLayer struct {
 	prevBlocks []render.Rect
 	nextBlocks []render.Rect
+	prevRects  []render.Rect
 	items      []overlayItem
 	inOverlay  bool
 	canvasPool []*render.Canvas
@@ -24,7 +25,11 @@ type OverlayLayer struct {
 // BeginFrame подготавливает слой оверлеев к новому кадру и сбрасывает кэши оверлеев с возвратом в пул.
 func (o *OverlayLayer) BeginFrame() {
 	o.prevBlocks, o.nextBlocks = o.nextBlocks, o.prevBlocks[:0]
+	o.prevRects = o.prevRects[:0]
 	for i := range o.items {
+		if !o.items[i].bounds.Empty() {
+			o.prevRects = append(o.prevRects, o.items[i].bounds)
+		}
 		if o.items[i].cache != nil {
 			o.canvasPool = append(o.canvasPool, o.items[i].cache)
 			o.items[i].cache = nil
@@ -106,6 +111,33 @@ func (o *OverlayLayer) IsBlockedCurrent(x, y int) bool {
 // HasActive возвращает true, если в текущем или предыдущем кадре были активные оверлеи (меню, попапы, модалки).
 func (o *OverlayLayer) HasActive() bool {
 	return len(o.prevBlocks) > 0 || len(o.nextBlocks) > 0 || len(o.items) > 0
+}
+
+// ActiveRects возвращает копию прямоугольников всех активных оверлеев (включая неблокирующие)
+// из текущего и предыдущего кадров в физических пикселях (Px).
+func (o *OverlayLayer) ActiveRects() []render.Rect {
+	if len(o.prevRects) == 0 && len(o.items) == 0 {
+		return nil
+	}
+	out := make([]render.Rect, 0, len(o.prevRects)+len(o.items))
+	appendUnique := func(r render.Rect) {
+		if r.Empty() {
+			return
+		}
+		for _, ex := range out {
+			if ex == r {
+				return
+			}
+		}
+		out = append(out, r)
+	}
+	for _, r := range o.prevRects {
+		appendUnique(r)
+	}
+	for i := range o.items {
+		appendUnique(o.items[i].bounds)
+	}
+	return out
 }
 
 // Flush отрисовывает все накопленные оверлеи поверх основного интерфейса.

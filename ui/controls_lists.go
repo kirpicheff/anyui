@@ -29,12 +29,14 @@ func TabItems(labels ...string) []TabItem {
 
 // TabBarEvent сообщает о действиях пользователя в TabBar за текущий кадр.
 type TabBarEvent struct {
-	SelectedID string
-	ClosedID   string
-	Added      bool
-	MovedFrom  int
-	MovedTo    int
-	DetachedID string
+	SelectedID    string
+	ClosedID      string
+	Added         bool
+	MovedFrom     int
+	MovedTo       int
+	DetachedID    string
+	AttachedID    string
+	AttachedIndex int
 }
 
 // ComputeVisibleRange вычисляет диапазон [start, end) видимых элементов для виртуализации списка.
@@ -665,7 +667,7 @@ func (c *Context) ListView(id string, count int, itemHeightDp Dp, selected *int,
 // с опциональными кнопками '×' (TabItem.Closable) и '+' (скрывается через HideAddButton),
 // а также поддержкой перетаскивания (drag-reorder) и открепления вкладки за пределы панели.
 func (c *Context) TabBar(id string, tabs []TabItem, activeID *string, opts ...Option) TabBarEvent {
-	ev := TabBarEvent{MovedFrom: -1, MovedTo: -1}
+	ev := TabBarEvent{MovedFrom: -1, MovedTo: -1, AttachedIndex: -1}
 	if activeID == nil {
 		return ev
 	}
@@ -721,6 +723,20 @@ func (c *Context) TabBar(id string, tabs []TabItem, activeID *string, opts ...Op
 		c.tabScroll[id] = maxSc
 	}
 	scrollX := c.tabScroll[id]
+	c.registerTabBar(tabBarRegion{
+		id:        id,
+		barRect:   barRect,
+		tabsRect:  tabsArea,
+		vertical:  false,
+		tabCount:  len(tabs),
+		tabSizePx: tabW,
+		gapPx:     c.Scale(2).Int(),
+		scrollPx:  scrollX,
+	})
+	if attID, attIdx, ok := c.consumeExternalTabAttach(id); ok {
+		ev.AttachedID = attID
+		ev.AttachedIndex = attIdx
+	}
 
 	c.Canvas.PushClip(tabsArea)
 	pxSize := c.Scale(12).Int()
@@ -816,6 +832,34 @@ func (c *Context) TabBar(id string, tabs []TabItem, activeID *string, opts ...Op
 	}
 	c.Canvas.PopClip()
 
+	// Индикатор вставки при перетаскивании откреплённого окна обратно в TabBar
+	if c.extTabHighlightID == id && c.extTabInsertIdx >= 0 {
+		idx := c.extTabInsertIdx
+		if idx > len(tabs) {
+			idx = len(tabs)
+		}
+		step := tabW + c.Scale(2).Int()
+		lineX := tabsArea.X + idx*step - scrollX
+		if lineX < tabsArea.X {
+			lineX = tabsArea.X
+		}
+		if lineX > tabsArea.X+tabsArea.W-c.Scale(3).Int() {
+			lineX = tabsArea.X + tabsArea.W - c.Scale(3).Int()
+		}
+		c.Canvas.DrawRoundedBox(tabsArea, c.ScaleF(6), c.Theme.Accent.WithAlpha(24), 1.5, c.Theme.Accent.WithAlpha(160))
+		indW := c.Scale(3).Int()
+		if indW < 2 {
+			indW = 2
+		}
+		indPad := c.Scale(4).Int()
+		c.Canvas.FillRoundedRect(render.Rect{
+			X: lineX,
+			Y: tabsArea.Y + indPad,
+			W: indW,
+			H: tabsArea.H - indPad*2,
+		}, c.ScaleF(2), c.Theme.Accent)
+	}
+
 	// Обработка перетаскивания (drag-reorder) и открепления вкладки (detach)
 	if c.tabDragID == id && c.tabDragIndex >= 0 && c.tabDragIndex < len(tabs) {
 		dy := c.MouseY - (barRect.Y + barRect.H/2)
@@ -901,7 +945,7 @@ func (c *Context) TabBar(id string, tabs []TabItem, activeID *string, opts ...Op
 
 // tabBarVertical рисует вертикальную панель вкладок (например, для боковой навигации и настроек).
 func (c *Context) tabBarVertical(id string, tabs []TabItem, activeID *string, st WidgetStyle) TabBarEvent {
-	ev := TabBarEvent{MovedFrom: -1, MovedTo: -1}
+	ev := TabBarEvent{MovedFrom: -1, MovedTo: -1, AttachedIndex: -1}
 
 	tabH := c.Scale(34).Int()
 	gap := c.Scale(2).Int()
@@ -967,6 +1011,20 @@ func (c *Context) tabBarVertical(id string, tabs []TabItem, activeID *string, st
 		c.tabScroll[id] = maxSc
 	}
 	scrollY := c.tabScroll[id]
+	c.registerTabBar(tabBarRegion{
+		id:        id,
+		barRect:   barRect,
+		tabsRect:  tabsArea,
+		vertical:  true,
+		tabCount:  len(tabs),
+		tabSizePx: tabH,
+		gapPx:     gap,
+		scrollPx:  scrollY,
+	})
+	if attID, attIdx, ok := c.consumeExternalTabAttach(id); ok {
+		ev.AttachedID = attID
+		ev.AttachedIndex = attIdx
+	}
 
 	c.Canvas.PushClip(tabsArea)
 	pxSize := c.Scale(12).Int()
@@ -1153,6 +1211,34 @@ func (c *Context) tabBarVertical(id string, tabs []TabItem, activeID *string, st
 		arm := c.ScaleF(5)
 		c.Canvas.DrawLine(cx-arm, cy, cx+arm, cy, c.ScaleF(1.6), c.Theme.TextMuted)
 		c.Canvas.DrawLine(cx, cy-arm, cx, cy+arm, c.ScaleF(1.6), c.Theme.TextMuted)
+	}
+
+	// Индикатор вставки при перетаскивании откреплённого окна обратно в вертикальный TabBar
+	if c.extTabHighlightID == id && c.extTabInsertIdx >= 0 {
+		idx := c.extTabInsertIdx
+		if idx > len(tabs) {
+			idx = len(tabs)
+		}
+		step := tabH + gap
+		lineY := tabsArea.Y + idx*step - scrollY
+		if lineY < tabsArea.Y {
+			lineY = tabsArea.Y
+		}
+		if lineY > tabsArea.Y+tabsArea.H-c.Scale(3).Int() {
+			lineY = tabsArea.Y + tabsArea.H - c.Scale(3).Int()
+		}
+		c.Canvas.DrawRoundedBox(tabsArea, c.ScaleF(6), c.Theme.Accent.WithAlpha(24), 1.5, c.Theme.Accent.WithAlpha(160))
+		indH := c.Scale(3).Int()
+		if indH < 2 {
+			indH = 2
+		}
+		indPad := c.Scale(6).Int()
+		c.Canvas.FillRoundedRect(render.Rect{
+			X: tabsArea.X + indPad,
+			Y: lineY,
+			W: tabsArea.W - indPad*2,
+			H: indH,
+		}, c.ScaleF(2), c.Theme.Accent)
 	}
 
 	return ev

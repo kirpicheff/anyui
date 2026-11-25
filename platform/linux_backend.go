@@ -79,3 +79,8 @@ func RunEventLoop(onStart func() error) error {
 	return runX11EventLoop(onStart)
 }
 
+// CursorScreenPos возвращает текущие экранные координаты курсора мыши (пока не поддерживается на Linux).
+func CursorScreenPos() (xPx, yPx int, ok bool) {
+	return 0, 0, false
+}
+

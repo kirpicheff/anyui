@@ -99,6 +99,11 @@ type App struct {
 
 	dispatchMu    sync.Mutex
 	dispatchQueue []func()
+
+	reattachHoverWin *Window
+	reattachHoverBar string
+	reattachHoverIdx int
+	cursorScreenFn   func() (int, int, bool)
 }
 
 // NewApp создаёт новый экземпляр приложения anyui с указанной конфигурацией.
@@ -347,6 +352,96 @@ func (a *App) removeWindow(target *Window) {
 	}
 	if a.mainWin == target {
 		a.mainWin = nil
+	}
+	if a.reattachHoverWin == target {
+		a.reattachHoverWin = nil
+		a.reattachHoverBar = ""
+		a.reattachHoverIdx = -1
+	}
+}
+
+func (a *App) cursorScreenPos() (int, int, bool) {
+	if a.cursorScreenFn != nil {
+		return a.cursorScreenFn()
+	}
+	return platform.CursorScreenPos()
+}
+
+func (a *App) findTabBarAtScreen(skip *Window, sx, sy int) (target *Window, barID string, insertIdx int, ok bool) {
+	a.mu.Lock()
+	wins := make([]*Window, len(a.windows))
+	copy(wins, a.windows)
+	a.mu.Unlock()
+
+	for i := len(wins) - 1; i >= 0; i-- {
+		w := wins[i]
+		if w == nil || w == skip || w.ctx == nil || w.platWin == nil {
+			continue
+		}
+		ox, oy := w.clientOrigin()
+		cw, ch := w.platWin.Size()
+		cx, cy := sx-ox, sy-oy
+		if cx < 0 || cy < 0 || cx >= cw || cy >= ch {
+			continue
+		}
+		if id, idx, hit := w.ctx.TabBarAtClient(cx, cy); hit {
+			return w, id, idx, true
+		}
+	}
+	return nil, "", -1, false
+}
+
+func (a *App) clearReattachHighlight() {
+	if a.reattachHoverWin != nil && a.reattachHoverWin.ctx != nil {
+		a.reattachHoverWin.ctx.SetExternalTabInsert("", -1)
+		a.reattachHoverWin.renderNow()
+	}
+	a.reattachHoverWin = nil
+	a.reattachHoverBar = ""
+	a.reattachHoverIdx = -1
+}
+
+func (a *App) handleWindowMove(src *Window) {
+	sx, sy, ok := a.cursorScreenPos()
+	if !ok {
+		a.clearReattachHighlight()
+		return
+	}
+	target, barID, idx, hit := a.findTabBarAtScreen(src, sx, sy)
+	if !hit {
+		a.clearReattachHighlight()
+		return
+	}
+	if target == a.reattachHoverWin && barID == a.reattachHoverBar && idx == a.reattachHoverIdx {
+		return
+	}
+	if a.reattachHoverWin != nil && a.reattachHoverWin != target && a.reattachHoverWin.ctx != nil {
+		a.reattachHoverWin.ctx.SetExternalTabInsert("", -1)
+		a.reattachHoverWin.renderNow()
+	}
+	a.reattachHoverWin = target
+	a.reattachHoverBar = barID
+	a.reattachHoverIdx = idx
+	target.ctx.SetExternalTabInsert(barID, idx)
+	target.renderNow()
+}
+
+func (a *App) handleWindowMoveEnd(src *Window) {
+	sx, sy, ok := a.cursorScreenPos()
+	target, barID, idx, hit := (*Window)(nil), "", -1, false
+	if ok {
+		target, barID, idx, hit = a.findTabBarAtScreen(src, sx, sy)
+	}
+	if a.reattachHoverWin != nil && a.reattachHoverWin != target && a.reattachHoverWin.ctx != nil {
+		a.reattachHoverWin.ctx.SetExternalTabInsert("", -1)
+		a.reattachHoverWin.renderNow()
+	}
+	a.reattachHoverWin = nil
+	a.reattachHoverBar = ""
+	a.reattachHoverIdx = -1
+	if hit && target != nil && target.ctx != nil && src.reattachTabID != "" {
+		target.ctx.EnqueueExternalTabAttach(barID, src.reattachTabID, idx)
+		target.renderNow()
 	}
 }
 

@@ -35,6 +35,7 @@ var (
 	procBeginPaint                = modUser32.NewProc("BeginPaint")
 	procEndPaint                  = modUser32.NewProc("EndPaint")
 	procGetClientRect             = modUser32.NewProc("GetClientRect")
+	procClientToScreen            = modUser32.NewProc("ClientToScreen")
 	procAdjustWindowRectEx        = modUser32.NewProc("AdjustWindowRectEx")
 	procSetWindowTextW            = modUser32.NewProc("SetWindowTextW")
 	procLoadCursorW               = modUser32.NewProc("LoadCursorW")
@@ -113,6 +114,9 @@ const (
 	wmMButtonDown    = 0x0207
 	wmMButtonUp      = 0x0208
 	wmMouseWheel     = 0x020A
+	wmMoving         = 0x0216
+	wmEnterSizeMove  = 0x0231
+	wmExitSizeMove   = 0x0232
 	wmMouseHWheel    = 0x020E
 	wmCaptureChanged = 0x0215
 	wmDropFiles      = 0x0233
@@ -214,6 +218,8 @@ type win32Window struct {
 	width            int
 	height           int
 	scale            float32
+	inSizeMove       bool
+	movingByUser     bool
 	cursor           CursorType
 	customHCursor    windows.Handle
 	customCursorHash uint64
@@ -735,6 +741,31 @@ func (w *win32Window) NativeHandle() uintptr {
 	return uintptr(w.hwnd)
 }
 
+// ClientOrigin возвращает экранные координаты верхнего левого угла клиентской области окна в физических пикселях.
+func (w *win32Window) ClientOrigin() (int, int) {
+	if w.hwnd == 0 {
+		return 0, 0
+	}
+	var pt point
+	r, _, _ := procClientToScreen.Call(uintptr(w.hwnd), uintptr(unsafe.Pointer(&pt)))
+	runtime.KeepAlive(&pt)
+	if r == 0 {
+		return w.Position()
+	}
+	return int(pt.x), int(pt.y)
+}
+
+// CursorScreenPos возвращает текущие экранные координаты курсора мыши в физических пикселях ОС.
+func CursorScreenPos() (xPx, yPx int, ok bool) {
+	var pt point
+	r, _, _ := procGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
+	runtime.KeepAlive(&pt)
+	if r == 0 {
+		return 0, 0, false
+	}
+	return int(pt.x), int(pt.y), true
+}
+
 func (w *win32Window) ClipboardText() (string, error) {
 	r, _, _ := procOpenClipboard.Call(uintptr(w.hwnd))
 	if r == 0 {
@@ -886,6 +917,29 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 			w.height = nh
 			w.emit(Event{Type: EventResize, Width: nw, Height: nh})
 			w.emit(Event{Type: EventPaint})
+		}
+		return 0
+
+	case wmEnterSizeMove:
+		w.inSizeMove = true
+		w.movingByUser = false
+		return 0
+
+	case wmMoving:
+		if w.inSizeMove {
+			w.movingByUser = true
+			x, y := w.Position()
+			w.emit(Event{Type: EventWindowMove, X: x, Y: y})
+		}
+		return 1
+
+	case wmExitSizeMove:
+		wasMoving := w.inSizeMove && w.movingByUser
+		w.inSizeMove = false
+		w.movingByUser = false
+		if wasMoving {
+			x, y := w.Position()
+			w.emit(Event{Type: EventWindowMoveEnd, X: x, Y: y})
 		}
 		return 0
 

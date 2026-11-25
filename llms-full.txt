@@ -17,8 +17,8 @@
 ## Правила работы с API
 
 - **Immediate Mode и многопоточность:** состояние хранится вне `drawFn`; вызовы методов `UI` и чтение/изменение состояния интерфейса выполняются **только в главном потоке** внутри `drawFn`. Для обновления состояния из фоновых горутин всегда используйте `App.Dispatch` (`app.Dispatch(func() { ... })`) или `Remember`. Если второй процесс приложения стартует с уже занятым `Config.SingleInstance.ID`, `App.Run` возвращает `ErrAlreadyRunning` (см. правило «Единственный экземпляр» ниже).
-- **Единицы измерения (`Dp` vs `Px`):** весь API раскладки, опций, оверлеев и ввода Headless (`LayoutRect`, `Tooltip`, `PushOverlay`, `PushNonBlockingOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`, `InjectMouse*`, `CurrentArea`, `MousePosDp`) работает строго в логических `Dp`. Физические `Px` используются только в колбэках рисования (`CanvasView`, `InteractiveCanvas`, `Table`, `ListView`), прямых методах (`DrawText`, `DrawSVG`, `CurrentAreaPx`, `MousePosPx`, `LastDirtyRectsPx`, `TitleBarHitTest`, `InjectMouse*Px`) и на границе ОС (`Config`, `Window`).
-- **`Rect` и `PointF` не типизированы по единицам:** `Rect` содержит `int`-поля, `PointF` — `float32`. В `Dp`-API (`CurrentArea`, `LayoutRect`, `PushOverlay`, `PushNonBlockingOverlay`, `Tooltip`, `Popover`, `ContextMenu`, `RegisterHoverArea`) они трактуются как `Dp`, а в колбэках рисования и `CurrentAreaPx`/`LastDirtyRectsPx` — как `Px`.
+- **Единицы измерения (`Dp` vs `Px`):** весь API раскладки, опций, оверлеев и ввода Headless (`LayoutRect`, `Tooltip`, `PushOverlay`, `PushNonBlockingOverlay`, `Popover`, `ContextMenu`, `RegisterHoverArea`, `InjectMouse*`, `CurrentArea`, `MousePosDp`) работает строго в логических `Dp`. Физические `Px` используются только в колбэках рисования (`CanvasView`, `InteractiveCanvas`, `Table`, `ListView`), прямых методах (`DrawText`, `DrawSVG`, `CurrentAreaPx`, `MousePosPx`, `LastDirtyRectsPx`, `ActiveOverlayRects`, `TitleBarHitTest`, `InjectMouse*Px`) и на границе ОС (`Config`, `Window`).
+- **`Rect` и `PointF` не типизированы по единицам:** `Rect` содержит `int`-поля, `PointF` — `float32`. В `Dp`-API (`CurrentArea`, `LayoutRect`, `PushOverlay`, `PushNonBlockingOverlay`, `Tooltip`, `Popover`, `ContextMenu`, `RegisterHoverArea`) они трактуются как `Dp`, а в колбэках рисования и `CurrentAreaPx`/`LastDirtyRectsPx`/`ActiveOverlayRects` — как `Px`.
 - **Холст (`Canvas`) и текст на нём:** все методы `Canvas` принимают и возвращают физические `Px` (конвертация — через `Scale`/`ScaleF`/`PxToDp`/`PxToDpf`). У `UI.DrawText` и `UI.DrawSVG` единицы смешанные: координаты `(xPx, yPx)` — в `Px`, а размер (`sizeDp`) — в `Dp`; у `Canvas.DrawSVG` и координаты, и размер — в `Px`. У `Canvas` нет метода рисования текста: внутри `CanvasView` / `InteractiveCanvas` текст выводится через `UI.DrawText` в абсолютных координатах `Px` (`areaPx.X + offset`, `areaPx.Y + offset`). `UI.Canvas` возвращает холст текущего кадра для прямой отрисовки вне `CanvasView` (например, в `ListView`/`Table`/`PushOverlay`) — координаты абсолютные `Px` окна с активным клипом.
 - **Статический слой (`StaticLayer`):** `StaticLayer` кеширует результат `fn` между кадрами в отдельный буфер; после изменения данных внутри слоя вызывайте `InvalidateStatic`, иначе слой не перерисуется.
 - **Единственный экземпляр (`SingleInstanceGuard`):** два варианта. (а) Ручной: `anyui.AcquireSingleInstance` → `SingleInstanceGuard.SetCallback` (получает `args []string` второго экземпляра) → `SingleInstanceGuard.StartIPC` после запуска цикла событий → `SingleInstanceGuard.Close` при выходе. (б) Декларативный: заполните `Config.SingleInstance` (`ID` или заранее полученный `Guard`, опционально `OnSecondInstance`, `SkipActivate`, `Args`) — `App` сам захватит экземпляр, сам вызовет `SingleInstanceGuard.StartIPC`, сам закроет guard при выходе и сам доставит `OnSecondInstance`; вручную `SingleInstanceGuard.SetCallback`/`SingleInstanceGuard.StartIPC`/`SingleInstanceGuard.Close` в этом варианте вызывать **не нужно** (свой callback будет перезаписан).
@@ -30,7 +30,7 @@
 - **Идентификаторы, ключи и `IDScope`:** `IDScope` (или `PushID`/`PopID`) изолирует `id` виджетов внутри циклов и переиспользуемых компонентов. Передача пустого `id == ""` автоматически генерирует детерминированный идентификатор по порядковому номеру виджета в текущем `IDScope`. В `Select`, `MultiSelect`, `TabBar`, `TreeView`, `TreeViewEx` и `Breadcrumbs` ключи элементов (`Key` / `ID`) локальны для конкретного виджета и должны быть уникальны в его пределах — при дублировании ключей выделение и клик совпадут для всех дубликатов. В `Breadcrumbs`, если у сегмента `ID == ""`, возвращается его `Label`.
 - **Выпадающие списки и вкладки:** `Select` с опцией `Searchable` заменяет комбобокс; `MultiSelect` работает с `map[string]bool`; `TabBar` и `TabItems` работают на строковых ключах.
 - **Раскладка и оверлеи:** для типового экрана используйте `Page` или `DockTop` / `DockBottom` / `ColumnFlex`. Для диалогов всегда используйте `Modal` — `PushOverlay` предназначен только для небольших всплывающих контролов.
-- **Точки расширения для нативных интеграций:** `Window.NativeHandle` возвращает нативный дескриптор окна ОС (HWND на Windows, XID на X11, ID wl_surface на Wayland, NSWindow* на macOS; `0` в `Headless`), а `HasActiveOverlays` возвращает признак наличия активных оверлеев (`Modal`, `Popover`, `FloatingPanel`, `Drawer`, `ContextMenu`, `Select`, `Tooltip`, `PushOverlay`), позволяя внешним нативным поверхностям уступать z-order и переключаться на софтверный фолбэк (`Canvas.DrawBGRAFast`).
+- **Точки расширения для нативных интеграций:** `Window.NativeHandle` возвращает нативный дескриптор окна ОС (HWND на Windows, XID на X11, ID wl_surface на Wayland, NSWindow* на macOS; `0` в `Headless`), `HasActiveOverlays` возвращает признак наличия активных оверлеев, а `ActiveOverlayRects` — их прямоугольники в `Px` (включая `Tooltip`, `PushNonBlockingOverlay` и уведомления `ShowToast`), позволяя внешним нативным поверхностям уступать z-order и переключаться на софтверный фолбэк (`Canvas.DrawBGRAFast`) только при реальном пересечении.
 - **Drag & Drop (Reorder и кросс-виджетный перенос):** `Reorderable` + `OnReorder` работают внутри `Table`, `TableEx`, `ListView`, `ListViewEx` (индексы `FromIndex`/`ToIndex`) и `TreeView`, `TreeViewEx` (ключи `FromKey`/`ToKey`; с `AllowReparent` доступны смена родителя и `DropInside`). Для кросс-виджетного переноса (например, `TreeView` → `Table`) используйте `DragSource` с типизированным `DragPayload` на источнике и `AcceptDrop` + `OnDrop` на приёмнике.
 - **Горячие клавиши (`Key`) и Headless-тесты:** из букв экспортированы базовые константы (`KeyA`, `KeyC`, `KeyV`, `KeyX`, `KeyY`, `KeyZ`); для остальных клавиш в `Shortcut` / `InjectKey` передавайте виртуальный код `anyui.Key('S')` или VK-код (например, `0x70` для F1). Для `anyui.NewHeadless` обязательно указывать `Config.FontRegular` (для детерминированных тестов используйте `anyui.DefaultTestFonts`).
 
@@ -39,7 +39,7 @@
 - `Button`, `IconButton`, `Hyperlink` → `bool`: `true` **только в кадре нажатия**.
 - `Toggle`, `Checkbox`, `RadioButton`, `RadioGroup`, `TextInput`, `TextArea`, `MaskedInput`, `Select`, `MultiSelect`, `TagInput`, `Slider`, `RangeSlider`, `NumberInput`, `ColorPicker`, `DatePicker`, `TimePicker`, `DateTimePicker`, `ListView`, `ListViewEx`, `TreeView`, `TreeViewEx`, `Pagination`, `Collapsible`, `Accordion` → `bool`: `true` **только в кадре изменения значения** (не означает «виджет сейчас активен/включён»; текущее состояние хранится в переданном указателе/карте).
 - `Breadcrumbs` → `string`: возвращает `ID` кликнутого сегмента (или `Label`, если `ID == ""`), либо `""` если клика в этом кадре не было.
-- `TabBar` → `TabBarEvent`: `SelectedID` (смена вкладки), `ClosedID` (клик по крестику/СКМ), `Added` (клик по `+`), `MovedFrom`/`MovedTo` (перетаскивание, `-1` если не было), `DetachedID` (отрыв вкладки).
+- `TabBar` → `TabBarEvent`: `SelectedID` (смена вкладки), `ClosedID` (клик по крестику/СКМ), `Added` (клик по `+`), `MovedFrom`/`MovedTo` (перетаскивание, `-1` если не было), `DetachedID` (отрыв вкладки), `AttachedID`/`AttachedIndex` (обратное прикрепление откреплённого окна, `-1` если не было).
 - `Table`, `TableEx` → `TableEvent`: `RowClicked`, `RowDoubleClicked`, `RowMiddleClicked` (`-1` если события не было), `SortChanged`, `ColumnResized`, `Drag`.
 
 ## Асинхронная загрузка данных (`Remember`)
@@ -433,12 +433,14 @@ type TabItem struct {
 }
 
 type TabBarEvent struct {
-	SelectedID string
-	ClosedID   string
-	Added      bool
-	MovedFrom  int
-	MovedTo    int
-	DetachedID string
+	SelectedID    string
+	ClosedID      string
+	Added         bool
+	MovedFrom     int
+	MovedTo       int
+	DetachedID    string
+	AttachedID    string
+	AttachedIndex int
 }
 
 type SelectItem struct {
@@ -806,6 +808,7 @@ func (w *Window) Maximize()
 func (w *Window) Minimize()
 func (w *Window) NativeHandle() uintptr
 func (w *Window) Position() (xPx, yPx int)
+func (w *Window) ReattachTabID() string
 func (w *Window) Restore()
 func (w *Window) RestoreState(state WindowState)
 func (w *Window) SetAlwaysOnTop(onTop bool)
@@ -821,7 +824,10 @@ func (w *Window) SetOnDragEnter(fn func(xPx, yPx int, hasFiles bool))
 func (w *Window) SetOnDragLeave(fn func())
 func (w *Window) SetOnDragOver(fn func(xPx, yPx int, hasFiles bool))
 func (w *Window) SetOnDropFiles(fn func(files []string, xPx, yPx int))
+func (w *Window) SetOnMove(fn func(xPx, yPx int))
+func (w *Window) SetOnMoveEnd(fn func(xPx, yPx int))
 func (w *Window) SetPosition(xPx, yPx int)
+func (w *Window) SetReattachTabID(tabID string)
 func (w *Window) SetSize(widthPx, heightPx int)
 func (w *Window) SetStrings(s Strings)
 func (w *Window) SetTheme(theme Theme)
@@ -870,6 +876,7 @@ func (h *Headless) Window() *Window
 
 ```go
 func (u *UI) Accordion(id string, items []AccordionItem, openIDs map[string]bool, opts ...Option) bool
+func (u *UI) ActiveOverlayRects() []Rect
 func (u *UI) Anchor(id string)
 func (u *UI) App() *App
 func (u *UI) Badge(text string, opts ...Option)

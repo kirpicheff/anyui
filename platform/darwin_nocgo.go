@@ -24,3 +24,8 @@ func NewTray(cfg TrayConfig) (Tray, error) {
 	return nil, errDarwinRequiresCGO
 }
 
+// CursorScreenPos возвращает текущие экранные координаты курсора мыши.
+func CursorScreenPos() (xPx, yPx int, ok bool) {
+	return 0, 0, false
+}
+

@@ -17,8 +17,9 @@ type stylerMockWindow struct {
 	captionCol  *platform.WindowColor
 	textCol     *platform.WindowColor
 	borderCol   *platform.WindowColor
-	brought     int
-	wakeUps     int
+	brought         int
+	wakeUps         int
+	invalidates     int
 	presents        int
 	presentRects    int
 	lastPresentRect render.Rect
@@ -32,7 +33,7 @@ func (m *stylerMockWindow) PresentRect(_ []byte, _, _, x, y, w, h int) {
 	m.presentRects++
 	m.lastPresentRect = render.Rect{X: x, Y: y, W: w, H: h}
 }
-func (m *stylerMockWindow) Invalidate()                             {}
+func (m *stylerMockWindow) Invalidate()                             { m.invalidates++ }
 func (m *stylerMockWindow) WakeUp()                                 { m.wakeUps++ }
 func (m *stylerMockWindow) Show()                                   {}
 func (m *stylerMockWindow) Hide()                                   {}
@@ -716,6 +717,74 @@ func TestDirectInputWithOpenOverlay(t *testing.T) {
 	}
 	if mouseDowns != 0 {
 		t.Fatalf("основной DirectInput-холст не должен получать клик внутри оверлея: got mouseDowns=%d", mouseDowns)
+	}
+}
+
+func TestWindowReattachTabToTargetTabBar(t *testing.T) {
+	app := NewApp(Config{Title: "Main"})
+	mwMain := &stylerMockWindow{w: 600, h: 400}
+	mwDetached := &stylerMockWindow{w: 400, h: 300}
+
+	ctxMain := ui.NewContext(mwMain, nil)
+	ctxDetached := ui.NewContext(mwDetached, nil)
+
+	tabs := []TabItem{
+		{ID: "t1", Title: "Tab 1"},
+		{ID: "t2", Title: "Tab 2"},
+	}
+	active := "t1"
+	var attachedID string
+	var attachedIdx int
+
+	mainWin := &Window{
+		app:     app,
+		platWin: mwMain,
+		ctx:     ctxMain,
+		drawFn: func(u *UI) {
+			ev := u.TabBar("main_tabs", tabs, &active)
+			if ev.AttachedID != "" {
+				attachedID = ev.AttachedID
+				attachedIdx = ev.AttachedIndex
+			}
+		},
+	}
+	mainWin.ui = &UI{ctx: ctxMain, win: mainWin}
+
+	detachedWin := &Window{
+		app:     app,
+		platWin: mwDetached,
+		ctx:     ctxDetached,
+	}
+	detachedWin.ui = &UI{ctx: ctxDetached, win: detachedWin}
+	detachedWin.SetReattachTabID("t3")
+
+	app.windows = []*Window{mainWin, detachedWin}
+	app.mainWin = mainWin
+
+	// Первичный рендер главного окна, чтобы зарегистрировать TabBar
+	mainWin.handleEvent(platform.Event{Type: platform.EventPaint})
+
+	// Имитируем курсор над второй позицией TabBar главного окна (clientOrigin у stylerMockWindow = 0,0)
+	curX, curY := 180, 18
+	app.cursorScreenFn = func() (int, int, bool) {
+		return curX, curY, true
+	}
+
+	// Перетаскивание откреплённого окна над TabBar должно сразу перерисовать главное окно с индикатором вставки
+	mwMain.presents = 0
+	detachedWin.handleEvent(platform.Event{Type: platform.EventWindowMove, X: 100, Y: 5})
+	if mwMain.presents == 0 {
+		t.Fatal("ожидалась перерисовка главного окна с индикатором вставки при EventWindowMove")
+	}
+
+	// Завершение перетаскивания над TabBar должно сразу доставить AttachedID в drawFn главного окна
+	mwMain.presents = 0
+	detachedWin.handleEvent(platform.Event{Type: platform.EventWindowMoveEnd, X: 100, Y: 5})
+	if mwMain.presents == 0 {
+		t.Fatal("ожидалась перерисовка главного окна при EventWindowMoveEnd над TabBar")
+	}
+	if attachedID != "t3" || attachedIdx != 1 {
+		t.Fatalf("ожидалось AttachedID=t3 AttachedIndex=1, получено id=%q idx=%d", attachedID, attachedIdx)
 	}
 }
 

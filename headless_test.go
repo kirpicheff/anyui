@@ -475,3 +475,83 @@ func TestHeadlessHasActiveOverlays(t *testing.T) {
 		t.Fatal("после снятия PushOverlay ожидалось HasActiveOverlays() == false")
 	}
 }
+
+func TestHeadlessActiveOverlayRects(t *testing.T) {
+	var nilUI *UI
+	if rects := nilUI.ActiveOverlayRects(); len(rects) != 0 {
+		t.Fatalf("ожидался пустой срез для nil *UI, получено %v", rects)
+	}
+
+	reg, bold, mono := DefaultTestFonts()
+	h, err := NewHeadless(Config{
+		Width:       640,
+		Height:      480,
+		FontRegular: reg,
+		FontBold:    bold,
+		FontMono:    mono,
+	})
+	if err != nil {
+		t.Fatalf("ошибка создания Headless: %v", err)
+	}
+	defer h.Close()
+
+	showNonBlocking := false
+	showModal := false
+	var rectsDuringDraw []Rect
+
+	h.SetDraw(func(ui *UI) {
+		rectsDuringDraw = ui.ActiveOverlayRects()
+		ui.Label("Базовый экран")
+		if showNonBlocking {
+			ui.PushNonBlockingOverlay(Rect{X: 10, Y: 12, W: 140, H: 36}, func() {
+				ui.Label("Подсказка")
+			})
+		}
+		if showModal {
+			ui.Modal("dlg_rects", &showModal, "Окно", func() {
+				ui.Label("Содержимое")
+			})
+		}
+	})
+
+	// 1. Без оверлеев — пусто
+	h.Step()
+	if len(rectsDuringDraw) != 0 || len(h.UI().ActiveOverlayRects()) != 0 {
+		t.Fatalf("ожидался пустой срез без оверлеев, получено during=%v post=%v", rectsDuringDraw, h.UI().ActiveOverlayRects())
+	}
+
+	// 2. PushNonBlockingOverlay попадает в ActiveOverlayRects() и сохраняется в начале следующего кадра
+	showNonBlocking = true
+	h.Step()
+	post := h.UI().ActiveOverlayRects()
+	wantNonBlocking := Rect{X: 10, Y: 12, W: 140, H: 36}
+	if len(post) != 1 || post[0] != wantNonBlocking {
+		t.Fatalf("ожидался прямоугольник %+v для PushNonBlockingOverlay, получено %+v", wantNonBlocking, post)
+	}
+	h.Step()
+	if len(rectsDuringDraw) != 1 || rectsDuringDraw[0] != wantNonBlocking {
+		t.Fatalf("в начале следующего кадра (во время OnDraw) ожидался %+v из prevRects, получено %+v", wantNonBlocking, rectsDuringDraw)
+	}
+
+	// 3. После снятия PushNonBlockingOverlay через 2 кадра список пуст
+	showNonBlocking = false
+	h.Step()
+	h.Step()
+	if len(h.UI().ActiveOverlayRects()) != 0 {
+		t.Fatalf("после снятия PushNonBlockingOverlay ожидался пустой срез, получено %+v", h.UI().ActiveOverlayRects())
+	}
+
+	// 4. Toast также отражается в ActiveOverlayRects()
+	h.UI().ShowToast("Уведомление", "Проверка", ToastInfo, 3*time.Second)
+	h.Step()
+	if len(h.UI().ActiveOverlayRects()) == 0 {
+		t.Fatal("ожидался непустой срез ActiveOverlayRects() при активном Toast")
+	}
+
+	// 5. Modal также добавляет прямоугольник
+	showModal = true
+	h.Step()
+	if len(h.UI().ActiveOverlayRects()) < 2 {
+		t.Fatalf("ожидались прямоугольники Modal и Toast, получено %+v", h.UI().ActiveOverlayRects())
+	}
+}
