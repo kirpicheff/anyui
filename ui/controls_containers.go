@@ -336,6 +336,10 @@ func (c *Context) ScrollView(id string, fn func(), opts ...Option) {
 	if newMaxSc < 0 {
 		newMaxSc = 0
 	}
+	newMaxScX := si.contentW - r.W
+	if newMaxScX < 0 {
+		newMaxScX = 0
+	}
 	if st.ScrollToID != "" && si.lastScrollID != st.ScrollToID {
 		targetID := st.ScrollToID
 		if offsets, ok := c.svChildOffsets[id]; ok {
@@ -368,15 +372,34 @@ func (c *Context) ScrollView(id string, fn func(), opts ...Option) {
 		}
 	}
 
-	if maxSc > 0 && si.contentH > 0 && vTrackLen > 0 {
-		thumbH := (vTrackLen * r.H) / si.contentH
+	if si.y > newMaxSc {
+		si.y = newMaxSc
+	}
+	if si.x > newMaxScX {
+		si.x = newMaxScX
+	}
+	if (newMaxSc > 0) != (maxSc > 0) || (newMaxScX > 0) != (maxScX > 0) {
+		c.RequestRedraw()
+	}
+
+	drawVTrackLen := r.H
+	if newMaxScX > 0 {
+		drawVTrackLen -= barW + c.Scale(2).Int()
+	}
+	drawHTrackLen := r.W
+	if newMaxSc > 0 {
+		drawHTrackLen -= barW + c.Scale(2).Int()
+	}
+
+	if newMaxSc > 0 && si.contentH > 0 && drawVTrackLen > 0 {
+		thumbH := (drawVTrackLen * r.H) / si.contentH
 		if thumbH < c.Scale(24).Int() {
 			thumbH = c.Scale(24).Int()
 		}
-		if thumbH > vTrackLen {
-			thumbH = vTrackLen
+		if thumbH > drawVTrackLen {
+			thumbH = drawVTrackLen
 		}
-		thumbY := r.Y + ((vTrackLen - thumbH) * si.y / maxSc)
+		thumbY := r.Y + ((drawVTrackLen - thumbH) * si.y / newMaxSc)
 		col := c.Theme.TextMuted.WithAlpha(110)
 		if si.dragging {
 			col = c.Theme.Accent
@@ -388,15 +411,15 @@ func (c *Context) ScrollView(id string, fn func(), opts ...Option) {
 			H: thumbH,
 		}, c.ScaleF(4), col)
 	}
-	if maxScX > 0 && si.contentW > 0 && hTrackLen > 0 {
-		thumbW := (hTrackLen * r.W) / si.contentW
+	if newMaxScX > 0 && si.contentW > 0 && drawHTrackLen > 0 {
+		thumbW := (drawHTrackLen * r.W) / si.contentW
 		if thumbW < c.Scale(24).Int() {
 			thumbW = c.Scale(24).Int()
 		}
-		if thumbW > hTrackLen {
-			thumbW = hTrackLen
+		if thumbW > drawHTrackLen {
+			thumbW = drawHTrackLen
 		}
-		thumbX := r.X + ((hTrackLen - thumbW) * si.x / maxScX)
+		thumbX := r.X + ((drawHTrackLen - thumbW) * si.x / newMaxScX)
 		col := c.Theme.TextMuted.WithAlpha(110)
 		if si.draggingH {
 			col = c.Theme.Accent

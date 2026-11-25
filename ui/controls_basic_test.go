@@ -292,6 +292,68 @@ func TestScrollViewWheel(t *testing.T) {
 	_ = render.Rect{}
 }
 
+func TestScrollViewCardAutoHeightNoGhostScrollbar(t *testing.T) {
+	ctx := newTestContext(300, 340)
+	bg := ctx.Theme.Bg
+
+	// 1. Новая карточка внутри ScrollView не должна оставлять призрачный скроллбар после Render.
+	ctx.Render(func(c *Context) {
+		c.ScrollView("sv_card", func() {
+			c.CardOpts(func() {
+				c.allocRect(100, 40)
+			}, Padding(8))
+		}, Width(300), Height(300))
+	})
+
+	barX := 300 - 8 - 2 + 4
+	for y := 80; y < 296; y += 10 {
+		off := (y*ctx.Canvas.Width + barX) * 4
+		gotB, gotG, gotR := ctx.Canvas.Pixels[off], ctx.Canvas.Pixels[off+1], ctx.Canvas.Pixels[off+2]
+		if gotR != bg.R || gotG != bg.G || gotB != bg.B {
+			t.Fatalf("в области скроллбара (%d, %d) обнаружен артефакт RGB(%d,%d,%d) вместо фона RGB(%d,%d,%d)",
+				barX, y, gotR, gotG, gotB, bg.R, bg.G, bg.B)
+		}
+	}
+
+	// 2. Сценарий чата: кнопка ниже ScrollView добавляет новое сообщение по клику на pass 0.
+	// За один вызов Render должно хватить проходов, чтобы новая CardOpts измерилась и не показала скроллбар.
+	messages := 1
+	drawChat := func(c *Context) {
+		c.ScrollView("sv_chat", func() {
+			for i := 0; i < messages; i++ {
+				c.CardOpts(func() {
+					c.allocRect(100, 30)
+				}, Padding(8))
+			}
+		}, Width(300), Height(300))
+		if c.ButtonOpts("send_btn", "Отправить", Width(120), Height(32)) {
+			messages++
+		}
+	}
+
+	ctx.Render(drawChat)
+	ctx.MouseX, ctx.MouseY = 40, 320
+	ctx.MousePressed = true
+	ctx.MouseDown = true
+	ctx.Render(drawChat)
+	ctx.MousePressed = false
+	ctx.MouseDown = false
+	ctx.MouseReleased = true
+	ctx.Render(drawChat)
+
+	if messages != 2 {
+		t.Fatalf("ожидалось messages == 2 после клика, получено %d", messages)
+	}
+	for y := 150; y < 296; y += 10 {
+		off := (y*ctx.Canvas.Width + barX) * 4
+		gotB, gotG, gotR := ctx.Canvas.Pixels[off], ctx.Canvas.Pixels[off+1], ctx.Canvas.Pixels[off+2]
+		if gotR != bg.R || gotG != bg.G || gotB != bg.B {
+			t.Fatalf("после добавления сообщения по клику в (%d, %d) остался скроллбар RGB(%d,%d,%d)",
+				barX, y, gotR, gotG, gotB)
+		}
+	}
+}
+
 func TestModalAutoHeight(t *testing.T) {
 	ctx := newTestContext(800, 600)
 	open := true

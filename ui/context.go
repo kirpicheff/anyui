@@ -858,8 +858,9 @@ func (c *Context) Render(drawFn func(ctx *Context)) {
 		c.wakeOnlyFrame = false
 	}
 
-	// Максимум 2 прохода на случай, если событие изменило состояние виджета
-	for pass := 0; pass < 2; pass++ {
+	// Максимум 4 прохода: событие на 1-м проходе может изменить состояние и породить
+	// новые виджеты с двухпроходным расчётом (Card AutoHeight, Justify, ScrollView).
+	for pass := 0; pass < 4; pass++ {
 		c.beginFrame()
 		drawFn(c)
 		c.endFrame()
