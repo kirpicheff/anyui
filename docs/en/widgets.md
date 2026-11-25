@@ -194,28 +194,28 @@ AnyUI provides a dedicated set of containers for overlays and floating UI elemen
   - Includes a header with title and close button `×`, automatically closes on `Escape` key press (`*open = false`).
   - Options: `anyui.Width(wDp)` (default 440 dp), `anyui.Height(hDp)` (default 280 dp), `anyui.AutoHeight()` / `anyui.Height(anyui.Auto)` (automatically fits height to content within window bounds), `anyui.MinHeight(...)`, `anyui.MaxHeight(...)`.
   - **Important:** always use `ui.Modal` for modal dialogs. Do not construct homemade modals with `PushOverlay(fullRect)` — this marks the entire screen as input-blocked on subsequent frames.
+  - **Critical for `open *bool`:** `Modal` (as well as `Popover`, `FloatingPanel`, and `Drawer`) defers rendering, `×` click handling, and `fn` execution until the end of the frame via `PushOverlay`. Always pass a pointer directly to a persistent state field (e.g., `&st.showLoginModal`), never a local copy (`open := st.showLoginModal; ui.Modal(..., &open, ...); st.showLoginModal = open` — this breaks closing via `×` and buttons inside `fn`).
 
 ```go
-var showLoginModal bool
-
+// st is the application state struct living outside drawFn.
 if ui.Button("btn_open_login", "Log In") {
-    showLoginModal = true
+    st.showLoginModal = true
 }
 
-ui.Modal("modal_login", &showLoginModal, "Authentication", func() {
+ui.Modal("modal_login", &st.showLoginModal, "Authentication", func() {
     ui.Column(12, func() {
         ui.Label("Enter your credentials:")
-        ui.TextInput("login_email", &email, "Email", anyui.FillWidth())
-        ui.TextInput("login_pass", &pass, "Password", anyui.Password(), anyui.FillWidth())
+        ui.TextInput("login_email", &st.email, "Email", anyui.FillWidth())
+        ui.TextInput("login_pass", &st.pass, "Password", anyui.Password(), anyui.FillWidth())
         ui.RowWith(anyui.AlignCenter, anyui.JustifyEnd, 8, 36,
             func() {
                 if ui.Button("btn_cancel", "Cancel", anyui.Secondary()) {
-                    showLoginModal = false
+                    st.showLoginModal = false
                 }
             },
             func() {
                 if ui.Button("btn_submit", "Log In", anyui.Primary()) {
-                    showLoginModal = false
+                    st.showLoginModal = false
                 }
             },
         )

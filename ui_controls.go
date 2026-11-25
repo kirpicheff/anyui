@@ -100,6 +100,8 @@ func (u *UI) ScrollView(id string, fn func(), opts ...Option) {
 }
 
 // Modal рисует модальное окно с затемнением фона и блокировкой кликов под ним.
+// В open передавайте указатель напрямую на долгоживущее поле состояния (не локальную копию),
+// так как отрисовка и закрытие по '×' выполняются в конце кадра внутри PushOverlay.
 func (u *UI) Modal(id string, open *bool, title string, fn func(), opts ...Option) {
 	u.ctx.Modal(id, open, title, fn, opts...)
 }

@@ -436,6 +436,8 @@ func (c *Context) ScrollView(id string, fn func(), opts ...Option) {
 // Modal рисует модальное окно с затемнением фона и блокировкой ввода под ним.
 // По умолчанию имеет размер 440×280 dp; при передаче AutoHeight() или Height(Auto)
 // автоматически подбирает высоту по содержимому (с учётом MinHeight/MaxHeight и высоты окна).
+// В open передавайте указатель напрямую на долгоживущее поле состояния (не локальную копию),
+// так как отрисовка и закрытие по '×' выполняются в конце кадра внутри PushOverlay.
 func (c *Context) Modal(id string, open *bool, title string, fn func(), opts ...Option) {
 	if open == nil || !*open {
 		return
