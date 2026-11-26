@@ -52,26 +52,35 @@ func (km *x11KeyMap) lookup(code xproto.Keycode, state uint16) (xproto.Keysym, x
 		return 0, 0
 	}
 
-	baseSym := km.keysyms[idx]
+	latinBase := km.keysyms[idx]
+
+	// Активная XKB-группа раскладки хранится в битах 13..14 поля state.
+	group := int((state >> 13) & 0x03)
+	groupIdx := idx + group*2
+	if group > 0 && (group*2 >= km.symsPerCode || groupIdx >= len(km.keysyms) || km.keysyms[groupIdx] == 0) {
+		groupIdx = idx
+	}
+
+	baseSym := km.keysyms[groupIdx]
 	shiftSym := baseSym
-	if km.symsPerCode > 1 && idx+1 < len(km.keysyms) && km.keysyms[idx+1] != 0 {
-		shiftSym = km.keysyms[idx+1]
+	if groupIdx+1 < idx+km.symsPerCode && groupIdx+1 < len(km.keysyms) && km.keysyms[groupIdx+1] != 0 {
+		shiftSym = km.keysyms[groupIdx+1]
 	}
 
 	shift := (state & xproto.ModMaskShift) != 0
 	caps := (state & xproto.ModMaskLock) != 0
 
 	if shift {
-		return shiftSym, baseSym
+		return shiftSym, latinBase
 	}
 	if caps && isLowerLetterKeysym(baseSym) {
-		return shiftSym, baseSym
+		return shiftSym, latinBase
 	}
-	return baseSym, baseSym
+	return baseSym, latinBase
 }
 
 func isLowerLetterKeysym(sym xproto.Keysym) bool {
-	return (sym >= 'a' && sym <= 'z') || (sym >= 0x06C0 && sym <= 0x06DF) || (sym >= 0x01000430 && sym <= 0x0100044F)
+	return (sym >= 'a' && sym <= 'z') || sym == 0x06A3 || (sym >= 0x06C0 && sym <= 0x06DF) || (sym >= 0x01000430 && sym <= 0x0100044F)
 }
 
 func modifiersFromX11State(state uint16) Modifiers {

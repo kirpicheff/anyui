@@ -125,3 +125,47 @@ func TestX11PropertyChunkBounds(t *testing.T) {
 		}
 	}
 }
+
+func TestX11KeyMapXKBGroupLookup(t *testing.T) {
+	km := &x11KeyMap{
+		minKeycode:  38,
+		maxKeycode:  39,
+		symsPerCode: 4,
+		keysyms: []xproto.Keysym{
+			// Keycode 38: латиница 'a'/'A', кириллица 'ф'/'Ф'
+			'a', 'A', 0x06C6, 0x06E6,
+			// Keycode 39: латиница '`'/'~', кириллица 'ё'/'Ё'
+			'`', '~', 0x06A3, 0x06B3,
+		},
+	}
+
+	// Группа 0 (латиница)
+	sym, base := km.lookup(38, 0)
+	if sym != 'a' || base != 'a' {
+		t.Fatalf("group 0: got (%#x, %#x), want ('a', 'a')", sym, base)
+	}
+
+	// Группа 1 (кириллица) без Shift: sym='ф', но base='a' (для горячих клавиш Ctrl+...)
+	sym, base = km.lookup(38, 1<<13)
+	if sym != 0x06C6 || base != 'a' || x11KeysymToRune(sym) != 'ф' {
+		t.Fatalf("group 1: got sym=%#x (%q), base=%#x, want 'ф' and 'a'", sym, x11KeysymToRune(sym), base)
+	}
+
+	// Группа 1 + Shift: sym='Ф'
+	sym, base = km.lookup(38, (1<<13)|xproto.ModMaskShift)
+	if sym != 0x06E6 || base != 'a' || x11KeysymToRune(sym) != 'Ф' {
+		t.Fatalf("group 1 + Shift: got sym=%#x (%q), base=%#x, want 'Ф' and 'a'", sym, x11KeysymToRune(sym), base)
+	}
+
+	// Группа 1 + CapsLock для 'ё' -> 'Ё'
+	sym, _ = km.lookup(39, (1<<13)|xproto.ModMaskLock)
+	if sym != 0x06B3 || x11KeysymToRune(sym) != 'Ё' {
+		t.Fatalf("group 1 + CapsLock (ё): got sym=%#x (%q), want 'Ё'", sym, x11KeysymToRune(sym))
+	}
+
+	// Пустая группа 2 откатывается на группу 0
+	sym, base = km.lookup(38, 2<<13)
+	if sym != 'a' || base != 'a' {
+		t.Fatalf("fallback group 2: got (%#x, %#x), want ('a', 'a')", sym, base)
+	}
+}
