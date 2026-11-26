@@ -168,4 +168,29 @@ func TestX11KeyMapXKBGroupLookup(t *testing.T) {
 	if sym != 'a' || base != 'a' {
 		t.Fatalf("fallback group 2: got (%#x, %#x), want ('a', 'a')", sym, base)
 	}
+
+	// Реальная Xorg core-карта при pc105 (symsPerCode=6): группа 0 занимает 4 слота, группа 1 — со смещения 4.
+	xorgSyms := []xproto.Keysym{
+		'a', 'A', 'a', 'A', 0x06C6, 0x06E6,
+		's', 'S', 's', 'S', 0x06D9, 0x06F9,
+	}
+	stride := detectX11GroupStride(38, 39, 6, xorgSyms)
+	if stride != 4 {
+		t.Fatalf("detectX11GroupStride = %d, want 4", stride)
+	}
+	kmXorg := &x11KeyMap{
+		minKeycode:  38,
+		maxKeycode:  39,
+		symsPerCode: 6,
+		groupStride: stride,
+		keysyms:     xorgSyms,
+	}
+	sym, base = kmXorg.lookup(38, 1<<13)
+	if sym != 0x06C6 || base != 'a' || x11KeysymToRune(sym) != 'ф' {
+		t.Fatalf("xorg group 1: got sym=%#x (%q), base=%#x, want 'ф' and 'a'", sym, x11KeysymToRune(sym), base)
+	}
+	sym, base = kmXorg.lookup(39, (1<<13)|xproto.ModMaskShift)
+	if sym != 0x06F9 || base != 's' || x11KeysymToRune(sym) != 'Ы' {
+		t.Fatalf("xorg group 1 + Shift: got sym=%#x (%q), base=%#x, want 'Ы' and 's'", sym, x11KeysymToRune(sym), base)
+	}
 }

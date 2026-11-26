@@ -13,11 +13,12 @@ import (
 )
 
 type x11KeyMap struct {
-	mu           sync.RWMutex
-	minKeycode   xproto.Keycode
-	maxKeycode   xproto.Keycode
-	symsPerCode  int
-	keysyms      []xproto.Keysym
+	mu          sync.RWMutex
+	minKeycode  xproto.Keycode
+	maxKeycode  xproto.Keycode
+	symsPerCode int
+	groupStride int
+	keysyms     []xproto.Keysym
 }
 
 func newX11KeyMap(conn *xgb.Conn, setup *xproto.SetupInfo) *x11KeyMap {
@@ -32,12 +33,47 @@ func (km *x11KeyMap) refresh(conn *xgb.Conn, setup *xproto.SetupInfo) {
 	if err != nil || reply == nil {
 		return
 	}
+	symsPerCode := int(reply.KeysymsPerKeycode)
+	stride := detectX11GroupStride(setup.MinKeycode, setup.MaxKeycode, symsPerCode, reply.Keysyms)
+
 	km.mu.Lock()
 	km.minKeycode = setup.MinKeycode
 	km.maxKeycode = setup.MaxKeycode
-	km.symsPerCode = int(reply.KeysymsPerKeycode)
+	km.symsPerCode = symsPerCode
+	km.groupStride = stride
 	km.keysyms = reply.Keysyms
 	km.mu.Unlock()
+}
+
+func detectX11GroupStride(minKeycode, maxKeycode xproto.Keycode, symsPerCode int, keysyms []xproto.Keysym) int {
+	if symsPerCode <= 4 {
+		return 2
+	}
+	// В Xorg (XkbGetCoreMap) при наличии 4-уровневых клавиш группа 0 занимает слоты [0..3],
+	// а группа 1 начинается со смещения 4. Определяем фактический шаг по клавишам a..z.
+	offset2Diff := 0
+	offset4Diff := 0
+	count := int(maxKeycode-minKeycode) + 1
+	for i := 0; i < count; i++ {
+		idx := i * symsPerCode
+		if idx+4 >= len(keysyms) {
+			break
+		}
+		base := keysyms[idx]
+		if base < 'a' || base > 'z' {
+			continue
+		}
+		if keysyms[idx+2] != 0 && keysyms[idx+2] != base {
+			offset2Diff++
+		}
+		if keysyms[idx+4] != 0 && keysyms[idx+4] != base {
+			offset4Diff++
+		}
+	}
+	if offset4Diff > offset2Diff {
+		return 4
+	}
+	return 2
 }
 
 func (km *x11KeyMap) lookup(code xproto.Keycode, state uint16) (xproto.Keysym, xproto.Keysym) {
@@ -55,9 +91,13 @@ func (km *x11KeyMap) lookup(code xproto.Keycode, state uint16) (xproto.Keysym, x
 	latinBase := km.keysyms[idx]
 
 	// Активная XKB-группа раскладки хранится в битах 13..14 поля state.
+	stride := km.groupStride
+	if stride <= 0 {
+		stride = 2
+	}
 	group := int((state >> 13) & 0x03)
-	groupIdx := idx + group*2
-	if group > 0 && (group*2 >= km.symsPerCode || groupIdx >= len(km.keysyms) || km.keysyms[groupIdx] == 0) {
+	groupIdx := idx + group*stride
+	if group > 0 && (group*stride >= km.symsPerCode || groupIdx >= len(km.keysyms) || km.keysyms[groupIdx] == 0) {
 		groupIdx = idx
 	}
 
