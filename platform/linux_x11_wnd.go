@@ -230,7 +230,9 @@ func runX11EventLoop(onStart func() error) error {
 
 		ev, err := d.conn.WaitForEvent()
 		if err != nil {
-			return err
+			// В xgb WaitForEvent возвращает протокольные ошибки X11 от асинхронных запросов,
+			// тогда как обрыв соединения возвращается как (nil, nil).
+			continue
 		}
 		if ev == nil {
 			return nil
@@ -606,10 +608,7 @@ func (w *x11Window) PresentRect(pixels []byte, width, height, rx, ry, rw, rh int
 	}
 
 	// Fallback на стандартный PutImage (полосами, чтобы не превысить лимит запроса X11)
-	maxBytes := int(xproto.Setup(w.disp.conn).MaximumRequestLength)*4 - 64
-	if maxBytes < 4096 {
-		maxBytes = 4096
-	}
+	maxBytes := x11MaxRequestBytes(w.disp.conn)
 	rowBytes := rw * 4
 	maxRows := maxBytes / rowBytes
 	if maxRows < 1 {
@@ -1010,7 +1009,46 @@ func (w *x11Window) SetIcon(rgba []byte, width, height int) error {
 		argb := (a << 24) | (r << 16) | (g << 8) | b
 		binary.LittleEndian.PutUint32(buf[(2+i)*4:], argb)
 	}
-	return xproto.ChangePropertyChecked(w.disp.conn, xproto.PropModeReplace, w.win, atom, xproto.AtomCardinal, 32, uint32(total), buf).Check()
+	maxBytes := x11MaxRequestBytes(w.disp.conn)
+	for i, bounds := range x11PropertyChunkBounds(len(buf), maxBytes) {
+		chunk := buf[bounds[0]:bounds[1]]
+		mode := byte(xproto.PropModeReplace)
+		if i > 0 {
+			mode = xproto.PropModeAppend
+		}
+		if err := xproto.ChangePropertyChecked(w.disp.conn, mode, w.win, atom, xproto.AtomCardinal, 32, uint32(len(chunk)/4), chunk).Check(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// x11MaxRequestBytes возвращает безопасный лимит полезных данных одного X11-запроса, выровненный по 4 байта.
+func x11MaxRequestBytes(conn *xgb.Conn) int {
+	maxBytes := int(xproto.Setup(conn).MaximumRequestLength)*4 - 64
+	if maxBytes < 4096 {
+		maxBytes = 4096
+	}
+	return maxBytes &^ 3
+}
+
+// x11PropertyChunkBounds разбивает буфер свойства на диапазоны [start, end], не превышающие maxBytes.
+func x11PropertyChunkBounds(totalBytes, maxBytes int) [][2]int {
+	if totalBytes <= 0 {
+		return nil
+	}
+	if maxBytes <= 0 {
+		return [][2]int{{0, totalBytes}}
+	}
+	var bounds [][2]int
+	for offset := 0; offset < totalBytes; offset += maxBytes {
+		end := offset + maxBytes
+		if end > totalBytes {
+			end = totalBytes
+		}
+		bounds = append(bounds, [2]int{offset, end})
+	}
+	return bounds
 }
 
 func (w *x11Window) ClipboardText() (string, error) {

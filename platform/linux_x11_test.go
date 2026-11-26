@@ -102,3 +102,26 @@ func TestHitTestToNetWMMoveResize(t *testing.T) {
 		t.Fatalf("HitBottomRight = (%d, %v), want (4, true)", dir, ok)
 	}
 }
+
+func TestX11PropertyChunkBounds(t *testing.T) {
+	// Маленькая иконка (16x16) укладывается в один запрос.
+	small := x11PropertyChunkBounds((2+16*16)*4, 262076)
+	if len(small) != 1 || small[0] != [2]int{0, 1032} {
+		t.Fatalf("unexpected small icon chunks: %v", small)
+	}
+
+	// Крупная иконка (256x256 = 262152 байт) превышает стандартный лимит X11 и должна разбиваться на чанки, кратные 4 байтам.
+	total := (2 + 256*256) * 4
+	chunks := x11PropertyChunkBounds(total, 262076)
+	if len(chunks) != 2 {
+		t.Fatalf("expected 2 chunks for 256x256 icon, got %d: %v", len(chunks), chunks)
+	}
+	if chunks[0] != [2]int{0, 262076} || chunks[1] != [2]int{262076, total} {
+		t.Fatalf("unexpected chunk bounds: %v", chunks)
+	}
+	for i, c := range chunks {
+		if (c[1]-c[0])%4 != 0 {
+			t.Fatalf("chunk %d size %d is not 4-byte aligned", i, c[1]-c[0])
+		}
+	}
+}

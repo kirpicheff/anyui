@@ -275,7 +275,7 @@ child, err := app.OpenWindow(anyui.Config{
 
 - Бэкенды Linux X11 и Wayland полностью реализованы на чистом Go без CGO (`CGO_ENABLED=0`), что позволяет кросс-компилировать бинарник с Windows (`GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build`).
 - При запуске бэкенд выбирается автоматически (`WAYLAND_DISPLAY` → Wayland, иначе X11, с автоматическим откатом на X11 и переопределением через переменную окружения `ANYUI_BACKEND`).
-- **X11:** используется `MIT-SHM` (`ShmPutImage`) с автоматическим переключением на `PutImage` (например, при работе по SSH / X11-forwarding), `Xft.dpi`, системные курсоры, `Frameless` (`_MOTIF_WM_HINTS` + `_NET_WM_MOVERESIZE`), Drag & Drop файлов (`XDND`), захват мыши (`GrabPointer`) и буфер обмена `CLIPBOARD` (текст UTF-8 и изображения `image/png`).
+- **X11:** используется `MIT-SHM` (`ShmPutImage`) с автоматическим переключением на `PutImage` (например, при работе по SSH / X11-forwarding), `Xft.dpi`, системные курсоры, `Frameless` (`_MOTIF_WM_HINTS` + `_NET_WM_MOVERESIZE`), `_NET_WM_ICON` (с разбиением крупных иконок на части под лимит запроса X11), Drag & Drop файлов (`XDND`), захват мыши (`GrabPointer`) и буфер обмена `CLIPBOARD` (текст UTF-8 и изображения `image/png`).
 - **Wayland:** используются `wl_compositor`, `wl_shm`, `xdg_shell`, `wl_seat` / `wl_pointer` / `wl_keyboard`, `wp_cursor_shape_manager_v1`, `wp_fractional_scale_manager_v1` / `wp_viewporter` для HiDPI и `wl_data_device_manager` для буфера обмена и Drag & Drop.
 - **Системная интеграция:**
   - Диалоги (`OpenFileDialog`, `OpenFilesDialog`, `SaveFileDialog`, `SelectFolderDialog`, `MessageBox`) работают через `zenity`, `yad` или `kdialog` (автоопределение в `PATH`).

@@ -275,7 +275,7 @@ The `anyui` core stays strictly software-rendered (no GPU/D3D11/OpenGL), while e
 
 - Both Linux X11 and Wayland backends are implemented in pure Go without CGO (`CGO_ENABLED=0`), enabling direct cross-compilation from Windows (`GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build`).
 - At runtime, the backend is selected automatically (`WAYLAND_DISPLAY` → Wayland, otherwise X11, with fallback to X11 and `ANYUI_BACKEND` override).
-- **X11:** uses `MIT-SHM` (`ShmPutImage`) with automatic fallback to `PutImage` (e.g., over SSH / X11-forwarding), `Xft.dpi`, system cursors, `Frameless`, `XDND`, `GrabPointer`, and `CLIPBOARD` (UTF-8 text and PNG images).
+- **X11:** uses `MIT-SHM` (`ShmPutImage`) with automatic fallback to `PutImage` (e.g., over SSH / X11-forwarding), `Xft.dpi`, system cursors, `Frameless`, `_NET_WM_ICON` (with chunked property transfer for large icons), `XDND`, `GrabPointer`, and `CLIPBOARD` (UTF-8 text and PNG images).
 - **Wayland:** uses `wl_compositor`, `wl_shm`, `xdg_shell`, `wl_seat` / `wl_pointer` / `wl_keyboard`, `wp_cursor_shape_manager_v1`, `wp_fractional_scale_manager_v1` / `wp_viewporter` for HiDPI, and `wl_data_device_manager` for clipboard and Drag & Drop.
 - **System integration:**
   - Dialogs (`OpenFileDialog`, `OpenFilesDialog`, `SaveFileDialog`, `SelectFolderDialog`, `MessageBox`) use `zenity`, `yad`, or `kdialog` (auto-detected in `PATH`).
