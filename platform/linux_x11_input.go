@@ -90,12 +90,16 @@ func (km *x11KeyMap) lookup(code xproto.Keycode, state uint16) (xproto.Keysym, x
 
 	latinBase := km.keysyms[idx]
 
-	// Активная XKB-группа раскладки хранится в битах 13..14 поля state.
+	// Активная XKB-группа раскладки: в XKB-событиях хранится в битах 13..14 поля state,
+	// а для core-клиентов без XkbUseExtension Xorg кодирует группу 1 через Mod5 (0x80).
 	stride := km.groupStride
 	if stride <= 0 {
 		stride = 2
 	}
 	group := int((state >> 13) & 0x03)
+	if group == 0 && (state&xproto.ModMask5) != 0 {
+		group = 1
+	}
 	groupIdx := idx + group*stride
 	if group > 0 && (group*stride >= km.symsPerCode || groupIdx >= len(km.keysyms) || km.keysyms[groupIdx] == 0) {
 		groupIdx = idx

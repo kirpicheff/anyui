@@ -145,10 +145,20 @@ func TestX11KeyMapXKBGroupLookup(t *testing.T) {
 		t.Fatalf("group 0: got (%#x, %#x), want ('a', 'a')", sym, base)
 	}
 
-	// Группа 1 (кириллица) без Shift: sym='ф', но base='a' (для горячих клавиш Ctrl+...)
+	// Группа 1 (кириллица) через XKB-бит 13 (0x2000) без Shift: sym='ф', но base='a'
 	sym, base = km.lookup(38, 1<<13)
 	if sym != 0x06C6 || base != 'a' || x11KeysymToRune(sym) != 'ф' {
 		t.Fatalf("group 1: got sym=%#x (%q), base=%#x, want 'ф' and 'a'", sym, x11KeysymToRune(sym), base)
+	}
+
+	// Группа 1 (кириллица) через Mod5 (0x80) — так Xorg передаёт группу core-клиентам без XkbUseExtension
+	sym, base = km.lookup(38, xproto.ModMask5|xproto.ModMask2)
+	if sym != 0x06C6 || base != 'a' || x11KeysymToRune(sym) != 'ф' {
+		t.Fatalf("group 1 via Mod5: got sym=%#x (%q), base=%#x, want 'ф' and 'a'", sym, x11KeysymToRune(sym), base)
+	}
+	sym, base = km.lookup(38, xproto.ModMask5|xproto.ModMask2|xproto.ModMaskShift)
+	if sym != 0x06E6 || base != 'a' || x11KeysymToRune(sym) != 'Ф' {
+		t.Fatalf("group 1 via Mod5+Shift: got sym=%#x (%q), base=%#x, want 'Ф' and 'a'", sym, x11KeysymToRune(sym), base)
 	}
 
 	// Группа 1 + Shift: sym='Ф'
