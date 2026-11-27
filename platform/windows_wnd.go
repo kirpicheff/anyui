@@ -1237,7 +1237,26 @@ func (w *win32Window) SetIcon(rgba []byte, width, height int) error {
 	return nil
 }
 
+func anyWindowInSizeMove() bool {
+	windowMapMu.RLock()
+	defer windowMapMu.RUnlock()
+	for _, w := range windowMap {
+		if w != nil && w.inSizeMove {
+			return true
+		}
+	}
+	return false
+}
+
 func (w *win32Window) pollElevatedDrag() {
+	if w.inSizeMove || anyWindowInSizeMove() {
+		if w.externalDragActive {
+			w.externalDragActive = false
+			w.emit(Event{Type: EventDragLeave})
+		}
+		return
+	}
+
 	st, _, _ := procGetAsyncKeyState.Call(vkLButton)
 	lbuttonDown := int16(st) < 0
 

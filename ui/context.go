@@ -261,6 +261,14 @@ type Context struct {
 	nextDirectCanvases    []directCanvasEntry
 	streamingCanvases     []streamingCanvasEntry
 	nextStreamingCanvases []streamingCanvasEntry
+
+	// Быстрый путь перерисовки оверлеев при клавиатурном вводе без полного BeginFrame
+	overlayUnderlay     []byte
+	overlayUnderlayW    int
+	overlayUnderlayH    int
+	overlayFocusableIDs map[string]struct{}
+	keyInputOnlyFrame   bool
+	hasNonKeyInput      bool
 }
 
 // NewContext создаёт новый UI-контекст поверх окна и менеджера шрифтов.
@@ -356,6 +364,14 @@ func (c *Context) DrawText(xPx, yPx Px, text string, sizeDp Dp, col render.Color
 		return
 	}
 	c.Font.DrawText(c.Canvas, xPx.Int(), yPx.Int(), text, c.Scale(sizeDp).Int(), col)
+}
+
+// DrawTextMono рисует строку текста моноширинным шрифтом в физических координатах xPx, yPx.
+func (c *Context) DrawTextMono(xPx, yPx Px, text string, sizeDp Dp, col render.Color) {
+	if c.Font == nil || text == "" {
+		return
+	}
+	c.Font.DrawTextStyled(c.Canvas, xPx.Int(), yPx.Int(), text, c.Scale(sizeDp).Int(), col, render.FontMono)
 }
 
 // RequestRedraw запрашивает повторную перерисовку после изменения состояния.
@@ -707,7 +723,9 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 		c.isInputFrame = true
 	case platform.EventWakeUp:
 		c.wakePending.Store(false)
-		c.wakeOnlyFrame = true
+		if !c.keyInputOnlyFrame && !c.hasNonKeyInput {
+			c.wakeOnlyFrame = true
+		}
 		c.isInputFrame = false
 		redraw = true
 	default:
@@ -932,6 +950,16 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 		c.wakeOnlyFrame = false
 	}
 
+	isKeyEvent := ev.Type == platform.EventKeyDown || ev.Type == platform.EventKeyUp || ev.Type == platform.EventChar
+	if isKeyEvent {
+		if !c.hasNonKeyInput {
+			c.keyInputOnlyFrame = true
+		}
+	} else if redraw && ev.Type != platform.EventWakeUp {
+		c.hasNonKeyInput = true
+		c.keyInputOnlyFrame = false
+	}
+
 	return redraw && c.Canvas.Width > 0 && c.Canvas.Height > 0
 }
 
@@ -949,7 +977,13 @@ func (c *Context) Render(drawFn func(ctx *Context)) {
 	if c.canSkipFullFrameForStreaming() {
 		c.renderStreamingOnly()
 		if !c.needsRedraw {
-			c.presentFrame(true)
+			if !c.streamingDirty.Empty() {
+				c.presentFrame(true)
+			} else {
+				c.wakeOnlyFrame = false
+				c.lastDirtyRects = c.lastDirtyRects[:0]
+				c.Canvas.ResetDirtyRects()
+			}
 			c.syncAnimTimer()
 			c.syncToastTimer()
 			return
@@ -968,6 +1002,15 @@ func (c *Context) Render(drawFn func(ctx *Context)) {
 			return
 		}
 		c.wakeOnlyFrame = false
+	}
+
+	// Быстрый путь для ввода текста с клавиатуры в сфокусированном виджете внутри оверлея
+	// (Modal / Drawer / Popover): не вызываем beginFrame() с Canvas.Clear() и drawFn(c),
+	// а восстанавливаем подложку и перерисовываем только оверлеи.
+	if c.canSkipFullFrameForOverlayInput() {
+		if c.renderOverlayInputOnly() {
+			return
+		}
 	}
 
 	// Максимум 4 прохода: событие на 1-м проходе может изменить состояние и породить
@@ -1022,6 +1065,8 @@ func (c *Context) canSkipFullFrameForToasts() bool {
 
 func (c *Context) renderToastsOnly() {
 	c.wakeOnlyFrame = false
+	c.keyInputOnlyFrame = false
+	c.hasNonKeyInput = false
 	c.restoreToastUnderlay()
 	c.drawToasts()
 
@@ -1165,6 +1210,7 @@ func (c *Context) canSkipFullFrameForStreaming() bool {
 func (c *Context) renderStreamingOnly() {
 	c.streamingDirty = render.Rect{}
 	shadowPad := c.Scale(32).Int()
+	anyStreamDrawn := false
 	for _, entry := range c.streamingCanvases {
 		if entry.onDraw == nil || entry.rect.Empty() {
 			continue
@@ -1179,8 +1225,10 @@ func (c *Context) renderStreamingOnly() {
 		// чтобы не накладывать полупрозрачные тени/backdrop повторно на неперезаписанные полосы.
 		drawnRect := c.Canvas.DirtyBounds().Intersect(entry.rect)
 		if drawnRect.Empty() {
-			drawnRect = entry.rect
+			continue
 		}
+		anyStreamDrawn = true
+		c.updateOverlayUnderlayRect(drawnRect)
 
 		needOverlays := c.Overlays.IntersectsAny(drawnRect, shadowPad)
 		needToasts := len(c.toasts) > 0
@@ -1237,6 +1285,387 @@ func (c *Context) renderStreamingOnly() {
 
 		c.SetStreamingDirtyRect(drawnRect)
 	}
+
+	// Видеокадр не менялся (проснулись от терминала, чата или тостов):
+	// восстанавливаем подложку только в области оверлеев, перерисовываем оверлеи
+	// и отправляем в PresentRect только прямоугольник оверлеев.
+	if !anyStreamDrawn {
+		w, h := c.Canvas.Width, c.Canvas.Height
+		need := w * h * 4
+		if len(c.Overlays.items) > 0 {
+			overlayRect := c.overlayBoundingRect(shadowPad)
+			if !overlayRect.Empty() {
+				if c.overlayUnderlayW != w || c.overlayUnderlayH != h || len(c.overlayUnderlay) != need {
+					c.needsRedraw = true
+				} else {
+					savedHitLen := len(c.nextHitRegions)
+					savedFocusLen := len(c.nextFocusOrder)
+					savedDirectLen := len(c.nextDirectCanvases)
+					savedStreamLen := len(c.nextStreamingCanvases)
+					savedCursor := c.nextCursor
+					savedCustomCursor := c.nextCustomCursor
+					savedHotID := c.HotID
+					savedLayoutSeq := c.layoutSeq
+					savedScopeLen := len(c.idScopeStack)
+					savedSeqLen := len(c.idSeqStack)
+					var savedSeqTop int
+					if savedSeqLen > 0 {
+						savedSeqTop = c.idSeqStack[savedSeqLen-1]
+					}
+
+					mainCanvas := c.Canvas
+					c.restoreOverlayUnderlayRect(overlayRect)
+					ok := c.Overlays.RedrawAll(func(layoutSeq, idSeqTop int) {
+						c.layoutSeq = layoutSeq
+						c.idScopeStack = c.idScopeStack[:0]
+						if len(c.idSeqStack) == 0 {
+							c.idSeqStack = append(c.idSeqStack, idSeqTop)
+						} else {
+							c.idSeqStack = c.idSeqStack[:1]
+							c.idSeqStack[0] = idSeqTop
+						}
+					}, func(it *overlayItem, _ render.Rect) {
+						if it.cache != nil && it.cache.Width == mainCanvas.Width && it.cache.Height == mainCanvas.Height {
+							it.cache.ClearTransparent()
+							c.Canvas = it.cache
+							it.draw()
+							c.Canvas = mainCanvas
+							mainCanvas.CompositeFrom(it.cache, overlayRect)
+							return
+						}
+						it.draw()
+					})
+
+					c.nextHitRegions = c.nextHitRegions[:savedHitLen]
+					c.nextFocusOrder = c.nextFocusOrder[:savedFocusLen]
+					c.nextDirectCanvases = c.nextDirectCanvases[:savedDirectLen]
+					c.nextStreamingCanvases = c.nextStreamingCanvases[:savedStreamLen]
+					c.nextCursor = savedCursor
+					c.nextCustomCursor = savedCustomCursor
+					c.HotID = savedHotID
+					c.layoutSeq = savedLayoutSeq
+					c.idScopeStack = c.idScopeStack[:savedScopeLen]
+					c.idSeqStack = c.idSeqStack[:savedSeqLen]
+					if savedSeqLen > 0 {
+						c.idSeqStack[savedSeqLen-1] = savedSeqTop
+					}
+
+					if !ok {
+						c.needsRedraw = true
+					} else {
+						c.SetStreamingDirtyRect(overlayRect)
+						if len(c.toasts) > 0 {
+							toastRect := c.toastsBoundingRect()
+							if !toastRect.Empty() {
+								c.saveToastUnderlay(toastRect)
+								c.drawToasts()
+								c.SetStreamingDirtyRect(toastRect)
+							}
+						}
+					}
+				}
+			}
+		} else if len(c.toasts) > 0 {
+			toastRect := c.toastsBoundingRect()
+			if !toastRect.Empty() {
+				c.restoreToastUnderlay()
+				c.drawToasts()
+				c.SetStreamingDirtyRect(toastRect)
+			}
+		}
+	}
+
+	c.keyInputOnlyFrame = false
+	c.hasNonKeyInput = false
+}
+
+func (c *Context) saveOverlayUnderlay() {
+	if c.Canvas == nil || c.Canvas.Width <= 0 || c.Canvas.Height <= 0 {
+		return
+	}
+	w, h := c.Canvas.Width, c.Canvas.Height
+	need := w * h * 4
+	if len(c.Canvas.Pixels) < need {
+		return
+	}
+	if cap(c.overlayUnderlay) < need {
+		c.overlayUnderlay = make([]byte, need)
+	} else {
+		c.overlayUnderlay = c.overlayUnderlay[:need]
+	}
+	copy(c.overlayUnderlay, c.Canvas.Pixels[:need])
+	c.overlayUnderlayW = w
+	c.overlayUnderlayH = h
+}
+
+func (c *Context) overlayBoundingRect(shadowPad int) render.Rect {
+	if c.Canvas == nil || c.Canvas.Width <= 0 || c.Canvas.Height <= 0 || len(c.Overlays.items) == 0 {
+		return render.Rect{}
+	}
+	full := render.Rect{X: 0, Y: 0, W: c.Canvas.Width, H: c.Canvas.Height}
+	var bbox render.Rect
+	for _, it := range c.Overlays.items {
+		if it.bounds.Empty() {
+			return full
+		}
+		r := it.bounds
+		if shadowPad > 0 {
+			r = render.Rect{
+				X: r.X - shadowPad,
+				Y: r.Y - shadowPad,
+				W: r.W + shadowPad*2,
+				H: r.H + shadowPad*2,
+			}
+		}
+		bbox = bbox.Union(r)
+	}
+	return bbox.Intersect(full)
+}
+
+func (c *Context) restoreOverlayUnderlay() {
+	if c.Canvas == nil || c.Canvas.Width != c.overlayUnderlayW || c.Canvas.Height != c.overlayUnderlayH {
+		return
+	}
+	need := c.Canvas.Width * c.Canvas.Height * 4
+	if len(c.overlayUnderlay) != need || len(c.Canvas.Pixels) < need {
+		return
+	}
+	copy(c.Canvas.Pixels[:need], c.overlayUnderlay)
+}
+
+func (c *Context) restoreOverlayUnderlayRect(r render.Rect) {
+	if c.Canvas == nil || r.Empty() {
+		return
+	}
+	w, h := c.Canvas.Width, c.Canvas.Height
+	if c.overlayUnderlayW != w || c.overlayUnderlayH != h || len(c.overlayUnderlay) != w*h*4 || len(c.Canvas.Pixels) < w*h*4 {
+		return
+	}
+	clamped := r.Intersect(render.Rect{X: 0, Y: 0, W: w, H: h})
+	if clamped.Empty() {
+		return
+	}
+	if clamped.X == 0 && clamped.Y == 0 && clamped.W == w && clamped.H == h {
+		copy(c.Canvas.Pixels[:w*h*4], c.overlayUnderlay)
+		return
+	}
+	rowBytes := clamped.W * 4
+	for y := 0; y < clamped.H; y++ {
+		off := ((clamped.Y+y)*w + clamped.X) * 4
+		copy(c.Canvas.Pixels[off:off+rowBytes], c.overlayUnderlay[off:off+rowBytes])
+	}
+}
+
+func (c *Context) updateOverlayUnderlayRect(r render.Rect) {
+	if c.Canvas == nil || r.Empty() {
+		return
+	}
+	w, h := c.Canvas.Width, c.Canvas.Height
+	if c.overlayUnderlayW != w || c.overlayUnderlayH != h || len(c.overlayUnderlay) != w*h*4 {
+		return
+	}
+	clamped := r.Intersect(render.Rect{X: 0, Y: 0, W: w, H: h})
+	if clamped.Empty() {
+		return
+	}
+	rowBytes := clamped.W * 4
+	for y := 0; y < clamped.H; y++ {
+		off := ((clamped.Y+y)*w + clamped.X) * 4
+		copy(c.overlayUnderlay[off:off+rowBytes], c.Canvas.Pixels[off:off+rowBytes])
+	}
+}
+
+func (c *Context) canSkipFullFrameForOverlayInput() bool {
+	if !c.keyInputOnlyFrame || c.wakeOnlyFrame || c.paintRequested || c.debugDirtyRect || c.needsRedraw || c.layers.staticDirty {
+		return false
+	}
+	if c.Theme != c.lastTheme || c.DpiScale != c.lastScale {
+		return false
+	}
+	if c.Animator != nil && c.Animator.HasActive() {
+		return false
+	}
+	if c.captureKeysFocus || c.FocusID == "" || len(c.Overlays.items) == 0 {
+		return false
+	}
+	if _, ok := c.overlayFocusableIDs[c.FocusID]; !ok {
+		return false
+	}
+	w, h := c.Canvas.Width, c.Canvas.Height
+	need := w * h * 4
+	if c.prevPresentW != w || c.prevPresentH != h || len(c.prevPresentPixels) != need {
+		return false
+	}
+	if c.overlayUnderlayW != w || c.overlayUnderlayH != h || len(c.overlayUnderlay) != need {
+		return false
+	}
+	for _, kp := range c.KeyEvents {
+		if kp.Code == KeyEscape || kp.Code == KeyEnter || (kp.Code == KeyTab && !kp.Mods.Ctrl && !kp.Mods.Alt) {
+			return false
+		}
+		for _, sc := range c.shortcuts {
+			if sc.Code == kp.Code && sc.Mods == kp.Mods {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func (c *Context) snapshotAutoHeights() map[string]int {
+	if len(c.autoHeights) == 0 {
+		return nil
+	}
+	snap := make(map[string]int, len(c.autoHeights))
+	for k, v := range c.autoHeights {
+		snap[k] = v
+	}
+	return snap
+}
+
+func (c *Context) autoHeightsChanged(snap map[string]int) bool {
+	if len(c.autoHeights) != len(snap) {
+		return true
+	}
+	for k, v := range c.autoHeights {
+		if sv, ok := snap[k]; !ok || sv != v {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Context) renderOverlayInputOnly() bool {
+	savedHitLen := len(c.nextHitRegions)
+	savedFocusLen := len(c.nextFocusOrder)
+	savedDirectLen := len(c.nextDirectCanvases)
+	savedStreamLen := len(c.nextStreamingCanvases)
+	savedCursor := c.nextCursor
+	savedCustomCursor := c.nextCustomCursor
+	savedHotID := c.HotID
+	savedLayoutSeq := c.layoutSeq
+	savedScopeLen := len(c.idScopeStack)
+	savedSeqLen := len(c.idSeqStack)
+	var savedSeqTop int
+	if savedSeqLen > 0 {
+		savedSeqTop = c.idSeqStack[savedSeqLen-1]
+	}
+
+	restoreCtxState := func() {
+		c.nextHitRegions = c.nextHitRegions[:savedHitLen]
+		c.nextFocusOrder = c.nextFocusOrder[:savedFocusLen]
+		c.nextDirectCanvases = c.nextDirectCanvases[:savedDirectLen]
+		c.nextStreamingCanvases = c.nextStreamingCanvases[:savedStreamLen]
+		c.HotID = savedHotID
+		c.layoutSeq = savedLayoutSeq
+		c.idScopeStack = c.idScopeStack[:savedScopeLen]
+		c.idSeqStack = c.idSeqStack[:savedSeqLen]
+		if savedSeqLen > 0 {
+			c.idSeqStack[savedSeqLen-1] = savedSeqTop
+		}
+	}
+
+	autoSnap := c.snapshotAutoHeights()
+	mainCanvas := c.Canvas
+	shadowPad := c.Scale(32).Int()
+	overlayRect := c.overlayBoundingRect(shadowPad)
+	if overlayRect.Empty() {
+		overlayRect = render.Rect{X: 0, Y: 0, W: mainCanvas.Width, H: mainCanvas.Height}
+	}
+
+	for pass := 0; pass < 4; pass++ {
+		c.needsRedraw = false
+		c.restoreOverlayUnderlayRect(overlayRect)
+
+		ok := c.Overlays.RedrawAll(func(layoutSeq, idSeqTop int) {
+			c.layoutSeq = layoutSeq
+			c.idScopeStack = c.idScopeStack[:0]
+			if len(c.idSeqStack) == 0 {
+				c.idSeqStack = append(c.idSeqStack, idSeqTop)
+			} else {
+				c.idSeqStack = c.idSeqStack[:1]
+				c.idSeqStack[0] = idSeqTop
+			}
+		}, func(it *overlayItem, _ render.Rect) {
+			if it.cache != nil && it.cache.Width == mainCanvas.Width && it.cache.Height == mainCanvas.Height {
+				it.cache.ClearTransparent()
+				c.Canvas = it.cache
+				it.draw()
+				c.Canvas = mainCanvas
+				mainCanvas.CompositeFrom(it.cache, overlayRect)
+				return
+			}
+			it.draw()
+		})
+
+		c.TypedRunes = c.TypedRunes[:0]
+		c.KeyEvents = c.KeyEvents[:0]
+		c.rawKeyEvents = c.rawKeyEvents[:0]
+		restoreCtxState()
+
+		_, focusInOverlay := c.overlayFocusableIDs[c.FocusID]
+		if !ok || c.autoHeightsChanged(autoSnap) || !focusInOverlay {
+			c.needsRedraw = false
+			c.nextCursor = savedCursor
+			c.nextCustomCursor = savedCustomCursor
+			return false
+		}
+		if !c.needsRedraw {
+			break
+		}
+	}
+
+	if c.needsRedraw {
+		c.needsRedraw = false
+		c.nextCursor = savedCursor
+		c.nextCustomCursor = savedCustomCursor
+		return false
+	}
+
+	sendRect := overlayRect
+	if len(c.toasts) > 0 {
+		toastRect := c.toastsBoundingRect()
+		c.saveToastUnderlay(toastRect)
+		c.drawToasts()
+		sendRect = sendRect.Union(toastRect)
+	}
+
+	c.rawMouseEvents = c.rawMouseEvents[:0]
+	c.isInputFrame = false
+	c.keyInputOnlyFrame = false
+	c.hasNonKeyInput = false
+	c.prevFocusID = c.FocusID
+	if c.nextCursor != c.lastCursor {
+		c.Win.SetCursor(c.nextCursor)
+		c.lastCursor = c.nextCursor
+	}
+	if c.nextCustomCursor != nil {
+		c.Win.SetCustomCursor(c.nextCustomCursor)
+		c.lastCustomCursor = c.nextCustomCursor
+	} else if c.lastCustomCursor != nil {
+		c.Win.SetCustomCursor(nil)
+		c.lastCustomCursor = nil
+	}
+
+	w, h := mainCanvas.Width, mainCanvas.Height
+	sendRect = sendRect.Intersect(render.Rect{X: 0, Y: 0, W: w, H: h})
+	if dp, ok := c.Win.(platform.DirtyPresenter); ok && !sendRect.Empty() && (sendRect.W < w || sendRect.H < h) {
+		if !c.prevPresentStale && c.prevPresentW == w && c.prevPresentH == h && len(c.prevPresentPixels) == w*h*4 {
+			rowBytes := sendRect.W * 4
+			for y := 0; y < sendRect.H; y++ {
+				off := ((sendRect.Y+y)*w + sendRect.X) * 4
+				copy(c.prevPresentPixels[off:off+rowBytes], mainCanvas.Pixels[off:off+rowBytes])
+			}
+		}
+		c.lastDirtyRects = append(c.lastDirtyRects[:0], sendRect)
+		dp.PresentRect(mainCanvas.Pixels, w, h, sendRect.X, sendRect.Y, sendRect.W, sendRect.H)
+		mainCanvas.ResetDirtyRects()
+	} else {
+		c.presentFrame(false)
+	}
+	c.syncAnimTimer()
+	c.syncToastTimer()
+	return true
 }
 
 // SetDebugDirtyRect включает или отключает отладочную рамку DirtyRect без искажения расчёта diff.
@@ -1412,6 +1841,9 @@ func (c *Context) beginFrame() {
 	c.nextHitRegions = c.nextHitRegions[:0]
 	c.nextDirectCanvases = c.nextDirectCanvases[:0]
 	c.nextStreamingCanvases = c.nextStreamingCanvases[:0]
+	if c.overlayFocusableIDs != nil {
+		clear(c.overlayFocusableIDs)
+	}
 	c.tabBars = c.tabBars[:0]
 	c.streamingDirty = render.Rect{}
 	c.layers.lastFrameBlitted = false
@@ -1439,6 +1871,13 @@ func (c *Context) beginFrame() {
 }
 
 func (c *Context) endFrame() {
+	if len(c.Overlays.items) > 0 {
+		c.saveOverlayUnderlay()
+	} else {
+		c.overlayUnderlay = c.overlayUnderlay[:0]
+		c.overlayUnderlayW = 0
+		c.overlayUnderlayH = 0
+	}
 	ovIdx := 0
 	c.Overlays.FlushWithStateAndCache(func(bounds render.Rect, nonBlocking bool) (int, int) {
 		if !bounds.Empty() && !nonBlocking {
@@ -1526,6 +1965,8 @@ func (c *Context) endFrame() {
 			c.MiddleMousePressed = false
 		}
 	}
+	c.keyInputOnlyFrame = false
+	c.hasNonKeyInput = false
 	if c.nextCursor != c.lastCursor {
 		c.Win.SetCursor(c.nextCursor)
 		c.lastCursor = c.nextCursor

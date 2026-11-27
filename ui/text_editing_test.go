@@ -350,3 +350,91 @@ func TestTextInputAndMaskedInputOnSubmit(t *testing.T) {
 		t.Fatalf("MaskedInput OnSubmit: ожидалось count=1 val='12.34' focus='', got count=%d val=%q focus=%q", maskCount, maskSubmitted, ctx.FocusID)
 	}
 }
+
+func TestTextInputCaretPosExternalFormat(t *testing.T) {
+	ctx := newTestContext(400, 200)
+	val := ""
+
+	formatCode := func(s string) string {
+		var digits []rune
+		for _, r := range s {
+			if r >= '0' && r <= '9' {
+				digits = append(digits, r)
+			}
+		}
+		var out []rune
+		for i, r := range digits {
+			if i > 0 && i%3 == 0 {
+				out = append(out, ' ')
+			}
+			out = append(out, r)
+		}
+		return string(out)
+	}
+
+	countDigitsBefore := func(s string, caret int) int {
+		runes := []rune(s)
+		if caret > len(runes) {
+			caret = len(runes)
+		}
+		n := 0
+		for i := 0; i < caret; i++ {
+			if runes[i] >= '0' && runes[i] <= '9' {
+				n++
+			}
+		}
+		return n
+	}
+
+	caretAfterDigits := func(s string, digitsCount int) int {
+		if digitsCount <= 0 {
+			return 0
+		}
+		n := 0
+		for i, r := range []rune(s) {
+			if r >= '0' && r <= '9' {
+				n++
+				if n == digitsCount {
+					return i + 1
+				}
+			}
+		}
+		return len([]rune(s))
+	}
+
+	draw := func(c *Context) {
+		c.IDScope("code_dlg", func() {
+			if c.TextInputOpts("code", &val, "", Width(200)) {
+				caret := c.CaretPos("code")
+				digitsBefore := countDigitsBefore(val, caret)
+				val = formatCode(val)
+				c.SetCaretPos("code", caretAfterDigits(val, digitsBefore))
+			}
+		})
+	}
+
+	// Фокусируем поле кликом
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 40, Y: 16})
+	ctx.Render(draw)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 40, Y: 16})
+
+	for _, ch := range "123123132" {
+		ctx.HandleEvent(platform.Event{Type: platform.EventChar, Char: ch})
+		ctx.Render(draw)
+	}
+
+	if val != "123 123 132" {
+		t.Fatalf("ожидалось отформатированное значение %q, получено %q", "123 123 132", val)
+	}
+
+	// Проверяем CaretPos и SetCaretPos внутри IDScope (включая зажим отрицательного значения)
+	ctx.IDScope("code_dlg", func() {
+		if got := ctx.CaretPos("code"); got != len([]rune("123 123 132")) {
+			t.Fatalf("ожидалась каретка в конце (%d), получено %d", len([]rune("123 123 132")), got)
+		}
+		ctx.SetCaretPos("code", -5)
+		if got := ctx.CaretPos("code"); got != 0 {
+			t.Fatalf("отрицательная позиция должна зажиматься в 0, получено %d", got)
+		}
+	})
+}

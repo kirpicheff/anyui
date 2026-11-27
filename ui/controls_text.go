@@ -82,6 +82,38 @@ func maskRunes(runes []rune) []rune {
 	return out
 }
 
+func (c *Context) resolveTextID(id string) string {
+	if c == nil || id == "" {
+		return id
+	}
+	return c.ResolveID("", id)
+}
+
+// CaretPos возвращает текущую позицию каретки (индекс руны) для текстового виджета с указанным id.
+// Учитывает активный IDScope.
+func (c *Context) CaretPos(id string) int {
+	if c == nil || c.caretPos == nil || id == "" {
+		return 0
+	}
+	return c.caretPos[c.resolveTextID(id)]
+}
+
+// SetCaretPos устанавливает позицию каретки (индекс руны) для текстового виджета с указанным id
+// и сбрасывает выделение. Учитывает активный IDScope.
+func (c *Context) SetCaretPos(id string, pos int) {
+	if c == nil || id == "" {
+		return
+	}
+	c.ensureTextEditingMaps()
+	if pos < 0 {
+		pos = 0
+	}
+	resolved := c.resolveTextID(id)
+	c.caretPos[resolved] = pos
+	c.textSelStart[resolved] = pos
+	c.RequestRedraw()
+}
+
 // TextInput рисует однострочное поле ввода текста и возвращает true при изменении значения.
 func (c *Context) TextInput(id string, value *string, placeholder string, widthDp Dp) bool {
 	if widthDp > 0 {

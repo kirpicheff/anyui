@@ -248,3 +248,35 @@ func (o *OverlayLayer) RedrawIntersecting(target *render.Canvas, r render.Rect, 
 	o.items = o.items[:n]
 	o.nextBlocks = o.nextBlocks[:savedBlocksLen]
 }
+
+// RedrawAll повторно отрисовывает все оверлеи с последнего полного кадра без очистки основного холста.
+// Если во время отрисовки добавился новый оверлей, возвращает false (требуется полный кадр).
+func (o *OverlayLayer) RedrawAll(
+	beforeDraw func(layoutSeq, idSeqTop int),
+	renderItem func(it *overlayItem, bounds render.Rect),
+) bool {
+	n := len(o.items)
+	if n == 0 {
+		return true
+	}
+	savedBlocksLen := len(o.nextBlocks)
+	o.inOverlay = true
+	for i := 0; i < n; i++ {
+		if beforeDraw != nil {
+			beforeDraw(o.items[i].layoutSeq, o.items[i].idSeqTop)
+		}
+		if renderItem != nil {
+			renderItem(&o.items[i], o.items[i].bounds)
+		} else {
+			o.items[i].draw()
+		}
+	}
+	o.inOverlay = false
+	if len(o.items) != n {
+		o.items = o.items[:n]
+		o.nextBlocks = o.nextBlocks[:savedBlocksLen]
+		return false
+	}
+	o.nextBlocks = o.nextBlocks[:savedBlocksLen]
+	return true
+}

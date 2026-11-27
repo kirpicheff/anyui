@@ -50,3 +50,48 @@ func TestNavyTheme(t *testing.T) {
 		t.Fatalf("unexpected NavyTheme Bg: %v", th.Bg)
 	}
 }
+
+func TestDrawTextMono(t *testing.T) {
+	reg, bold, mono := DefaultTestFonts()
+	fm, err := render.NewFontFromBytes(reg)
+	if err != nil {
+		t.Fatalf("NewFontFromBytes(reg): %v", err)
+	}
+	if err := fm.RegisterFontBytes(render.FontBold, bold); err != nil {
+		t.Fatalf("RegisterFontBytes(bold): %v", err)
+	}
+	if err := fm.RegisterFontBytes(render.FontMono, mono); err != nil {
+		t.Fatalf("RegisterFontBytes(mono): %v", err)
+	}
+
+	mw1 := &stylerMockWindow{w: 320, h: 64, scale: 1.0}
+	ctx1 := ui.NewContext(mw1, fm)
+	u1 := &UI{ctx: ctx1}
+	ctx1.Canvas.Clear(render.RGB(0, 0, 0))
+	u1.DrawText(10, 10, "iiiiWWWW", 16, render.RGB(255, 255, 255))
+
+	mw2 := &stylerMockWindow{w: 320, h: 64, scale: 1.0}
+	ctx2 := ui.NewContext(mw2, fm)
+	u2 := &UI{ctx: ctx2}
+	ctx2.Canvas.Clear(render.RGB(0, 0, 0))
+	u2.DrawTextMono(10, 10, "iiiiWWWW", 16, render.RGB(255, 255, 255))
+
+	nonZero := 0
+	diff := 0
+	for i := 0; i < len(ctx2.Canvas.Pixels); i += 4 {
+		if ctx2.Canvas.Pixels[i] != 0 || ctx2.Canvas.Pixels[i+1] != 0 || ctx2.Canvas.Pixels[i+2] != 0 {
+			nonZero++
+		}
+		if ctx1.Canvas.Pixels[i] != ctx2.Canvas.Pixels[i] ||
+			ctx1.Canvas.Pixels[i+1] != ctx2.Canvas.Pixels[i+1] ||
+			ctx1.Canvas.Pixels[i+2] != ctx2.Canvas.Pixels[i+2] {
+			diff++
+		}
+	}
+	if nonZero == 0 {
+		t.Fatal("DrawTextMono не отрисовал ни одного пикселя текста")
+	}
+	if diff == 0 {
+		t.Fatal("DrawTextMono должен отличаться от обычного DrawText (пропорционального шрифта)")
+	}
+}

@@ -35,6 +35,12 @@ func (c *Context) registerFocusable(id string) {
 		return
 	}
 	c.nextFocusOrder = append(c.nextFocusOrder, id)
+	if c.Overlays.inOverlay {
+		if c.overlayFocusableIDs == nil {
+			c.overlayFocusableIDs = make(map[string]struct{})
+		}
+		c.overlayFocusableIDs[id] = struct{}{}
+	}
 }
 
 // FocusOrder возвращает срез идентификаторов фокусируемых виджетов в порядке обхода по Tab.

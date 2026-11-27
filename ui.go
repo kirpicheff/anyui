@@ -515,6 +515,23 @@ func (u *UI) SetFocus(id string) {
 	u.ctx.RequestRedraw()
 }
 
+// CaretPos возвращает текущую позицию каретки (индекс руны) для текстового виджета с указанным id.
+func (u *UI) CaretPos(id string) int {
+	if u == nil || u.ctx == nil {
+		return 0
+	}
+	return u.ctx.CaretPos(id)
+}
+
+// SetCaretPos устанавливает позицию каретки (индекс руны) для текстового виджета с указанным id
+// и сбрасывает выделение. Удобно при внешнем переформатировании значения в TextInput.
+func (u *UI) SetCaretPos(id string, pos int) {
+	if u == nil || u.ctx == nil {
+		return
+	}
+	u.ctx.SetCaretPos(id, pos)
+}
+
 // Shortcut регистрирует глобальную горячую клавишу для текущего окна.
 func (u *UI) Shortcut(key Key, mods Modifiers, fn func()) {
 	u.ctx.RegisterShortcut(key, mods, fn)
@@ -523,6 +540,11 @@ func (u *UI) Shortcut(key Key, mods Modifiers, fn func()) {
 // DrawText рисует строку текста в физических координатах (xPx, yPx) с размером sizeDp и цветом col.
 func (u *UI) DrawText(xPx, yPx Px, text string, sizeDp Dp, col Color) {
 	u.ctx.DrawText(xPx, yPx, text, sizeDp, col)
+}
+
+// DrawTextMono рисует строку текста моноширинным шрифтом в физических координатах (xPx, yPx) с размером sizeDp и цветом col.
+func (u *UI) DrawTextMono(xPx, yPx Px, text string, sizeDp Dp, col Color) {
+	u.ctx.DrawTextMono(xPx, yPx, text, sizeDp, col)
 }
 
 // StaticLayer кеширует статический блок интерфейса (фон, неизменяемый текст) в отдельный Static Layer.
