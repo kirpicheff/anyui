@@ -262,6 +262,12 @@ func (d *x11Display) flushPaints() {
 	d.mu.Unlock()
 
 	for _, w := range wins {
+		if w.closed.Load() {
+			continue
+		}
+		if ev, ok := w.takePendingMouseMove(); ok && w.handler != nil {
+			w.handler(ev)
+		}
 		if w.needsPaint.Swap(false) && w.handler != nil && !w.closed.Load() {
 			w.handler(Event{Type: EventPaint})
 		}
@@ -304,36 +310,36 @@ func (d *x11Display) dispatchEvent(ev xgb.Event) {
 
 	case xproto.FocusOutEvent:
 		if w := d.windowByID(e.Event); w != nil && w.handler != nil {
+			w.flushPendingMouseMove()
 			w.handler(Event{Type: EventFocusLost})
 		}
 
 	case xproto.MotionNotifyEvent:
-		if w := d.windowByID(e.Event); w != nil && w.handler != nil {
-			w.handler(Event{
-				Type: EventMouseMove,
-				X:    int(e.EventX),
-				Y:    int(e.EventY),
-				Mods: modifiersFromX11State(e.State),
-			})
+		if w := d.windowByID(e.Event); w != nil {
+			w.queueMouseMove(int(e.EventX), int(e.EventY), modifiersFromX11State(e.State))
 		}
 
 	case xproto.ButtonPressEvent:
 		if w := d.windowByID(e.Event); w != nil {
+			w.flushPendingMouseMove()
 			w.handleButtonPress(e)
 		}
 
 	case xproto.ButtonReleaseEvent:
 		if w := d.windowByID(e.Event); w != nil {
+			w.flushPendingMouseMove()
 			w.handleButtonRelease(e)
 		}
 
 	case xproto.KeyPressEvent:
 		if w := d.windowByID(e.Event); w != nil {
+			w.flushPendingMouseMove()
 			w.handleKeyPress(e)
 		}
 
 	case xproto.KeyReleaseEvent:
 		if w := d.windowByID(e.Event); w != nil {
+			w.flushPendingMouseMove()
 			w.handleKeyRelease(e)
 		}
 
@@ -353,6 +359,37 @@ func (d *x11Display) windowByID(id xproto.Window) *x11Window {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.windows[id]
+}
+
+// queueMouseMove сохраняет последнее движение курсора X11 для склейки в пределах пачки PollForEvent.
+func (w *x11Window) queueMouseMove(x, y int, mods Modifiers) {
+	w.mu.Lock()
+	w.pendingMoveEv = Event{
+		Type: EventMouseMove,
+		X:    x,
+		Y:    y,
+		Mods: mods,
+	}
+	w.hasPendingMove = true
+	w.mu.Unlock()
+}
+
+func (w *x11Window) takePendingMouseMove() (Event, bool) {
+	w.mu.Lock()
+	if !w.hasPendingMove {
+		w.mu.Unlock()
+		return Event{}, false
+	}
+	ev := w.pendingMoveEv
+	w.hasPendingMove = false
+	w.mu.Unlock()
+	return ev, true
+}
+
+func (w *x11Window) flushPendingMouseMove() {
+	if ev, ok := w.takePendingMouseMove(); ok && w.handler != nil && !w.closed.Load() {
+		w.handler(ev)
+	}
 }
 
 func (d *x11Display) flushWakeUps() {
@@ -400,9 +437,11 @@ type x11Window struct {
 	fullscreen bool
 	onClose    func() bool
 
-	needsPaint  atomic.Bool
-	wakePending atomic.Bool
-	closed      atomic.Bool
+	needsPaint     atomic.Bool
+	wakePending    atomic.Bool
+	closed         atomic.Bool
+	hasPendingMove bool
+	pendingMoveEv  Event
 
 	// MIT-SHM буфер
 	shmSeg  shm.Seg
@@ -577,6 +616,7 @@ func (w *x11Window) Present(pixels []byte, width, height int) {
 }
 
 func (w *x11Window) PresentRect(pixels []byte, width, height, rx, ry, rw, rh int) {
+	defer PerfSince("x11.present_rect", PerfNow())
 	if w.closed.Load() || width <= 0 || height <= 0 || len(pixels) < width*height*4 {
 		return
 	}

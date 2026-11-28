@@ -8,6 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 	"unicode/utf16"
 	"unsafe"
 
@@ -27,6 +28,7 @@ var (
 	procUpdateWindow              = modUser32.NewProc("UpdateWindow")
 	procDefWindowProcW            = modUser32.NewProc("DefWindowProcW")
 	procGetMessageW               = modUser32.NewProc("GetMessageW")
+	procPeekMessageW              = modUser32.NewProc("PeekMessageW")
 	procTranslateMessage          = modUser32.NewProc("TranslateMessage")
 	procDispatchMessageW          = modUser32.NewProc("DispatchMessageW")
 	procPostQuitMessage           = modUser32.NewProc("PostQuitMessage")
@@ -102,6 +104,7 @@ const (
 	wmKeyDown        = 0x0100
 	wmKeyUp          = 0x0101
 	wmChar           = 0x0102
+	pmRemove         = 0x0001
 	wmSysKeyDown     = 0x0104
 	wmSysKeyUp       = 0x0105
 	wmTimer          = 0x0113
@@ -121,7 +124,9 @@ const (
 	wmCaptureChanged = 0x0215
 	wmDropFiles      = 0x0233
 	wmDPIChanged     = 0x02E0
-	wmAppWakeUp      = 0x8001
+	wmAppWakeUp          = 0x8001
+	timerIDWakeCoalesce  = 2
+	winWakeMinIntervalNs = int64(8 * time.Millisecond)
 
 	htClient = 1
 
@@ -243,6 +248,8 @@ type win32Window struct {
 	savedRect         rect
 	releasingCapture  bool
 	wakePending       atomic.Bool
+	wakePosted        atomic.Bool
+	lastWakeNs        int64
 	invalidatePending atomic.Bool
 	dropTarget         *dropTarget
 	elevatedDragDrop   bool
@@ -537,6 +544,7 @@ func (w *win32Window) BackBuffer(width, height int) []byte {
 }
 
 func (w *win32Window) Present(pixels []byte, width, height int) {
+	defer PerfSince("win.present", PerfNow())
 	if width <= 0 || height <= 0 || len(pixels) < width*height*4 {
 		return
 	}
@@ -564,6 +572,7 @@ func (w *win32Window) Present(pixels []byte, width, height int) {
 
 // PresentRect обновляет только изменённую прямоугольную область окна (Dirty Rectangle).
 func (w *win32Window) PresentRect(pixels []byte, width, height, rx, ry, rw, rh int) {
+	defer PerfSince("win.present_rect", PerfNow())
 	if width <= 0 || height <= 0 || len(pixels) < width*height*4 {
 		return
 	}
@@ -621,8 +630,37 @@ func (w *win32Window) Invalidate() {
 }
 
 func (w *win32Window) WakeUp() {
-	if w.hwnd != 0 && w.wakePending.CompareAndSwap(false, true) {
+	w.wakePending.Store(true)
+	if w.hwnd != 0 && w.wakePosted.CompareAndSwap(false, true) {
 		procPostMessageW.Call(uintptr(w.hwnd), wmAppWakeUp, 0, 0)
+	}
+}
+
+// handleWinWakeUp склеивает шторм WakeUp-событий и откладывает повторные пробуждения
+// через низкоприоритетный WM_TIMER, чтобы WM_KEYDOWN / WM_MOUSEMOVE обрабатывались без задержек.
+func (w *win32Window) handleWinWakeUp(hwnd windows.Handle) {
+	now := time.Now().UnixNano()
+	if w.lastWakeNs > 0 {
+		if elapsed := now - w.lastWakeNs; elapsed < winWakeMinIntervalNs {
+			remMs := (winWakeMinIntervalNs - elapsed + int64(time.Millisecond) - 1) / int64(time.Millisecond)
+			if remMs < 1 {
+				remMs = 1
+			}
+			procSetTimer.Call(uintptr(hwnd), timerIDWakeCoalesce, uintptr(remMs), 0)
+			return
+		}
+	}
+	w.wakePending.Store(false)
+	w.lastWakeNs = now
+	w.emit(Event{Type: EventWakeUp})
+	w.wakePosted.Store(false)
+	if w.wakePending.Load() && w.wakePosted.CompareAndSwap(false, true) {
+		remNs := winWakeMinIntervalNs - (time.Now().UnixNano() - w.lastWakeNs)
+		remMs := int64(1)
+		if remNs > int64(time.Millisecond) {
+			remMs = (remNs + int64(time.Millisecond) - 1) / int64(time.Millisecond)
+		}
+		procSetTimer.Call(uintptr(hwnd), timerIDWakeCoalesce, uintptr(remMs), 0)
 	}
 }
 
@@ -944,6 +982,11 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 		return 0
 
 	case wmTimer:
+		if wParam == timerIDWakeCoalesce {
+			procKillTimer.Call(uintptr(hwnd), timerIDWakeCoalesce)
+			w.handleWinWakeUp(hwnd)
+			return 0
+		}
 		if wParam == timerIDDragTrack && w.elevatedDragDrop {
 			w.pollElevatedDrag()
 			return 0
@@ -1031,8 +1074,7 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 		return 0
 
 	case wmAppWakeUp:
-		w.wakePending.Store(false)
-		w.emit(Event{Type: EventWakeUp})
+		w.handleWinWakeUp(hwnd)
 		return 0
 
 	case wmMouseMove:
@@ -1120,7 +1162,27 @@ func win32WndProc(hwnd windows.Handle, msg uint32, wParam, lParam uintptr) uintp
 		return 0
 
 	case wmKeyDown, wmSysKeyDown:
-		w.emit(winKeyEvent(EventKeyDown, wParam, lParam))
+		ev := winKeyEvent(EventKeyDown, wParam, lParam)
+		// После TranslateMessage парный WM_CHAR для печатной клавиши уже находится в очереди окна:
+		// забираем его в EventKeyDown.Char, чтобы не запускать два Render() на один символ.
+		if msg == wmKeyDown && !ev.Mods.Ctrl && !ev.Mods.Alt && !ev.Mods.Win {
+			var charMsg msgStruct
+			ok, _, _ := procPeekMessageW.Call(
+				uintptr(unsafe.Pointer(&charMsg)),
+				uintptr(hwnd),
+				wmChar,
+				wmChar,
+				pmRemove,
+			)
+			runtime.KeepAlive(&charMsg)
+			if ok != 0 {
+				r := rune(charMsg.wParam)
+				if r >= 32 {
+					ev.Char = r
+				}
+			}
+		}
+		w.emit(ev)
 		return 0
 
 	case wmKeyUp, wmSysKeyUp:

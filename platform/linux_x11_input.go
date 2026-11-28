@@ -288,9 +288,7 @@ func (w *x11Window) handleKeyPress(e xproto.KeyPressEvent) {
 			Char:     ch,
 			Mods:     mods,
 		})
-	}
-
-	if ch != 0 {
+	} else if ch != 0 {
 		w.handler(Event{
 			Type: EventChar,
 			Char: ch,

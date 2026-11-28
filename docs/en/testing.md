@@ -318,4 +318,73 @@ This verifies layout and coordinate contracts across DPI targets:
 - `ui.CurrentAreaPx()` returns physical pixels `Px`.
 - `ui.MousePosDp()` converts physical mouse cursor coordinates into logical `Dp`.
 
+---
+
+## Runtime Performance Profiling (`ANYUI_PERF`)
+
+AnyUI includes lightweight runtime performance counters (`platform/perf.go`). When disabled, overhead is a single `bool` check (no background goroutine is started and no allocations occur).
+
+### Environment Variables
+
+| Variable | Purpose |
+|---|---|
+| `ANYUI_PERF=1` | Enables metric collection and prints a summary once per second (`n`, `avg`, `max`). Any other value or omitting it disables profiling. |
+| `ANYUI_PERF_FILE=<path>` | Redirects output from `stderr` to a file (opened in `O_APPEND` mode). Each line is prefixed with `pid=<PID> HH:MM:SS` to distinguish multiple processes (e.g., launcher and a separate viewer window). |
+
+### How to Run
+
+**Linux / macOS (output to `stderr` or a file):**
+```bash
+ANYUI_PERF=1 ./myapp
+ANYUI_PERF=1 ANYUI_PERF_FILE=/tmp/perf.log ./myapp
+```
+
+**Windows — current terminal (`cmd` / PowerShell):**
+```cmd
+set ANYUI_PERF=1
+set ANYUI_PERF_FILE=C:\temp\perf.log
+myapp.exe
+```
+```powershell
+$env:ANYUI_PERF = "1"
+$env:ANYUI_PERF_FILE = "C:\temp\perf.log"
+.\myapp.exe
+```
+
+**Windows — console-less GUI app or child process spawned by a launcher/shortcut:**
+
+When the target window is launched as a separate process that does not inherit the current terminal environment, set the variables in the user registry environment via `setx` (ensure the target directory such as `C:\temp` exists):
+```cmd
+setx ANYUI_PERF 1
+setx ANYUI_PERF_FILE C:\temp\perf.log
+```
+Then **restart** the application so the launcher and its child processes pick up the new environment.
+
+Disable after profiling:
+```cmd
+reg delete HKCU\Environment /F /V ANYUI_PERF
+reg delete HKCU\Environment /F /V ANYUI_PERF_FILE
+```
+
+### Key Metrics
+
+| Metric | Description |
+|---|---|
+| `ui.render_total` | Total `Context.Render()` duration (frame start through `Present`). |
+| `ui.path.full_pass` | Duration of a full render pass (`beginFrame` + `drawFn` + `endFrame`). |
+| `ui.draw_fn` | Execution time of user `drawFn(ui)`. |
+| `ui.path.streaming_only` | Frame count taken by the streaming canvas fast path (`Streaming: true`). |
+| `ui.path.toasts_only` | Frame count taken by the local `Toast` redraw fast path. |
+| `ui.path.overlay_input` / `ui.overlay_input_total` | Count and duration of the overlay keyboard input fast path. |
+| `ui.path.overlay_mouse` / `ui.overlay_mouse_total` | Count and duration of the overlay hover/wheel fast path. |
+| `ui.overlay_draw` / `ui.overlay_composite` | Overlay content drawing time and cache clear/compositing time. |
+| `ui.stream_ov_draw` / `ui.stream_ov_comp` | Overlay drawing and compositing inside `streaming_only` (e.g., terminal/modal over video). |
+| `ui.save_underlay` | Time spent saving the underlay region behind active overlays. |
+| `ui.present_frame` / `ui.diff_rect` | Total `presentFrame` duration and `computeDiffRect` time. |
+| `win.present` / `win.present_rect` | Full-window / dirty-rect presentation on Windows (`BitBlt`). |
+| `x11.present_rect` | Dirty-rect presentation on Linux X11 (`MIT-SHM PutImage`). |
+| `wl.shm_copy` / `wl.frame_latency` | `wl_shm` copy time and Wayland compositor `wl_callback.done` latency. |
+| `wl.paint_deferred_by_frame` / `wl.frame_timeout` / `wl.all_buffers_busy` | Counters for frame-deferred paints, `framePending` timeouts, and all-3 `wl_shm` buffers busy on Wayland. |
+
+
 

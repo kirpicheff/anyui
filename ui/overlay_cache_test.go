@@ -354,3 +354,209 @@ func TestStreamingEmptyDrawRedrawsOverlaysOnly(t *testing.T) {
 		t.Fatalf("кэш оверлея после обновления видео должен сохранять новый цвет терминала %+v, получено %+v", termColor, got)
 	}
 }
+
+// TestOverlayMouseOnlyFastPath проверяет быстрый путь перерисовки оверлея при ховере и колесе
+// без вызова drawFn главного окна, а также корректный откат на полный проход при выходе
+// курсора за пределы оверлея или закрытии оверлея кликом.
+func TestOverlayMouseOnlyFastPath(t *testing.T) {
+	win := &dirtyMockWindow{mockWindow: mockWindow{w: 800, h: 600, scale: 1.0}}
+	ctx := NewContext(win, nil)
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx.Clock = func() time.Time { return now }
+
+	mainDrawCount := 0
+	showOverlay := true
+	wheelAccum := float32(0)
+	panelRect := render.Rect{X: 300, Y: 100, W: 300, H: 240}
+	btn1Rect := render.Rect{X: 320, Y: 120, W: 120, H: 36}
+	btn2Rect := render.Rect{X: 320, Y: 170, W: 120, H: 36}
+
+	draw := func(c *Context) {
+		mainDrawCount++
+		c.Canvas.FillRect(render.Rect{X: 0, Y: 0, W: 800, H: 600}, render.RGB(15, 20, 28))
+		if !showOverlay {
+			return
+		}
+		c.PushOverlay(panelRect, func() {
+			c.Canvas.FillRect(panelRect, render.RGB(30, 35, 45))
+			if panelRect.Contains(c.MouseX, c.MouseY) && c.WheelY != 0 {
+				wheelAccum += c.WheelY
+			}
+			c.registerHitRegion("ov_btn1", btn1Rect, platform.CursorHand, false)
+			c.registerHitRegion("ov_btn2", btn2Rect, platform.CursorHand, false)
+			if btn1Rect.Contains(c.MouseX, c.MouseY) {
+				c.Canvas.FillRect(btn1Rect, render.RGB(80, 130, 220))
+				c.nextCursor = platform.CursorHand
+			} else {
+				c.Canvas.FillRect(btn1Rect, render.RGB(50, 60, 75))
+			}
+			if btn2Rect.Contains(c.MouseX, c.MouseY) {
+				c.Canvas.FillRect(btn2Rect, render.RGB(200, 80, 80))
+				c.nextCursor = platform.CursorHand
+				if c.MouseReleased {
+					showOverlay = false
+					c.RequestRedraw()
+				}
+			} else {
+				c.Canvas.FillRect(btn2Rect, render.RGB(50, 60, 75))
+			}
+		})
+	}
+
+	// 1. Первый полный кадр с курсором внутри оверлея (на первой кнопке)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 350, Y: 135})
+	ctx.HandleEvent(platform.Event{Type: platform.EventPaint})
+	ctx.Render(draw)
+
+	baseMain := mainDrawCount
+	baseFull := win.fullPresents
+	baseRect := win.rectPresents
+
+	// 2. Перемещаем курсор на вторую кнопку внутри оверлея -> должен сработать fast-path без drawFn
+	if !ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 350, Y: 185}) {
+		t.Fatal("перемещение курсора между кнопками оверлея должно требовать перерисовки")
+	}
+	ctx.Render(draw)
+
+	if mainDrawCount != baseMain {
+		t.Fatalf("при ховере внутри оверлея полный drawFn не должен вызываться: %d -> %d", baseMain, mainDrawCount)
+	}
+	if win.fullPresents != baseFull {
+		t.Fatalf("при ховере внутри оверлея не должно быть full Present: %d -> %d", baseFull, win.fullPresents)
+	}
+	if win.rectPresents != baseRect+1 {
+		t.Fatalf("ожидался 1 PresentRect при ховере внутри оверлея, получено %d -> %d", baseRect, win.rectPresents)
+	}
+	if got := pixelAt(ctx.Canvas, 350, 185); got != render.RGB(200, 80, 80) {
+		t.Fatalf("вторая кнопка должна подсветиться цветом ховера, получено %+v", got)
+	}
+
+	// 3. Колесо прокрутки внутри оверлея -> тоже fast-path без drawFn
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseWheel, X: 350, Y: 185, WheelY: -1.0})
+	ctx.Render(draw)
+
+	if mainDrawCount != baseMain {
+		t.Fatalf("при колесе внутри оверлея полный drawFn не должен вызываться: %d -> %d", baseMain, mainDrawCount)
+	}
+	if wheelAccum != -1.0 {
+		t.Fatalf("ожидалось накопление WheelY=-1.0, получено %v", wheelAccum)
+	}
+
+	// 4. Выход курсора за пределы оверлея -> должен сработать обычный полный проход
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 50, Y: 50})
+	ctx.Render(draw)
+	if mainDrawCount != baseMain+1 {
+		t.Fatalf("при выходе курсора из оверлея должен вызываться полный drawFn: %d -> %d", baseMain, mainDrawCount)
+	}
+
+	// 5. Возвращаемся на кнопку закрытия и кликаем -> клик идёт через полный проход и закрывает оверлей
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseMove, X: 350, Y: 185})
+	ctx.Render(draw)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 350, Y: 185})
+	ctx.Render(draw)
+	ctx.HandleEvent(platform.Event{Type: platform.EventMouseUp, Button: platform.MouseLeft, X: 350, Y: 185})
+	ctx.Render(draw)
+
+	if showOverlay {
+		t.Fatal("клик по кнопке закрытия внутри оверлея должен закрывать оверлей")
+	}
+	if got := pixelAt(ctx.Canvas, 350, 185); got != render.RGB(15, 20, 28) {
+		t.Fatalf("после закрытия оверлея должен восстановиться фон главного окна, получено %+v", got)
+	}
+}
+
+// TestFocusedOverlayRefreshesDuringVideoStreaming проверяет, что сфокусированный оверлей
+// (например, терминал) перерисовывается на wakeOnly-кадре даже если одновременно обновился видеокадр,
+// не залипая на протухшем кэше.
+func TestFocusedOverlayRefreshesDuringVideoStreaming(t *testing.T) {
+	win := &dirtyMockWindow{mockWindow: mockWindow{w: 800, h: 600, scale: 1.0}}
+	ctx := NewContext(win, nil)
+
+	videoColor := render.RGB(20, 30, 40)
+	termColor := render.RGB(10, 10, 10)
+	panelRect := render.Rect{X: 300, Y: 100, W: 300, H: 200}
+
+	draw := func(c *Context) {
+		c.InteractiveCanvas("video", CanvasCallbacks{
+			Streaming: true,
+			OnDraw: func(canvas *render.Canvas, area render.Rect, focused bool) {
+				canvas.FillRect(area, videoColor)
+			},
+		}, Width(800), Height(600))
+
+		c.PushOverlay(panelRect, func() {
+			c.registerFocusable("term_canvas")
+			c.Canvas.FillRect(panelRect, termColor)
+		})
+	}
+
+	// Первый полный кадр и фокус в терминале внутри оверлея
+	ctx.HandleEvent(platform.Event{Type: platform.EventPaint})
+	ctx.Render(draw)
+	ctx.FocusID = "term_canvas"
+
+	// Одновременно приходят новый видеокадр и обновление терминала в одном EventWakeUp
+	videoColor = render.RGB(60, 80, 100)
+	termColor = render.RGB(50, 200, 120)
+	ctx.HandleEvent(platform.Event{Type: platform.EventWakeUp})
+	ctx.Render(draw)
+
+	if got := pixelAt(ctx.Canvas, 20, 20); got != videoColor {
+		t.Fatalf("видеофон должен обновиться на %+v, получено %+v", videoColor, got)
+	}
+	if got := pixelAt(ctx.Canvas, 400, 150); got != termColor {
+		t.Fatalf("сфокусированный оверлей терминала должен обновиться на %+v одновременно с видео, получено %+v", termColor, got)
+	}
+}
+
+// TestPushBackdropWithLocalOverlay проверяет, что PushBackdrop затемняет весь экран и блокирует
+// клики по основному интерфейсу, при этом ввод текста в локальном PushOverlay обновляет
+// экран через локальный PresentRect без полноэкранного Present.
+func TestPushBackdropWithLocalOverlay(t *testing.T) {
+	win := &dirtyMockWindow{mockWindow: mockWindow{w: 800, h: 600, scale: 1.0}}
+	ctx := NewContext(win, nil)
+
+	full := render.Rect{X: 0, Y: 0, W: 800, H: 600}
+	card := render.Rect{X: 250, Y: 180, W: 300, H: 200}
+	inputText := ""
+
+	draw := func(c *Context) {
+		c.Canvas.FillRect(full, render.RGB(40, 60, 80))
+		c.PushBackdrop(full, render.RGBA(0, 0, 0, 140))
+		c.PushOverlay(card, func() {
+			c.Canvas.FillRect(card, render.RGB(30, 35, 45))
+			c.LayoutRect(card, func() {
+				c.TextInput("pwd_custom", &inputText, "Пароль", 220)
+			})
+		})
+	}
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventPaint})
+	ctx.Render(draw)
+	ctx.FocusID = "pwd_custom"
+	ctx.HandleEvent(platform.Event{Type: platform.EventPaint})
+	ctx.Render(draw)
+
+	if !ctx.Overlays.IsBlocked(10, 10) {
+		t.Fatal("точка под PushBackdrop должна блокироваться для виджетов основного окна")
+	}
+
+	baseFull := win.fullPresents
+	baseRect := win.rectPresents
+
+	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: 'A', Char: 'a'})
+	ctx.Render(draw)
+
+	if inputText != "a" {
+		t.Fatalf("ожидался текст %q, получено %q", "a", inputText)
+	}
+	if win.fullPresents != baseFull {
+		t.Fatalf("при вводе в карточку с PushBackdrop не должно быть full Present: %d -> %d", baseFull, win.fullPresents)
+	}
+	if win.rectPresents != baseRect+1 {
+		t.Fatalf("ожидался 1 вызов PresentRect, получено %d -> %d", baseRect, win.rectPresents)
+	}
+	if win.lastRect.W >= 800 || win.lastRect.H >= 600 {
+		t.Fatalf("ожидался локальный прямоугольник карточки в PresentRect, получено %+v", win.lastRect)
+	}
+}

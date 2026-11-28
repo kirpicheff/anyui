@@ -318,4 +318,73 @@ h.Step()
 - `ui.CurrentAreaPx()` возвращает физические пиксели `Px`.
 - `ui.MousePosDp()` автоматически пересчитывает физические координаты курсора в логические `Dp`.
 
+---
+
+## Диагностика производительности в рантайме (`ANYUI_PERF`)
+
+В AnyUI встроены лёгкие счётчики производительности (`platform/perf.go`). Когда диагностика выключена, накладные расходы сведены к проверке одного `bool`-флага (фоновая горутина не запускается, аллокаций нет).
+
+### Переменные окружения
+
+| Переменная | Назначение |
+|---|---|
+| `ANYUI_PERF=1` | Включает сбор метрик и ежесекундную печать сводки (`n`, `avg`, `max`). Любое другое значение или отсутствие переменной отключает сбор. |
+| `ANYUI_PERF_FILE=<путь>` | Перенаправляет вывод из `stderr` в указанный файл (режим дозаписи `O_APPEND`). Каждая строка получает префикс `pid=<PID> HH:MM:SS`, что позволяет различать несколько процессов (например, лаунчер и отдельное окно вьювера). |
+
+### Как запускать
+
+**Linux / macOS (вывод в `stderr` или в файл):**
+```bash
+ANYUI_PERF=1 ./myapp
+ANYUI_PERF=1 ANYUI_PERF_FILE=/tmp/perf.log ./myapp
+```
+
+**Windows — текущий терминал (`cmd` / PowerShell):**
+```cmd
+set ANYUI_PERF=1
+set ANYUI_PERF_FILE=C:\temp\perf.log
+myapp.exe
+```
+```powershell
+$env:ANYUI_PERF = "1"
+$env:ANYUI_PERF_FILE = "C:\temp\perf.log"
+.\myapp.exe
+```
+
+**Windows — GUI-приложение без консоли или дочерний процесс, запускаемый лаунчером/ярлыком:**
+
+Если целевое окно запускается отдельным процессом и не наследует переменные текущего терминала, задайте их в пользовательском окружении реестра через `setx` (директория для лог-файла, например `C:\temp`, должна существовать):
+```cmd
+setx ANYUI_PERF 1
+setx ANYUI_PERF_FILE C:\temp\perf.log
+```
+После этого **перезапустите** приложение (лаунчер и его дочерние процессы подхватят новые переменные).
+
+Отключение после завершения замеров:
+```cmd
+reg delete HKCU\Environment /F /V ANYUI_PERF
+reg delete HKCU\Environment /F /V ANYUI_PERF_FILE
+```
+
+### Основные метрики в отчёте
+
+| Метрика | Описание |
+|---|---|
+| `ui.render_total` | Полное время вызова `Context.Render()` (от начала кадра до завершения `Present`). |
+| `ui.path.full_pass` | Время одного полного прохода (`beginFrame` + `drawFn` + `endFrame`). |
+| `ui.draw_fn` | Время выполнения пользовательской функции `drawFn(ui)`. |
+| `ui.path.streaming_only` | Число кадров по быстрому пути потокового холста (`Streaming: true`). |
+| `ui.path.toasts_only` | Число кадров по быстрому пути локальной перерисовки `Toast`. |
+| `ui.path.overlay_input` / `ui.overlay_input_total` | Число и время кадров быстрого пути ввода с клавиатуры внутри оверлея. |
+| `ui.path.overlay_mouse` / `ui.overlay_mouse_total` | Число и время кадров быстрого пути ховера/колеса внутри оверлея. |
+| `ui.overlay_draw` / `ui.overlay_composite` | Время отрисовки содержимого оверлеев и очистки/композитинга их кэшей. |
+| `ui.stream_ov_draw` / `ui.stream_ov_comp` | Отрисовка и композитинг оверлеев внутри `streaming_only` (например, терминал/модалка поверх видео). |
+| `ui.save_underlay` | Время сохранения подложки под активными оверлеями. |
+| `ui.present_frame` / `ui.diff_rect` | Полное время `presentFrame` и расчёт `computeDiffRect`. |
+| `win.present` / `win.present_rect` | Вывод всего окна / грязного прямоугольника на Windows (`BitBlt`). |
+| `x11.present_rect` | Вывод грязного прямоугольника на Linux X11 (`MIT-SHM PutImage`). |
+| `wl.shm_copy` / `wl.frame_latency` | Копирование в `wl_shm` и задержка `wl_callback.done` от композитора Wayland. |
+| `wl.paint_deferred_by_frame` / `wl.frame_timeout` / `wl.all_buffers_busy` | Счётчики ожидания кадра, срабатывания таймаута `framePending` и занятости всех 3 `wl_shm`-буферов на Wayland. |
+
+
 

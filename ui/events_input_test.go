@@ -607,14 +607,15 @@ func TestInteractiveCanvasStreamingFastPath(t *testing.T) {
 		t.Fatal("после стримингового fast-path флаг prevPresentStale должен быть установлен")
 	}
 
-	// Последующее обычное событие (например, клик вне холста) должно синхронизировать prevPresentPixels
+	// Последующее обычное событие (например, клик вне холста) должно локально синхронизировать
+	// prevPresentPixels по stalePresentRect без принудительного полноэкранного Present.
 	ctx.HandleEvent(platform.Event{Type: platform.EventMouseDown, Button: platform.MouseLeft, X: 350, Y: 250})
 	ctx.Render(draw)
-	if win.fullPresents != 2 {
-		t.Fatalf("обычный кадр после стриминга должен синхронизировать prevPresentPixels через full Present, получено full=%d", win.fullPresents)
+	if win.fullPresents != 1 {
+		t.Fatalf("обычный кадр после стриминга не должен вызывать лишний full Present, получено full=%d", win.fullPresents)
 	}
 	if ctx.prevPresentStale {
-		t.Fatal("флаг prevPresentStale должен быть сброшен после полной синхронизации")
+		t.Fatal("флаг prevPresentStale должен быть сброшен после локальной синхронизации")
 	}
 }
 

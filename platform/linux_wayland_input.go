@@ -231,6 +231,7 @@ func (s *wlSeatState) handlePointerEvent(ev wlEvent) {
 			if btn == MouseLeft && win.tryFramelessMoveResize(px, cy, s.seatID, serial) {
 				return
 			}
+			win.flushPendingMouseMove()
 			win.emit(Event{
 				Type:   EventMouseDown,
 				X:      px,
@@ -240,6 +241,7 @@ func (s *wlSeatState) handlePointerEvent(ev wlEvent) {
 			})
 		} else {
 			cy := py - win.csdHeightPx()
+			win.flushPendingMouseMove()
 			win.emit(Event{
 				Type:   EventMouseUp,
 				X:      px,
@@ -302,16 +304,12 @@ func (s *wlSeatState) handlePointerEvent(ev wlEvent) {
 		if moved {
 			if !win.handleCSDMouseMove(px, py) {
 				cy := py - win.csdHeightPx()
-				win.emit(Event{
-					Type: EventMouseMove,
-					X:    px,
-					Y:    cy,
-					Mods: mods,
-				})
+				win.queueMouseMove(px, cy, mods)
 			}
 		}
 		if axX != 0 || axY != 0 {
 			cy := py - win.csdHeightPx()
+			win.flushPendingMouseMove()
 			win.emit(Event{
 				Type:   EventMouseWheel,
 				X:      px,
@@ -504,8 +502,7 @@ func (s *wlSeatState) handleKeyboardEvent(ev wlEvent) {
 					Char:     keyChar,
 					Mods:     mods,
 				})
-			}
-			if keyChar != 0 {
+			} else if keyChar != 0 {
 				win.emit(Event{
 					Type: EventChar,
 					Char: keyChar,
@@ -622,8 +619,7 @@ func (s *wlSeatState) startRepeat(surfID uint32, key uint32) {
 						Char:     keyChar,
 						Mods:     mods,
 					})
-				}
-				if keyChar != 0 {
+				} else if keyChar != 0 {
 					win.emit(Event{
 						Type: EventChar,
 						Char: keyChar,

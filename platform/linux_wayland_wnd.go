@@ -3,6 +3,7 @@
 package platform
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"image"
@@ -14,6 +15,9 @@ import (
 
 	"golang.org/x/sys/unix"
 )
+
+// Максимальное время ожидания wl_callback.done до принудительного сброса framePending.
+const wlFrameTimeoutNs = int64(80 * time.Millisecond)
 
 const (
 	// wl_compositor requests
@@ -315,6 +319,38 @@ func (d *wlDisplay) flushWakeUps() {
 	}
 }
 
+func (d *wlDisplay) nextPollTimeoutMs() int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	now := time.Now().UnixNano()
+	minMs := -1
+	for _, w := range d.windows {
+		if w.closed.Load() || !w.configured.Load() {
+			continue
+		}
+		if !w.framePending.Load() || !w.hasDeferredWork() {
+			continue
+		}
+		sent := w.frameSentNs.Load()
+		if sent <= 0 {
+			continue
+		}
+		remNs := wlFrameTimeoutNs - (now - sent)
+		if remNs <= 0 {
+			return 0
+		}
+		remMs := int((remNs + int64(time.Millisecond) - 1) / int64(time.Millisecond))
+		if remMs < 1 {
+			remMs = 1
+		}
+		if minMs < 0 || remMs < minMs {
+			minMs = remMs
+		}
+	}
+	return minMs
+}
+
 func (d *wlDisplay) flushPaints() {
 	d.mu.Lock()
 	wins := make([]*waylandWindow, 0, len(d.windows))
@@ -323,8 +359,31 @@ func (d *wlDisplay) flushPaints() {
 	}
 	d.mu.Unlock()
 
+	now := time.Now().UnixNano()
 	for _, w := range wins {
-		if !w.framePending.Load() && w.needsPaint.Swap(false) && w.handler != nil && !w.closed.Load() && w.configured.Load() {
+		if w.closed.Load() || !w.configured.Load() {
+			continue
+		}
+		if w.framePending.Load() {
+			sent := w.frameSentNs.Load()
+			if sent > 0 && now-sent >= wlFrameTimeoutNs {
+				w.framePending.Store(false)
+				w.frameSentNs.Store(0)
+				if perfOn {
+					PerfCount("wl.frame_timeout")
+				}
+			}
+		}
+		if w.framePending.Load() {
+			if perfOn && w.hasDeferredWork() {
+				PerfCount("wl.paint_deferred_by_frame")
+			}
+			continue
+		}
+		if ev, ok := w.takePendingMouseMove(); ok {
+			w.emit(ev)
+		}
+		if !w.framePending.Load() && w.needsPaint.Swap(false) && w.handler != nil && !w.closed.Load() {
 			w.handler(Event{Type: EventPaint})
 		}
 	}
@@ -357,7 +416,8 @@ func runWaylandEventLoop(onStart func() error) error {
 		}
 		d.flushPaints()
 
-		wlReady, wakeReady, err := d.conn.waitEvents(-1)
+		timeoutMs := d.nextPollTimeoutMs()
+		wlReady, wakeReady, err := d.conn.waitEvents(timeoutMs)
 		if err != nil {
 			return err
 		}
@@ -534,8 +594,10 @@ type waylandWindow struct {
 	pendingH   int
 	pendingMax bool
 	pendingFS  bool
-	buffers    [2]*wlShmBuffer
-	bufIdx     int
+	buffers        [3]*wlShmBuffer
+	bufIdx         int
+	hasPendingMove bool
+	pendingMoveEv  Event
 
 	csdEnabled    bool
 	csdHoverBtn   int
@@ -551,6 +613,7 @@ type waylandWindow struct {
 	csdGen        uint64
 
 	framePending      atomic.Bool
+	frameSentNs       atomic.Int64
 	configured        atomic.Bool
 	needsPaint        atomic.Bool
 	wakePending       atomic.Bool
@@ -952,6 +1015,48 @@ func (w *waylandWindow) emit(ev Event) {
 	}
 }
 
+// queueMouseMove сохраняет последнее движение указателя для коалесинга в пределах пачки/кадра.
+func (w *waylandWindow) queueMouseMove(x, y int, mods Modifiers) {
+	w.mu.Lock()
+	w.pendingMoveEv = Event{
+		Type: EventMouseMove,
+		X:    x,
+		Y:    y,
+		Mods: mods,
+	}
+	w.hasPendingMove = true
+	w.mu.Unlock()
+}
+
+func (w *waylandWindow) takePendingMouseMove() (Event, bool) {
+	w.mu.Lock()
+	if !w.hasPendingMove {
+		w.mu.Unlock()
+		return Event{}, false
+	}
+	ev := w.pendingMoveEv
+	w.hasPendingMove = false
+	w.mu.Unlock()
+	return ev, true
+}
+
+func (w *waylandWindow) hasDeferredWork() bool {
+	if w.needsPaint.Load() {
+		return true
+	}
+	w.mu.Lock()
+	has := w.hasPendingMove
+	w.mu.Unlock()
+	return has
+}
+
+// flushPendingMouseMove немедленно доставляет накопленное движение мыши перед кнопкой/колесом.
+func (w *waylandWindow) flushPendingMouseMove() {
+	if ev, ok := w.takePendingMouseMove(); ok {
+		w.emit(ev)
+	}
+}
+
 func (w *waylandWindow) currentCursor() CursorType {
 	w.mu.Lock()
 	c := w.cursor
@@ -998,14 +1103,35 @@ func (w *waylandWindow) PresentRect(pixels []byte, width, height, rx, ry, rw, rh
 	}
 
 	w.mu.Lock()
-	idx := w.bufIdx
-	if w.buffers[idx] != nil && w.buffers[idx].busy.Load() {
-		alt := 1 - idx
-		if w.buffers[alt] == nil || !w.buffers[alt].busy.Load() {
-			idx = alt
+	idx := -1
+	// Ищем свободный слот среди уже выделенных (начиная с w.bufIdx).
+	for step := 0; step < len(w.buffers); step++ {
+		cand := (w.bufIdx + step) % len(w.buffers)
+		if w.buffers[cand] != nil && !w.buffers[cand].busy.Load() {
+			idx = cand
+			break
 		}
 	}
-	w.bufIdx = 1 - idx
+	// Если свободного среди выделенных нет — лениво выделяем следующий пустой слот (0, 1 или 2).
+	if idx < 0 {
+		for i := 0; i < len(w.buffers); i++ {
+			if w.buffers[i] == nil {
+				idx = i
+				break
+			}
+		}
+	}
+	// Если все 3 слота выделены и заняты композитором — не перезаписываем активный буфер,
+	// а откладываем перерисовку до wl_buffer.release / wl_callback.done.
+	if idx < 0 {
+		w.mu.Unlock()
+		if perfOn {
+			PerfCount("wl.all_buffers_busy")
+		}
+		w.needsPaint.Store(true)
+		return
+	}
+	w.bufIdx = (idx + 1) % len(w.buffers)
 
 	buf := w.buffers[idx]
 	if buf == nil || buf.width != totalW || buf.height != totalH {
@@ -1022,7 +1148,7 @@ func (w *waylandWindow) PresentRect(pixels []byte, width, height, rx, ry, rw, rh
 	}
 
 	// Вычисляем область копирования для выбранного буфера с учётом изменений,
-	// записанных ранее в другой слот двойного буфера.
+	// записанных ранее в остальные слоты пула.
 	var copyRect image.Rectangle
 	if buf.fullSync {
 		copyRect = fullClient
@@ -1034,13 +1160,17 @@ func (w *waylandWindow) PresentRect(pixels []byte, width, height, rx, ry, rw, rh
 	}
 	buf.pendingDirty = image.Rectangle{}
 
-	if other := w.buffers[1-idx]; other != nil && !other.fullSync {
+	for j, other := range w.buffers {
+		if j == idx || other == nil || other.fullSync {
+			continue
+		}
 		if other.pendingDirty.Empty() {
 			other.pendingDirty = curDirty
 		} else {
 			other.pendingDirty = other.pendingDirty.Union(curDirty).Intersect(fullClient)
 		}
 	}
+	lw, lh := w.logicalW, w.logicalH
 	w.mu.Unlock()
 
 	csdUpdated := false
@@ -1053,6 +1183,7 @@ func (w *waylandWindow) PresentRect(pixels []byte, width, height, rx, ry, rw, rh
 		}
 	}
 
+	copyStart := PerfNow()
 	dstBase := barH * totalW * 4
 	if copyRect == fullClient {
 		copy(buf.data[dstBase:dstBase+width*height*4], pixels[:width*height*4])
@@ -1065,51 +1196,59 @@ func (w *waylandWindow) PresentRect(pixels []byte, width, height, rx, ry, rw, rh
 			copy(buf.data[dstBase+off:dstBase+off+lineBytes], pixels[off:off+lineBytes])
 		}
 	}
+	PerfSince("wl.shm_copy", copyStart)
 	buf.busy.Store(true)
 
-	var aw wlWriter
-	aw.uint32(buf.bufferID)
-	aw.int32(0)
-	aw.int32(0)
-	_ = w.disp.conn.send(w.surfaceID, wlSurfaceAttach, aw.bytes())
+	// Собираем attach + damage + frame + commit в один стековый буфер и отправляем за один SendmsgN.
+	var batchBuf [96]byte
+	batch := batchBuf[:0]
+
+	var attachPayload [12]byte
+	binary.LittleEndian.PutUint32(attachPayload[0:4], buf.bufferID)
+	batch = appendWLMsg(batch, w.surfaceID, wlSurfaceAttach, attachPayload[:])
 
 	dmgRect := image.Rect(curDirty.Min.X, curDirty.Min.Y+barH, curDirty.Max.X, curDirty.Max.Y+barH)
 	if csdUpdated && barH > 0 {
 		dmgRect = dmgRect.Union(image.Rect(0, 0, totalW, barH))
 	}
+	var dmgPayload [16]byte
 	if w.disp.compositorVer >= 4 {
-		var dw wlWriter
-		dw.int32(int32(dmgRect.Min.X))
-		dw.int32(int32(dmgRect.Min.Y))
-		dw.int32(int32(dmgRect.Dx()))
-		dw.int32(int32(dmgRect.Dy()))
-		_ = w.disp.conn.send(w.surfaceID, wlSurfaceDamageBuffer, dw.bytes())
+		binary.LittleEndian.PutUint32(dmgPayload[0:4], uint32(int32(dmgRect.Min.X)))
+		binary.LittleEndian.PutUint32(dmgPayload[4:8], uint32(int32(dmgRect.Min.Y)))
+		binary.LittleEndian.PutUint32(dmgPayload[8:12], uint32(int32(dmgRect.Dx())))
+		binary.LittleEndian.PutUint32(dmgPayload[12:16], uint32(int32(dmgRect.Dy())))
+		batch = appendWLMsg(batch, w.surfaceID, wlSurfaceDamageBuffer, dmgPayload[:])
 	} else {
-		var dw wlWriter
-		dw.int32(0)
-		dw.int32(0)
-		dw.int32(int32(w.logicalW))
-		dw.int32(int32(w.logicalH))
-		_ = w.disp.conn.send(w.surfaceID, wlSurfaceDamage, dw.bytes())
+		binary.LittleEndian.PutUint32(dmgPayload[8:12], uint32(int32(lw)))
+		binary.LittleEndian.PutUint32(dmgPayload[12:16], uint32(int32(lh)))
+		batch = appendWLMsg(batch, w.surfaceID, wlSurfaceDamage, dmgPayload[:])
 	}
 
+	var frameCB uint32
 	if !w.framePending.Swap(true) {
+		w.frameSentNs.Store(time.Now().UnixNano())
 		var cbID uint32
 		cbID = w.disp.conn.allocID(func(ev wlEvent) {
 			if ev.Opcode == wlCallbackEventDone {
+				if sent := w.frameSentNs.Swap(0); sent != 0 && perfOn {
+					PerfRecord("wl.frame_latency", time.Duration(time.Now().UnixNano()-sent))
+				}
 				w.framePending.Store(false)
 				w.disp.conn.removeHandler(cbID)
 			}
 		})
-		var fw wlWriter
-		fw.uint32(cbID)
-		if err := w.disp.conn.send(w.surfaceID, wlSurfaceFrame, fw.bytes()); err != nil {
-			w.framePending.Store(false)
-			w.disp.conn.removeHandler(cbID)
-		}
+		frameCB = cbID
+		var framePayload [4]byte
+		binary.LittleEndian.PutUint32(framePayload[0:4], cbID)
+		batch = appendWLMsg(batch, w.surfaceID, wlSurfaceFrame, framePayload[:])
 	}
 
-	_ = w.disp.conn.send(w.surfaceID, wlSurfaceCommit, nil)
+	batch = appendWLMsg(batch, w.surfaceID, wlSurfaceCommit, nil)
+	if err := w.disp.conn.sendBatch(batch); err != nil && frameCB != 0 {
+		w.framePending.Store(false)
+		w.frameSentNs.Store(0)
+		w.disp.conn.removeHandler(frameCB)
+	}
 	if w.pendingActivate.Swap(false) {
 		w.activate()
 	}
@@ -1214,6 +1353,7 @@ func (w *waylandWindow) Hide() {
 	}
 	w.configured.Store(false)
 	w.framePending.Store(false)
+	w.frameSentNs.Store(0)
 	w.pendingActivate.Store(false)
 
 	var aw wlWriter

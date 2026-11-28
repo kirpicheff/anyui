@@ -223,6 +223,45 @@ func (c *wlConn) dispatch(ev wlEvent) {
 	}
 }
 
+// appendWLMsg дописывает сериализованное сообщение Wayland в буфер dst.
+func appendWLMsg(dst []byte, objectID uint32, opcode uint16, payload []byte) []byte {
+	totalLen := 8 + len(payload)
+	var hdr [8]byte
+	binary.LittleEndian.PutUint32(hdr[0:4], objectID)
+	binary.LittleEndian.PutUint32(hdr[4:8], (uint32(totalLen)<<16)|uint32(opcode))
+	dst = append(dst, hdr[:]...)
+	return append(dst, payload...)
+}
+
+// sendBatch отправляет заранее собранную пачку сообщений Wayland за один вызов SendmsgN.
+func (c *wlConn) sendBatch(pkt []byte) error {
+	if c.closed.Load() {
+		return errors.New("соединение Wayland закрыто")
+	}
+	if len(pkt) == 0 {
+		return nil
+	}
+
+	c.sendMu.Lock()
+	defer c.sendMu.Unlock()
+
+	offset := 0
+	for offset < len(pkt) {
+		n, err := unix.SendmsgN(c.fd, pkt[offset:], nil, nil, unix.MSG_NOSIGNAL)
+		if err != nil {
+			if errors.Is(err, unix.EINTR) {
+				continue
+			}
+			return err
+		}
+		if n == 0 {
+			return io.ErrUnexpectedEOF
+		}
+		offset += n
+	}
+	return nil
+}
+
 // send отправляет сообщение Wayland без файловых дескрипторов.
 func (c *wlConn) send(objectID uint32, opcode uint16, payload []byte) error {
 	return c.sendWithFDs(objectID, opcode, payload, nil)

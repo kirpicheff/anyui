@@ -8,7 +8,18 @@ type overlayItem struct {
 	layoutSeq   int
 	idSeqTop    int
 	cache       *render.Canvas
+	cacheRect   render.Rect
 	nonBlocking bool
+}
+
+type overlayCacheSlot struct {
+	canvas *render.Canvas
+	dirty  render.Rect
+}
+
+type overlayBackdrop struct {
+	rect  render.Rect
+	color render.Color
 }
 
 // OverlayLayer управляет отложенной отрисовкой всплывающих элементов поверх основного UI
@@ -18,21 +29,27 @@ type OverlayLayer struct {
 	nextBlocks []render.Rect
 	prevRects  []render.Rect
 	items      []overlayItem
+	backdrops  []overlayBackdrop
 	inOverlay  bool
-	canvasPool []*render.Canvas
+	canvasPool []overlayCacheSlot
 }
 
 // BeginFrame подготавливает слой оверлеев к новому кадру и сбрасывает кэши оверлеев с возвратом в пул.
 func (o *OverlayLayer) BeginFrame() {
 	o.prevBlocks, o.nextBlocks = o.nextBlocks, o.prevBlocks[:0]
 	o.prevRects = o.prevRects[:0]
+	o.backdrops = o.backdrops[:0]
 	for i := range o.items {
 		if !o.items[i].bounds.Empty() {
 			o.prevRects = append(o.prevRects, o.items[i].bounds)
 		}
 		if o.items[i].cache != nil {
-			o.canvasPool = append(o.canvasPool, o.items[i].cache)
+			o.canvasPool = append(o.canvasPool, overlayCacheSlot{
+				canvas: o.items[i].cache,
+				dirty:  o.items[i].cacheRect,
+			})
 			o.items[i].cache = nil
+			o.items[i].cacheRect = render.Rect{}
 		}
 	}
 	o.items = o.items[:0]
@@ -45,15 +62,18 @@ func (o *OverlayLayer) AllocCache(w, h int) *render.Canvas {
 		return nil
 	}
 	for i := len(o.canvasPool) - 1; i >= 0; i-- {
-		cv := o.canvasPool[i]
-		if cv.Width == w && cv.Height == h {
+		slot := o.canvasPool[i]
+		if slot.canvas.Width == w && slot.canvas.Height == h {
 			o.canvasPool = append(o.canvasPool[:i], o.canvasPool[i+1:]...)
-			cv.Clear(render.RGBA(0, 0, 0, 0))
-			return cv
+			if !slot.dirty.Empty() {
+				slot.canvas.ClearRectTransparent(slot.dirty)
+			}
+			slot.canvas.ResetDirtyRects()
+			return slot.canvas
 		}
 	}
 	cv := render.NewCanvas(w, h)
-	cv.Clear(render.RGBA(0, 0, 0, 0))
+	cv.ResetDirtyRects()
 	return cv
 }
 
@@ -108,9 +128,54 @@ func (o *OverlayLayer) IsBlockedCurrent(x, y int) bool {
 	return false
 }
 
+// ContainsBlocking возвращает true, если точка (x, y) находится внутри хотя бы одного
+// блокирующего оверлея с последнего полного кадра.
+func (o *OverlayLayer) ContainsBlocking(x, y int) bool {
+	for _, it := range o.items {
+		if !it.nonBlocking && !it.bounds.Empty() && it.bounds.Contains(x, y) {
+			return true
+		}
+	}
+	return false
+}
+
+// PushBackdrop регистрирует фоновое затемнение (например, для Modal/Drawer), которое блокирует
+// ввод по основному окну, но рисуется отдельно от кэша содержимого оверлея, чтобы не раздувать
+// область перерисовки и композитинга диалога до всего экрана.
+func (o *OverlayLayer) PushBackdrop(rect render.Rect, color render.Color) {
+	if rect.Empty() {
+		return
+	}
+	o.nextBlocks = append(o.nextBlocks, rect)
+	if color.A > 0 {
+		o.backdrops = append(o.backdrops, overlayBackdrop{rect: rect, color: color})
+	}
+}
+
+// HasBackdrops возвращает true, если в текущем кадре зарегистрированы фоновые затемнения.
+func (o *OverlayLayer) HasBackdrops() bool {
+	return len(o.backdrops) > 0
+}
+
+// DrawBackdrops отрисовывает все фоновые затемнения в пределах области clip (или целиком при пустом clip).
+func (o *OverlayLayer) DrawBackdrops(target *render.Canvas, clip render.Rect) {
+	if target == nil || len(o.backdrops) == 0 {
+		return
+	}
+	for _, b := range o.backdrops {
+		r := b.rect
+		if !clip.Empty() {
+			r = r.Intersect(clip)
+		}
+		if !r.Empty() {
+			target.FillRect(r, b.color)
+		}
+	}
+}
+
 // HasActive возвращает true, если в текущем или предыдущем кадре были активные оверлеи (меню, попапы, модалки).
 func (o *OverlayLayer) HasActive() bool {
-	return len(o.prevBlocks) > 0 || len(o.nextBlocks) > 0 || len(o.items) > 0
+	return len(o.prevBlocks) > 0 || len(o.nextBlocks) > 0 || len(o.items) > 0 || len(o.backdrops) > 0
 }
 
 // ActiveRects возвращает копию прямоугольников всех активных оверлеев (включая неблокирующие)
@@ -235,7 +300,13 @@ func (o *OverlayLayer) RedrawIntersecting(target *render.Canvas, r render.Rect, 
 		it := o.items[i]
 		if overlayBoundsIntersects(it.bounds, r, padPx) {
 			if target != nil && it.cache != nil {
-				target.CompositeFrom(it.cache, r)
+				if !it.cacheRect.Empty() {
+					if cr := r.Intersect(it.cacheRect); !cr.Empty() {
+						target.CompositeFrom(it.cache, cr)
+					}
+				} else {
+					target.CompositeFrom(it.cache, r)
+				}
 			} else {
 				if beforeDraw != nil {
 					beforeDraw(it.layoutSeq, it.idSeqTop)

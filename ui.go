@@ -475,6 +475,16 @@ func (u *UI) PushNonBlockingOverlay(bounds Rect, drawFn func()) {
 	u.ctx.PushNonBlockingOverlay(u.scaleRect(bounds), drawFn)
 }
 
+// PushBackdrop регистрирует фоновое затемнение поверх основного интерфейса (например, для кастомного диалога).
+// Прямоугольник bounds задаётся в логических пикселях (Dp / CurrentArea()) и блокирует ввод под ним,
+// но не раздувает область кэширования, композитинга и PresentRect последующего локального PushOverlay.
+func (u *UI) PushBackdrop(bounds Rect, color Color) {
+	if u == nil || u.ctx == nil {
+		return
+	}
+	u.ctx.PushBackdrop(u.scaleRect(bounds), color)
+}
+
 // HasActiveOverlays возвращает true, если в текущем кадре есть активные оверлеи
 // (Modal, Popover, FloatingPanel, Drawer, ContextMenu, Select, Tooltip, PushOverlay и др.).
 // Полезно внешним нативным поверхностям, чтобы корректно уступать z-order и переключаться на софтверный вывод.

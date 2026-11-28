@@ -500,8 +500,8 @@ func (c *Context) Modal(id string, open *bool, title string, fn func(), opts ...
 		H: h,
 	}
 
-	c.PushOverlay(full, func() {
-		c.Canvas.FillRect(full, render.RGBA(0, 0, 0, 140))
+	c.Overlays.PushBackdrop(full, render.RGBA(0, 0, 0, 140))
+	c.PushOverlay(box, func() {
 		c.drawDropShadow(box, c.Theme.RadiusLg, 24, 150)
 		c.Canvas.DrawRoundedBox(box, c.ScaleF(c.Theme.RadiusLg), c.Theme.Card, 1.0, c.Theme.Border)
 
@@ -792,8 +792,8 @@ func (c *Context) Drawer(id string, open *bool, side DrawerSide, fn func(), opts
 		c.RequestRedraw()
 	}
 
-	c.PushOverlay(full, func() {
-		c.Canvas.FillRect(full, render.RGBA(0, 0, 0, uint8(90*anim)))
+	c.Overlays.PushBackdrop(full, render.RGBA(0, 0, 0, uint8(90*anim)))
+	c.PushOverlay(panelRect, func() {
 		c.drawDropShadow(panelRect, 0, 18, 120)
 		bg := c.Theme.Card
 		if st.Bg != nil {

@@ -319,28 +319,34 @@ func (c *Canvas) CompositeFrom(src *Canvas, area Rect) {
 	if vis.Empty() {
 		return
 	}
+	rowBytes := vis.W * 4
 	for y := vis.Y; y < vis.Y+vis.H; y++ {
 		dstRow := (y*c.Width + vis.X) * 4
 		srcRow := (y*src.Width + vis.X) * 4
-		for x := 0; x < vis.W; x++ {
-			so := srcRow + x*4
-			a := uint32(src.Pixels[so+3])
+		dst := c.Pixels[dstRow : dstRow+rowBytes]
+		s := src.Pixels[srcRow : srcRow+rowBytes]
+		_ = dst[rowBytes-1]
+		_ = s[rowBytes-1]
+		for i := 0; i < rowBytes; i += 4 {
+			a := uint32(s[i+3])
 			if a == 0 {
 				continue
 			}
-			do := dstRow + x*4
 			if a == 255 {
-				c.Pixels[do+0] = src.Pixels[so+0]
-				c.Pixels[do+1] = src.Pixels[so+1]
-				c.Pixels[do+2] = src.Pixels[so+2]
-				c.Pixels[do+3] = 255
+				dst[i+0] = s[i+0]
+				dst[i+1] = s[i+1]
+				dst[i+2] = s[i+2]
+				dst[i+3] = 255
 				continue
 			}
 			invA := 255 - a
-			c.Pixels[do+0] = uint8((uint32(src.Pixels[so+0])*a + uint32(c.Pixels[do+0])*invA + 127) / 255)
-			c.Pixels[do+1] = uint8((uint32(src.Pixels[so+1])*a + uint32(c.Pixels[do+1])*invA + 127) / 255)
-			c.Pixels[do+2] = uint8((uint32(src.Pixels[so+2])*a + uint32(c.Pixels[do+2])*invA + 127) / 255)
-			c.Pixels[do+3] = 255
+			tb := uint32(s[i+0])*a + uint32(dst[i+0])*invA + 128
+			tg := uint32(s[i+1])*a + uint32(dst[i+1])*invA + 128
+			tr := uint32(s[i+2])*a + uint32(dst[i+2])*invA + 128
+			dst[i+0] = uint8((tb + (tb >> 8)) >> 8)
+			dst[i+1] = uint8((tg + (tg >> 8)) >> 8)
+			dst[i+2] = uint8((tr + (tr >> 8)) >> 8)
+			dst[i+3] = 255
 		}
 	}
 	c.AddDirtyRect(vis)
@@ -378,23 +384,70 @@ func (c *Canvas) FillRect(r Rect, col Color) {
 	}
 	c.AddDirtyRect(area)
 
+	rowBytes := area.W * 4
 	if col.A == 255 {
-		for y := area.Y; y < area.Y+area.H; y++ {
-			row := (y*c.Width + area.X) * 4
-			for x := 0; x < area.W; x++ {
-				i := row + x*4
-				c.Pixels[i+0] = col.B
-				c.Pixels[i+1] = col.G
-				c.Pixels[i+2] = col.R
-				c.Pixels[i+3] = 255
-			}
+		firstOff := (area.Y*c.Width + area.X) * 4
+		firstRow := c.Pixels[firstOff : firstOff+rowBytes]
+		_ = firstRow[rowBytes-1]
+		for i := 0; i < rowBytes; i += 4 {
+			firstRow[i+0] = col.B
+			firstRow[i+1] = col.G
+			firstRow[i+2] = col.R
+			firstRow[i+3] = 255
+		}
+		for y := area.Y + 1; y < area.Y+area.H; y++ {
+			off := (y*c.Width + area.X) * 4
+			copy(c.Pixels[off:off+rowBytes], firstRow)
 		}
 		return
 	}
 
+	a := uint32(col.A)
+	invA := 255 - a
+	bA := uint32(col.B)*a + 128
+	gA := uint32(col.G)*a + 128
+	rA := uint32(col.R)*a + 128
+	bSrc := uint32(col.B) * a
+	gSrc := uint32(col.G) * a
+	rSrc := uint32(col.R) * a
+
 	for y := area.Y; y < area.Y+area.H; y++ {
-		for x := area.X; x < area.X+area.W; x++ {
-			c.blendPixelUnchecked(x, y, col, 255)
+		off := (y*c.Width + area.X) * 4
+		row := c.Pixels[off : off+rowBytes]
+		_ = row[rowBytes-1]
+		for i := 0; i < rowBytes; i += 4 {
+			dstA := uint32(row[i+3])
+			if dstA == 0 {
+				row[i+0] = col.B
+				row[i+1] = col.G
+				row[i+2] = col.R
+				row[i+3] = col.A
+				continue
+			}
+			if dstA == 255 {
+				tb := bA + uint32(row[i+0])*invA
+				tg := gA + uint32(row[i+1])*invA
+				tr := rA + uint32(row[i+2])*invA
+				row[i+0] = uint8((tb + (tb >> 8)) >> 8)
+				row[i+1] = uint8((tg + (tg >> 8)) >> 8)
+				row[i+2] = uint8((tr + (tr >> 8)) >> 8)
+				row[i+3] = 255
+				continue
+			}
+			tdw := dstA*invA + 128
+			dstWeight := (tdw + (tdw >> 8)) >> 8
+			outA := a + dstWeight
+			if outA > 255 {
+				outA = 255
+			}
+			if outA == 0 {
+				continue
+			}
+			half := outA >> 1
+			row[i+0] = uint8((bSrc + uint32(row[i+0])*dstWeight + half) / outA)
+			row[i+1] = uint8((gSrc + uint32(row[i+1])*dstWeight + half) / outA)
+			row[i+2] = uint8((rSrc + uint32(row[i+2])*dstWeight + half) / outA)
+			row[i+3] = uint8(outA)
 		}
 	}
 }
