@@ -573,6 +573,22 @@ app.Run(func(ui *anyui.UI) {
 })
 ```
 
+#### Вкладки в заголовке
+`TabBar` можно разместить в слоте `LeftContent` шапки. Дополнительных опций у `TitleBar` для этого нет, высота шапки не меняется: вкладки занимают ширину слота (до системных кнопок), а свободная область остаётся зоной перетаскивания окна. Типичный сценарий — показывать вкладки в шапке только при скрытом тулбаре:
+
+```go
+cfg := anyui.TitleBarConfig{HeightDp: 36}
+if !toolbarVisible {
+	cfg.LeftContent = func() {
+		ev := ui.TabBar("tabs", tabs, &active) // HideAddButton() скрывает «+»
+		_ = ev // Added, ClosedID, MovedFrom/MovedTo — обрабатываются как обычно
+	}
+}
+ui.TitleBar("main_title", "Remote Desktop", cfg)
+```
+
+Пример: вкладка «Расширенный ввод» демо, кнопка «Окно: вкладки в заголовке».
+
 ### Локализация встроенных строк (`Strings`)
 Все встроенные подписи (`DatePicker`, `TimePicker`, `MultiSelect`, `Select`, `LogView`, контекстное меню текстовых полей) настраиваются через `anyui.Strings` (`RussianStrings()`, `EnglishStrings()`):
 

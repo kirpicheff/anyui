@@ -564,6 +564,22 @@ app.Run(func(ui *anyui.UI) {
 })
 ```
 
+#### Tabs in the title bar
+A `TabBar` can be placed into the `LeftContent` slot of the title bar. `TitleBar` needs no extra options and its height does not change: the tabs take the slot width (up to the system buttons) and the free area stays a window drag zone. A typical scenario is showing the tabs in the title bar only while the toolbar is hidden:
+
+```go
+cfg := anyui.TitleBarConfig{HeightDp: 36}
+if !toolbarVisible {
+	cfg.LeftContent = func() {
+		ev := ui.TabBar("tabs", tabs, &active) // HideAddButton() hides "+"
+		_ = ev // Added, ClosedID, MovedFrom/MovedTo are handled as usual
+	}
+}
+ui.TitleBar("main_title", "Remote Desktop", cfg)
+```
+
+Example: the "Advanced input" demo tab, button "Window: tabs in the title bar".
+
 ### Control String Localization (`Strings`)
 All built-in strings (`DatePicker`, `TimePicker`, `MultiSelect`, `Select`, `LogView`, text context menus) can be customized via `anyui.Strings` (`RussianStrings()`, `EnglishStrings()`):
 

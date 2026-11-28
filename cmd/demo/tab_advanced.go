@@ -72,6 +72,10 @@ func (st *demoState) drawTabAdvanced(ui *anyui.UI) {
 		if st.vertTabID == "" {
 			st.vertTabID = "Общие"
 		}
+		if ui.Button("btn_tbt_demo", "Окно: вкладки в заголовке (при скрытом тулбаре)", anyui.Secondary()) {
+			st.openTitleBarTabsDemo(ui)
+		}
+		ui.Spacer(8)
 		ui.Row(14, 114, func() {
 			ui.TabBar("tb_vert_demo", anyui.TabItems("Общие", "Сеть", "Вид"), &st.vertTabID,
 				anyui.TabOrientation(anyui.Vertical),
