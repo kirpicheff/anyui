@@ -662,8 +662,21 @@ func parseXKBKeymap(text string) *wlKeymap {
 	inKeycodes := false
 	inSymbols := false
 	inKeyBlock := false
+	seenBrace := false
+	braceDepth := 0
 	var keyName string
 	var keyBuf strings.Builder
+	aliases := make(map[string]string)
+
+	resolveAliases := func() {
+		for alias, target := range aliases {
+			if _, exists := km.keycodes[alias]; !exists {
+				if code, ok := km.keycodes[target]; ok {
+					km.keycodes[alias] = code
+				}
+			}
+		}
+	}
 
 	flushKeyBlock := func() {
 		if keyName != "" {
@@ -681,33 +694,73 @@ func parseXKBKeymap(text string) *wlKeymap {
 
 	for _, rawLine := range strings.Split(text, "\n") {
 		line := strings.TrimSpace(rawLine)
-		if !inKeyBlock {
+		if !inKeycodes && !inSymbols {
 			if strings.HasPrefix(line, "xkb_keycodes") {
 				inKeycodes = true
-				inSymbols = false
+				open := strings.Count(line, "{")
+				closeCnt := strings.Count(line, "}")
+				seenBrace = open > 0
+				braceDepth = open - closeCnt
+				if seenBrace && braceDepth <= 0 {
+					inKeycodes = false
+					seenBrace = false
+					braceDepth = 0
+				}
 				continue
 			}
 			if strings.HasPrefix(line, "xkb_symbols") {
 				inSymbols = true
-				inKeycodes = false
+				open := strings.Count(line, "{")
+				closeCnt := strings.Count(line, "}")
+				seenBrace = open > 0
+				braceDepth = open - closeCnt
+				if seenBrace && braceDepth <= 0 {
+					inSymbols = false
+					seenBrace = false
+					braceDepth = 0
+				}
 				continue
 			}
-			if line == "};" {
-				inKeycodes = false
-				inSymbols = false
-				continue
-			}
+			continue
 		}
 
-		if inKeycodes && strings.HasPrefix(line, "<") {
-			// Формат: <AD01> = 24;
-			eq := strings.IndexByte(line, '=')
-			if eq > 0 {
-				name := strings.TrimSpace(line[:eq])
-				valStr := strings.TrimSpace(strings.TrimSuffix(line[eq+1:], ";"))
-				if kc, err := strconv.ParseUint(valStr, 10, 32); err == nil && kc >= 8 {
-					km.keycodes[name] = uint32(kc - 8)
+		open := strings.Count(line, "{")
+		closeCnt := strings.Count(line, "}")
+		if open > 0 {
+			seenBrace = true
+		}
+		braceDepth += open - closeCnt
+
+		if inKeycodes {
+			if braceDepth == 1 {
+				if strings.HasPrefix(line, "<") {
+					// Формат: <AD01> = 24;
+					eq := strings.IndexByte(line, '=')
+					if eq > 0 {
+						name := strings.TrimSpace(line[:eq])
+						valStr := strings.TrimSpace(strings.TrimSuffix(line[eq+1:], ";"))
+						if kc, err := strconv.ParseUint(valStr, 10, 32); err == nil && kc >= 8 {
+							km.keycodes[name] = uint32(kc - 8)
+						}
+					}
+				} else if strings.HasPrefix(line, "alias ") || strings.HasPrefix(line, "alias\t") {
+					// Формат: alias <LatQ> = <AD01>;
+					rest := strings.TrimSpace(line[len("alias"):])
+					eq := strings.IndexByte(rest, '=')
+					if eq > 0 {
+						aliasName := strings.TrimSpace(rest[:eq])
+						targetName := strings.TrimSpace(strings.TrimSuffix(rest[eq+1:], ";"))
+						if strings.HasPrefix(aliasName, "<") && strings.HasPrefix(targetName, "<") {
+							aliases[aliasName] = targetName
+						}
+					}
 				}
+			}
+			if seenBrace && braceDepth <= 0 {
+				resolveAliases()
+				inKeycodes = false
+				seenBrace = false
+				braceDepth = 0
 			}
 			continue
 		}
@@ -716,31 +769,46 @@ func parseXKBKeymap(text string) *wlKeymap {
 			if inKeyBlock {
 				keyBuf.WriteString(line)
 				keyBuf.WriteByte('\n')
-				if strings.Contains(line, "};") {
+				if braceDepth <= 1 && strings.Contains(line, "};") {
 					flushKeyBlock()
+				}
+				if seenBrace && braceDepth <= 0 {
+					flushKeyBlock()
+					inSymbols = false
+					seenBrace = false
+					braceDepth = 0
 				}
 				continue
 			}
 
 			keyLine := line
-			if strings.HasPrefix(keyLine, "override ") {
-				keyLine = strings.TrimSpace(strings.TrimPrefix(keyLine, "override "))
+			if strings.HasPrefix(keyLine, "override ") || strings.HasPrefix(keyLine, "override\t") {
+				keyLine = strings.TrimSpace(keyLine[len("override"):])
 			}
-			if strings.HasPrefix(keyLine, "key <") {
-				gt := strings.IndexByte(keyLine, '>')
-				if gt <= 5 {
-					continue
+			if strings.HasPrefix(keyLine, "key ") || strings.HasPrefix(keyLine, "key\t") {
+				afterKey := strings.TrimSpace(keyLine[3:])
+				if strings.HasPrefix(afterKey, "<") {
+					gt := strings.IndexByte(afterKey, '>')
+					if gt > 1 {
+						keyName = afterKey[:gt+1]
+						rest := afterKey[gt+1:]
+						keyBuf.Reset()
+						keyBuf.WriteString(rest)
+						keyBuf.WriteByte('\n')
+						if braceDepth <= 1 && strings.Contains(rest, "};") {
+							flushKeyBlock()
+						} else {
+							inKeyBlock = true
+						}
+					}
 				}
-				keyName = keyLine[4 : gt+1]
-				rest := keyLine[gt+1:]
-				keyBuf.Reset()
-				keyBuf.WriteString(rest)
-				keyBuf.WriteByte('\n')
-				if strings.Contains(rest, "};") {
-					flushKeyBlock()
-				} else {
-					inKeyBlock = true
-				}
+			}
+
+			if seenBrace && braceDepth <= 0 {
+				flushKeyBlock()
+				inSymbols = false
+				seenBrace = false
+				braceDepth = 0
 			}
 		}
 	}
@@ -753,21 +821,25 @@ func parseXKBKeymap(text string) *wlKeymap {
 
 func parseXKBSymbolGroups(block string) [][]rune {
 	lower := strings.ToLower(block)
-	// Формат GNOME Mutter / libxkbcommon: symbols[Group1]= [ q, Q ], symbols[Group2]= [ Cyrillic_shorti, Cyrillic_SHORTI ]
-	if strings.Contains(lower, "symbols[group") {
+	// Формат GNOME Mutter / libxkbcommon:
+	// symbols[Group1]= [ q, Q ], symbols[Group2]= [ Cyrillic_shorti, Cyrillic_SHORTI ]
+	// или symbols[1]= [ q, Q ], symbols[2]= [ Cyrillic_shorti, Cyrillic_SHORTI ]
+	if strings.Contains(lower, "symbols[") {
 		var groups [][]rune
 		idx := 0
 		for idx < len(lower) {
-			pos := strings.Index(lower[idx:], "symbols[group")
+			pos := strings.Index(lower[idx:], "symbols[")
 			if pos < 0 {
 				break
 			}
-			numStart := idx + pos + len("symbols[group")
+			numStart := idx + pos + len("symbols[")
 			rb := strings.IndexByte(block[numStart:], ']')
 			if rb <= 0 {
 				break
 			}
-			groupNum, err := strconv.Atoi(strings.TrimSpace(block[numStart : numStart+rb]))
+			groupSpec := strings.TrimSpace(lower[numStart : numStart+rb])
+			groupSpec = strings.TrimPrefix(groupSpec, "group")
+			groupNum, err := strconv.Atoi(strings.TrimSpace(groupSpec))
 			afterRB := numStart + rb + 1
 			open := strings.IndexByte(block[afterRB:], '[')
 			if open < 0 {
@@ -1197,6 +1269,11 @@ func xkbSymNameToRune(name string) rune {
 		r := rune(name[0])
 		if r >= 0x20 && r <= 0x7E {
 			return r
+		}
+	}
+	if strings.HasPrefix(name, "0x") || strings.HasPrefix(name, "0X") {
+		if v, err := strconv.ParseUint(name[2:], 16, 32); err == nil {
+			return x11KeysymUint32ToRune(uint32(v))
 		}
 	}
 	if strings.HasPrefix(name, "U") && len(name) >= 5 {

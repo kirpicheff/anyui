@@ -446,17 +446,21 @@ xkb_keycodes "evdev+aliases(qwerty)" {
     <AB08> = 59;
     <AB09> = 60;
     <AE03> = 12;
+    alias <LatQ> = <AD01>;
 };
 xkb_symbols "pc+us+ru:2+inet(evdev)" {
     name[group1]="English (US)";
     name[group2]="Russian";
-
-    key <AD01> {
-        type= "ALPHABETIC",
-        symbols[Group1]= [               q,               Q ],
-        symbols[Group2]= [ Cyrillic_shorti, Cyrillic_SHORTI ]
+    indicator "Caps Lock" {
+        !allowExplicit;
     };
-    key <AD11> {
+
+    key   <LatQ> {
+        type= "ALPHABETIC",
+        symbols[1]= [               q,               Q ],
+        symbols[2]= [ Cyrillic_shorti, Cyrillic_SHORTI ]
+    };
+    key	<AD11> {
         type[group1]= "FOUR_LEVEL",
         type[group2]= "ALPHABETIC",
         symbols[Group1]= [     bracketleft,       braceleft ],
@@ -714,6 +718,53 @@ func TestWaylandPresentRectOptimizationAndCSDCache(t *testing.T) {
 			w.buffers[0].data[(1*4+1)*4], w.buffers[0].data[(2*4+2)*4])
 	}
 }
+
+func TestParseXKBKeymapHexKeysyms(t *testing.T) {
+	// Формат GNOME Mutter / libxkbcommon, где keysym заданы hex-числами 0x...
+	sample := `
+xkb_keymap {
+xkb_keycodes "(unnamed)" {
+    <AD01> = 24;
+    <AD02> = 25;
+    <AE03> = 12;
+};
+xkb_symbols "(unnamed)" {
+    key <AD01> {
+        symbols[1]= [ 0x71, 0x51 ],
+        symbols[2]= [ 0x6ca, 0x6ea ]
+    };
+    key <AD02> {
+        symbols[1]= [ 0x77, 0x57 ],
+        symbols[2]= [ 0x6c3, 0x6e3 ]
+    };
+    key <AE03> {
+        symbols[1]= [ 0x33, 0x23 ],
+        symbols[2]= [ 0x33, 0x6b0 ]
+    };
+};
+};
+`
+	km := parseXKBKeymap(sample)
+	if km == nil {
+		t.Fatal("parseXKBKeymap вернул nil для hex keysym")
+	}
+	if _, ch := translateEvdevKey(16, Modifiers{}, false, 0, km); ch != 'q' {
+		t.Fatalf("group 0 lower: ch=%q, want 'q'", ch)
+	}
+	if _, ch := translateEvdevKey(16, Modifiers{}, false, 1, km); ch != 'й' {
+		t.Fatalf("group 1 lower: ch=%q, want 'й'", ch)
+	}
+	if _, ch := translateEvdevKey(16, Modifiers{Shift: true}, false, 1, km); ch != 'Й' {
+		t.Fatalf("group 1 shift: ch=%q, want 'Й'", ch)
+	}
+	if _, ch := translateEvdevKey(17, Modifiers{}, false, 1, km); ch != 'ц' {
+		t.Fatalf("evdev 17 group 1: ch=%q, want 'ц'", ch)
+	}
+	if _, ch := translateEvdevKey(4, Modifiers{Shift: true}, false, 1, km); ch != '№' {
+		t.Fatalf("evdev 4 group 1 shift: ch=%q, want '№'", ch)
+	}
+}
+
 
 
 

@@ -1036,6 +1036,7 @@ func (c *Canvas) BackdropBlur(r Rect, radius int, cr CornerRadii) // radius в P
 func (c *Canvas) BlendPixel(x, y int, col Color, cov uint8) // cov: покрытие 0..255 для сглаживания
 func (c *Canvas) BlitFrom(src *Canvas, area Rect) // копирование области без альфа-смешивания (замена пикселей)
 func (c *Canvas) Clear(col Color)
+func (c *Canvas) ClearRectTransparent(r Rect)
 func (c *Canvas) ClearTransparent()
 func (c *Canvas) CompositeFrom(src *Canvas, area Rect) // наложение области с учётом альфа-канала
 func (c *Canvas) CurrentClip() Rect

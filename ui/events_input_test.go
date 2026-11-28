@@ -813,3 +813,28 @@ func TestToastFastPathAndTimerLifecycle(t *testing.T) {
 		t.Fatalf("просроченный тост должен быть удалён, осталось %d", ctx.ToastsCount())
 	}
 }
+
+func TestOverlayTextInputSkipsRedrawOnKeyUp(t *testing.T) {
+	win := &dirtyMockWindow{mockWindow: mockWindow{w: 400, h: 300, scale: 1.0}}
+	ctx := NewContext(win, nil)
+
+	text := ""
+	open := true
+	draw := func(c *Context) {
+		c.Modal("chat_modal", &open, "Чат", func() {
+			c.TextInput("chat_input", &text, "", 200)
+		})
+	}
+
+	ctx.Render(draw)
+	ctx.FocusID = "chat_input"
+	ctx.Render(draw)
+
+	if ctx.HandleEvent(platform.Event{Type: platform.EventKeyUp, KeyCode: 'A', ScanCode: 38}) {
+		t.Fatal("EventKeyUp при фокусе в TextInput внутри оверлея не должен запускать лишний Render()")
+	}
+	if !ctx.HandleEvent(platform.Event{Type: platform.EventChar, Char: 'а'}) {
+		t.Fatal("EventChar при фокусе в TextInput внутри оверлея должен запускать Render()")
+	}
+}
+

@@ -387,8 +387,13 @@ func x11KeysymToRune(sym xproto.Keysym) rune {
 	return 0
 }
 
+// x11KeysymUint32ToRune преобразует числовой X11 KeySym (например, из hex в XKB keymap Wayland) в Unicode-символ.
+func x11KeysymUint32ToRune(sym uint32) rune {
+	return x11KeysymToRune(xproto.Keysym(sym))
+}
+
 var cyrillicKeysymTable = map[xproto.Keysym]rune{
-	0x06A3: 'ё', 0x06B3: 'Ё',
+	0x06A3: 'ё', 0x06B0: '№', 0x06B3: 'Ё',
 	0x06C1: 'а', 0x06C2: 'б', 0x06D7: 'в', 0x06C7: 'г', 0x06C4: 'д',
 	0x06C5: 'е', 0x06D6: 'ж', 0x06DA: 'з', 0x06C9: 'и', 0x06CA: 'й',
 	0x06CB: 'к', 0x06CC: 'л', 0x06CD: 'м', 0x06CE: 'н', 0x06CF: 'о',

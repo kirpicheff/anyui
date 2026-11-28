@@ -184,6 +184,29 @@ func (c *Canvas) ClearTransparent() {
 	c.MarkFullDirty()
 }
 
+// ClearRectTransparent очищает полностью прозрачными пикселями (нули) только указанный прямоугольник.
+func (c *Canvas) ClearRectTransparent(r Rect) {
+	if c == nil || len(c.Pixels) == 0 || c.Width <= 0 || c.Height <= 0 {
+		return
+	}
+	bounds := Rect{X: 0, Y: 0, W: c.Width, H: c.Height}
+	clamped := bounds.Intersect(r)
+	if clamped.Empty() {
+		return
+	}
+	if clamped == bounds {
+		clear(c.Pixels)
+		c.MarkFullDirty()
+		return
+	}
+	rowBytes := clamped.W * 4
+	for y := 0; y < clamped.H; y++ {
+		off := ((clamped.Y+y)*c.Width + clamped.X) * 4
+		clear(c.Pixels[off : off+rowBytes])
+	}
+	c.AddDirtyRect(clamped)
+}
+
 // AddDirtyRect регистрирует изменённую область холста для оптимизации перерисовки и блиттинга.
 func (c *Canvas) AddDirtyRect(r Rect) {
 	if c == nil || c.Width <= 0 || c.Height <= 0 {

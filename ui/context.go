@@ -936,14 +936,23 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 		})
 		redraw = true
 	case platform.EventKeyUp:
-		c.rawKeyEvents = append(c.rawKeyEvents, RawKeyEvent{
-			Pressed:  false,
-			KeyCode:  ev.KeyCode,
-			ScanCode: ev.ScanCode,
-			Extended: ev.Extended,
-			Mods:     ev.Mods,
-		})
-		redraw = true
+		// Если фокус находится в обычном виджете внутри оверлея (например, TextInput),
+		// отпускание клавиши не меняет состояние виджета — не ставим redraw = true,
+		// чтобы не запускать лишний Render() / PresentRect().
+		inOverlayWidget := false
+		if !c.captureKeysFocus && c.FocusID != "" && len(c.Overlays.items) > 0 {
+			_, inOverlayWidget = c.overlayFocusableIDs[c.FocusID]
+		}
+		if !inOverlayWidget {
+			c.rawKeyEvents = append(c.rawKeyEvents, RawKeyEvent{
+				Pressed:  false,
+				KeyCode:  ev.KeyCode,
+				ScanCode: ev.ScanCode,
+				Extended: ev.Extended,
+				Mods:     ev.Mods,
+			})
+			redraw = true
+		}
 	case platform.EventChar:
 		c.TypedRunes = append(c.TypedRunes, ev.Char)
 		redraw = true
@@ -1329,7 +1338,7 @@ func (c *Context) renderStreamingOnly() {
 						}
 					}, func(it *overlayItem, _ render.Rect) {
 						if it.cache != nil && it.cache.Width == mainCanvas.Width && it.cache.Height == mainCanvas.Height {
-							it.cache.ClearTransparent()
+							it.cache.ClearRectTransparent(overlayRect)
 							c.Canvas = it.cache
 							it.draw()
 							c.Canvas = mainCanvas
@@ -1539,6 +1548,17 @@ func (c *Context) autoHeightsChanged(snap map[string]int) bool {
 }
 
 func (c *Context) renderOverlayInputOnly() bool {
+	// Если пришёл только EventKeyUp без KeyEvents/TypedRunes, ничего не изменилось —
+	// пропускаем и перерисовку, и PresentRect().
+	if len(c.KeyEvents) == 0 && len(c.TypedRunes) == 0 {
+		c.rawKeyEvents = c.rawKeyEvents[:0]
+		c.rawMouseEvents = c.rawMouseEvents[:0]
+		c.isInputFrame = false
+		c.keyInputOnlyFrame = false
+		c.hasNonKeyInput = false
+		return true
+	}
+
 	savedHitLen := len(c.nextHitRegions)
 	savedFocusLen := len(c.nextFocusOrder)
 	savedDirectLen := len(c.nextDirectCanvases)
@@ -1591,7 +1611,7 @@ func (c *Context) renderOverlayInputOnly() bool {
 			}
 		}, func(it *overlayItem, _ render.Rect) {
 			if it.cache != nil && it.cache.Width == mainCanvas.Width && it.cache.Height == mainCanvas.Height {
-				it.cache.ClearTransparent()
+				it.cache.ClearRectTransparent(overlayRect)
 				c.Canvas = it.cache
 				it.draw()
 				c.Canvas = mainCanvas

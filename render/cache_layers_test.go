@@ -183,3 +183,30 @@ func TestFontCenterTextYOpticalBalance(t *testing.T) {
 	}
 }
 
+func TestClearRectTransparent(t *testing.T) {
+	c := NewCanvas(10, 10)
+	for i := range c.Pixels {
+		c.Pixels[i] = 0x77
+	}
+	c.ResetDirtyRects()
+
+	c.ClearRectTransparent(Rect{X: 2, Y: 3, W: 4, H: 3})
+
+	for y := 0; y < 10; y++ {
+		for x := 0; x < 10; x++ {
+			off := (y*10 + x) * 4
+			inside := x >= 2 && x < 6 && y >= 3 && y < 6
+			if inside {
+				if c.Pixels[off] != 0 || c.Pixels[off+1] != 0 || c.Pixels[off+2] != 0 || c.Pixels[off+3] != 0 {
+					t.Fatalf("пиксель (%d,%d) внутри прямоугольника не очищен: %v", x, y, c.Pixels[off:off+4])
+				}
+			} else {
+				if c.Pixels[off] != 0x77 || c.Pixels[off+3] != 0x77 {
+					t.Fatalf("пиксель (%d,%d) вне прямоугольника повреждён: %v", x, y, c.Pixels[off:off+4])
+				}
+			}
+		}
+	}
+}
+
+
