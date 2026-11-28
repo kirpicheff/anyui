@@ -1,4 +1,4 @@
-# AnyUI (v0.8.14) — Полный справочник API
+# AnyUI (v0.8.15) — Полный справочник API
 
 Лёгкий кроссплатформенный UI-фреймворк на Go с программным 2D-рендерингом (без WebView2 и OpenGL/GPU).
 
@@ -577,6 +577,7 @@ type KeyEvent struct {
 	KeyCode  uint32             // Виртуальный код клавиши (VK_* на Windows)
 	ScanCode uint16             // Аппаратный скан-код клавиши (на Linux — X11/XKB keycode: evdev + 8 и для X11, и для Wayland)
 	Extended bool               // Признак расширенной клавиши (bit 24 lParam на Windows)
+	Char     rune               // Печатный символ по текущей раскладке (при Pressed == true, 0 если недоступен или Ctrl/Alt)
 	Mods     Modifiers // Состояние модификаторов
 }
 

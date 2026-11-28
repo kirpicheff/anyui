@@ -295,9 +295,7 @@ func (d *x11Display) dispatchEvent(ev xgb.Event) {
 
 	case xproto.ClientMessageEvent:
 		if e.Window == d.wakeWin && e.Type == d.wakeAtom {
-			if w := d.anyWindow(); w != nil && w.handler != nil {
-				w.handler(Event{Type: EventWakeUp})
-			}
+			d.flushWakeUps()
 			return
 		}
 		if w := d.windowByID(e.Window); w != nil {
@@ -357,6 +355,21 @@ func (d *x11Display) windowByID(id xproto.Window) *x11Window {
 	return d.windows[id]
 }
 
+func (d *x11Display) flushWakeUps() {
+	d.mu.Lock()
+	wins := make([]*x11Window, 0, len(d.windows))
+	for _, w := range d.windows {
+		wins = append(wins, w)
+	}
+	d.mu.Unlock()
+
+	for _, w := range wins {
+		if w.wakePending.Swap(false) && w.handler != nil && !w.closed.Load() {
+			w.handler(Event{Type: EventWakeUp})
+		}
+	}
+}
+
 func (d *x11Display) anyWindow() *x11Window {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -387,8 +400,9 @@ type x11Window struct {
 	fullscreen bool
 	onClose    func() bool
 
-	needsPaint atomic.Bool
-	closed     atomic.Bool
+	needsPaint  atomic.Bool
+	wakePending atomic.Bool
+	closed      atomic.Bool
 
 	// MIT-SHM буфер
 	shmSeg  shm.Seg
@@ -698,6 +712,10 @@ func (w *x11Window) Invalidate() {
 }
 
 func (w *x11Window) WakeUp() {
+	if w.closed.Load() {
+		return
+	}
+	w.wakePending.Store(true)
 	w.disp.wakeUp()
 }
 

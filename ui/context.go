@@ -46,6 +46,7 @@ type RawKeyEvent struct {
 	KeyCode  uint32             // Виртуальный код клавиши (VK_* на Windows)
 	ScanCode uint16             // Аппаратный скан-код клавиши (на Linux — X11/XKB keycode: evdev + 8 и для X11, и для Wayland)
 	Extended bool               // Признак расширенной клавиши (bit 24 lParam на Windows)
+	Char     rune               // Печатный символ по текущей раскладке (при Pressed == true, 0 если недоступен или Ctrl/Alt)
 	Mods     platform.Modifiers // Состояние модификаторов
 }
 
@@ -688,6 +689,7 @@ func (c *Context) tryDirectCanvasEvent(ev platform.Event) (bool, bool) {
 				KeyCode:  ev.KeyCode,
 				ScanCode: ev.ScanCode,
 				Extended: ev.Extended,
+				Char:     ev.Char,
 				Mods:     ev.Mods,
 			})
 		}
@@ -929,6 +931,7 @@ func (c *Context) HandleEvent(ev platform.Event) bool {
 			KeyCode:  ev.KeyCode,
 			ScanCode: ev.ScanCode,
 			Extended: ev.Extended,
+			Char:     ev.Char,
 			Mods:     ev.Mods,
 		})
 		redraw = true

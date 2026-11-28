@@ -300,6 +300,21 @@ func (d *wlDisplay) anyWindow() *waylandWindow {
 	return nil
 }
 
+func (d *wlDisplay) flushWakeUps() {
+	d.mu.Lock()
+	wins := make([]*waylandWindow, 0, len(d.windows))
+	for _, w := range d.windows {
+		wins = append(wins, w)
+	}
+	d.mu.Unlock()
+
+	for _, w := range wins {
+		if w.wakePending.Swap(false) && w.handler != nil && !w.closed.Load() {
+			w.handler(Event{Type: EventWakeUp})
+		}
+	}
+}
+
 func (d *wlDisplay) flushPaints() {
 	d.mu.Lock()
 	wins := make([]*waylandWindow, 0, len(d.windows))
@@ -349,9 +364,7 @@ func runWaylandEventLoop(onStart func() error) error {
 		if wakeReady {
 			d.conn.drainWakePipe()
 			if d.wakePending.Swap(false) {
-				if w := d.anyWindow(); w != nil && w.handler != nil {
-					w.handler(Event{Type: EventWakeUp})
-				}
+				d.flushWakeUps()
 			}
 		}
 		if wlReady {
@@ -364,15 +377,18 @@ func runWaylandEventLoop(onStart func() error) error {
 }
 
 type wlShmBuffer struct {
-	poolID   uint32
-	bufferID uint32
-	fd       int
-	data     []byte
-	width    int
-	height   int
-	stride   int
-	size     int
-	busy     atomic.Bool
+	poolID       uint32
+	bufferID     uint32
+	fd           int
+	data         []byte
+	width        int
+	height       int
+	stride       int
+	size         int
+	busy         atomic.Bool
+	csdGen       uint64
+	fullSync     bool
+	pendingDirty image.Rectangle
 }
 
 func createWLShmBuffer(d *wlDisplay, width, height int) (*wlShmBuffer, error) {
@@ -405,13 +421,14 @@ func createWLShmBuffer(d *wlDisplay, width, height int) (*wlShmBuffer, error) {
 	}
 
 	buf := &wlShmBuffer{
-		poolID: poolID,
-		fd:     fd,
-		data:   data,
-		width:  width,
-		height: height,
-		stride: stride,
-		size:   size,
+		poolID:   poolID,
+		fd:       fd,
+		data:     data,
+		width:    width,
+		height:   height,
+		stride:   stride,
+		size:     size,
+		fullSync: true,
 	}
 
 	buf.bufferID = d.conn.allocID(func(ev wlEvent) {
@@ -426,7 +443,7 @@ func createWLShmBuffer(d *wlDisplay, width, height int) (*wlShmBuffer, error) {
 	bw.int32(int32(width))
 	bw.int32(int32(height))
 	bw.int32(int32(stride))
-	bw.uint32(wlShmFormatARGB88)
+	bw.uint32(wlShmFormatXRGB88)
 	if err := d.conn.send(poolID, wlShmPoolCreateBuffer, bw.bytes()); err != nil {
 		buf.destroy(d)
 		return nil, err
@@ -520,14 +537,23 @@ type waylandWindow struct {
 	buffers    [2]*wlShmBuffer
 	bufIdx     int
 
-	csdEnabled   bool
-	csdHoverBtn  int
-	csdTitle     string
-	csdLastClick time.Time
+	csdEnabled    bool
+	csdHoverBtn   int
+	csdTitle      string
+	csdLastClick  time.Time
+	csdCache      []byte
+	csdCacheW     int
+	csdCacheH     int
+	csdCacheTitle string
+	csdCacheHover int
+	csdCacheDark  bool
+	csdCacheScale float32
+	csdGen        uint64
 
 	framePending      atomic.Bool
 	configured        atomic.Bool
 	needsPaint        atomic.Bool
+	wakePending       atomic.Bool
 	closed            atomic.Bool
 	hidden            atomic.Bool
 	pendingActivate   atomic.Bool
@@ -959,6 +985,18 @@ func (w *waylandWindow) PresentRect(pixels []byte, width, height, rx, ry, rw, rh
 	totalW := width
 	totalH := height + barH
 
+	// Нормализуем грязный прямоугольник клиентской области.
+	fullClient := image.Rect(0, 0, width, height)
+	var curDirty image.Rectangle
+	if rw <= 0 || rh <= 0 {
+		curDirty = fullClient
+	} else {
+		curDirty = image.Rect(rx, ry, rx+rw, ry+rh).Intersect(fullClient)
+		if curDirty.Empty() {
+			curDirty = fullClient
+		}
+	}
+
 	w.mu.Lock()
 	idx := w.bufIdx
 	if w.buffers[idx] != nil && w.buffers[idx].busy.Load() {
@@ -982,13 +1020,50 @@ func (w *waylandWindow) PresentRect(pixels []byte, width, height, rx, ry, rw, rh
 		w.buffers[idx] = newBuf
 		buf = newBuf
 	}
+
+	// Вычисляем область копирования для выбранного буфера с учётом изменений,
+	// записанных ранее в другой слот двойного буфера.
+	var copyRect image.Rectangle
+	if buf.fullSync {
+		copyRect = fullClient
+		buf.fullSync = false
+	} else if buf.pendingDirty.Empty() {
+		copyRect = curDirty
+	} else {
+		copyRect = curDirty.Union(buf.pendingDirty).Intersect(fullClient)
+	}
+	buf.pendingDirty = image.Rectangle{}
+
+	if other := w.buffers[1-idx]; other != nil && !other.fullSync {
+		if other.pendingDirty.Empty() {
+			other.pendingDirty = curDirty
+		} else {
+			other.pendingDirty = other.pendingDirty.Union(curDirty).Intersect(fullClient)
+		}
+	}
 	w.mu.Unlock()
 
+	csdUpdated := false
 	if barH > 0 {
-		w.renderCSDTitleBar(buf.data, totalW, barH)
-		copy(buf.data[barH*totalW*4:], pixels[:width*height*4])
-	} else {
-		copy(buf.data, pixels[:width*height*4])
+		csdBytes, gen := w.ensureCSDCache(totalW, barH)
+		if len(csdBytes) > 0 && buf.csdGen != gen {
+			copy(buf.data[:len(csdBytes)], csdBytes)
+			buf.csdGen = gen
+			csdUpdated = true
+		}
+	}
+
+	dstBase := barH * totalW * 4
+	if copyRect == fullClient {
+		copy(buf.data[dstBase:dstBase+width*height*4], pixels[:width*height*4])
+	} else if !copyRect.Empty() {
+		rowStride := width * 4
+		xOff := copyRect.Min.X * 4
+		lineBytes := copyRect.Dx() * 4
+		for y := copyRect.Min.Y; y < copyRect.Max.Y; y++ {
+			off := y*rowStride + xOff
+			copy(buf.data[dstBase+off:dstBase+off+lineBytes], pixels[off:off+lineBytes])
+		}
 	}
 	buf.busy.Store(true)
 
@@ -998,21 +1073,16 @@ func (w *waylandWindow) PresentRect(pixels []byte, width, height, rx, ry, rw, rh
 	aw.int32(0)
 	_ = w.disp.conn.send(w.surfaceID, wlSurfaceAttach, aw.bytes())
 
-	if rw <= 0 || rh <= 0 {
-		rx, ry, rw, rh = 0, 0, totalW, totalH
-	} else if barH > 0 {
-		if rx == 0 && ry == 0 && rw == width && rh == height {
-			rh = totalH
-		} else {
-			ry += barH
-		}
+	dmgRect := image.Rect(curDirty.Min.X, curDirty.Min.Y+barH, curDirty.Max.X, curDirty.Max.Y+barH)
+	if csdUpdated && barH > 0 {
+		dmgRect = dmgRect.Union(image.Rect(0, 0, totalW, barH))
 	}
 	if w.disp.compositorVer >= 4 {
 		var dw wlWriter
-		dw.int32(int32(rx))
-		dw.int32(int32(ry))
-		dw.int32(int32(rw))
-		dw.int32(int32(rh))
+		dw.int32(int32(dmgRect.Min.X))
+		dw.int32(int32(dmgRect.Min.Y))
+		dw.int32(int32(dmgRect.Dx()))
+		dw.int32(int32(dmgRect.Dy()))
 		_ = w.disp.conn.send(w.surfaceID, wlSurfaceDamageBuffer, dw.bytes())
 	} else {
 		var dw wlWriter
@@ -1023,19 +1093,20 @@ func (w *waylandWindow) PresentRect(pixels []byte, width, height, rx, ry, rw, rh
 		_ = w.disp.conn.send(w.surfaceID, wlSurfaceDamage, dw.bytes())
 	}
 
-	var cbID uint32
-	cbID = w.disp.conn.allocID(func(ev wlEvent) {
-		if ev.Opcode == wlCallbackEventDone {
+	if !w.framePending.Swap(true) {
+		var cbID uint32
+		cbID = w.disp.conn.allocID(func(ev wlEvent) {
+			if ev.Opcode == wlCallbackEventDone {
+				w.framePending.Store(false)
+				w.disp.conn.removeHandler(cbID)
+			}
+		})
+		var fw wlWriter
+		fw.uint32(cbID)
+		if err := w.disp.conn.send(w.surfaceID, wlSurfaceFrame, fw.bytes()); err != nil {
 			w.framePending.Store(false)
 			w.disp.conn.removeHandler(cbID)
 		}
-	})
-	var fw wlWriter
-	fw.uint32(cbID)
-	if err := w.disp.conn.send(w.surfaceID, wlSurfaceFrame, fw.bytes()); err == nil {
-		w.framePending.Store(true)
-	} else {
-		w.disp.conn.removeHandler(cbID)
 	}
 
 	_ = w.disp.conn.send(w.surfaceID, wlSurfaceCommit, nil)
@@ -1056,6 +1127,7 @@ func (w *waylandWindow) WakeUp() {
 	if w.closed.Load() {
 		return
 	}
+	w.wakePending.Store(true)
 	w.disp.wakePending.Store(true)
 	w.disp.conn.wakeUp()
 }

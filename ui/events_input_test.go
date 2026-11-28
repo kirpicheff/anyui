@@ -440,9 +440,13 @@ func TestInteractiveCanvasInputCaptureAndFocus(t *testing.T) {
 
 	// Проверяем на втором кадре, что Tab не сбросил и не переключил фокус (т.к. captureKeysFocus сработал)
 	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: KeyEscape, ScanCode: 0x01})
+	ctx.HandleEvent(platform.Event{Type: platform.EventKeyDown, KeyCode: 0xDB, ScanCode: 34, Char: 'х'})
 	ctx.Render(draw)
-	if !lastFocused || len(keys) != 5 || keys[4].KeyCode != KeyEscape {
+	if !lastFocused || len(keys) != 6 || keys[4].KeyCode != KeyEscape {
 		t.Fatalf("Escape не должен сбрасывать фокус и должен попасть в OnKey: focused=%v len=%d", lastFocused, len(keys))
+	}
+	if keys[5].KeyCode != 0xDB || keys[5].ScanCode != 34 || keys[5].Char != 'х' {
+		t.Fatalf("ожидался проброс Char='х' в RawKeyEvent, получено %+v", keys[5])
 	}
 
 	// Потеря фокуса окном (Alt+Tab / WM_KILLFOCUS) вызывает OnFocusLost

@@ -489,19 +489,26 @@ func (s *wlSeatState) handleKeyboardEvent(ev wlEvent) {
 		// Приводим evdev keycode к X11/XKB keycode (+8), чтобы ScanCode на Linux
 		// совпадал между бэкендами Wayland и X11.
 		scanCode := uint16(key + 8)
+		ext := evdevIsExtended(key)
+		var keyChar rune
+		if ch != 0 && !mods.Ctrl && !mods.Alt {
+			keyChar = ch
+		}
 		if state == 1 || state == 2 {
 			if vk != 0 {
 				win.emit(Event{
 					Type:     EventKeyDown,
 					KeyCode:  vk,
 					ScanCode: scanCode,
+					Extended: ext,
+					Char:     keyChar,
 					Mods:     mods,
 				})
 			}
-			if ch != 0 && !mods.Ctrl && !mods.Alt {
+			if keyChar != 0 {
 				win.emit(Event{
 					Type: EventChar,
-					Char: ch,
+					Char: keyChar,
 					Mods: mods,
 				})
 			}
@@ -515,6 +522,7 @@ func (s *wlSeatState) handleKeyboardEvent(ev wlEvent) {
 					Type:     EventKeyUp,
 					KeyCode:  vk,
 					ScanCode: scanCode,
+					Extended: ext,
 					Mods:     mods,
 				})
 			}
@@ -601,18 +609,24 @@ func (s *wlSeatState) startRepeat(surfID uint32, key uint32) {
 					return
 				}
 				vk, ch := translateEvdevKey(key, mods, caps, group, km)
+				var keyChar rune
+				if ch != 0 && !mods.Ctrl && !mods.Alt {
+					keyChar = ch
+				}
 				if vk != 0 {
 					win.emit(Event{
 						Type:     EventKeyDown,
 						KeyCode:  vk,
 						ScanCode: uint16(key + 8),
+						Extended: evdevIsExtended(key),
+						Char:     keyChar,
 						Mods:     mods,
 					})
 				}
-				if ch != 0 && !mods.Ctrl && !mods.Alt {
+				if keyChar != 0 {
 					win.emit(Event{
 						Type: EventChar,
-						Char: ch,
+						Char: keyChar,
 						Mods: mods,
 					})
 				}
@@ -638,6 +652,7 @@ type wlKeymap struct {
 }
 
 // parseXKBKeymap извлекает keycodes и символы из текстового XKB keymap без CGO.
+// Поддерживает как однострочную, так и многострочную форму GNOME Mutter / libxkbcommon.
 func parseXKBKeymap(text string) *wlKeymap {
 	km := &wlKeymap{
 		keycodes: make(map[string]uint32),
@@ -646,22 +661,42 @@ func parseXKBKeymap(text string) *wlKeymap {
 
 	inKeycodes := false
 	inSymbols := false
+	inKeyBlock := false
+	var keyName string
+	var keyBuf strings.Builder
+
+	flushKeyBlock := func() {
+		if keyName != "" {
+			if evCode, ok := km.keycodes[keyName]; ok {
+				groups := parseXKBSymbolGroups(keyBuf.String())
+				if len(groups) > 0 {
+					km.symbols[evCode] = groups
+				}
+			}
+		}
+		inKeyBlock = false
+		keyName = ""
+		keyBuf.Reset()
+	}
+
 	for _, rawLine := range strings.Split(text, "\n") {
 		line := strings.TrimSpace(rawLine)
-		if strings.HasPrefix(line, "xkb_keycodes") {
-			inKeycodes = true
-			inSymbols = false
-			continue
-		}
-		if strings.HasPrefix(line, "xkb_symbols") {
-			inSymbols = true
-			inKeycodes = false
-			continue
-		}
-		if line == "};" {
-			inKeycodes = false
-			inSymbols = false
-			continue
+		if !inKeyBlock {
+			if strings.HasPrefix(line, "xkb_keycodes") {
+				inKeycodes = true
+				inSymbols = false
+				continue
+			}
+			if strings.HasPrefix(line, "xkb_symbols") {
+				inSymbols = true
+				inKeycodes = false
+				continue
+			}
+			if line == "};" {
+				inKeycodes = false
+				inSymbols = false
+				continue
+			}
 		}
 
 		if inKeycodes && strings.HasPrefix(line, "<") {
@@ -677,20 +712,35 @@ func parseXKBKeymap(text string) *wlKeymap {
 			continue
 		}
 
-		if inSymbols && strings.HasPrefix(line, "key <") {
-			// Формат: key <AD01> { [ q, Q ], [ Cyrillic_shorti, Cyrillic_SHORTI ] };
-			gt := strings.IndexByte(line, '>')
-			if gt <= 5 {
+		if inSymbols {
+			if inKeyBlock {
+				keyBuf.WriteString(line)
+				keyBuf.WriteByte('\n')
+				if strings.Contains(line, "};") {
+					flushKeyBlock()
+				}
 				continue
 			}
-			name := line[4 : gt+1]
-			evCode, ok := km.keycodes[name]
-			if !ok {
-				continue
+
+			keyLine := line
+			if strings.HasPrefix(keyLine, "override ") {
+				keyLine = strings.TrimSpace(strings.TrimPrefix(keyLine, "override "))
 			}
-			groups := parseXKBSymbolGroups(line[gt+1:])
-			if len(groups) > 0 {
-				km.symbols[evCode] = groups
+			if strings.HasPrefix(keyLine, "key <") {
+				gt := strings.IndexByte(keyLine, '>')
+				if gt <= 5 {
+					continue
+				}
+				keyName = keyLine[4 : gt+1]
+				rest := keyLine[gt+1:]
+				keyBuf.Reset()
+				keyBuf.WriteString(rest)
+				keyBuf.WriteByte('\n')
+				if strings.Contains(rest, "};") {
+					flushKeyBlock()
+				} else {
+					inKeyBlock = true
+				}
 			}
 		}
 	}
@@ -701,30 +751,83 @@ func parseXKBKeymap(text string) *wlKeymap {
 	return km
 }
 
-func parseXKBSymbolGroups(rest string) [][]rune {
+func parseXKBSymbolGroups(block string) [][]rune {
+	lower := strings.ToLower(block)
+	// Формат GNOME Mutter / libxkbcommon: symbols[Group1]= [ q, Q ], symbols[Group2]= [ Cyrillic_shorti, Cyrillic_SHORTI ]
+	if strings.Contains(lower, "symbols[group") {
+		var groups [][]rune
+		idx := 0
+		for idx < len(lower) {
+			pos := strings.Index(lower[idx:], "symbols[group")
+			if pos < 0 {
+				break
+			}
+			numStart := idx + pos + len("symbols[group")
+			rb := strings.IndexByte(block[numStart:], ']')
+			if rb <= 0 {
+				break
+			}
+			groupNum, err := strconv.Atoi(strings.TrimSpace(block[numStart : numStart+rb]))
+			afterRB := numStart + rb + 1
+			open := strings.IndexByte(block[afterRB:], '[')
+			if open < 0 {
+				break
+			}
+			listStart := afterRB + open + 1
+			closeIdx := strings.IndexByte(block[listStart:], ']')
+			if closeIdx < 0 {
+				break
+			}
+			if err == nil && groupNum >= 1 && groupNum <= 8 {
+				for len(groups) < groupNum {
+					groups = append(groups, nil)
+				}
+				groups[groupNum-1] = parseXKBSymbolList(block[listStart : listStart+closeIdx])
+			}
+			idx = listStart + closeIdx + 1
+		}
+		if len(groups) > 0 {
+			return groups
+		}
+	}
+
+	// Короткая форма: [ q, Q ], [ Cyrillic_shorti, Cyrillic_SHORTI ]
 	var groups [][]rune
 	idx := 0
-	for idx < len(rest) {
-		open := strings.IndexByte(rest[idx:], '[')
+	for idx < len(block) {
+		open := strings.IndexByte(block[idx:], '[')
 		if open < 0 {
 			break
 		}
-		start := idx + open + 1
-		close := strings.IndexByte(rest[start:], ']')
-		if close < 0 {
+		openAbs := idx + open
+		start := openAbs + 1
+		closeIdx := strings.IndexByte(block[start:], ']')
+		if closeIdx < 0 {
 			break
 		}
-		content := rest[start : start+close]
-		parts := strings.Split(content, ",")
-		levels := make([]rune, 0, len(parts))
-		for _, p := range parts {
-			symName := strings.TrimSpace(p)
-			levels = append(levels, xkbSymNameToRune(symName))
+		// Пропускаем скобки вида type[group1] или actions[group1], где перед '[' стоит буква/цифра.
+		if openAbs > 0 && isXKBIdentChar(block[openAbs-1]) {
+			idx = start + closeIdx + 1
+			continue
 		}
-		groups = append(groups, levels)
-		idx = start + close + 1
+		groups = append(groups, parseXKBSymbolList(block[start:start+closeIdx]))
+		idx = start + closeIdx + 1
 	}
 	return groups
+}
+
+func parseXKBSymbolList(content string) []rune {
+	parts := strings.Split(content, ",")
+	levels := make([]rune, 0, len(parts))
+	for _, p := range parts {
+		symName := strings.TrimSpace(p)
+		levels = append(levels, xkbSymNameToRune(symName))
+	}
+	return levels
+}
+
+func isXKBIdentChar(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || b == '_'
 }
 
 func translateEvdevKey(evCode uint32, mods Modifiers, caps bool, group uint32, km *wlKeymap) (uint32, rune) {
@@ -766,6 +869,31 @@ func isLetterRune(r rune) bool {
 	return (r >= 'a' && r <= 'z') || (r >= 'а' && r <= 'я') || r == 'ё'
 }
 
+func evdevIsExtended(code uint32) bool {
+	switch code {
+	case 96, // KP_Enter
+		97,  // Right Ctrl
+		98,  // KP_Slash
+		100, // Right Alt
+		102, // Home
+		103, // Up
+		104, // PageUp
+		105, // Left
+		106, // Right
+		107, // End
+		108, // Down
+		109, // PageDown
+		110, // Insert
+		111, // Delete
+		125, // Left Meta/Win
+		126, // Right Meta/Win
+		127: // Apps/Menu
+		return true
+	default:
+		return false
+	}
+}
+
 func evdevToVK(code uint32) uint32 {
 	switch code {
 	case 1:
@@ -774,6 +902,10 @@ func evdevToVK(code uint32) uint32 {
 		return uint32('1' + (code - 2))
 	case 11:
 		return '0'
+	case 12:
+		return 0xBD // VK_OEM_MINUS ('-')
+	case 13:
+		return 0xBB // VK_OEM_PLUS ('=')
 	case 14:
 		return 0x08 // BackSpace
 	case 15:
@@ -798,8 +930,14 @@ func evdevToVK(code uint32) uint32 {
 		return 'O'
 	case 25:
 		return 'P'
-	case 28:
-		return 0x0D // Return
+	case 26:
+		return 0xDB // VK_OEM_4 ('[' / 'х')
+	case 27:
+		return 0xDD // VK_OEM_6 (']' / 'ъ')
+	case 28, 96:
+		return 0x0D // Return / KP_Enter
+	case 29, 97:
+		return 0x11 // VK_CONTROL (Left / Right)
 	case 30:
 		return 'A'
 	case 31:
@@ -818,6 +956,16 @@ func evdevToVK(code uint32) uint32 {
 		return 'K'
 	case 38:
 		return 'L'
+	case 39:
+		return 0xBA // VK_OEM_1 (';' / 'ж')
+	case 40:
+		return 0xDE // VK_OEM_7 ('\'' / 'э')
+	case 41:
+		return 0xC0 // VK_OEM_3 ('`' / 'ё')
+	case 42, 54:
+		return 0x10 // VK_SHIFT (Left / Right)
+	case 43:
+		return 0xDC // VK_OEM_5 ('\\')
 	case 44:
 		return 'Z'
 	case 45:
@@ -832,14 +980,58 @@ func evdevToVK(code uint32) uint32 {
 		return 'N'
 	case 50:
 		return 'M'
+	case 51:
+		return 0xBC // VK_OEM_COMMA (',' / 'б')
+	case 52:
+		return 0xBE // VK_OEM_PERIOD ('.' / 'ю')
+	case 53:
+		return 0xBF // VK_OEM_2 ('/' / '.')
+	case 55:
+		return 0x6A // VK_MULTIPLY (KP_*)
+	case 56, 100:
+		return 0x12 // VK_MENU (Left / Right Alt)
 	case 57:
 		return 0x20 // Space
+	case 58:
+		return 0x14 // VK_CAPITAL (CapsLock)
 	case 59, 60, 61, 62, 63, 64, 65, 66, 67, 68:
 		return 0x70 + (code - 59) // F1..F10
+	case 69:
+		return 0x90 // VK_NUMLOCK
+	case 70:
+		return 0x91 // VK_SCROLL
+	case 71:
+		return 0x67 // VK_NUMPAD7
+	case 72:
+		return 0x68 // VK_NUMPAD8
+	case 73:
+		return 0x69 // VK_NUMPAD9
+	case 74:
+		return 0x6D // VK_SUBTRACT (KP_-)
+	case 75:
+		return 0x64 // VK_NUMPAD4
+	case 76:
+		return 0x65 // VK_NUMPAD5
+	case 77:
+		return 0x66 // VK_NUMPAD6
+	case 78:
+		return 0x6B // VK_ADD (KP_+)
+	case 79:
+		return 0x61 // VK_NUMPAD1
+	case 80:
+		return 0x62 // VK_NUMPAD2
+	case 81:
+		return 0x63 // VK_NUMPAD3
+	case 82:
+		return 0x60 // VK_NUMPAD0
+	case 83:
+		return 0x6E // VK_DECIMAL (KP_.)
 	case 87:
 		return 0x7A // F11
 	case 88:
 		return 0x7B // F12
+	case 98:
+		return 0x6F // VK_DIVIDE (KP_/)
 	case 102:
 		return 0x24 // Home
 	case 103:
@@ -860,6 +1052,12 @@ func evdevToVK(code uint32) uint32 {
 		return 0x2D // Insert
 	case 111:
 		return 0x2E // Delete
+	case 125:
+		return 0x5B // VK_LWIN
+	case 126:
+		return 0x5C // VK_RWIN
+	case 127:
+		return 0x5D // VK_APPS
 	default:
 		return 0
 	}
@@ -931,6 +1129,51 @@ func evdevToFallbackRune(code uint32, shift, caps bool) rune {
 			return '+'
 		}
 		return '='
+	case 26:
+		if shift {
+			return '{'
+		}
+		return '['
+	case 27:
+		if shift {
+			return '}'
+		}
+		return ']'
+	case 39:
+		if shift {
+			return ':'
+		}
+		return ';'
+	case 40:
+		if shift {
+			return '"'
+		}
+		return '\''
+	case 41:
+		if shift {
+			return '~'
+		}
+		return '`'
+	case 43:
+		if shift {
+			return '|'
+		}
+		return '\\'
+	case 51:
+		if shift {
+			return '<'
+		}
+		return ','
+	case 52:
+		if shift {
+			return '>'
+		}
+		return '.'
+	case 53:
+		if shift {
+			return '?'
+		}
+		return '/'
 	case 57:
 		return ' '
 	}
@@ -1001,6 +1244,7 @@ var xkbNamedSyms = map[string]rune{
 	"bar":             '|',
 	"braceright":      '}',
 	"asciitilde":      '~',
+	"numerosign":      '№',
 	"Cyrillic_io":     'ё',
 	"Cyrillic_IO":     'Ё',
 	"Cyrillic_a":      'а',

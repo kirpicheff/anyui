@@ -217,6 +217,57 @@ func csdEdgeToCursor(hit HitTestResult) CursorType {
 	}
 }
 
+// ensureCSDCache возвращает актуальный кэшированный буфер CSD-шапки и номер его поколения.
+// Перерисовка выполняется только при изменении заголовка, подсветки кнопок, размеров, масштаба или темы.
+func (w *waylandWindow) ensureCSDCache(totalW, barH int) ([]byte, uint64) {
+	if barH <= 0 || totalW <= 0 {
+		return nil, 0
+	}
+	dark := w.cfg.DarkTitle || IsSystemDarkTheme()
+
+	w.mu.Lock()
+	title := w.csdTitle
+	if title == "" {
+		title = w.cfg.Title
+	}
+	hover := w.csdHoverBtn
+	scale := w.scale
+	if scale <= 0 {
+		scale = 1.0
+	}
+	needSize := totalW * barH * 4
+	if len(w.csdCache) == needSize &&
+		w.csdCacheW == totalW &&
+		w.csdCacheH == barH &&
+		w.csdCacheTitle == title &&
+		w.csdCacheHover == hover &&
+		w.csdCacheDark == dark &&
+		w.csdCacheScale == scale &&
+		w.csdGen > 0 {
+		buf := w.csdCache
+		gen := w.csdGen
+		w.mu.Unlock()
+		return buf, gen
+	}
+	w.mu.Unlock()
+
+	cache := make([]byte, needSize)
+	w.renderCSDTitleBarWithTheme(cache, totalW, barH, title, hover, scale, dark)
+
+	w.mu.Lock()
+	w.csdCache = cache
+	w.csdCacheW = totalW
+	w.csdCacheH = barH
+	w.csdCacheTitle = title
+	w.csdCacheHover = hover
+	w.csdCacheDark = dark
+	w.csdCacheScale = scale
+	w.csdGen++
+	gen := w.csdGen
+	w.mu.Unlock()
+	return cache, gen
+}
+
 func (w *waylandWindow) renderCSDTitleBar(dst []byte, totalW, barH int) {
 	if barH <= 0 || totalW <= 0 || len(dst) < totalW*barH*4 {
 		return
@@ -233,8 +284,14 @@ func (w *waylandWindow) renderCSDTitleBar(dst []byte, totalW, barH int) {
 	if scale <= 0 {
 		scale = 1.0
 	}
-
 	dark := w.cfg.DarkTitle || IsSystemDarkTheme()
+	w.renderCSDTitleBarWithTheme(dst, totalW, barH, title, hover, scale, dark)
+}
+
+func (w *waylandWindow) renderCSDTitleBarWithTheme(dst []byte, totalW, barH int, title string, hover int, scale float32, dark bool) {
+	if barH <= 0 || totalW <= 0 || len(dst) < totalW*barH*4 {
+		return
+	}
 	bgR, bgG, bgB := uint8(243), uint8(243), uint8(243)
 	fgR, fgG, fgB := uint8(32), uint8(32), uint8(32)
 	sepR, sepG, sepB := uint8(215), uint8(215), uint8(215)

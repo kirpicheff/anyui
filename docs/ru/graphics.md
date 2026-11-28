@@ -83,7 +83,7 @@ ui.InteractiveCanvas("rdp_view", anyui.CanvasCallbacks{
 		canvas.DrawBGRAFast(area, frameBGRA, frameW, frameH, anyui.ScaleFit)
 	},
 	OnKey: func(ev anyui.KeyEvent) {
-		// ev.Pressed, ev.KeyCode, ev.ScanCode (на Linux — X11/XKB keycode = evdev+8 на X11 и Wayland), ev.Extended, ev.Mods
+		// ev.Pressed, ev.KeyCode, ev.ScanCode (на Linux — X11/XKB keycode = evdev+8 на X11 и Wayland), ev.Extended, ev.Char, ev.Mods
 	},
 	OnMouseMove: func(x, y int, mods anyui.Modifiers) {
 		// x, y — физические пиксели относительно area.X, area.Y

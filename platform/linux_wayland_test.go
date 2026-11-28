@@ -432,4 +432,288 @@ func TestWaylandKeyboardScanCodeX11Offset(t *testing.T) {
 	}
 }
 
+func TestParseXKBKeymapMultilineGNOME(t *testing.T) {
+	// Формат многострочного XKB keymap, который отдаёт GNOME Mutter / libxkbcommon.
+	sample := `
+xkb_keymap {
+xkb_keycodes "evdev+aliases(qwerty)" {
+    <AD01> = 24;
+    <AD11> = 34;
+    <AD12> = 35;
+    <AC10> = 47;
+    <AC11> = 48;
+    <TLDE> = 49;
+    <AB08> = 59;
+    <AB09> = 60;
+    <AE03> = 12;
+};
+xkb_symbols "pc+us+ru:2+inet(evdev)" {
+    name[group1]="English (US)";
+    name[group2]="Russian";
+
+    key <AD01> {
+        type= "ALPHABETIC",
+        symbols[Group1]= [               q,               Q ],
+        symbols[Group2]= [ Cyrillic_shorti, Cyrillic_SHORTI ]
+    };
+    key <AD11> {
+        type[group1]= "FOUR_LEVEL",
+        type[group2]= "ALPHABETIC",
+        symbols[Group1]= [     bracketleft,       braceleft ],
+        symbols[Group2]= [     Cyrillic_ha,     Cyrillic_HA ]
+    };
+    key <AD12> {
+        symbols[Group1]= [    bracketright,      braceright ],
+        symbols[Group2]= [ Cyrillic_hardsign, Cyrillic_HARDSIGN ]
+    };
+    key <AC10> {
+        symbols[Group1]= [       semicolon,           colon ],
+        symbols[Group2]= [    Cyrillic_zhe,    Cyrillic_ZHE ]
+    };
+    key <AC11> {
+        symbols[Group1]= [      apostrophe,        quotedbl ],
+        symbols[Group2]= [      Cyrillic_e,      Cyrillic_E ]
+    };
+    key <TLDE> {
+        symbols[Group1]= [           grave,      asciitilde ],
+        symbols[Group2]= [     Cyrillic_io,     Cyrillic_IO ]
+    };
+    key <AB08> {
+        symbols[Group1]= [           comma,            less ],
+        symbols[Group2]= [     Cyrillic_be,     Cyrillic_BE ]
+    };
+    key <AB09> {
+        symbols[Group1]= [          period,         greater ],
+        symbols[Group2]= [     Cyrillic_yu,     Cyrillic_YU ]
+    };
+    key <AE03> {
+        symbols[Group1]= [               3,      numbersign ],
+        symbols[Group2]= [               3,      numerosign ]
+    };
+};
+};
+`
+	km := parseXKBKeymap(sample)
+	if km == nil {
+		t.Fatal("parseXKBKeymap вернул nil для многострочного keymap GNOME")
+	}
+
+	checks := []struct {
+		evdev  uint32
+		group  uint32
+		shift  bool
+		wantVK uint32
+		wantCh rune
+	}{
+		{16, 0, false, 'Q', 'q'},
+		{16, 1, false, 'Q', 'й'},
+		{26, 1, false, 0xDB, 'х'},
+		{26, 1, true, 0xDB, 'Х'},
+		{27, 1, false, 0xDD, 'ъ'},
+		{39, 1, false, 0xBA, 'ж'},
+		{40, 1, false, 0xDE, 'э'},
+		{41, 1, false, 0xC0, 'ё'},
+		{51, 1, false, 0xBC, 'б'},
+		{52, 1, false, 0xBE, 'ю'},
+		{4, 1, true, '3', '№'},
+	}
+	for _, tc := range checks {
+		vk, ch := translateEvdevKey(tc.evdev, Modifiers{Shift: tc.shift}, false, tc.group, km)
+		if vk != tc.wantVK || ch != tc.wantCh {
+			t.Fatalf("evdev=%d group=%d shift=%v: получено vk=0x%X ch=%q, ожидалось vk=0x%X ch=%q",
+				tc.evdev, tc.group, tc.shift, vk, ch, tc.wantVK, tc.wantCh)
+		}
+	}
+}
+
+func TestWaylandEvdevVKExtendedAndKeyDownChar(t *testing.T) {
+	if !evdevIsExtended(97) || !evdevIsExtended(100) || !evdevIsExtended(105) || !evdevIsExtended(96) {
+		t.Fatal("ожидался Extended=true для RCtrl, RAlt, Left, KP_Enter")
+	}
+	if evdevIsExtended(29) || evdevIsExtended(42) || evdevIsExtended(28) {
+		t.Fatal("ожидался Extended=false для LCtrl, LShift, Enter")
+	}
+	if evdevToVK(58) != 0x14 || evdevToVK(29) != 0x11 || evdevToVK(42) != 0x10 || evdevToVK(125) != 0x5B {
+		t.Fatal("некорректные VK для модификаторов и CapsLock")
+	}
+
+	km := parseXKBKeymap(`
+xkb_keymap {
+xkb_keycodes "evdev" { <AD11> = 34; };
+xkb_symbols "pc+us+ru:2" {
+    key <AD11> {
+        symbols[Group1]= [ bracketleft, braceleft ],
+        symbols[Group2]= [ Cyrillic_ha, Cyrillic_HA ]
+    };
+};
+};
+`)
+
+	disp := &wlDisplay{windows: make(map[uint32]*waylandWindow)}
+	var got []Event
+	w := &waylandWindow{
+		disp:      disp,
+		surfaceID: 55,
+		handler:   func(ev Event) { got = append(got, ev) },
+	}
+	disp.windows[w.surfaceID] = w
+
+	seat := &wlSeatState{
+		disp:              disp,
+		keyboardSurfaceID: w.surfaceID,
+		keymap:            km,
+		xkbGroup:          1, // русская раскладка
+	}
+
+	// Нажатие 'х' (evdev 26)
+	var down wlWriter
+	down.uint32(1)
+	down.uint32(10)
+	down.uint32(26)
+	down.uint32(1)
+	seat.handleKeyboardEvent(wlEvent{Opcode: wlKeyboardEventKey, Payload: down.bytes()})
+
+	if len(got) < 2 || got[0].Type != EventKeyDown || got[0].KeyCode != 0xDB || got[0].Char != 'х' || got[0].ScanCode != 34 {
+		t.Fatalf("ожидался EventKeyDown с VK=0xDB, Char='х', ScanCode=34; получено: %+v", got)
+	}
+	if got[1].Type != EventChar || got[1].Char != 'х' {
+		t.Fatalf("ожидался EventChar с Char='х'; получено: %+v", got[1])
+	}
+
+	// При зажатом Ctrl Char должен быть 0
+	got = nil
+	seat.mods.Ctrl = true
+	seat.handleKeyboardEvent(wlEvent{Opcode: wlKeyboardEventKey, Payload: down.bytes()})
+	if len(got) != 1 || got[0].Type != EventKeyDown || got[0].Char != 0 {
+		t.Fatalf("при Ctrl ожидался только EventKeyDown с Char=0; получено: %+v", got)
+	}
+}
+
+func TestWaylandPerWindowWakeUp(t *testing.T) {
+	conn, _ := newTestWaylandPair(t)
+	disp := &wlDisplay{
+		conn:    conn,
+		windows: make(map[uint32]*waylandWindow),
+	}
+	var w1Wakes, w2Wakes int
+	w1 := &waylandWindow{
+		disp:      disp,
+		surfaceID: 101,
+		handler: func(ev Event) {
+			if ev.Type == EventWakeUp {
+				w1Wakes++
+			}
+		},
+	}
+	w2 := &waylandWindow{
+		disp:      disp,
+		surfaceID: 102,
+		handler: func(ev Event) {
+			if ev.Type == EventWakeUp {
+				w2Wakes++
+			}
+		},
+	}
+	disp.windows[w1.surfaceID] = w1
+	disp.windows[w2.surfaceID] = w2
+
+	w2.WakeUp()
+	disp.flushWakeUps()
+
+	if w1Wakes != 0 || w2Wakes != 1 {
+		t.Fatalf("ожидалось w1Wakes=0, w2Wakes=1; получено w1=%d, w2=%d", w1Wakes, w2Wakes)
+	}
+}
+
+func TestWaylandPresentRectOptimizationAndCSDCache(t *testing.T) {
+	conn, serverFD := newTestWaylandPair(t)
+	disp := &wlDisplay{
+		conn:          conn,
+		shmID:         5,
+		compositorVer: 4,
+		windows:       make(map[uint32]*waylandWindow),
+	}
+	w := &waylandWindow{
+		disp:       disp,
+		surfaceID:  30,
+		width:      4,
+		height:     4,
+		scale:      1.0,
+		csdEnabled: true,
+		csdTitle:   "Title 1",
+	}
+	w.configured.Store(true)
+
+	// 1. Проверяем кэш CSD-шапки: повторный вызов с теми же параметрами не меняет поколение.
+	barH := w.csdHeightPx()
+	_, gen1 := w.ensureCSDCache(64, barH)
+	_, gen2 := w.ensureCSDCache(64, barH)
+	if gen1 == 0 || gen1 != gen2 {
+		t.Fatalf("кэш CSD перерисовался без изменений: gen1=%d gen2=%d", gen1, gen2)
+	}
+	w.mu.Lock()
+	w.csdTitle = "Title 2"
+	w.mu.Unlock()
+	_, gen3 := w.ensureCSDCache(64, barH)
+	if gen3 <= gen2 {
+		t.Fatalf("кэш CSD не обновился при смене заголовка: gen2=%d gen3=%d", gen2, gen3)
+	}
+
+	// 2. Проверяем PresentRect без CSD: формат XRGB8888, partial copy для двойного буфера и единичный frame callback.
+	w.mu.Lock()
+	w.csdEnabled = false
+	w.mu.Unlock()
+
+	pix := make([]byte, 4*4*4)
+	for i := range pix {
+		pix[i] = 0x11
+	}
+	// Кадр 1 -> buffers[0] (fullSync)
+	w.PresentRect(pix, 4, 4, 0, 0, 4, 4)
+
+	msgs1 := readAllServerWLMsgs(t, serverFD)
+	var sawXRGB bool
+	var frameCount1 int
+	for _, m := range msgs1 {
+		if m.opcode == wlShmPoolCreateBuffer && len(m.payload) == 24 {
+			format := binary.LittleEndian.Uint32(m.payload[20:24])
+			if format == wlShmFormatXRGB88 {
+				sawXRGB = true
+			}
+		}
+		if m.objID == w.surfaceID && m.opcode == wlSurfaceFrame {
+			frameCount1++
+		}
+	}
+	if !sawXRGB {
+		t.Fatal("ожидался формат wlShmFormatXRGB88 при создании shm-буфера")
+	}
+	if frameCount1 != 1 {
+		t.Fatalf("ожидался 1 wl_surface.frame callback, получено %d", frameCount1)
+	}
+
+	// Кадр 2 (пока framePending == true): меняем только пиксель (1, 1) -> buffers[1] (fullSync).
+	pix[(1*4+1)*4] = 0xAA
+	w.PresentRect(pix, 4, 4, 1, 1, 1, 1)
+
+	msgs2 := readAllServerWLMsgs(t, serverFD)
+	for _, m := range msgs2 {
+		if m.objID == w.surfaceID && m.opcode == wlSurfaceFrame {
+			t.Fatal("не должен создаваться повторный wl_surface.frame callback, пока framePending == true")
+		}
+	}
+
+	// Освобождаем buffers[0], меняем пиксель (2, 2) и делаем кадр 3 -> buffers[0].
+	// Благодаря pendingDirty в buffers[0] должны попасть и (1, 1)=0xAA из кадра 2, и (2, 2)=0xBB из кадра 3.
+	w.buffers[0].busy.Store(false)
+	pix[(2*4+2)*4] = 0xBB
+	w.PresentRect(pix, 4, 4, 2, 2, 1, 1)
+
+	if w.buffers[0].data[(1*4+1)*4] != 0xAA || w.buffers[0].data[(2*4+2)*4] != 0xBB {
+		t.Fatalf("partial copy не синхронизировал prevDirty: (1,1)=0x%X (2,2)=0x%X",
+			w.buffers[0].data[(1*4+1)*4], w.buffers[0].data[(2*4+2)*4])
+	}
+}
+
+
 

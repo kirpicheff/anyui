@@ -275,23 +275,27 @@ func (w *x11Window) handleKeyPress(e xproto.KeyPressEvent) {
 		vk = x11KeysymToVK(sym)
 	}
 
+	var ch rune
+	if !mods.Ctrl && !mods.Alt {
+		ch = x11KeysymToRune(sym)
+	}
+
 	if vk != 0 {
 		w.handler(Event{
 			Type:     EventKeyDown,
 			KeyCode:  vk,
 			ScanCode: uint16(e.Detail),
+			Char:     ch,
 			Mods:     mods,
 		})
 	}
 
-	if !mods.Ctrl && !mods.Alt {
-		if ch := x11KeysymToRune(sym); ch != 0 {
-			w.handler(Event{
-				Type: EventChar,
-				Char: ch,
-				Mods: mods,
-			})
-		}
+	if ch != 0 {
+		w.handler(Event{
+			Type: EventChar,
+			Char: ch,
+			Mods: mods,
+		})
 	}
 }
 
