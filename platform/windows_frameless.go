@@ -104,7 +104,14 @@ func hitTestResultToWin32(r HitTestResult) uintptr {
 }
 
 func (w *win32Window) enableFramelessShadow() {
-	if err := procDwmExtendFrame.Find(); err != nil || w.hwnd == 0 {
+	if w.hwnd == 0 {
+		return
+	}
+	// WM_NCCALCSIZE при создании окна приходит до регистрации в windowMap и обрабатывается системой
+	// по умолчанию (со стандартным заголовком); принудительный пересчёт рамки применяет безрамочный режим
+	procSetWindowPos.Call(uintptr(w.hwnd), 0, 0, 0, 0, 0,
+		swpNoMove|swpNoSize|swpNoZOrder|swpFrameChanged)
+	if err := procDwmExtendFrame.Find(); err != nil {
 		return
 	}
 	// Расширение рамки на 1 пиксель включает тень DWM вокруг безрамочного окна
