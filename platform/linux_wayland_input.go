@@ -486,12 +486,15 @@ func (s *wlSeatState) handleKeyboardEvent(ev wlEvent) {
 		}
 
 		vk, ch := translateEvdevKey(key, mods, caps, group, km)
+		// Приводим evdev keycode к X11/XKB keycode (+8), чтобы ScanCode на Linux
+		// совпадал между бэкендами Wayland и X11.
+		scanCode := uint16(key + 8)
 		if state == 1 || state == 2 {
 			if vk != 0 {
 				win.emit(Event{
 					Type:     EventKeyDown,
 					KeyCode:  vk,
-					ScanCode: uint16(key),
+					ScanCode: scanCode,
 					Mods:     mods,
 				})
 			}
@@ -511,7 +514,7 @@ func (s *wlSeatState) handleKeyboardEvent(ev wlEvent) {
 				win.emit(Event{
 					Type:     EventKeyUp,
 					KeyCode:  vk,
-					ScanCode: uint16(key),
+					ScanCode: scanCode,
 					Mods:     mods,
 				})
 			}
@@ -602,7 +605,7 @@ func (s *wlSeatState) startRepeat(surfID uint32, key uint32) {
 					win.emit(Event{
 						Type:     EventKeyDown,
 						KeyCode:  vk,
-						ScanCode: uint16(key),
+						ScanCode: uint16(key + 8),
 						Mods:     mods,
 					})
 				}
@@ -1077,7 +1080,8 @@ func (w *waylandWindow) logicalToPhys(lx, ly float64) (int, int) {
 }
 
 func (w *waylandWindow) tryFramelessMoveResize(px, py int, seatID, serial uint32) bool {
-	if !w.cfg.Frameless || w.toplevelID == 0 || seatID == 0 {
+	topID := w.currentToplevelID()
+	if !w.cfg.Frameless || topID == 0 || seatID == 0 {
 		return false
 	}
 	w.mu.Lock()
@@ -1098,7 +1102,7 @@ func (w *waylandWindow) tryFramelessMoveResize(px, py int, seatID, serial uint32
 		var wr wlWriter
 		wr.uint32(seatID)
 		wr.uint32(serial)
-		_ = w.disp.conn.send(w.toplevelID, xdgToplevelMove, wr.bytes())
+		_ = w.disp.conn.send(topID, xdgToplevelMove, wr.bytes())
 		return true
 	}
 
@@ -1107,7 +1111,7 @@ func (w *waylandWindow) tryFramelessMoveResize(px, py int, seatID, serial uint32
 		wr.uint32(seatID)
 		wr.uint32(serial)
 		wr.uint32(edge)
-		_ = w.disp.conn.send(w.toplevelID, xdgToplevelResize, wr.bytes())
+		_ = w.disp.conn.send(topID, xdgToplevelResize, wr.bytes())
 		return true
 	}
 	return false

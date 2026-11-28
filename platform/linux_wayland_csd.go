@@ -145,11 +145,13 @@ func (w *waylandWindow) handleCSDMouseDown(px, py int, btn MouseButton, seatID, 
 	if btn == MouseLeft {
 		edge := w.csdEdgeHit(px, py, totalW, totalH)
 		if edgeCode := hitTestToXDGRegionEdge(edge); edgeCode != 0 && seatID != 0 {
-			var wr wlWriter
-			wr.uint32(seatID)
-			wr.uint32(serial)
-			wr.uint32(edgeCode)
-			_ = w.disp.conn.send(w.toplevelID, xdgToplevelResize, wr.bytes())
+			if topID := w.currentToplevelID(); topID != 0 {
+				var wr wlWriter
+				wr.uint32(seatID)
+				wr.uint32(serial)
+				wr.uint32(edgeCode)
+				_ = w.disp.conn.send(topID, xdgToplevelResize, wr.bytes())
+			}
 			return true
 		}
 	}
@@ -191,11 +193,11 @@ func (w *waylandWindow) handleCSDMouseDown(px, py int, btn MouseButton, seatID, 
 		return true
 	}
 
-	if seatID != 0 && w.toplevelID != 0 {
+	if topID := w.currentToplevelID(); seatID != 0 && topID != 0 {
 		var wr wlWriter
 		wr.uint32(seatID)
 		wr.uint32(serial)
-		_ = w.disp.conn.send(w.toplevelID, xdgToplevelMove, wr.bytes())
+		_ = w.disp.conn.send(topID, xdgToplevelMove, wr.bytes())
 	}
 	return true
 }

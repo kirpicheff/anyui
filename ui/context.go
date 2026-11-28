@@ -44,7 +44,7 @@ type KeyPress struct {
 type RawKeyEvent struct {
 	Pressed  bool               // true — KeyDown, false — KeyUp
 	KeyCode  uint32             // Виртуальный код клавиши (VK_* на Windows)
-	ScanCode uint16             // Аппаратный скан-код клавиши
+	ScanCode uint16             // Аппаратный скан-код клавиши (на Linux — X11/XKB keycode: evdev + 8 и для X11, и для Wayland)
 	Extended bool               // Признак расширенной клавиши (bit 24 lParam на Windows)
 	Mods     platform.Modifiers // Состояние модификаторов
 }

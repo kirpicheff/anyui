@@ -97,22 +97,34 @@ const (
 	wpViewporterGetViewport uint16 = 1
 	wpViewportDestroy       uint16 = 0
 	wpViewportSetDest       uint16 = 2
+
+	// xdg_activation_v1 / xdg_activation_token_v1
+	xdgActivationDestroy        uint16 = 0
+	xdgActivationGetToken       uint16 = 1
+	xdgActivationActivate       uint16 = 2
+	xdgActivationTokenSetSerial uint16 = 0
+	xdgActivationTokenSetAppID  uint16 = 1
+	xdgActivationTokenSetSurf   uint16 = 2
+	xdgActivationTokenCommit    uint16 = 3
+	xdgActivationTokenDestroy   uint16 = 4
+	xdgActivationTokenEventDone uint16 = 0
 )
 
 type wlDisplay struct {
 	conn       *wlConn
 	registryID uint32
 
-	compositorID  uint32
-	compositorVer uint32
-	shmID         uint32
-	xdgWmBaseID   uint32
-	seatID        uint32
-	decorMgrID    uint32
-	fracScaleID   uint32
-	viewporterID  uint32
+	compositorID     uint32
+	compositorVer    uint32
+	shmID            uint32
+	xdgWmBaseID      uint32
+	seatID           uint32
+	decorMgrID       uint32
+	fracScaleID      uint32
+	viewporterID     uint32
 	cursorShapeMgrID uint32
-	dataDevMgrID  uint32
+	dataDevMgrID     uint32
+	activationID     uint32
 
 	seat        *wlSeatState
 	dataDev     *wlDataDeviceState
@@ -215,6 +227,9 @@ func getWaylandDisplay() (*wlDisplay, error) {
 		}
 		if conn.hasGlobal("wl_data_device_manager") {
 			d.dataDevMgrID, _, _ = conn.bindGlobal(regID, "wl_data_device_manager", 3, nil)
+		}
+		if conn.hasGlobal("xdg_activation_v1") {
+			d.activationID, _, _ = conn.bindGlobal(regID, "xdg_activation_v1", 1, nil)
 		}
 		if conn.hasGlobal("wl_seat") {
 			if seatID, _, bindErr := conn.bindGlobal(regID, "wl_seat", 8, nil); bindErr == nil {
@@ -510,10 +525,13 @@ type waylandWindow struct {
 	csdTitle     string
 	csdLastClick time.Time
 
-	framePending atomic.Bool
-	configured   atomic.Bool
-	needsPaint   atomic.Bool
-	closed       atomic.Bool
+	framePending      atomic.Bool
+	configured        atomic.Bool
+	needsPaint        atomic.Bool
+	closed            atomic.Bool
+	hidden            atomic.Bool
+	pendingActivate   atomic.Bool
+	activationPending atomic.Bool
 }
 
 func newWaylandWindow(cfg WindowConfig) (Window, error) {
@@ -593,67 +611,9 @@ func newWaylandWindow(cfg WindowConfig) (Window, error) {
 		_ = d.conn.send(w.surfaceID, wlSurfaceSetBufferScale, sw.bytes())
 	}
 
-	w.xdgSurfaceID = d.conn.allocID(w.handleXDGSurfaceEvent)
-	var xw wlWriter
-	xw.uint32(w.xdgSurfaceID)
-	xw.uint32(w.surfaceID)
-	if err := d.conn.send(d.xdgWmBaseID, xdgWmBaseGetXdgSurface, xw.bytes()); err != nil {
+	if err := w.createRoleObjects(); err != nil {
 		w.destroyObjects()
 		return nil, err
-	}
-
-	w.toplevelID = d.conn.allocID(w.handleToplevelEvent)
-	var tw wlWriter
-	tw.uint32(w.toplevelID)
-	if err := d.conn.send(w.xdgSurfaceID, xdgSurfaceGetToplevel, tw.bytes()); err != nil {
-		w.destroyObjects()
-		return nil, err
-	}
-
-	if cfg.Title != "" {
-		w.SetTitle(cfg.Title)
-	}
-	var aw wlWriter
-	aw.string("anyui")
-	_ = d.conn.send(w.toplevelID, xdgToplevelSetAppID, aw.bytes())
-
-	if cfg.MinWidth > 0 || cfg.MinHeight > 0 {
-		var mw wlWriter
-		mw.int32(int32(cfg.MinWidth))
-		mw.int32(int32(cfg.MinHeight))
-		_ = d.conn.send(w.toplevelID, xdgToplevelSetMinSize, mw.bytes())
-	}
-
-	if parent, ok := cfg.Parent.(*waylandWindow); ok && parent != nil && parent.toplevelID != 0 {
-		var pw wlWriter
-		pw.uint32(parent.toplevelID)
-		_ = d.conn.send(w.toplevelID, xdgToplevelSetParent, pw.bytes())
-	}
-
-	if d.decorMgrID != 0 {
-		w.decorID = d.conn.allocID(func(ev wlEvent) {
-			if ev.Opcode == 0 && !cfg.Frameless {
-				r := wlReader{data: ev.Payload}
-				if mode, ok := r.uint32(); ok && mode == zxdgDecModeClientSide {
-					w.mu.Lock()
-					w.csdEnabled = true
-					w.mu.Unlock()
-					w.needsPaint.Store(true)
-				}
-			}
-		})
-		var dw wlWriter
-		dw.uint32(w.decorID)
-		dw.uint32(w.toplevelID)
-		_ = d.conn.send(d.decorMgrID, zxdgDecMgrGetToplevelDec, dw.bytes())
-
-		mode := zxdgDecModeServerSide
-		if cfg.Frameless {
-			mode = zxdgDecModeClientSide
-		}
-		var sm wlWriter
-		sm.uint32(mode)
-		_ = d.conn.send(w.decorID, zxdgToplevelDecSetMode, sm.bytes())
 	}
 
 	if cfg.InitialState != nil && cfg.InitialState.Maximized {
@@ -665,6 +625,147 @@ func newWaylandWindow(cfg WindowConfig) (Window, error) {
 	_ = d.conn.roundtrip()
 
 	return w, nil
+}
+
+// currentXDGSurfaceID возвращает текущий идентификатор xdg_surface под блокировкой.
+func (w *waylandWindow) currentXDGSurfaceID() uint32 {
+	w.mu.Lock()
+	id := w.xdgSurfaceID
+	w.mu.Unlock()
+	return id
+}
+
+// currentToplevelID возвращает текущий идентификатор xdg_toplevel под блокировкой.
+func (w *waylandWindow) currentToplevelID() uint32 {
+	w.mu.Lock()
+	id := w.toplevelID
+	w.mu.Unlock()
+	return id
+}
+
+// createRoleObjects создаёт xdg_surface, xdg_toplevel и декорацию для существующего wl_surface.
+// Используется при первичном создании окна и при перемапливании после Hide().
+func (w *waylandWindow) createRoleObjects() error {
+	d := w.disp
+
+	w.mu.Lock()
+	title := w.csdTitle
+	wasMax := w.maximized
+	wasFS := w.fullscreen
+	w.mu.Unlock()
+
+	xdgSurfID := d.conn.allocID(w.handleXDGSurfaceEvent)
+	var xw wlWriter
+	xw.uint32(xdgSurfID)
+	xw.uint32(w.surfaceID)
+	if err := d.conn.send(d.xdgWmBaseID, xdgWmBaseGetXdgSurface, xw.bytes()); err != nil {
+		d.conn.removeHandler(xdgSurfID)
+		return err
+	}
+
+	topID := d.conn.allocID(w.handleToplevelEvent)
+	var tw wlWriter
+	tw.uint32(topID)
+	if err := d.conn.send(xdgSurfID, xdgSurfaceGetToplevel, tw.bytes()); err != nil {
+		d.conn.removeHandler(topID)
+		_ = d.conn.send(xdgSurfID, xdgSurfaceDestroy, nil)
+		d.conn.removeHandler(xdgSurfID)
+		return err
+	}
+
+	w.mu.Lock()
+	w.xdgSurfaceID = xdgSurfID
+	w.toplevelID = topID
+	w.mu.Unlock()
+
+	if title != "" {
+		var titleW wlWriter
+		titleW.string(title)
+		_ = d.conn.send(topID, xdgToplevelSetTitle, titleW.bytes())
+	}
+	var aw wlWriter
+	aw.string("anyui")
+	_ = d.conn.send(topID, xdgToplevelSetAppID, aw.bytes())
+
+	if w.cfg.MinWidth > 0 || w.cfg.MinHeight > 0 {
+		var mw wlWriter
+		mw.int32(int32(w.cfg.MinWidth))
+		mw.int32(int32(w.cfg.MinHeight))
+		_ = d.conn.send(topID, xdgToplevelSetMinSize, mw.bytes())
+	}
+
+	if parent, ok := w.cfg.Parent.(*waylandWindow); ok && parent != nil {
+		if parentTopID := parent.currentToplevelID(); parentTopID != 0 {
+			var pw wlWriter
+			pw.uint32(parentTopID)
+			_ = d.conn.send(topID, xdgToplevelSetParent, pw.bytes())
+		}
+	}
+
+	if d.decorMgrID != 0 {
+		decorID := d.conn.allocID(func(ev wlEvent) {
+			if ev.Opcode == 0 && !w.cfg.Frameless {
+				r := wlReader{data: ev.Payload}
+				if mode, ok := r.uint32(); ok && mode == zxdgDecModeClientSide {
+					w.mu.Lock()
+					w.csdEnabled = true
+					w.mu.Unlock()
+					w.needsPaint.Store(true)
+				}
+			}
+		})
+		w.mu.Lock()
+		w.decorID = decorID
+		w.mu.Unlock()
+
+		var dw wlWriter
+		dw.uint32(decorID)
+		dw.uint32(topID)
+		_ = d.conn.send(d.decorMgrID, zxdgDecMgrGetToplevelDec, dw.bytes())
+
+		mode := zxdgDecModeServerSide
+		if w.cfg.Frameless {
+			mode = zxdgDecModeClientSide
+		}
+		var sm wlWriter
+		sm.uint32(mode)
+		_ = d.conn.send(decorID, zxdgToplevelDecSetMode, sm.bytes())
+	}
+
+	if wasFS {
+		var fw wlWriter
+		fw.uint32(0)
+		_ = d.conn.send(topID, xdgToplevelSetFullscreen, fw.bytes())
+	} else if wasMax {
+		_ = d.conn.send(topID, xdgToplevelSetMaximized, nil)
+	}
+
+	return nil
+}
+
+// destroyRoleObjects уничтожает декорацию, xdg_toplevel и xdg_surface, сохраняя wl_surface.
+func (w *waylandWindow) destroyRoleObjects() {
+	w.mu.Lock()
+	decorID := w.decorID
+	topID := w.toplevelID
+	xdgSurfID := w.xdgSurfaceID
+	w.decorID = 0
+	w.toplevelID = 0
+	w.xdgSurfaceID = 0
+	w.mu.Unlock()
+
+	if decorID != 0 {
+		_ = w.disp.conn.send(decorID, zxdgToplevelDecDestroy, nil)
+		w.disp.conn.removeHandler(decorID)
+	}
+	if topID != 0 {
+		_ = w.disp.conn.send(topID, xdgToplevelDestroy, nil)
+		w.disp.conn.removeHandler(topID)
+	}
+	if xdgSurfID != 0 {
+		_ = w.disp.conn.send(xdgSurfID, xdgSurfaceDestroy, nil)
+		w.disp.conn.removeHandler(xdgSurfID)
+	}
 }
 
 func (w *waylandWindow) handleSurfaceEvent(ev wlEvent) {
@@ -723,6 +824,10 @@ func (w *waylandWindow) handleXDGSurfaceEvent(ev wlEvent) {
 	if ev.Opcode != xdgSurfaceEventConfigure {
 		return
 	}
+	xdgSurfID := w.currentXDGSurfaceID()
+	if xdgSurfID == 0 || ev.ObjectID != xdgSurfID {
+		return
+	}
 	r := wlReader{data: ev.Payload}
 	serial, ok := r.uint32()
 	if !ok {
@@ -731,7 +836,7 @@ func (w *waylandWindow) handleXDGSurfaceEvent(ev wlEvent) {
 
 	var aw wlWriter
 	aw.uint32(serial)
-	_ = w.disp.conn.send(w.xdgSurfaceID, xdgSurfaceAckConfigure, aw.bytes())
+	_ = w.disp.conn.send(xdgSurfID, xdgSurfaceAckConfigure, aw.bytes())
 
 	w.mu.Lock()
 	pw, ph := w.pendingW, w.pendingH
@@ -770,7 +875,7 @@ func (w *waylandWindow) handleXDGSurfaceEvent(ev wlEvent) {
 	gw.int32(0)
 	gw.int32(int32(logW))
 	gw.int32(int32(logH))
-	_ = w.disp.conn.send(w.xdgSurfaceID, xdgSurfaceSetWindowGeom, gw.bytes())
+	_ = w.disp.conn.send(xdgSurfID, xdgSurfaceSetWindowGeom, gw.bytes())
 
 	first := !w.configured.Swap(true)
 	if (resized || first) && w.handler != nil {
@@ -781,6 +886,10 @@ func (w *waylandWindow) handleXDGSurfaceEvent(ev wlEvent) {
 }
 
 func (w *waylandWindow) handleToplevelEvent(ev wlEvent) {
+	topID := w.currentToplevelID()
+	if topID == 0 || ev.ObjectID != topID {
+		return
+	}
 	switch ev.Opcode {
 	case xdgToplevelEventConfigure:
 		r := wlReader{data: ev.Payload}
@@ -930,6 +1039,9 @@ func (w *waylandWindow) PresentRect(pixels []byte, width, height, rx, ry, rw, rh
 	}
 
 	_ = w.disp.conn.send(w.surfaceID, wlSurfaceCommit, nil)
+	if w.pendingActivate.Swap(false) {
+		w.activate()
+	}
 }
 
 func (w *waylandWindow) Invalidate() {
@@ -948,24 +1060,113 @@ func (w *waylandWindow) WakeUp() {
 	w.disp.conn.wakeUp()
 }
 
+// activate запрашивает у композитора активацию и вывод окна на передний план
+// через протокол xdg_activation_v1 (get_activation_token -> commit -> done -> activate).
+// Метод асинхронен и безопасен для вызова из любой горутины (например, из обработчика трея).
+func (w *waylandWindow) activate() {
+	if w.closed.Load() || w.hidden.Load() || w.disp == nil || w.disp.activationID == 0 || w.surfaceID == 0 {
+		return
+	}
+	if w.activationPending.Swap(true) {
+		return
+	}
+
+	surfID := w.surfaceID
+	actID := w.disp.activationID
+	var tokenID uint32
+	tokenID = w.disp.conn.allocID(func(ev wlEvent) {
+		if ev.Opcode != xdgActivationTokenEventDone {
+			return
+		}
+		r := wlReader{data: ev.Payload}
+		token, ok := r.string()
+
+		w.activationPending.Store(false)
+		_ = w.disp.conn.send(tokenID, xdgActivationTokenDestroy, nil)
+		w.disp.conn.removeHandler(tokenID)
+
+		if !ok || token == "" || w.closed.Load() || w.hidden.Load() {
+			return
+		}
+		var aw wlWriter
+		aw.string(token)
+		aw.uint32(surfID)
+		_ = w.disp.conn.send(actID, xdgActivationActivate, aw.bytes())
+	})
+
+	var tw wlWriter
+	tw.uint32(tokenID)
+	if err := w.disp.conn.send(actID, xdgActivationGetToken, tw.bytes()); err != nil {
+		w.activationPending.Store(false)
+		w.disp.conn.removeHandler(tokenID)
+		return
+	}
+
+	var appW wlWriter
+	appW.string("anyui")
+	_ = w.disp.conn.send(tokenID, xdgActivationTokenSetAppID, appW.bytes())
+
+	if err := w.disp.conn.send(tokenID, xdgActivationTokenCommit, nil); err != nil {
+		w.activationPending.Store(false)
+		_ = w.disp.conn.send(tokenID, xdgActivationTokenDestroy, nil)
+		w.disp.conn.removeHandler(tokenID)
+		return
+	}
+}
+
 func (w *waylandWindow) Show() {
 	if w.closed.Load() {
 		return
 	}
-	_ = w.disp.conn.send(w.surfaceID, wlSurfaceCommit, nil)
+	if w.hidden.Swap(false) {
+		if err := w.createRoleObjects(); err != nil {
+			w.hidden.Store(true)
+			return
+		}
+		w.pendingActivate.Store(true)
+		_ = w.disp.conn.send(w.surfaceID, wlSurfaceCommit, nil)
+		w.WakeUp()
+		return
+	}
+	if w.configured.Load() {
+		w.activate()
+	} else {
+		w.pendingActivate.Store(true)
+	}
 	w.Invalidate()
 }
 
 func (w *waylandWindow) Hide() {
-	if w.closed.Load() {
+	if w.closed.Load() || w.hidden.Swap(true) {
 		return
 	}
+	w.configured.Store(false)
+	w.framePending.Store(false)
+	w.pendingActivate.Store(false)
+
 	var aw wlWriter
 	aw.uint32(0)
 	aw.int32(0)
 	aw.int32(0)
 	_ = w.disp.conn.send(w.surfaceID, wlSurfaceAttach, aw.bytes())
 	_ = w.disp.conn.send(w.surfaceID, wlSurfaceCommit, nil)
+	w.destroyRoleObjects()
+}
+
+func (w *waylandWindow) BringToFront() {
+	if w.closed.Load() {
+		return
+	}
+	if w.hidden.Load() {
+		w.Show()
+		return
+	}
+	if w.configured.Load() {
+		w.activate()
+	} else {
+		w.pendingActivate.Store(true)
+	}
+	w.Invalidate()
 }
 
 func (w *waylandWindow) Close() {
@@ -999,21 +1200,7 @@ func (w *waylandWindow) destroyObjects() {
 	}
 	w.mu.Unlock()
 
-	if w.decorID != 0 {
-		_ = w.disp.conn.send(w.decorID, zxdgToplevelDecDestroy, nil)
-		w.disp.conn.removeHandler(w.decorID)
-		w.decorID = 0
-	}
-	if w.toplevelID != 0 {
-		_ = w.disp.conn.send(w.toplevelID, xdgToplevelDestroy, nil)
-		w.disp.conn.removeHandler(w.toplevelID)
-		w.toplevelID = 0
-	}
-	if w.xdgSurfaceID != 0 {
-		_ = w.disp.conn.send(w.xdgSurfaceID, xdgSurfaceDestroy, nil)
-		w.disp.conn.removeHandler(w.xdgSurfaceID)
-		w.xdgSurfaceID = 0
-	}
+	w.destroyRoleObjects()
 	if w.fracScaleID != 0 {
 		_ = w.disp.conn.send(w.fracScaleID, wpFracScaleDestroy, nil)
 		w.disp.conn.removeHandler(w.fracScaleID)
@@ -1039,12 +1226,13 @@ func (w *waylandWindow) SetTitle(title string) {
 	if csd {
 		w.needsPaint.Store(true)
 	}
-	if w.toplevelID == 0 {
+	topID := w.currentToplevelID()
+	if topID == 0 {
 		return
 	}
 	var tw wlWriter
 	tw.string(title)
-	_ = w.disp.conn.send(w.toplevelID, xdgToplevelSetTitle, tw.bytes())
+	_ = w.disp.conn.send(topID, xdgToplevelSetTitle, tw.bytes())
 }
 
 func (w *waylandWindow) SetCursor(cursor CursorType) {
@@ -1081,26 +1269,36 @@ func (w *waylandWindow) Scale() float32 {
 }
 
 func (w *waylandWindow) Minimize() {
-	if w.toplevelID != 0 {
-		_ = w.disp.conn.send(w.toplevelID, xdgToplevelSetMinimized, nil)
+	if topID := w.currentToplevelID(); topID != 0 {
+		_ = w.disp.conn.send(topID, xdgToplevelSetMinimized, nil)
 	}
 }
 
 func (w *waylandWindow) Maximize() {
-	if w.toplevelID != 0 {
-		_ = w.disp.conn.send(w.toplevelID, xdgToplevelSetMaximized, nil)
+	if topID := w.currentToplevelID(); topID != 0 {
+		_ = w.disp.conn.send(topID, xdgToplevelSetMaximized, nil)
 	}
 }
 
 func (w *waylandWindow) Restore() {
-	if w.toplevelID == 0 {
+	if w.closed.Load() {
 		return
 	}
-	if w.IsFullscreen() {
-		_ = w.disp.conn.send(w.toplevelID, xdgToplevelUnsetFull, nil)
+	if w.hidden.Load() {
+		w.Show()
 	}
-	if w.IsMaximized() {
-		_ = w.disp.conn.send(w.toplevelID, xdgToplevelUnsetMaximized, nil)
+	if topID := w.currentToplevelID(); topID != 0 {
+		if w.IsFullscreen() {
+			_ = w.disp.conn.send(topID, xdgToplevelUnsetFull, nil)
+		}
+		if w.IsMaximized() {
+			_ = w.disp.conn.send(topID, xdgToplevelUnsetMaximized, nil)
+		}
+	}
+	if w.configured.Load() {
+		w.activate()
+	} else {
+		w.pendingActivate.Store(true)
 	}
 }
 
@@ -1115,15 +1313,16 @@ func (w *waylandWindow) IsMinimized() bool {
 }
 
 func (w *waylandWindow) SetFullscreen(fullscreen bool) {
-	if w.toplevelID == 0 {
+	topID := w.currentToplevelID()
+	if topID == 0 {
 		return
 	}
 	if fullscreen {
 		var fw wlWriter
 		fw.uint32(0)
-		_ = w.disp.conn.send(w.toplevelID, xdgToplevelSetFullscreen, fw.bytes())
+		_ = w.disp.conn.send(topID, xdgToplevelSetFullscreen, fw.bytes())
 	} else {
-		_ = w.disp.conn.send(w.toplevelID, xdgToplevelUnsetFull, nil)
+		_ = w.disp.conn.send(topID, xdgToplevelUnsetFull, nil)
 	}
 }
 

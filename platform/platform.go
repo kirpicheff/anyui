@@ -101,7 +101,7 @@ type Event struct {
 	WheelX   float32     // Для EventMouseWheel (положительное — вправо)
 	WheelY   float32     // Для EventMouseWheel (положительное — вверх)
 	KeyCode  uint32      // Виртуальный код клавиши (VK_* на Windows)
-	ScanCode uint16      // Аппаратный скан-код клавиши
+	ScanCode uint16      // Аппаратный скан-код клавиши (на Linux — X11/XKB keycode: evdev + 8 и для X11, и для Wayland)
 	Extended bool        // Признак расширенной клавиши (bit 24 lParam на Windows)
 	Char      rune       // Для EventChar (введённый символ Unicode)
 	Mods      Modifiers
